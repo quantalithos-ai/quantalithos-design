@@ -1,4 +1,4 @@
-# Quarkon AI — 项目愿景
+# Quantalithos AI — 项目愿景
 
 ## 一句话定位
 
@@ -8,7 +8,7 @@
 
 当前 AI 编程助手（Cursor、Copilot、Claude Code）都是单 Agent 模式：一个人对一个 AI，做一件事。但真实的软件开发是多角色协作：产品、开发、测试、运维各司其职，按流程推进。
 
-Quarkon AI 要做的是把这种多角色协作搬到 AI 上——用户不再亲自写每一行代码，而是像管理一个开发团队一样，发布需求、审批方案、确认发布，AI 团队负责执行。
+Quantalithos AI 要做的是把这种多角色协作搬到 AI 上——用户不再亲自写每一行代码，而是像管理一个开发团队一样，发布需求、审批方案、确认发布，AI 团队负责执行。
 
 ## 核心体验
 
@@ -20,7 +20,7 @@ Quarkon AI 要做的是把这种多角色协作搬到 AI 上——用户不再�
 
 ## 与同类产品的区别
 
-| 维度 | Cursor / Copilot | OpenClaw / Superpowers | Quarkon AI |
+| 维度 | Cursor / Copilot | OpenClaw / Superpowers | Quantalithos AI |
 |------|-------------------|------------------------|------------|
 | Agent 数量 | 单 Agent | 多 Agent（CLI） | 多 Agent（可视化） |
 | 交互方式 | IDE 内嵌 | 终端命令行 | 聊天群组 |
@@ -32,20 +32,20 @@ Quarkon AI 要做的是把这种多角色协作搬到 AI 上——用户不再�
 
 六个子项目构成完整平台：
 
-- **quarkon-runtime**：Agent 运行时，负责 Agent 生命周期、LLM 调用、工具系统、记忆
-- **quarkon-flow**：流程编排引擎，负责阶段状态机、工作流模板、门禁、任务调度
-- **quarkon-chat**：聊天前端，用户与 AI 团队的交互界面
-- **quarkon-vault**：产物管理，PRD、代码、测试报告等全生命周期管理
-- **quarkon-gate**：API 网关，认证、路由、权限
-- **quarkon-infra**：基础设施，部署、监控、CI/CD
+- **quantalithos-runtime**：Agent 运行时，负责 Agent 生命周期、LLM 调用、工具系统、记忆
+- **quantalithos-flow**：流程编排引擎，负责阶段状态机、工作流模板、门禁、任务调度
+- **quantalithos-chat**：聊天前端，用户与 AI 团队的交互界面
+- **quantalithos-vault**：产物管理，PRD、代码、测试报告等全生命周期管理
+- **quantalithos-gate**：API 网关，认证、路由、权限
+- **quantalithos-infra**：基础设施，部署、监控、CI/CD
 
 核心协作模型：
 
 ```
-quarkon-flow（daemon）编排流程
-    → 下发任务卡给 quarkon-runtime 中的 Agent
+quantalithos-flow（daemon）编排流程
+    → 下发任务卡给 quantalithos-runtime 中的 Agent
     → Agent 执行当前 step，提交产物
-    → quarkon-flow 校验并推进到下一 step
+    → quantalithos-flow 校验并推进到下一 step
 ```
 
 ## 开发路线

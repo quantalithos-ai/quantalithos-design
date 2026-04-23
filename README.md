@@ -11,7 +11,7 @@ AI 驱动的软件研发协作平台。所有员工均为 AI Agent，用户以�
 | **quantalithos-runtime** | Agent 运行时 — Agent 生命周期、LLM 调用、工具系统、记忆、角色定义 |
 | **quantalithos-flow** | 流程编排引擎 — 阶段状态机、工作流模板、门禁控制、交接包、任务调度 |
 | **quantalithos-chat** | 聊天前端 — 私聊/群聊界面、频道管理、门禁确认、产物预览 |
-| **quantalithos-vault** | 产物管理服务 — PRD/方案/代码/测试报告的存储、版本控制、搜索 |
+| **quantalithos-platform** | 平台数据服务 — PRD/方案/代码/测试报告的存储、版本控制、搜索 |
 | **quantalithos-gate** | API 网关 — 认证授权、WebSocket、请求路由、权限控制 |
 | **quantalithos-sync** | 工作区同步工具 — 项目配置(manifest)驱动、多源拉取/推送、跨机器恢复 |
 | **quantalithos-infra** | 基础设施 — Docker/K8s、CI/CD、监控告警、数据库迁移 |
@@ -28,7 +28,7 @@ quantalithos-gate (API 网关)
       ├──────────────┬──────────────┐
       │              │              │
       ▼              ▼              ▼
-quantalithos-runtime  quantalithos-flow   quantalithos-vault
+quantalithos-runtime  quantalithos-flow   quantalithos-platform
 (Agent 运行时)   (流程引擎)     (产物服务)
       │              │              │
       └──────────────┴──────────────┘
@@ -65,7 +65,7 @@ quantalithos-ai/
     ├── quantalithos-runtime/     # 需求 / 设计 / 原型
     ├── quantalithos-flow/
     ├── quantalithos-chat/
-    ├── quantalithos-vault/
+    ├── quantalithos-platform/
     ├── quantalithos-gate/
     ├── quantalithos-sync/
     └── quantalithos-infra/

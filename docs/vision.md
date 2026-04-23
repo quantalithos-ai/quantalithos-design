@@ -35,7 +35,7 @@ Quantalithos AI 要做的是把这种多角色协作搬到 AI 上——用户不
 - **quantalithos-runtime**：Agent 运行时，负责 Agent 生命周期、LLM 调用、工具系统、记忆
 - **quantalithos-flow**：流程编排引擎，负责阶段状态机、工作流模板、门禁、任务调度
 - **quantalithos-chat**：聊天前端，用户与 AI 团队的交互界面
-- **quantalithos-vault**：产物管理，PRD、代码、测试报告等全生命周期管理
+- **quantalithos-platform**：产物管理，PRD、代码、测试报告等全生命周期管理
 - **quantalithos-gate**：API 网关，认证、路由、权限
 - **quantalithos-infra**：基础设施，部署、监控、CI/CD
 

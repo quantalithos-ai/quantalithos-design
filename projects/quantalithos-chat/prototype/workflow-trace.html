@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>任务流水线 · 多角色执行过程</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: #f5f5f5; padding: 40px; }
+.chat-area { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.section-label { font-size: 11px; color: #999; text-align: center; margin: 8px 0 -8px; }
+
+/* 卡片 */
+.card { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #eee; position: relative; transition: box-shadow 0.2s; }
+.card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+
+/* 头部 */
+.hd { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.hd .tag { font-size: 11px; font-weight: 600; color: #1976d2; background: #e3f2fd; padding: 1px 6px; border-radius: 4px; }
+.hd .title { font-size: 13px; font-weight: 500; color: #333; }
+.hd .badge { margin-left: auto; font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+.badge-run { background: #e3f2fd; color: #1565c0; }
+.badge-done { background: #e8f5e9; color: #2e7d32; }
+.badge-rej { background: #fce4ec; color: #c62828; }
+
+/* 进度条 */
+.progress { display: flex; align-items: center; margin-bottom: 8px; }
+.node { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+.dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; font-weight: 600; position: relative; z-index: 1; }
+.dot.done { background: #4caf50; }
+.dot.run { background: #1976d2; box-shadow: 0 0 0 3px rgba(25,118,210,0.2); animation: glow 1.8s ease-in-out infinite; }
+@keyframes glow { 0%,100% { box-shadow: 0 0 0 3px rgba(25,118,210,0.2); } 50% { box-shadow: 0 0 0 6px rgba(25,118,210,0.1); } }
+.dot.wait { background: #e0e0e0; color: #999; }
+.dot.fail { background: #ef5350; }
+.lbl { font-size: 9px; color: #888; margin-top: 3px; white-space: nowrap; }
+.actor { font-size: 8px; color: #bbb; }
+.dur { font-size: 8px; color: #aaa; }
+.line { flex: 0 0 40px; height: 2px; background: #e0e0e0; margin: 0 -6px; margin-bottom: 18px; }
+.line.done { background: #4caf50; }
+.line.active { background: #1976d2; }
+.line.rej { background: #ef5350; position: relative; }
+.line.rej::after { content: '←'; position: absolute; top: -8px; left: 50%; transform: translateX(-50%); color: #ef5350; font-size: 10px; }
+
+/* 底栏 */
+.ft { display: flex; gap: 10px; font-size: 10px; color: #aaa; flex-wrap: wrap; }
+.ft span { display: flex; align-items: center; gap: 2px; }
+
+/* hover 提示 */
+.hover-hint { font-size: 9px; color: #90caf9; margin-top: 6px; opacity: 0; transition: opacity 0.2s; }
+.card:hover .hover-hint { opacity: 1; }
+
+/* ===== Trace 面板 ===== */
+.trace { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 100; width: 600px; background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.15); overflow: hidden; }
+.card:hover .trace { display: block; }
+
+.trace-hd { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 6px; }
+.trace-hd .tag { font-size: 11px; font-weight: 600; color: #1976d2; }
+.trace-hd .title { font-size: 12px; font-weight: 500; }
+
+/* 角色块 */
+.role { border-bottom: 1px solid #f5f5f5; }
+.role:last-of-type { border-bottom: none; }
+.role-hd { display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 11px; font-weight: 500; }
+.role-hd .av { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #fff; font-weight: 600; }
+.role-hd .meta { margin-left: auto; font-size: 9px; color: #bbb; font-weight: 400; }
+.role-hd.be { background: #fff8f0; } .role-hd.be .av { background: #f57c00; }
+.role-hd.tl { background: #f0f9f0; } .role-hd.tl .av { background: #388e3c; }
+.role-hd.qa { background: #fdf0f0; } .role-hd.qa .av { background: #c62828; }
+
+/* 步骤列表 */
+.steps { padding: 4px 16px 8px 42px; }
+.step { display: flex; align-items: flex-start; gap: 6px; padding: 2px 0; font-size: 10.5px; line-height: 1.6; color: #555; position: relative; }
+.step::before { content: ''; position: absolute; left: -16px; top: 0; bottom: -4px; width: 1px; background: #e8e8e8; }
+.step:last-child::before { display: none; }
+.step .ic { flex-shrink: 0; width: 14px; text-align: center; font-size: 9px; margin-top: 2px; position: relative; z-index: 1; }
+.step .ic::after { content: ''; position: absolute; left: -10px; top: 5px; width: 7px; height: 7px; border-radius: 50%; }
+.step.ok .ic::after { background: #4caf50; }
+.step.err .ic::after { background: #ef5350; }
+.step.info .ic::after { background: #1976d2; }
+.step.ask .ic::after { background: #f57c00; }
+.step.bug .ic::after { background: #c62828; }
+.step code { background: #f5f5f5; padding: 0 3px; border-radius: 2px; font-size: 9.5px; font-family: 'SF Mono', Monaco, monospace; color: #333; }
+.step .tool { color: #1976d2; font-weight: 500; }
+.step .res { color: #388e3c; }
+.step .rej-text { color: #c62828; font-weight: 500; }
+.step .ask-text { color: #f57c00; }
+.step .reply-text { color: #7b1fa2; }
+.step .bug-text { color: #c62828; }
+
+/* 角色间连接 */
+.conn { text-align: center; padding: 2px 0; font-size: 10px; color: #ccc; }
+
+/* 汇总 */
+.trace-ft { padding: 8px 16px; background: #fafafa; border-top: 1px solid #f0f0f0; display: flex; gap: 10px; flex-wrap: wrap; font-size: 10px; color: #999; }
+.trace-ft span { display: flex; align-items: center; gap: 2px; }
+</style>
+</head>
+<body>
+
+<div class="chat-area">
+
+  <div class="section-label">群聊中的任务流水线卡片</div>
+
+  <!-- 卡片 1：执行中 -->
+  <div class="card">
+    <div class="hd">
+      <span class="tag">TASK-003</span>
+      <span class="title">文章标签系统</span>
+      <span class="badge badge-run">● 执行中</span>
+    </div>
+    <div class="progress">
+      <div class="node"><div class="dot run">⟳</div><div class="lbl">implement</div><div class="actor">后端开发-1</div><div class="dur">4/7 步</div></div>
+      <div class="line active"></div>
+      <div class="node"><div class="dot wait">2</div><div class="lbl">code_review</div><div class="actor">Tech Lead</div></div>
+      <div class="line"></div>
+      <div class="node"><div class="dot wait">3</div><div class="lbl">testing</div><div class="actor">测试-1</div></div>
+    </div>
+    <div class="ft"><span>⏱ 12.3s</span><span>🔧 5 次调用</span><span>💬 1 次提问</span></div>
+    <div class="hover-hint">hover 查看执行过程</div>
+  </div>
+
+  <!-- 卡片 2：审查打回 -->
+  <div class="card">
+    <div class="hd">
+      <span class="tag">TASK-003</span>
+      <span class="title">文章标签系统</span>
+      <span class="badge badge-rej">↩ 审查打回</span>
+    </div>
+    <div class="progress">
+      <div class="node"><div class="dot run">⟳</div><div class="lbl">implement</div><div class="actor">后端开发-1</div><div class="dur">修复中</div></div>
+      <div class="line rej"></div>
+      <div class="node"><div class="dot fail">✗</div><div class="lbl">code_review</div><div class="actor">Tech Lead</div><div class="dur" style="color:#c62828;">唯一索引</div></div>
+      <div class="line"></div>
+      <div class="node"><div class="dot wait">3</div><div class="lbl">testing</div><div class="actor">测试-1</div></div>
+    </div>
+    <div class="ft"><span>⏱ 22.0s</span><span>❌ 1 次打回</span></div>
+    <div class="hover-hint">hover 查看执行过程</div>
+  </div>
+
+  <!-- 卡片 3：全部完成（带 trace 面板） -->
+  <div class="card">
+    <div class="hd">
+      <span class="tag">TASK-003</span>
+      <span class="title">文章标签系统</span>
+      <span class="badge badge-done">✓ 已完成</span>
+    </div>
+    <div class="progress">
+      <div class="node"><div class="dot done">✓</div><div class="lbl">implement</div><div class="actor">后端开发-1</div><div class="dur">17.0s</div></div>
+      <div class="line done"></div>
+      <div class="node"><div class="dot done">✓</div><div class="lbl">code_review</div><div class="actor">Tech Lead</div><div class="dur">5.0s</div></div>
+      <div class="line done"></div>
+      <div class="node"><div class="dot done">✓</div><div class="lbl">testing</div><div class="actor">测试-1</div><div class="dur">5.2s</div></div>
+    </div>
+    <div class="ft"><span>⏱ 27.2s</span><span>📎 3 文件</span><span>✅ 12 测试</span><span>❌ 1 打回</span><span>🐛 1 BUG</span></div>
+    <div class="hover-hint">hover 查看执行过程</div>
+
+    <!-- Trace 面板 -->
+    <div class="trace">
+      <div class="trace-hd">
+        <span class="tag">TASK-003</span>
+        <span class="title">文章标签系统 · 完整执行过程</span>
+      </div>
+
+      <!-- 后端开发 -->
+      <div class="role">
+        <div class="role-hd be"><div class="av">BE</div>后端开发-1 · implement<div class="meta">17.0s · 7 步 · 含 1 次修复</div></div>
+        <div class="steps">
+          <div class="step ok"><span class="ic"></span><span class="tool">task_read</span>("TASK-003") → 读取标签系统需求</div>
+          <div class="step ok"><span class="ic"></span><span class="tool">file_write</span>(<code>tests/test_tags.rs</code>) → 写失败测试</div>
+          <div class="step ok"><span class="ic"></span><span class="tool">code_execute</span>(<code>cargo test</code>) → <span class="res">1 failed ✓ 红灯确认</span></div>
+          <div class="step ask"><span class="ic"></span><span class="ask-text">ask_teammate</span>(TL): "标签名支持中文吗？" → <span class="reply-text">"支持，VARCHAR(200)"</span></div>
+          <div class="step ok"><span class="ic"></span><span class="tool">file_write</span>(<code>src/models/tag.rs</code>) + <span class="tool">file_write</span>(<code>src/routes/tags.rs</code>)</div>
+          <div class="step ok"><span class="ic"></span><span class="tool">code_execute</span>(<code>cargo test</code>) → <span class="res">12 passed ✓ 绿灯</span></div>
+          <div class="step ok"><span class="ic"></span><span class="tool">submit_step_result</span>({ changed_files: 3, test_result: "passed" })</div>
+        </div>
+      </div>
+
+      <div class="conn">▼</div>
+
+      <!-- TL 审查 -->
+      <div class="role">
+        <div class="role-hd tl"><div class="av">TL</div>Tech Lead · code_review<div class="meta">5.0s · 含 1 次打回</div></div>
+        <div class="steps">
+          <div class="step ok"><span class="ic"></span><span class="tool">git_diff</span> + <span class="tool">file_read</span> × 3 → 审查代码变更</div>
+          <div class="step err"><span class="ic"></span><span class="rej-text">第一次审查：tag_name 缺少唯一索引 → rejected</span></div>
+          <div class="step info"><span class="ic"></span>↩ 打回给后端开发-1（修复耗时 2.1s）</div>
+          <div class="step ok"><span class="ic"></span><span class="tool">git_diff</span> → 确认已加唯一索引</div>
+          <div class="step ok"><span class="ic"></span>第二次审查 → <span class="res">approved ✓</span></div>
+        </div>
+      </div>
+
+      <div class="conn">▼</div>
+
+      <!-- 测试 -->
+      <div class="role">
+        <div class="role-hd qa"><div class="av">QA</div>测试-1 · testing<div class="meta">5.2s</div></div>
+        <div class="steps">
+          <div class="step ok"><span class="ic"></span><span class="tool">task_read</span> + <span class="tool">file_read</span> × 2 → 了解需求和实现</div>
+          <div class="step ok"><span class="ic"></span><span class="tool">code_execute</span>(<code>cargo test</code>) → <span class="res">12 passed, 0 failed</span></div>
+          <div class="step bug"><span class="ic"></span><span class="bug-text">额外发现</span>：空标签名返回 500 → <span class="tool">task_create</span>(BUG-002)</div>
+          <div class="step ok"><span class="ic"></span><span class="tool">submit_step_result</span>({ total: 12, passed: 12, verdict: "passed" })</div>
+        </div>
+      </div>
+
+      <div class="trace-ft">
+        <span>⏱ 总耗时 27.2s</span>
+        <span>👥 3 角色</span>
+        <span>🔧 16 次工具调用</span>
+        <span>💬 1 次 ask</span>
+        <span>❌ 1 次打回</span>
+        <span>🐛 1 个 BUG</span>
+        <span>📊 ~8200 tokens</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

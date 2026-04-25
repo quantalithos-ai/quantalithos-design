@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;background:#eef1f5;height:100vh;overflow:hidden;color:#333;}
+.app{display:flex;height:100vh;}
+
+/* 导航 */
+.nav{width:56px;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;flex-shrink:0;}
+.ni{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;transition:all .2s;position:relative;color:#8888aa;}
+.ni:hover{background:#2a2a4a;color:#ccc;}.ni.on{background:#3a3a5e;color:#fff;}
+.ni .dot{position:absolute;top:5px;right:5px;width:8px;height:8px;background:#ef5350;border-radius:50%;border:2px solid #1a1a2e;}
+.nav-sp{flex:1;}
+.nav-av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#1976d2,#42a5f5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;font-weight:600;}
+
+/* 侧边栏 */
+.sb{width:250px;background:#fff;border-right:1px solid #e4e8ec;display:flex;flex-direction:column;flex-shrink:0;}
+.sb.hide{display:none;}
+.sb-hd{padding:14px 16px;font-size:14px;font-weight:600;border-bottom:1px solid #f0f2f5;color:#1a1a2e;}
+.sb-items{flex:1;overflow-y:auto;padding:4px 0;}
+.sb-lbl{padding:8px 16px 4px;font-size:10px;color:#b0b8c4;text-transform:uppercase;letter-spacing:.5px;}
+.si{display:flex;align-items:center;padding:10px 16px;cursor:pointer;gap:10px;border-radius:0;transition:background .15s;}
+.si:hover{background:#f5f7fa;}.si.on{background:#e8f0fe;border-right:3px solid #1976d2;}
+.si-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;flex-shrink:0;font-weight:500;}
+.si-info{flex:1;min-width:0;}
+.si-name{font-size:13px;font-weight:500;color:#1a1a2e;}
+.si-pre{font-size:11px;color:#8c95a4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+
+/* 主区域 */
+.main{flex:1;display:flex;flex-direction:column;background:#f5f7fa;}
+.pg{display:none;flex-direction:column;height:100%;}.pg.on{display:flex;}
+.hd{padding:12px 20px;background:#fff;border-bottom:1px solid #e4e8ec;display:flex;align-items:center;}
+.hd-i{flex:1;}.hd-t{font-size:14px;font-weight:600;color:#1a1a2e;}.hd-s{font-size:11px;color:#8c95a4;margin-top:2px;}
+.hd-btns{display:flex;gap:6px;}
+.hd-btn{padding:4px 10px;border:1px solid #dde1e6;background:#fff;border-radius:6px;font-size:11px;cursor:pointer;color:#555;transition:all .15s;}
+.hd-btn:hover{background:#f0f2f5;border-color:#c0c8d0;}
+
+/* 消息 */
+.msgs{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px;}
+.m{display:flex;gap:8px;max-width:76%;}.m.me{margin-left:auto;flex-direction:row-reverse;}.m.sys{max-width:100%;justify-content:center;}
+.m-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+.m-av.tl{background:#2e7d32;}.m-av.be{background:#e65100;}.m-av.fe{background:#00838f;}.m-av.qa{background:#b71c1c;}.m-av.dv{background:#4527a0;}.m-av.u{background:#1565c0;}.m-av.as{background:#6a1b9a;}
+.m-b{max-width:100%;}.m-n{font-size:10px;color:#8c95a4;margin-bottom:2px;}.m.me .m-n{text-align:right;}
+.m-c{background:#fff;padding:8px 12px;border-radius:12px;font-size:12.5px;line-height:1.65;box-shadow:0 1px 3px rgba(0,0,0,.05);border:1px solid #f0f2f5;}
+.m.me .m-c{background:#e8f0fe;border-color:#d0ddf0;}
+.m.sys .m-c{background:#fef9e7;color:#b8860b;font-size:11px;padding:4px 14px;border-radius:16px;box-shadow:none;border:1px solid #f5e6a3;}
+.m-t{font-size:9px;color:#b0b8c4;margin-top:2px;}
+
+/* 轻量通知 */
+.ntf{font-size:10.5px;color:#8c95a4;text-align:center;padding:3px 0;}
+.ntf a{color:#1976d2;cursor:pointer;text-decoration:none;font-weight:500;}
+.ntf a:hover{text-decoration:underline;}
+
+/* 门禁 */
+.gate{background:#fff;border:1px solid #dde1e6;border-radius:12px;padding:14px 16px;margin:6px auto;max-width:400px;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.gate-hd{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:13px;font-weight:600;color:#1a1a2e;}
+.gate-hd .exp{margin-left:auto;font-size:10px;color:#b0b8c4;font-weight:400;}
+.gate-desc{font-size:11.5px;color:#555;margin-bottom:8px;line-height:1.5;}
+.gate-art{display:flex;align-items:center;gap:5px;padding:5px 8px;background:#f5f7fa;border-radius:6px;margin-bottom:3px;font-size:11px;color:#555;}
+.gate-btns{display:flex;gap:6px;margin-top:10px;}
+.g-btn{padding:6px 16px;border:none;border-radius:6px;font-size:11.5px;cursor:pointer;font-weight:500;transition:opacity .15s;}
+.g-btn:hover{opacity:.85;}
+.g-btn.ok{background:#43a047;color:#fff;}.g-btn.chg{background:#f57c00;color:#fff;}.g-btn.no{background:#e53935;color:#fff;}
+
+/* 输入 */
+.inp{padding:10px 20px;background:#fff;border-top:1px solid #e4e8ec;}
+.inp-r{display:flex;gap:8px;align-items:flex-end;}
+.inp-r textarea{flex:1;border:1px solid #dde1e6;border-radius:10px;padding:8px 12px;font-size:13px;resize:none;outline:none;min-height:36px;font-family:inherit;line-height:1.5;transition:border-color .2s;}
+.inp-r textarea:focus{border-color:#64b5f6;box-shadow:0 0 0 2px rgba(100,181,246,.15);}
+.snd{padding:7px 18px;background:linear-gradient(135deg,#1976d2,#42a5f5);color:#fff;border:none;border-radius:10px;font-size:12px;cursor:pointer;font-weight:500;transition:opacity .15s;}
+.snd:hover{opacity:.9;}
+
+/* 看板 */
+.kb{flex:1;overflow-x:auto;padding:20px;display:flex;gap:14px;}
+.kb-col{min-width:200px;background:#f5f7fa;border-radius:12px;padding:12px;}
+.kb-col-hd{font-size:12px;font-weight:600;margin-bottom:10px;color:#555;}
+.kb-card{background:#fff;border:1px solid #e4e8ec;border-radius:8px;padding:10px;margin-bottom:8px;font-size:11px;cursor:pointer;transition:all .2s;}
+.kb-card:hover{box-shadow:0 3px 12px rgba(0,0,0,.08);transform:translateY(-1px);}
+.kb-card-hd{display:flex;align-items:center;gap:4px;margin-bottom:3px;}
+.kb-id{color:#1976d2;font-weight:600;font-size:11px;}
+.kb-st{padding:2px 6px;border-radius:8px;font-size:9px;font-weight:500;margin-left:auto;}
+.s-done{background:#e8f5e9;color:#2e7d32;}.s-dev{background:#e3f2fd;color:#1565c0;}.s-rev{background:#fff3e0;color:#e65100;}.s-wait{background:#f0f2f5;color:#8c95a4;}
+.kb-card-sub{color:#8c95a4;font-size:9px;margin-top:3px;}
+
+/* 进度页 */
+.prog{flex:1;padding:24px;overflow-y:auto;}
+.stg-bar{display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:24px;}
+.stg{text-align:center;cursor:pointer;transition:transform .15s;}
+.stg:hover{transform:scale(1.08);}
+.stg-d{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;margin:0 auto;box-shadow:0 2px 6px rgba(0,0,0,.1);transition:box-shadow .2s;}
+.stg:hover .stg-d{box-shadow:0 3px 12px rgba(0,0,0,.18);}
+.stg-d.done{background:linear-gradient(135deg,#43a047,#66bb6a);}.stg-d.now{background:linear-gradient(135deg,#1565c0,#42a5f5);}.stg-d.pend{background:#dde1e6;color:#8c95a4;}
+.stg-n{font-size:10px;margin-top:4px;color:#555;font-weight:500;}
+.stg-l{width:28px;height:2px;background:#dde1e6;margin-bottom:16px;border-radius:1px;}.stg-l.done{background:#66bb6a;}
+
+/* 阶段详情 */
+.stage-detail{animation:fadeIn .25s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+
+/* 详情面板 */
+.detail-panel{position:fixed;right:0;top:0;width:500px;height:100vh;background:#fff;box-shadow:-6px 0 24px rgba(0,0,0,.12);z-index:200;display:none;flex-direction:column;overflow:hidden;border-left:1px solid #e4e8ec;}
+.detail-panel.show{display:flex;}
+.dp-hd{padding:14px 18px;border-bottom:1px solid #e4e8ec;display:flex;align-items:center;gap:8px;background:#fafbfc;}
+.dp-hd .close{margin-left:auto;cursor:pointer;font-size:18px;color:#8c95a4;transition:color .15s;}
+.dp-hd .close:hover{color:#333;}
+.dp-body{flex:1;overflow-y:auto;padding:18px;}
+
+/* BPMN */
+.bpmn-flow{display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center;padding:10px 0;margin-bottom:14px;}
+.bn{display:flex;flex-direction:column;align-items:center;min-width:46px;}
+.bd{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+.bd.done{background:#43a047;}.bd.run{background:#1565c0;animation:gl 1.8s ease-in-out infinite;}.bd.wait{background:#dde1e6;color:#8c95a4;box-shadow:none;}.bd.fail{background:#e53935;}
+@keyframes gl{0%,100%{box-shadow:0 0 0 3px rgba(21,101,192,.2);}50%{box-shadow:0 0 0 6px rgba(21,101,192,.1);}}
+.bdia{width:20px;height:20px;background:#fff;border:2px solid #8c95a4;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;}
+.bdia.done{border-color:#43a047;background:#e8f5e9;}.bdia.active{border-color:#1565c0;background:#e3f2fd;}
+.bdia-i{transform:rotate(-45deg);font-size:8px;}
+.bstart{width:18px;height:18px;border-radius:50%;border:2px solid #43a047;background:#e8f5e9;}
+.bend{width:18px;height:18px;border-radius:50%;border:3px solid #333;}.bend.done{border-color:#43a047;background:#e8f5e9;}
+.bline{width:20px;height:2px;background:#dde1e6;margin:0 -2px;margin-top:11px;border-radius:1px;}.bline.done{background:#66bb6a;}.bline.active{background:#42a5f5;}
+.bl{font-size:8px;color:#8c95a4;margin-top:3px;}.ba{font-size:7px;color:#b0b8c4;}
+
+/* Trace */
+.tr-block{border:1px solid #e4e8ec;border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.tr-hd{display:flex;align-items:center;gap:6px;padding:8px 12px;font-size:11px;font-weight:500;}
+.tr-av{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:600;}
+.tr-hd.be{background:#fff3e0;}.tr-hd.be .tr-av{background:#e65100;}
+.tr-hd.tl{background:#e8f5e9;}.tr-hd.tl .tr-av{background:#2e7d32;}
+.tr-hd.qa{background:#fce4ec;}.tr-hd.qa .tr-av{background:#b71c1c;}
+.tr-meta{margin-left:auto;font-size:9px;color:#b0b8c4;font-weight:400;}
+.tr-steps{padding:6px 12px 8px 36px;}
+.tr-step{padding:2px 0;font-size:10px;line-height:1.6;color:#555;}
+.tr-step code{background:#f0f2f5;padding:1px 4px;border-radius:3px;font-size:9px;font-family:'SF Mono',Monaco,monospace;color:#333;}
+.tr-step .t{color:#1565c0;font-weight:500;}.tr-step .r{color:#2e7d32;}.tr-step .x{color:#c62828;font-weight:500;}.tr-step .a{color:#e65100;}.tr-step .p{color:#6a1b9a;}
+.tr-conn{text-align:center;padding:2px 0;font-size:10px;color:#b0b8c4;}
+.tr-ft{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:#8c95a4;padding:10px 12px;border-top:1px solid #e4e8ec;background:#fafbfc;}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="nav">
+    <div class="ni on" onclick="sp('chat')">💬<div class="dot"></div></div>
+    <div class="ni" onclick="sp('kanban')">📊</div>
+    <div class="ni" onclick="sp('progress')">📈</div>
+    <div class="ni" onclick="sp('team')">👥</div>
+    <div class="nav-sp"></div>
+    <div class="nav-av">A</div>
+  </div>
+  <div class="sb" id="sb">
+    <div class="sb-hd">消息</div>
+    <div class="sb-items">
+      <div class="sb-lbl">置顶</div>
+      <div class="si"><div class="si-av" style="background:#7b1fa2;">🤖</div><div class="si-info"><div class="si-name">Assistant</div><div class="si-pre">有什么可以帮你的？</div></div></div>
+      <div class="sb-lbl">项目</div>
+      <div class="si on"><div class="si-av" style="background:#388e3c;border-radius:6px;font-size:10px;">博客</div><div class="si-info"><div class="si-name">博客系统 <span style="font-size:9px;color:#4caf50;">●</span></div><div class="si-pre">TASK-005 前端页面执行中</div></div></div>
+    </div>
+  </div>
+  <div class="main">
+
+    <!-- ===== 聊天页（干净版） ===== -->
+    <div class="pg on" id="pg-chat">
+      <div class="hd"><div class="hd-i"><div class="hd-t">📁 博客系统 · 项目群聊</div><div class="hd-s">TL, BE-1, BE-2, FE-1, QA-1, DevOps · 阶段 3</div></div><div class="hd-btns"><div class="hd-btn" onclick="sp('kanban')">📊</div><div class="hd-btn" onclick="sp('progress')">📈</div><div class="hd-btn" onclick="sp('team')">👥</div></div></div>
+      <div class="msgs">
+
+        <div class="m sys"><div class="m-c">🔔 阶段 3 迭代开发已启动</div></div>
+
+        <div class="m"><div class="m-av tl">TL</div><div class="m-b"><div class="m-n">Tech Lead</div><div class="m-c">任务拆解完成，5 个任务。T-001 和 T-002 无依赖，并行启动。</div><div class="m-t">10:00</div></div></div>
+
+        <div class="ntf">⚡ 并行启动 <a onclick="od('T-001')">TASK-001</a> (BE-1) + <a onclick="od('T-002')">TASK-002</a> (BE-2)</div>
+
+        <div class="ntf">✅ <a onclick="od('T-001')">TASK-001</a> 脚手架已完成 · 14.1s · 8 测试通过</div>
+        <div class="ntf">✅ <a onclick="od('T-002')">TASK-002</a> 文章CRUD已完成 · 18.3s · 15 测试通过</div>
+
+        <div class="ntf">⚡ 依赖满足，并行启动 <a onclick="od('T-003')">TASK-003</a> (BE-1) + <a onclick="od('T-004')">TASK-004</a> (BE-2)</div>
+
+        <div class="m"><div class="m-av be">B1</div><div class="m-b"><div class="m-n">后端开发-1</div><div class="m-c">TASK-003 标签系统实现完成，提交审查。<br><span style="font-size:10px;color:#1976d2;cursor:pointer;" onclick="od('T-003')">📋 查看执行过程 →</span></div><div class="m-t">14:30</div></div></div>
+
+        <div class="m"><div class="m-av tl">TL</div><div class="m-b"><div class="m-n">Tech Lead</div><div class="m-c">TASK-003 审查：<code style="background:#f5f5f5;padding:0 3px;border-radius:2px;font-size:11px;">tag_name</code> 缺少唯一索引，打回修改。</div><div class="m-t">14:45</div></div></div>
+
+        <div class="ntf">↩ <a onclick="od('T-003')">TASK-003</a> 审查打回 → 后端开发-1 修复中</div>
+
+        <div class="m"><div class="m-av be">B1</div><div class="m-b"><div class="m-n">后端开发-1</div><div class="m-c">已修复唯一索引问题，重新提交。</div><div class="m-t">14:52</div></div></div>
+
+        <div class="ntf">✅ <a onclick="od('T-003')">TASK-003</a> 审查通过 → 测试-1 测试中</div>
+
+        <div class="m"><div class="m-av qa">QA</div><div class="m-b"><div class="m-n">测试-1</div><div class="m-c">TASK-003 测试通过，12 用例全过。另外发现空标签名返回 500，已创建 <a onclick="od('BUG-002')" style="color:#c62828;cursor:pointer;">BUG-002</a>。</div><div class="m-t">15:00</div></div></div>
+
+        <div class="ntf">🐛 <a onclick="od('BUG-002')">BUG-002</a> 空标签名500 · 指派给 BE-1</div>
+
+        <div class="ntf">✅ <a onclick="od('T-003')">TASK-003</a> 标签系统已完成 · 27.2s · 1次打回</div>
+        <div class="ntf">✅ <a onclick="od('T-004')">TASK-004</a> 评论系统已完成 · 22.1s</div>
+
+        <div class="ntf">⚡ 依赖满足，启动 <a onclick="od('T-005')">TASK-005</a> 前端页面 (FE-1)</div>
+
+        <!-- 头脑风暴 session -->
+        <div class="m sys"><div class="m-c">🗣 头脑风暴开始 · 评论功能技术方案</div></div>
+        <div class="m"><div class="m-av be">B1</div><div class="m-b"><div class="m-n">后端开发-1</div><div class="m-c">建议 REST API + 30 秒轮询。</div><div class="m-t">09:10</div></div></div>
+        <div class="m"><div class="m-av fe">FE</div><div class="m-b"><div class="m-n">前端开发-1</div><div class="m-c">同意轮询，评论列表用虚拟滚动。</div><div class="m-t">09:11</div></div></div>
+        <div class="m"><div class="m-av qa">QA</div><div class="m-b"><div class="m-n">测试-1</div><div class="m-c">需要测试并发评论和 XSS。</div><div class="m-t">09:12</div></div></div>
+        <div class="m me"><div class="m-av u">A</div><div class="m-b"><div class="m-n">你</div><div class="m-c">不需要实时，轮询就行。</div><div class="m-t">09:13</div></div></div>
+        <div class="m"><div class="m-av tl">TL</div><div class="m-b"><div class="m-n">Tech Lead</div><div class="m-c">总结：REST + 轮询 + XSS 过滤。</div><div class="m-t">09:15</div></div></div>
+        <div class="m sys"><div class="m-c">🗣 头脑风暴结束 · 结论已提交</div></div>
+
+        <!-- 门禁 -->
+        <div class="gate">
+          <div class="gate-hd">🔍 用户验收 <span class="exp">⏰ 7天</span></div>
+          <div class="gate-desc">所有功能开发完成，请验收：</div>
+          <div class="gate-art">📊 集成测试 · 42 passed, coverage 85%</div>
+          <div class="gate-art">🔗 staging.blog.example.com</div>
+          <div class="gate-btns"><button class="g-btn ok">✅ 通过</button><button class="g-btn chg">✏️ 修改</button></div>
+        </div>
+
+        <div class="m me"><div class="m-av u">A</div><div class="m-b"><div class="m-n">你</div><div class="m-c">整体不错，发布阶段准备好了吗？</div><div class="m-t">17:00</div></div></div>
+        <div class="m"><div class="m-av dv">DO</div><div class="m-b"><div class="m-n">DevOps</div><div class="m-c">CI/CD 就绪，staging 正常。发布时走 precheck → deploy → smoke → 观察。</div><div class="m-t">17:01</div></div></div>
+
+      </div>
+      <div class="inp"><div class="inp-r"><textarea placeholder="输入消息..." rows="1"></textarea><button class="snd">发送</button></div></div>
+    </div>
+
+    <!-- ===== 看板页 ===== -->
+    <div class="pg" id="pg-kanban">
+      <div class="hd"><div class="hd-i"><div class="hd-t">📊 工单看板</div><div class="hd-s">5 工单 · 3 完成 · 1 进行中 · 1 待开始</div></div><div class="hd-btns"><div class="hd-btn" onclick="sp('chat')">💬</div></div></div>
+      <div class="kb">
+        <div class="kb-col"><div class="kb-col-hd">📋 待开始 (1)</div>
+          <div class="kb-card" onclick="od('T-005')"><div class="kb-card-hd"><span class="kb-id">T-005</span><span class="kb-st s-wait">待开始</span></div><div>前端页面</div><div class="kb-card-sub">👤 FE-1 · 依赖 T-003,T-004</div></div>
+        </div>
+        <div class="kb-col" style="background:#f0f7ff;"><div class="kb-col-hd" style="color:#1565c0;">🔨 开发中 (1)</div>
+          <div class="kb-card" onclick="od('T-005')"><div class="kb-card-hd"><span class="kb-id">T-005</span><span class="kb-st s-dev">开发中</span></div><div>前端页面</div><div class="kb-card-sub">👤 FE-1 · implement 3/5步</div></div>
+        </div>
+        <div class="kb-col" style="background:#fff8f0;"><div class="kb-col-hd" style="color:#e65100;">👀 审查中 (0)</div>
+          <div style="color:#ddd;font-size:10px;text-align:center;padding:16px;">暂无</div>
+        </div>
+        <div class="kb-col" style="background:#f0f9f0;"><div class="kb-col-hd" style="color:#2e7d32;">✅ 已完成 (4)</div>
+          <div class="kb-card" onclick="od('T-001')"><div class="kb-card-hd"><span class="kb-id">T-001</span><span class="kb-st s-done">完成</span></div><div>脚手架</div><div class="kb-card-sub">14.1s · 8 测试</div></div>
+          <div class="kb-card" onclick="od('T-002')"><div class="kb-card-hd"><span class="kb-id">T-002</span><span class="kb-st s-done">完成</span></div><div>文章CRUD</div><div class="kb-card-sub">18.3s · 15 测试</div></div>
+          <div class="kb-card" onclick="od('T-003')"><div class="kb-card-hd"><span class="kb-id">T-003</span><span class="kb-st s-done">完成</span></div><div>标签系统</div><div class="kb-card-sub">27.2s · 12 测试 · 1打回</div></div>
+          <div class="kb-card" onclick="od('T-004')"><div class="kb-card-hd"><span class="kb-id">T-004</span><span class="kb-st s-done">完成</span></div><div>评论系统</div><div class="kb-card-sub">22.1s · 18 测试</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 进度页 ===== -->
+    <div class="pg" id="pg-progress">
+      <div class="hd"><div class="hd-i"><div class="hd-t">📈 项目进度</div><div class="hd-s">标准六阶段 · 当前：阶段 3 · 点击阶段展开子流程</div></div><div class="hd-btns"><div class="hd-btn" onclick="sp('chat')">💬</div></div></div>
+      <div class="prog">
+
+        <!-- Pipeline 主流程（可点击展开） -->
+        <div class="stg-bar">
+          <div class="stg" onclick="toggleStage('s0')" style="cursor:pointer;"><div class="stg-d done">✓</div><div class="stg-n">校准</div></div><div class="stg-l done"></div>
+          <div class="stg" onclick="toggleStage('s1')" style="cursor:pointer;"><div class="stg-d done">✓</div><div class="stg-n">需求</div></div><div class="stg-l done"></div>
+          <div class="stg" onclick="toggleStage('s2')" style="cursor:pointer;"><div class="stg-d done">✓</div><div class="stg-n">设计</div></div><div class="stg-l done"></div>
+          <div class="stg" onclick="toggleStage('s3')" style="cursor:pointer;"><div class="stg-d now" style="font-size:11px;font-weight:600;">4/5</div><div class="stg-n" style="color:#1976d2;font-weight:500;">开发</div></div><div class="stg-l"></div>
+          <div class="stg" onclick="toggleStage('s4')" style="cursor:pointer;"><div class="stg-d pend">5</div><div class="stg-n">验收</div></div><div class="stg-l"></div>
+          <div class="stg" onclick="toggleStage('s5')" style="cursor:pointer;"><div class="stg-d pend">6</div><div class="stg-n">发布</div></div>
+        </div>
+
+        <!-- 阶段 0：目标校准（子流程） -->
+        <div class="stage-detail" id="s0" style="display:none;">
+          <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:600;margin-bottom:4px;">阶段 0 · 目标校准 <span style="font-size:10px;color:#4caf50;font-weight:400;">✓ 已完成</span></div>
+            <div style="font-size:10px;color:#999;margin-bottom:8px;">TL 接手交接包，校准项目目标</div>
+            <div style="display:flex;align-items:center;gap:4px;justify-content:center;flex-wrap:wrap;">
+              <div class="bn"><div class="bstart"></div><div class="bl">start</div></div><div class="bline done"></div>
+              <div class="bn"><div class="bd done">✓</div><div class="bl">review_align</div><div class="ba">TL · 3.2s</div></div><div class="bline done"></div>
+              <div class="bn"><div class="bend done"></div><div class="bl">end</div></div>
+            </div>
+            <div style="font-size:9px;color:#aaa;margin-top:6px;text-align:center;">产出：goal_alignment_brief · 项目类型=new_project · 推荐路由=需求分析</div>
+          </div>
+        </div>
+
+        <!-- 阶段 1：需求理解（SVG 二维布局） -->
+        <div class="stage-detail" id="s1" style="display:none;">
+          <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:600;margin-bottom:4px;">阶段 1 · 需求理解 <span style="font-size:10px;color:#4caf50;font-weight:400;">✓ 已完成</span></div>
+            <div style="font-size:10px;color:#8c95a4;margin-bottom:10px;">收集需求 → 头脑风暴 → 撰写 PRD → 评审 → 条件分支 → 用户确认</div>
+            <svg viewBox="0 0 680 200" style="width:100%;max-width:680px;margin:0 auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="ah1" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#66bb6a"/></marker>
+                <marker id="ah1r" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#ef5350"/></marker>
+              </defs>
+              <!-- 主线 -->
+              <line x1="30" y1="80" x2="80" y2="80" stroke="#66bb6a" stroke-width="2" marker-end="url(#ah1)"/>
+              <line x1="130" y1="80" x2="170" y2="80" stroke="#66bb6a" stroke-width="2" marker-end="url(#ah1)"/>
+              <line x1="250" y1="80" x2="290" y2="80" stroke="#66bb6a" stroke-width="2" marker-end="url(#ah1)"/>
+              <line x1="370" y1="80" x2="410" y2="80" stroke="#66bb6a" stroke-width="2" marker-end="url(#ah1)"/>
+              <line x1="490" y1="80" x2="520" y2="80" stroke="#66bb6a" stroke-width="2" marker-end="url(#ah1)"/>
+              <!-- 条件分支线 -->
+              <line x1="540" y1="60" x2="580" y2="40" stroke="#66bb6a" stroke-width="2" marker-end="url(#ah1)"/>
+              <line x1="540" y1="100" x2="580" y2="150" stroke="#ef5350" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#ah1r)"/>
+              <!-- 回退线 -->
+              <path d="M 600 160 Q 600 180, 340 180 Q 300 180, 300 90" fill="none" stroke="#ef5350" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#ah1r)"/>
+              <!-- approved 线 -->
+              <line x1="640" y1="40" x2="660" y2="40" stroke="#66bb6a" stroke-width="2" marker-end="url(#ah1)"/>
+
+              <!-- Start -->
+              <circle cx="20" cy="80" r="8" fill="#e8f5e9" stroke="#43a047" stroke-width="2"/>
+              <text x="20" y="105" text-anchor="middle" font-size="8" fill="#8c95a4">start</text>
+
+              <!-- collect -->
+              <rect x="82" y="64" width="48" height="32" rx="6" fill="#e8f5e9" stroke="#43a047" stroke-width="1.5"/>
+              <text x="106" y="83" text-anchor="middle" font-size="8" fill="#2e7d32" font-weight="600">collect</text>
+              <text x="106" y="108" text-anchor="middle" font-size="7" fill="#8c95a4">TL · 5.1s</text>
+
+              <!-- brainstorm (session) -->
+              <rect x="172" y="60" width="76" height="40" rx="6" fill="#faf5ff" stroke="#7b1fa2" stroke-width="1.5" stroke-dasharray="4"/>
+              <text x="210" y="78" text-anchor="middle" font-size="8" fill="#7b1fa2" font-weight="500">🗣 brainstorm</text>
+              <text x="210" y="90" text-anchor="middle" font-size="7" fill="#8c95a4">session · 全员</text>
+
+              <!-- write_prd -->
+              <rect x="292" y="64" width="76" height="32" rx="6" fill="#e8f5e9" stroke="#43a047" stroke-width="1.5"/>
+              <text x="330" y="83" text-anchor="middle" font-size="8" fill="#2e7d32" font-weight="600">write_prd</text>
+              <text x="330" y="108" text-anchor="middle" font-size="7" fill="#8c95a4">TL · 8.3s</text>
+
+              <!-- review_prd (session) -->
+              <rect x="412" y="60" width="76" height="40" rx="6" fill="#faf5ff" stroke="#7b1fa2" stroke-width="1.5" stroke-dasharray="4"/>
+              <text x="450" y="78" text-anchor="middle" font-size="8" fill="#7b1fa2" font-weight="500">🗣 review_prd</text>
+              <text x="450" y="90" text-anchor="middle" font-size="7" fill="#8c95a4">session · 全员</text>
+
+              <!-- Gateway (菱形) -->
+              <rect x="522" y="62" width="24" height="24" rx="2" transform="rotate(45 534 74)" fill="#e8f5e9" stroke="#43a047" stroke-width="1.5"/>
+              <text x="534" y="78" text-anchor="middle" font-size="8" fill="#2e7d32" font-weight="700">◇</text>
+
+              <!-- approved 分支标签 -->
+              <text x="560" y="35" font-size="7" fill="#43a047" font-weight="500">approved ✓</text>
+
+              <!-- 用户确认 (User Task) -->
+              <rect x="582" y="22" width="56" height="36" rx="6" fill="#fff3e0" stroke="#f57c00" stroke-width="1.5" stroke-dasharray="4"/>
+              <text x="610" y="38" text-anchor="middle" font-size="7" fill="#e65100" font-weight="500">👤 用户确认</text>
+              <text x="610" y="50" text-anchor="middle" font-size="6" fill="#8c95a4">硬门禁</text>
+
+              <!-- needs_revision 分支标签 -->
+              <text x="570" y="145" font-size="7" fill="#ef5350" font-weight="500">needs_revision</text>
+              <text x="570" y="155" font-size="6" fill="#8c95a4">→ 回退 write_prd</text>
+
+              <!-- End -->
+              <circle cx="670" cy="40" r="8" fill="#e8f5e9" stroke="#43a047" stroke-width="3"/>
+              <text x="670" y="60" text-anchor="middle" font-size="8" fill="#8c95a4">end</text>
+            </svg>
+            <div style="font-size:9px;color:#8c95a4;margin-top:6px;text-align:center;">产出：PRD v1 · 头脑风暴纪要 · 用户已确认 · 红色虚线=回退路径</div>
+
+
+              <div class="bn" style="border:1px dashed #ff9800;border-radius:6px;padding:3px 5px;background:#fff8f0;"><div class="bd done" style="width:18px;height:18px;font-size:8px;background:#ff9800;">✓</div><div class="bl" style="color:#e65100;">👤 用户确认PRD</div><div class="ba">硬门禁 · 通过</div></div><div class="bline done"></div>
+              <div class="bn"><div class="bend done"></div><div class="bl">end</div></div>
+            </div>
+            <div style="font-size:9px;color:#aaa;margin-top:6px;text-align:center;">产出：PRD v1 · 头脑风暴纪要 · 用户已确认</div>
+          </div>
+        </div>
+
+        <!-- 阶段 2：方案拆解（子流程：含条件分支 + 环境准备） -->
+        <div class="stage-detail" id="s2" style="display:none;">
+          <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:600;margin-bottom:4px;">阶段 2 · 方案拆解 <span style="font-size:10px;color:#4caf50;font-weight:400;">✓ 已完成</span></div>
+            <div style="font-size:10px;color:#999;margin-bottom:8px;">技术方案 → 任务拆解 → 设计评审 → 环境准备</div>
+            <div style="display:flex;align-items:center;gap:4px;justify-content:center;flex-wrap:wrap;">
+              <div class="bn"><div class="bstart"></div><div class="bl">start</div></div><div class="bline done"></div>
+              <div class="bn"><div class="bd done">✓</div><div class="bl">tech_design</div><div class="ba">TL · 12.5s</div></div><div class="bline done"></div>
+              <div class="bn"><div class="bd done">✓</div><div class="bl">task_break</div><div class="ba">TL · 6.2s</div></div><div class="bline done"></div>
+              <div class="bn" style="border:1px dashed #7b1fa2;border-radius:6px;padding:3px 5px;background:#faf5ff;"><div class="bd done" style="width:18px;height:18px;font-size:8px;">✓</div><div class="bl" style="color:#7b1fa2;">🗣 design_review</div><div class="ba">session · 全员</div></div><div class="bline done"></div>
+
+              <div class="bn"><div class="bd done">✓</div><div class="bl">env_setup</div><div class="ba">DevOps · 4.1s</div></div><div class="bline done"></div>
+              <div class="bn"><div class="bend done"></div><div class="bl">end</div></div>
+            </div>
+            <div style="font-size:9px;color:#aaa;margin-top:6px;text-align:center;">产出：架构文档 · API 设计 · 5 个任务卡 · CI/CD 就绪 · 软门禁自动通过</div>
+          </div>
+        </div>
+
+        <!-- 阶段 3：迭代开发（当前阶段，展开显示） -->
+        <div class="stage-detail" id="s3">
+          <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid #bbdefb;">
+            <div style="font-size:12px;font-weight:600;margin-bottom:4px;">阶段 3 · 迭代开发 <span style="font-size:10px;color:#1976d2;font-weight:400;">● 进行中 4/5</span></div>
+            <div style="font-size:10px;color:#999;margin-bottom:8px;">并行网关 fork → 多任务并行 → join → 集成测试</div>
+            <svg viewBox="0 0 700 220" style="width:100%;max-width:700px;margin:0 auto 10px;display:block;" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="a3" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#66bb6a"/></marker>
+                <marker id="a3b" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#42a5f5"/></marker>
+                <marker id="a3g" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#aaa"/></marker>
+              </defs>
+
+              <!-- Start -->
+              <circle cx="20" cy="110" r="8" fill="#e8f5e9" stroke="#43a047" stroke-width="2"/>
+              <text x="20" y="132" text-anchor="middle" font-size="7" fill="#8c95a4">start</text>
+              <line x1="28" y1="110" x2="58" y2="110" stroke="#66bb6a" stroke-width="2" marker-end="url(#a3)"/>
+
+              <!-- Fork -->
+              <circle cx="68" cy="110" r="10" fill="#faf5ff" stroke="#7b1fa2" stroke-width="2"/>
+              <text x="68" y="114" text-anchor="middle" font-size="10" fill="#7b1fa2" font-weight="700">+</text>
+              <text x="68" y="132" text-anchor="middle" font-size="7" fill="#8c95a4">fork</text>
+
+              <!-- 分支线 fork → 各任务 -->
+              <line x1="78" y1="100" x2="120" y2="30" stroke="#66bb6a" stroke-width="1.5" marker-end="url(#a3)"/>
+              <line x1="78" y1="105" x2="120" y2="70" stroke="#66bb6a" stroke-width="1.5" marker-end="url(#a3)"/>
+              <line x1="78" y1="115" x2="120" y2="150" stroke="#66bb6a" stroke-width="1.5" marker-end="url(#a3)"/>
+              <line x1="78" y1="120" x2="120" y2="190" stroke="#42a5f5" stroke-width="1.5" marker-end="url(#a3b)"/>
+
+              <!-- T-001 行 -->
+              <rect x="122" y="16" width="60" height="28" rx="5" fill="#e8f5e9" stroke="#43a047" stroke-width="1" cursor="pointer" onclick="od('T-001')"/>
+              <text x="152" y="33" text-anchor="middle" font-size="8" fill="#2e7d32" font-weight="500">✓ T-001</text>
+              <text x="152" y="10" text-anchor="middle" font-size="6" fill="#8c95a4">脚手架 · BE-1</text>
+              <line x1="182" y1="30" x2="220" y2="30" stroke="#66bb6a" stroke-width="1.5"/>
+              <rect x="222" y="18" width="40" height="24" rx="4" fill="#e8f5e9" stroke="#43a047" stroke-width="1"/>
+              <text x="242" y="33" text-anchor="middle" font-size="7" fill="#2e7d32">✓ review</text>
+              <line x1="262" y1="30" x2="290" y2="30" stroke="#66bb6a" stroke-width="1.5"/>
+              <rect x="292" y="18" width="40" height="24" rx="4" fill="#e8f5e9" stroke="#43a047" stroke-width="1"/>
+              <text x="312" y="33" text-anchor="middle" font-size="7" fill="#2e7d32">✓ test</text>
+
+              <!-- T-002 行 -->
+              <rect x="122" y="56" width="60" height="28" rx="5" fill="#e8f5e9" stroke="#43a047" stroke-width="1" cursor="pointer" onclick="od('T-002')"/>
+              <text x="152" y="73" text-anchor="middle" font-size="8" fill="#2e7d32" font-weight="500">✓ T-002</text>
+              <text x="152" y="50" text-anchor="middle" font-size="6" fill="#8c95a4">文章CRUD · BE-2</text>
+              <line x1="182" y1="70" x2="220" y2="70" stroke="#66bb6a" stroke-width="1.5"/>
+              <rect x="222" y="58" width="40" height="24" rx="4" fill="#e8f5e9" stroke="#43a047" stroke-width="1"/>
+              <text x="242" y="73" text-anchor="middle" font-size="7" fill="#2e7d32">✓ review</text>
+              <line x1="262" y1="70" x2="290" y2="70" stroke="#66bb6a" stroke-width="1.5"/>
+              <rect x="292" y="58" width="40" height="24" rx="4" fill="#e8f5e9" stroke="#43a047" stroke-width="1"/>
+              <text x="312" y="73" text-anchor="middle" font-size="7" fill="#2e7d32">✓ test</text>
+
+              <!-- T-003+T-004 合并行（依赖 T-002，完成后并行） -->
+              <rect x="122" y="136" width="60" height="28" rx="5" fill="#e8f5e9" stroke="#43a047" stroke-width="1" cursor="pointer" onclick="od('T-003')"/>
+              <text x="152" y="153" text-anchor="middle" font-size="8" fill="#2e7d32" font-weight="500">✓ T-003</text>
+              <text x="152" y="130" text-anchor="middle" font-size="6" fill="#8c95a4">标签 · BE-1 · 1打回</text>
+              <line x1="182" y1="150" x2="220" y2="150" stroke="#66bb6a" stroke-width="1.5"/>
+              <rect x="222" y="138" width="40" height="24" rx="4" fill="#e8f5e9" stroke="#43a047" stroke-width="1"/>
+              <text x="242" y="153" text-anchor="middle" font-size="7" fill="#2e7d32">✓ review</text>
+              <line x1="262" y1="150" x2="290" y2="150" stroke="#66bb6a" stroke-width="1.5"/>
+              <rect x="292" y="138" width="40" height="24" rx="4" fill="#e8f5e9" stroke="#43a047" stroke-width="1"/>
+              <text x="312" y="153" text-anchor="middle" font-size="7" fill="#2e7d32">✓ test</text>
+
+              <!-- T-005 行（执行中） -->
+              <rect x="122" y="176" width="60" height="28" rx="5" fill="#e3f2fd" stroke="#1565c0" stroke-width="1.5" cursor="pointer" onclick="od('T-005')"/>
+              <text x="152" y="193" text-anchor="middle" font-size="8" fill="#1565c0" font-weight="500">● T-005</text>
+              <text x="152" y="170" text-anchor="middle" font-size="6" fill="#8c95a4">前端 · FE-1</text>
+              <line x1="182" y1="190" x2="220" y2="190" stroke="#42a5f5" stroke-width="1.5" stroke-dasharray="4"/>
+              <rect x="222" y="178" width="40" height="24" rx="4" fill="#f0f2f5" stroke="#ddd" stroke-width="1"/>
+              <text x="242" y="193" text-anchor="middle" font-size="7" fill="#aaa">review</text>
+              <line x1="262" y1="190" x2="290" y2="190" stroke="#ddd" stroke-width="1.5"/>
+              <rect x="292" y="178" width="40" height="24" rx="4" fill="#f0f2f5" stroke="#ddd" stroke-width="1"/>
+              <text x="312" y="193" text-anchor="middle" font-size="7" fill="#aaa">test</text>
+
+              <!-- 汇合线 → Join -->
+              <line x1="332" y1="30" x2="370" y2="100" stroke="#66bb6a" stroke-width="1.5"/>
+              <line x1="332" y1="70" x2="370" y2="105" stroke="#66bb6a" stroke-width="1.5"/>
+              <line x1="332" y1="150" x2="370" y2="115" stroke="#66bb6a" stroke-width="1.5"/>
+              <line x1="332" y1="190" x2="370" y2="120" stroke="#ddd" stroke-width="1.5" stroke-dasharray="4"/>
+
+              <!-- Join -->
+              <circle cx="380" cy="110" r="10" fill="#faf5ff" stroke="#7b1fa2" stroke-width="2"/>
+              <text x="380" y="114" text-anchor="middle" font-size="10" fill="#7b1fa2" font-weight="700">+</text>
+              <text x="380" y="132" text-anchor="middle" font-size="7" fill="#8c95a4">join</text>
+              <text x="380" y="142" text-anchor="middle" font-size="6" fill="#b0b8c4">等待全部完成</text>
+
+              <!-- Join → 集成测试 -->
+              <line x1="390" y1="110" x2="430" y2="110" stroke="#ddd" stroke-width="2" marker-end="url(#a3g)"/>
+              <rect x="432" y="94" width="70" height="32" rx="6" fill="#f0f2f5" stroke="#ddd" stroke-width="1.5"/>
+              <text x="467" y="113" text-anchor="middle" font-size="8" fill="#8c95a4" font-weight="500">集成测试</text>
+              <text x="467" y="140" text-anchor="middle" font-size="7" fill="#b0b8c4">QA · 待执行</text>
+
+              <!-- → End -->
+              <line x1="502" y1="110" x2="530" y2="110" stroke="#ddd" stroke-width="2"/>
+              <circle cx="540" cy="110" r="8" fill="#fff" stroke="#333" stroke-width="3"/>
+              <text x="540" y="132" text-anchor="middle" font-size="7" fill="#8c95a4">end</text>
+
+              <!-- 波次标注 -->
+              <text x="50" y="8" font-size="7" fill="#7b1fa2">Wave 1（无依赖）</text>
+              <rect x="118" y="12" width="218" height="76" rx="4" fill="none" stroke="#7b1fa2" stroke-width="0.5" stroke-dasharray="3" opacity="0.3"/>
+              <text x="50" y="128" font-size="7" fill="#7b1fa2">Wave 2（依赖 T-002）</text>
+              <rect x="118" y="132" width="218" height="36" rx="4" fill="none" stroke="#7b1fa2" stroke-width="0.5" stroke-dasharray="3" opacity="0.3"/>
+              <text x="50" y="168" font-size="7" fill="#1565c0">Wave 3（依赖 T-003+T-004）</text>
+              <rect x="118" y="172" width="218" height="36" rx="4" fill="none" stroke="#1565c0" stroke-width="0.5" stroke-dasharray="3" opacity="0.3"/>
+            </svg>
+            <!-- 任务列表 -->
+            <div style="font-size:11px;font-weight:500;margin-bottom:6px;">任务列表（点击查看执行过程）</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:5px;font-size:10px;background:#f9f9f9;cursor:pointer;" onclick="od('T-001')"><span>✅</span><b>T-001</b> 脚手架<span style="margin-left:auto;color:#4caf50;">14.1s</span></div>
+              <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:5px;font-size:10px;background:#f9f9f9;cursor:pointer;" onclick="od('T-002')"><span>✅</span><b>T-002</b> 文章CRUD<span style="margin-left:auto;color:#4caf50;">18.3s</span></div>
+              <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:5px;font-size:10px;background:#f9f9f9;cursor:pointer;" onclick="od('T-003')"><span>✅</span><b>T-003</b> 标签系统 <span style="color:#c62828;font-size:9px;">❌1打回</span><span style="margin-left:auto;color:#4caf50;">27.2s</span></div>
+              <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:5px;font-size:10px;background:#f9f9f9;cursor:pointer;" onclick="od('T-004')"><span>✅</span><b>T-004</b> 评论系统<span style="margin-left:auto;color:#4caf50;">22.1s</span></div>
+              <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:5px;font-size:10px;background:#e3f2fd;border:1px solid #bbdefb;cursor:pointer;" onclick="od('T-005')"><span>🔨</span><b style="color:#1565c0;">T-005</b> 前端页面<span style="margin-left:auto;color:#1565c0;">执行中</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 阶段 4：验收（子流程预览） -->
+        <div class="stage-detail" id="s4" style="display:none;">
+          <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;opacity:0.6;">
+            <div style="font-size:12px;font-weight:600;margin-bottom:4px;">阶段 4 · 验收确认 <span style="font-size:10px;color:#999;font-weight:400;">○ 未开始</span></div>
+            <div style="font-size:10px;color:#999;margin-bottom:8px;">集成测试 → 用户验收 → 分支收尾</div>
+            <div style="display:flex;align-items:center;gap:4px;justify-content:center;flex-wrap:wrap;">
+              <div class="bn"><div class="bstart"></div><div class="bl">start</div></div><div class="bline"></div>
+              <div class="bn"><div class="bd wait">1</div><div class="bl">集成测试</div><div class="ba">QA</div></div><div class="bline"></div>
+              <div class="bn"><div class="bdia"><div class="bdia-i">◇</div></div><div class="bl">判断</div></div><div class="bline"></div>
+              <div class="bn" style="border:1px dashed #ff9800;border-radius:6px;padding:3px 5px;background:#fff8f0;"><div class="bd wait" style="width:18px;height:18px;font-size:8px;">2</div><div class="bl" style="color:#e65100;">👤 用户验收</div><div class="ba">硬门禁</div></div><div class="bline"></div>
+              <div class="bn"><div class="bdia"><div class="bdia-i">◇</div></div><div class="bl">判断</div></div><div class="bline"></div>
+              <div class="bn"><div class="bd wait">3</div><div class="bl">分支收尾</div><div class="ba">DevOps</div></div><div class="bline"></div>
+              <div class="bn"><div class="bend"></div><div class="bl">end</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 阶段 5：发布（SVG 含回滚分支） -->
+        <div class="stage-detail" id="s5" style="display:none;">
+          <div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;opacity:0.7;">
+            <div style="font-size:12px;font-weight:600;margin-bottom:4px;">阶段 5 · 发布执行 <span style="font-size:10px;color:#8c95a4;font-weight:400;">○ 未开始</span></div>
+            <div style="font-size:10px;color:#8c95a4;margin-bottom:10px;">预检 → 部署 → 冒烟测试 → 观察 → 结案 · 红色虚线=回滚路径</div>
+            <svg viewBox="0 0 680 180" style="width:100%;max-width:680px;margin:0 auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="a5" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#aaa"/></marker>
+                <marker id="a5r" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#ef5350"/></marker>
+              </defs>
+
+              <!-- 主线 -->
+              <line x1="28" y1="50" x2="58" y2="50" stroke="#aaa" stroke-width="1.5" marker-end="url(#a5)"/>
+              <line x1="118" y1="50" x2="148" y2="50" stroke="#aaa" stroke-width="1.5" marker-end="url(#a5)"/>
+              <line x1="168" y1="38" x2="198" y2="30" stroke="#aaa" stroke-width="1.5" marker-end="url(#a5)"/>
+              <line x1="258" y1="30" x2="288" y2="30" stroke="#aaa" stroke-width="1.5" marker-end="url(#a5)"/>
+              <line x1="348" y1="30" x2="378" y2="30" stroke="#aaa" stroke-width="1.5" marker-end="url(#a5)"/>
+              <line x1="398" y1="18" x2="428" y2="10" stroke="#aaa" stroke-width="1.5" marker-end="url(#a5)"/>
+              <line x1="488" y1="10" x2="518" y2="10" stroke="#aaa" stroke-width="1.5" marker-end="url(#a5)"/>
+              <line x1="538" y1="0" x2="568" y2="0" stroke="#aaa" stroke-width="1.5" marker-end="url(#a5)"/>
+              <line x1="628" y1="0" x2="650" y2="0" stroke="#aaa" stroke-width="1.5"/>
+
+              <!-- 回滚分支线 -->
+              <line x1="168" y1="62" x2="198" y2="130" stroke="#ef5350" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#a5r)"/>
+              <line x1="398" y1="42" x2="428" y2="90" stroke="#ef5350" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#a5r)"/>
+              <line x1="538" y1="22" x2="540" y2="90" stroke="#ef5350" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#a5r)"/>
+              <!-- rollback → 结案 -->
+              <line x1="260" y1="140" x2="580" y2="140" stroke="#ef5350" stroke-width="1.5" stroke-dasharray="4"/>
+              <line x1="460" y1="100" x2="580" y2="100" stroke="#ef5350" stroke-width="1.5" stroke-dasharray="4"/>
+              <line x1="580" y1="100" x2="580" y2="10" stroke="#ef5350" stroke-width="1" stroke-dasharray="4"/>
+              <line x1="580" y1="140" x2="580" y2="10" stroke="#ef5350" stroke-width="1" stroke-dasharray="4"/>
+
+              <!-- Start -->
+              <circle cx="20" cy="50" r="8" fill="#f0f2f5" stroke="#aaa" stroke-width="2"/>
+              <text x="20" y="72" text-anchor="middle" font-size="7" fill="#8c95a4">start</text>
+
+              <!-- precheck -->
+              <rect x="60" y="34" width="56" height="32" rx="6" fill="#f0f2f5" stroke="#aaa" stroke-width="1.5"/>
+              <text x="88" y="53" text-anchor="middle" font-size="8" fill="#555">precheck</text>
+              <text x="88" y="78" text-anchor="middle" font-size="6" fill="#b0b8c4">DevOps</text>
+
+              <!-- ◇ precheck 判断 -->
+              <rect x="148" y="32" width="20" height="20" rx="2" transform="rotate(45 158 42)" fill="#fff" stroke="#aaa" stroke-width="1.5"/>
+              <text x="158" y="46" text-anchor="middle" font-size="7" fill="#555">◇</text>
+              <text x="180" y="26" font-size="6" fill="#43a047">pass</text>
+              <text x="180" y="76" font-size="6" fill="#ef5350">fail→retry</text>
+
+              <!-- deploy -->
+              <rect x="200" y="14" width="56" height="32" rx="6" fill="#f0f2f5" stroke="#aaa" stroke-width="1.5"/>
+              <text x="228" y="33" text-anchor="middle" font-size="8" fill="#555">deploy</text>
+              <text x="228" y="58" text-anchor="middle" font-size="6" fill="#b0b8c4">DevOps</text>
+
+              <!-- smoke -->
+              <rect x="290" y="14" width="56" height="32" rx="6" fill="#f0f2f5" stroke="#aaa" stroke-width="1.5"/>
+              <text x="318" y="33" text-anchor="middle" font-size="8" fill="#555">smoke</text>
+              <text x="318" y="58" text-anchor="middle" font-size="6" fill="#b0b8c4">QA</text>
+
+              <!-- ◇ smoke 判断 -->
+              <rect x="378" y="12" width="20" height="20" rx="2" transform="rotate(45 388 22)" fill="#fff" stroke="#aaa" stroke-width="1.5"/>
+              <text x="388" y="26" text-anchor="middle" font-size="7" fill="#555">◇</text>
+              <text x="410" y="6" font-size="6" fill="#43a047">pass</text>
+              <text x="416" y="86" font-size="6" fill="#ef5350">fail→rollback</text>
+
+              <!-- observe -->
+              <rect x="430" y="-6" width="56" height="32" rx="6" fill="#f0f2f5" stroke="#aaa" stroke-width="1.5"/>
+              <text x="458" y="13" text-anchor="middle" font-size="8" fill="#555">observe</text>
+              <text x="458" y="38" text-anchor="middle" font-size="6" fill="#b0b8c4">DevOps</text>
+
+              <!-- ◇ observe 判断 -->
+              <rect x="518" y="-18" width="20" height="20" rx="2" transform="rotate(45 528 -8)" fill="#fff" stroke="#aaa" stroke-width="1.5"/>
+              <text x="528" y="-4" text-anchor="middle" font-size="7" fill="#555">◇</text>
+              <text x="548" y="-14" font-size="6" fill="#43a047">healthy</text>
+              <text x="548" y="86" font-size="6" fill="#ef5350">degraded→rollback</text>
+
+              <!-- 结案 -->
+              <rect x="570" y="-16" width="56" height="32" rx="6" fill="#f0f2f5" stroke="#aaa" stroke-width="1.5"/>
+              <text x="598" y="3" text-anchor="middle" font-size="8" fill="#555">结案</text>
+              <text x="598" y="28" text-anchor="middle" font-size="6" fill="#b0b8c4">TL</text>
+
+              <!-- End -->
+              <circle cx="660" cy="0" r="8" fill="#fff" stroke="#333" stroke-width="3"/>
+              <text x="660" y="22" text-anchor="middle" font-size="7" fill="#8c95a4">end</text>
+
+              <!-- rollback 节点 -->
+              <rect x="200" y="120" width="56" height="32" rx="6" fill="#fce4ec" stroke="#ef5350" stroke-width="1.5"/>
+              <text x="228" y="139" text-anchor="middle" font-size="8" fill="#c62828">rollback</text>
+              <text x="228" y="164" text-anchor="middle" font-size="6" fill="#b0b8c4">DevOps · 回滚</text>
+
+              <rect x="430" y="80" width="56" height="32" rx="6" fill="#fce4ec" stroke="#ef5350" stroke-width="1.5"/>
+              <text x="458" y="99" text-anchor="middle" font-size="8" fill="#c62828">rollback</text>
+              <text x="458" y="124" text-anchor="middle" font-size="6" fill="#b0b8c4">DevOps · 回滚</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- BPMN 图例 -->
+        <div style="background:#fff;border-radius:10px;padding:10px 14px;font-size:9px;color:#999;display:flex;gap:10px;flex-wrap:wrap;">
+          <span>○ Start Event</span><span>⊕ End Event</span><span>□ Task</span><span>◇ Exclusive Gateway</span><span>+ Parallel Gateway</span><span style="color:#7b1fa2;">🗣 Session (Ad-Hoc)</span><span style="color:#e65100;">👤 User Task (Gate)</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== 团队页 ===== -->
+    <div class="pg" id="pg-team">
+      <div class="hd"><div class="hd-i"><div class="hd-t">👥 团队</div><div class="hd-s">6 个 Agent</div></div><div class="hd-btns"><div class="hd-btn" onclick="sp('chat')">💬</div></div></div>
+      <div style="flex:1;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+        <div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;"><div class="m-av tl" style="width:32px;height:32px;font-size:11px;">TL</div><div style="flex:1;"><div style="font-size:12px;font-weight:500;">Tech Lead</div><div style="font-size:10px;color:#999;">需求分析、方案设计、代码审查</div></div><div style="font-size:10px;padding:2px 6px;border-radius:8px;background:#e8f5e9;color:#2e7d32;">🟢 空闲</div></div>
+        <div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;"><div class="m-av be" style="width:32px;height:32px;font-size:11px;">B1</div><div style="flex:1;"><div style="font-size:12px;font-weight:500;">后端开发-1</div><div style="font-size:10px;color:#999;">Rust · 标签/评论模块</div></div><div style="font-size:10px;padding:2px 6px;border-radius:8px;background:#e8f5e9;color:#2e7d32;">🟢 空闲</div></div>
+        <div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;"><div class="m-av be" style="width:32px;height:32px;font-size:11px;">B2</div><div style="flex:1;"><div style="font-size:12px;font-weight:500;">后端开发-2</div><div style="font-size:10px;color:#999;">Rust · 文章CRUD模块</div></div><div style="font-size:10px;padding:2px 6px;border-radius:8px;background:#e8f5e9;color:#2e7d32;">🟢 空闲</div></div>
+        <div style="background:#fff;border:1px solid #bbdefb;border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;"><div class="m-av fe" style="width:32px;height:32px;font-size:11px;">FE</div><div style="flex:1;"><div style="font-size:12px;font-weight:500;">前端开发-1</div><div style="font-size:10px;color:#1976d2;">React · 正在执行 TASK-005</div></div><div style="font-size:10px;padding:2px 6px;border-radius:8px;background:#e3f2fd;color:#1565c0;">🔵 执行中</div></div>
+        <div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;"><div class="m-av qa" style="width:32px;height:32px;font-size:11px;">QA</div><div style="flex:1;"><div style="font-size:12px;font-weight:500;">测试-1</div><div style="font-size:10px;color:#999;">功能测试、回归测试</div></div><div style="font-size:10px;padding:2px 6px;border-radius:8px;background:#e8f5e9;color:#2e7d32;">🟢 空闲</div></div>
+        <div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px;"><div class="m-av dv" style="width:32px;height:32px;font-size:11px;">DO</div><div style="flex:1;"><div style="font-size:12px;font-weight:500;">DevOps</div><div style="font-size:10px;color:#999;">CI/CD、部署、监控</div></div><div style="font-size:10px;padding:2px 6px;border-radius:8px;background:#e8f5e9;color:#2e7d32;">🟢 空闲</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 任务详情面板（右侧滑出） ===== -->
+<div class="detail-panel" id="dp">
+  <div class="dp-hd">
+    <span style="font-size:11px;font-weight:600;color:#1976d2;" id="dp-id">TASK-003</span>
+    <span style="font-size:12px;font-weight:500;" id="dp-title">文章标签系统</span>
+    <span class="close" onclick="cd()">✕</span>
+  </div>
+  <div class="dp-body" id="dp-body">
+
+    <!-- BPMN 流程图 -->
+    <div style="font-size:11px;font-weight:600;margin-bottom:6px;">BPMN 流程</div>
+    <div class="bpmn-flow">
+      <div class="bn"><div class="bstart"></div><div class="bl">start</div></div>
+      <div class="bline done"></div>
+      <div class="bn"><div class="bd done">✓</div><div class="bl">implement</div><div class="ba">BE-1 · 17s</div></div>
+      <div class="bline done"></div>
+      <div class="bn"><div class="bd done">✓</div><div class="bl">review</div><div class="ba">TL · 5s</div></div>
+      <div class="bline done"></div>
+      <div class="bn"><div class="bdia done"><div class="bdia-i">◇</div></div><div class="bl">判断</div><div class="ba" style="color:#c62828;">1次打回</div></div>
+      <div class="bline done"></div>
+      <div class="bn"><div class="bd done">✓</div><div class="bl">testing</div><div class="ba">QA · 5s</div></div>
+      <div class="bline done"></div>
+      <div class="bn"><div class="bdia done"><div class="bdia-i">◇</div></div><div class="bl">判断</div></div>
+      <div class="bline done"></div>
+      <div class="bn"><div class="bend done"></div><div class="bl">end</div></div>
+    </div>
+
+    <!-- 多角色执行过程 -->
+    <div style="font-size:11px;font-weight:600;margin-bottom:6px;">执行过程</div>
+
+    <div class="tr-block">
+      <div class="tr-hd be"><div class="tr-av">BE</div>后端开发-1 · implement (TDD Enforced)<div class="tr-meta">17.0s · 7 步</div></div>
+      <div class="tr-steps">
+        <div class="tr-step">✅ <span class="t">task_read</span>("TASK-003") → 读取需求</div>
+        <div class="tr-step">✅ <span class="t">file_write</span>(<code>tests/test_tags.rs</code>) → 写失败测试</div>
+        <div class="tr-step">✅ <span class="t">code_execute</span>(<code>cargo test</code>) → <span class="r">1 failed ✓ 红灯</span></div>
+        <div class="tr-step">💬 <span class="a">ask_teammate</span>(TL): "支持中文吗？" → <span class="p">"支持，VARCHAR(200)"</span></div>
+        <div class="tr-step">✅ <span class="t">file_write</span>(<code>tag.rs</code> + <code>tags.rs</code>)</div>
+        <div class="tr-step">✅ <span class="t">code_execute</span>(<code>cargo test</code>) → <span class="r">12 passed ✓ 绿灯</span></div>
+        <div class="tr-step">✅ <span class="t">submit_step_result</span>({ files: 3, test: passed })</div>
+      </div>
+    </div>
+
+    <div class="tr-conn">▼ ◇ Exclusive Gateway: review_decision</div>
+
+    <div class="tr-block">
+      <div class="tr-hd tl"><div class="tr-av">TL</div>Tech Lead · code_review<div class="tr-meta">5.0s · 含 1 次打回</div></div>
+      <div class="tr-steps">
+        <div class="tr-step">✅ <span class="t">git_diff</span> + <span class="t">file_read</span> × 3</div>
+        <div class="tr-step">❌ <span class="x">第一次：缺少唯一索引 → rejected</span></div>
+        <div class="tr-step">🔄 ◇ Gateway → "needs_revision" → 回退 implement</div>
+        <div class="tr-step">✅ 第二次 → <span class="r">approved ✓</span></div>
+        <div class="tr-step">✅ ◇ Gateway → "approved" → 推进 testing</div>
+      </div>
+    </div>
+
+    <div class="tr-conn">▼ ◇ Exclusive Gateway: test_decision</div>
+
+    <div class="tr-block">
+      <div class="tr-hd qa"><div class="tr-av">QA</div>测试-1 · testing<div class="tr-meta">5.2s</div></div>
+      <div class="tr-steps">
+        <div class="tr-step">✅ <span class="t">code_execute</span>(<code>cargo test</code>) → <span class="r">12 passed</span></div>
+        <div class="tr-step">🐛 <span class="x">额外发现</span>：空标签名 500 → <span class="t">task_create</span>(BUG-002)</div>
+        <div class="tr-step">✅ ◇ Gateway → "passed" → End Event</div>
+      </div>
+    </div>
+
+    <div class="tr-ft">
+      <span>⏱ 27.2s</span><span>👥 3 角色</span><span>◇ 2 网关</span><span>↩ 1 回退</span><span>🔧 16 调用</span><span>💬 1 ask</span><span>🐛 1 BUG</span><span>📊 ~8200 tokens</span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function sp(p){
+  document.querySelectorAll('.pg').forEach(x=>x.classList.remove('on'));
+  document.getElementById('pg-'+p).classList.add('on');
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
+  const m={chat:'💬',kanban:'📊',progress:'📈',team:'👥'};
+  document.querySelectorAll('.ni').forEach(n=>{if(n.textContent.trim().startsWith(m[p]))n.classList.add('on');});
+  document.getElementById('sb').classList.toggle('hide',p!=='chat');
+}
+function od(id){
+  const dp=document.getElementById('dp');
+  document.getElementById('dp-id').textContent=id;
+  const titles={'T-001':'项目脚手架','T-002':'文章CRUD','T-003':'文章标签系统','T-004':'评论系统','T-005':'前端页面','BUG-002':'空标签名返回500'};
+  document.getElementById('dp-title').textContent=titles[id]||id;
+  dp.classList.add('show');
+}
+function cd(){document.getElementById('dp').classList.remove('show');}
+function toggleStage(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const all=document.querySelectorAll('.stage-detail');
+  all.forEach(x=>{if(x.id!==id)x.style.display='none';});
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+</script>
+</body>
+</html>

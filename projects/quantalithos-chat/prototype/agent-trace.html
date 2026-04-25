@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 执行过程 Hover 面板</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: #f0f0f0; padding: 40px; }
+
+.chat-area { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+.msg { display: flex; gap: 8px; max-width: 85%; position: relative; }
+.msg.self { margin-left: auto; flex-direction: row-reverse; }
+
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; flex-shrink: 0; font-weight: 600; }
+.avatar.tl { background: #388e3c; }
+.avatar.be { background: #f57c00; }
+.avatar.qa { background: #c62828; }
+.avatar.u { background: #1976d2; }
+
+.msg-body { }
+.msg-name { font-size: 11px; color: #999; margin-bottom: 2px; }
+.msg-bubble { background: #fff; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: default; position: relative; }
+.msg.self .msg-bubble { background: #d1e7ff; }
+.msg-time { font-size: 10px; color: #ccc; margin-top: 2px; }
+
+/* 工单卡片 */
+.embed-card { background: #f7f7f7; border: 1px solid #eee; border-radius: 8px; padding: 8px 10px; margin-top: 6px; font-size: 12px; }
+.embed-card-row { display: flex; align-items: center; gap: 6px; }
+.embed-card-id { color: #1976d2; font-weight: 600; }
+.embed-card-status { padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 500; margin-left: auto; }
+.s-done { background: #e8f5e9; color: #2e7d32; }
+.s-dev { background: #e3f2fd; color: #1565c0; }
+.embed-card-sub { color: #999; margin-top: 3px; display: flex; gap: 8px; font-size: 11px; }
+
+/* Hover 触发区域 */
+.has-trace .msg-bubble { border-left: 3px solid #1976d2; }
+.has-trace .msg-bubble:hover { background: #f0f7ff; }
+.trace-hint { font-size: 10px; color: #90caf9; margin-top: 4px; }
+
+/* 执行过程面板 */
+.trace-panel { display: none; position: absolute; left: 40px; top: 100%; z-index: 100; width: 480px; background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); padding: 16px; margin-top: 8px; }
+.has-trace:hover .trace-panel { display: block; }
+
+.trace-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
+.trace-header .agent-name { font-size: 13px; font-weight: 600; color: #333; }
+.trace-header .task-name { font-size: 12px; color: #666; }
+.trace-header .total { margin-left: auto; font-size: 11px; color: #999; }
+
+.trace-step { display: flex; gap: 10px; padding: 6px 0; position: relative; }
+.trace-step + .trace-step { border-top: 1px solid #f8f8f8; }
+
+.trace-step-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; margin-top: 2px; }
+.trace-step-icon.done { background: #e8f5e9; color: #2e7d32; }
+.trace-step-icon.running { background: #e3f2fd; color: #1565c0; animation: pulse 1.5s infinite; }
+.trace-step-icon.pending { background: #f5f5f5; color: #bbb; }
+
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.trace-step-content { flex: 1; min-width: 0; }
+.trace-step-name { font-size: 12px; font-weight: 500; color: #333; }
+.trace-step-detail { font-size: 11px; color: #888; margin-top: 2px; line-height: 1.5; }
+.trace-step-detail code { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; font-size: 10px; font-family: 'SF Mono', Monaco, monospace; }
+.trace-step-detail .tool-call { color: #1976d2; }
+.trace-step-detail .tool-result { color: #388e3c; }
+.trace-step-detail .ask { color: #f57c00; }
+.trace-step-detail .ask-reply { color: #7b1fa2; }
+
+.trace-step-time { font-size: 10px; color: #bbb; flex-shrink: 0; margin-top: 2px; }
+
+.trace-footer { margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0; font-size: 11px; color: #999; display: flex; gap: 12px; }
+
+/* 正在执行的消息 */
+.msg-running .msg-bubble { border-left: 3px solid #1976d2; background: #fafcff; }
+.running-indicator { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; color: #1976d2; }
+.running-dot { width: 6px; height: 6px; border-radius: 50%; background: #1976d2; animation: pulse 1s infinite; }
+</style>
+</head>
+<body>
+
+<div class="chat-area">
+
+  <!-- TL 消息 -->
+  <div class="msg">
+    <div class="avatar tl">TL</div>
+    <div class="msg-body">
+      <div class="msg-name">Tech Lead</div>
+      <div class="msg-bubble">任务分配完成，TASK-003 标签系统指派给 @后端开发-1。</div>
+      <div class="msg-time">10:00</div>
+    </div>
+  </div>
+
+  <!-- BE 正在执行（实时状态） -->
+  <div class="msg msg-running has-trace">
+    <div class="avatar be">BE</div>
+    <div class="msg-body">
+      <div class="msg-name">后端开发-1</div>
+      <div class="msg-bubble">
+        正在执行 TASK-003 标签系统...
+        <div class="embed-card">
+          <div class="embed-card-row">
+            <span class="embed-card-id">TASK-003</span>
+            <span>文章标签系统</span>
+            <span class="embed-card-status s-dev">执行中</span>
+          </div>
+          <div class="embed-card-sub">
+            <span>🔵 TDD 流程</span>
+            <span>步骤 4/7</span>
+            <span>⏱ 12.3s</span>
+          </div>
+        </div>
+        <div class="running-indicator">
+          <div class="running-dot"></div>
+          编写实现代码...
+        </div>
+        <div class="trace-hint">hover 查看执行过程 →</div>
+      </div>
+      <div class="msg-time">10:01</div>
+
+      <!-- Hover 面板：正在执行 -->
+      <div class="trace-panel">
+        <div class="trace-header">
+          <span class="agent-name">🔵 后端开发-1</span>
+          <span class="task-name">TASK-003 标签系统 · TDD 流程</span>
+          <span class="total">12.3s · 4/7 步</span>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">读取工单</div>
+            <div class="trace-step-detail">
+              <span class="tool-call">task_read</span>("TASK-003") → <span class="tool-result">标签系统需求</span>
+            </div>
+          </div>
+          <div class="trace-step-time">0.5s</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">写失败测试</div>
+            <div class="trace-step-detail">
+              <span class="tool-call">file_write</span>(<code>tests/test_tags.rs</code>)
+            </div>
+          </div>
+          <div class="trace-step-time">3.2s</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">确认测试失败</div>
+            <div class="trace-step-detail">
+              <span class="tool-call">code_execute</span>(<code>cargo test tests::tags</code>) → <span class="tool-result">1 failed ✓</span>
+            </div>
+          </div>
+          <div class="trace-step-time">1.1s</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon running">⟳</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name" style="color: #1565c0;">编写实现代码</div>
+            <div class="trace-step-detail">
+              <span class="tool-call">file_write</span>(<code>src/models/tag.rs</code>) → <span class="tool-result">done</span><br>
+              <span class="tool-call">file_write</span>(<code>src/routes/tags.rs</code>) → <span class="tool-result">done</span><br>
+              <span class="ask">💬 ask_teammate</span>(TL): "标签名支持中文吗？"<br>
+              <span class="ask-reply">← TL: "支持，用 VARCHAR(200)"</span><br>
+              <span class="tool-call">file_write</span>(<code>src/models/tag.rs</code>) → 修改为 VARCHAR(200)...
+            </div>
+          </div>
+          <div class="trace-step-time">7.5s...</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon pending">5</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name" style="color: #bbb;">确认测试通过</div>
+          </div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon pending">6</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name" style="color: #bbb;">重构</div>
+          </div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon pending">7</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name" style="color: #bbb;">提交结果</div>
+          </div>
+        </div>
+
+        <div class="trace-footer">
+          <span>⏱ 已用 12.3s</span>
+          <span>🔧 5 次工具调用</span>
+          <span>💬 1 次 ask_teammate</span>
+          <span>📊 ~2800 tokens</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用户提问 -->
+  <div class="msg self">
+    <div class="avatar u">A</div>
+    <div class="msg-body">
+      <div class="msg-name">你</div>
+      <div class="msg-bubble">评论功能进展如何？</div>
+      <div class="msg-time">10:15</div>
+    </div>
+  </div>
+
+  <!-- BE 完成的消息（可 hover 看历史执行过程） -->
+  <div class="msg has-trace">
+    <div class="avatar be">BE</div>
+    <div class="msg-body">
+      <div class="msg-name">后端开发-1</div>
+      <div class="msg-bubble">
+        TASK-003 标签系统实现完成 ✅
+        <div class="embed-card">
+          <div class="embed-card-row">
+            <span class="embed-card-id">TASK-003</span>
+            <span>文章标签系统</span>
+            <span class="embed-card-status s-done">已完成</span>
+          </div>
+          <div class="embed-card-sub">
+            <span>📎 3 files</span>
+            <span>✅ 12 tests passed</span>
+            <span>⏱ 17.0s</span>
+          </div>
+        </div>
+        <div class="trace-hint">hover 查看执行过程 →</div>
+      </div>
+      <div class="msg-time">10:18</div>
+
+      <!-- Hover 面板：已完成 -->
+      <div class="trace-panel">
+        <div class="trace-header">
+          <span class="agent-name">✅ 后端开发-1</span>
+          <span class="task-name">TASK-003 标签系统 · TDD 流程</span>
+          <span class="total">17.0s · 7/7 步</span>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">读取工单</div>
+            <div class="trace-step-detail"><span class="tool-call">task_read</span>("TASK-003")</div>
+          </div>
+          <div class="trace-step-time">0.5s</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">写失败测试</div>
+            <div class="trace-step-detail"><span class="tool-call">file_write</span>(<code>tests/test_tags.rs</code>)</div>
+          </div>
+          <div class="trace-step-time">3.2s</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">确认测试失败</div>
+            <div class="trace-step-detail"><span class="tool-call">code_execute</span>(<code>cargo test</code>) → <span class="tool-result">1 failed ✓</span></div>
+          </div>
+          <div class="trace-step-time">1.1s</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">编写实现代码</div>
+            <div class="trace-step-detail">
+              <span class="tool-call">file_write</span>(<code>src/models/tag.rs</code>)<br>
+              <span class="tool-call">file_write</span>(<code>src/routes/tags.rs</code>)<br>
+              <span class="ask">💬 ask_teammate</span>(TL): "标签名支持中文吗？"<br>
+              <span class="ask-reply">← "支持，用 VARCHAR(200)"</span>
+            </div>
+          </div>
+          <div class="trace-step-time">8.5s</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">确认测试通过</div>
+            <div class="trace-step-detail"><span class="tool-call">code_execute</span>(<code>cargo test</code>) → <span class="tool-result">12 passed ✓</span></div>
+          </div>
+          <div class="trace-step-time">1.3s</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">重构</div>
+            <div class="trace-step-detail"><span class="tool-call">file_write</span>(<code>src/models/tag.rs</code>) 优化索引定义</div>
+          </div>
+          <div class="trace-step-time">2.1s</div>
+        </div>
+
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">提交结果</div>
+            <div class="trace-step-detail">
+              <span class="tool-call">submit_step_result</span>({<br>
+              &nbsp;&nbsp;changed_files: [tag.rs, tags.rs, test_tags.rs],<br>
+              &nbsp;&nbsp;test_result: "passed"<br>
+              })
+            </div>
+          </div>
+          <div class="trace-step-time">0.3s</div>
+        </div>
+
+        <div class="trace-footer">
+          <span>⏱ 总耗时 17.0s</span>
+          <span>🔧 8 次工具调用</span>
+          <span>💬 1 次 ask_teammate</span>
+          <span>📊 ~4200 tokens</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QA 消息 -->
+  <div class="msg has-trace">
+    <div class="avatar qa">QA</div>
+    <div class="msg-body">
+      <div class="msg-name">测试-1</div>
+      <div class="msg-bubble">
+        TASK-003 测试完成 ✅ 12/12 passed
+        <div class="trace-hint">hover 查看执行过程 →</div>
+      </div>
+      <div class="msg-time">10:25</div>
+
+      <div class="trace-panel">
+        <div class="trace-header">
+          <span class="agent-name">✅ 测试-1</span>
+          <span class="task-name">TASK-003 标签系统 · 测试</span>
+          <span class="total">5.2s · 3 步</span>
+        </div>
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">读取任务和代码</div>
+            <div class="trace-step-detail">
+              <span class="tool-call">task_read</span>("TASK-003")<br>
+              <span class="tool-call">file_read</span>(<code>src/models/tag.rs</code>)<br>
+              <span class="tool-call">file_read</span>(<code>src/routes/tags.rs</code>)
+            </div>
+          </div>
+          <div class="trace-step-time">1.2s</div>
+        </div>
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">执行测试</div>
+            <div class="trace-step-detail">
+              <span class="tool-call">code_execute</span>(<code>cargo test tests::tags</code>) → <span class="tool-result">12 passed, 0 failed</span><br>
+              🐛 额外发现：空标签名返回 500 → <span class="tool-call">task_create</span>(BUG-002)
+            </div>
+          </div>
+          <div class="trace-step-time">3.5s</div>
+        </div>
+        <div class="trace-step">
+          <div class="trace-step-icon done">✓</div>
+          <div class="trace-step-content">
+            <div class="trace-step-name">提交结果</div>
+            <div class="trace-step-detail"><span class="tool-call">submit_step_result</span>({ total: 12, passed: 12, verdict: "passed" })</div>
+          </div>
+          <div class="trace-step-time">0.5s</div>
+        </div>
+        <div class="trace-footer">
+          <span>⏱ 5.2s</span>
+          <span>🔧 5 次工具调用</span>
+          <span>🐛 发现 1 个额外 BUG</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

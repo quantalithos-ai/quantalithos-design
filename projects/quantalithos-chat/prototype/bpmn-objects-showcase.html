@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BPMN 2.0 对象展示 · Quantalithos AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;background:#f5f7fa;color:#333;}
+
+/* 顶部 */
+.top{background:#1a1a2e;color:#fff;padding:16px 24px;display:flex;align-items:center;gap:12px;}
+.top h1{font-size:16px;font-weight:600;}
+.top .sub{font-size:12px;color:#8888aa;}
+
+/* Tab */
+.tabs{display:flex;background:#fff;border-bottom:2px solid #e4e8ec;padding:0 24px;gap:0;}
+.tab{padding:12px 20px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:#666;transition:all .2s;}
+.tab:hover{color:#333;background:#f8f9fb;}
+.tab.on{color:#1565c0;border-bottom-color:#1565c0;font-weight:600;}
+
+/* 内容区 */
+.panels{padding:24px;}
+.panel{display:none;}.panel.on{display:block;}
+
+/* 对象展示行 */
+.obj-row{display:flex;gap:24px;margin-bottom:20px;background:#fff;border-radius:12px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);border:1px solid #eef0f4;}
+.obj-left{width:200px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid #f0f2f5;padding-right:20px;}
+.obj-right{flex:1;min-width:0;}
+.obj-label{font-size:11px;color:#1565c0;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;}
+.obj-name{font-size:14px;font-weight:600;margin-bottom:2px;}
+.obj-name-en{font-size:10px;color:#999;margin-bottom:8px;}
+.obj-desc{font-size:12px;color:#666;line-height:1.6;margin-bottom:10px;}
+.obj-scene{font-size:11px;color:#888;line-height:1.5;}
+.obj-scene b{color:#555;font-weight:500;}
+
+/* BPMN 图形 */
+.bpmn-shape{margin:10px 0;}
+.ev-circle{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:12px;}
+.ev-start{width:32px;height:32px;border:2px solid #43a047;background:#e8f5e9;color:#2e7d32;}
+.ev-end{width:32px;height:32px;border:3px solid #333;background:#fff;}
+.ev-end-term{width:32px;height:32px;border:3px solid #e53935;background:#ffebee;color:#c62828;font-size:10px;}
+.ev-inter{width:32px;height:32px;border:2px double #666;background:#fff;}
+.ev-boundary{width:28px;height:28px;border:2px dashed #e65100;background:#fff3e0;font-size:10px;}
+
+/* 活动 */
+.act-box{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:500;border:2px solid #90a4ae;background:#fff;position:relative;}
+.act-user{border-color:#1565c0;background:#e3f2fd;}
+.act-service{border-color:#e65100;background:#fff3e0;}
+.act-call{border-color:#6a1b9a;background:#f3e5f5;border-width:3px;}
+.act-adhoc{border-style:dashed;border-color:#00838f;background:#e0f7fa;}
+.act-icon{font-size:14px;}
+.act-loop{position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);font-size:10px;}
+
+/* 网关 */
+.gw{width:32px;height:32px;background:#fff;border:2px solid #666;transform:rotate(45deg);display:inline-flex;align-items:center;justify-content:center;}
+.gw-inner{transform:rotate(-45deg);font-size:11px;font-weight:700;}
+.gw-xor{border-color:#f57c00;}
+.gw-and{border-color:#1565c0;}
+.gw-or{border-color:#7b1fa2;}
+.gw-ev{border-color:#00838f;}
+
+/* 连接线 */
+.conn{display:flex;align-items:center;gap:4px;margin:6px 0;}
+.conn-line{height:2px;width:60px;background:#666;}
+.conn-cond{height:2px;width:60px;background:#666;position:relative;}
+.conn-cond::before{content:'';position:absolute;left:0;top:-4px;width:8px;height:8px;background:#fff;border:2px solid #666;transform:rotate(45deg);}
+.conn-default{height:2px;width:60px;background:#666;position:relative;}
+.conn-default::before{content:'/';position:absolute;left:8px;top:-8px;font-size:12px;color:#666;}
+.conn-msg{height:0;width:60px;border-top:2px dashed #999;}
+.conn-arrow{font-size:10px;color:#666;}
+
+/* 产品界面模拟 */
+.ui-mock{background:#f8f9fb;border:1px solid #e4e8ec;border-radius:10px;padding:14px;margin-top:8px;}
+.ui-label{font-size:10px;color:#999;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;}
+
+/* 进度条模拟 */
+.progress-bar{display:flex;align-items:center;gap:0;}
+.p-node{display:flex;flex-direction:column;align-items:center;}
+.p-dot{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:600;}
+.p-dot.done{background:#43a047;}.p-dot.run{background:#1565c0;animation:gl 1.8s ease-in-out infinite;}.p-dot.wait{background:#dde1e6;color:#999;}
+@keyframes gl{0%,100%{box-shadow:0 0 0 3px rgba(21,101,192,.2);}50%{box-shadow:0 0 0 6px rgba(21,101,192,.1);}}
+.p-lbl{font-size:8px;color:#888;margin-top:3px;}
+.p-line{width:24px;height:2px;background:#dde1e6;margin-bottom:14px;}.p-line.done{background:#66bb6a;}.p-line.active{background:#42a5f5;}
+
+/* 门禁卡片 */
+.gate-card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px;border-left:4px solid #f57c00;}
+.gate-hd{font-size:12px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.gate-desc{font-size:11px;color:#666;margin-bottom:8px;}
+.gate-btns{display:flex;gap:8px;}
+.gate-btn{padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;border:none;font-weight:500;}
+.gate-btn.ok{background:#e8f5e9;color:#2e7d32;}.gate-btn.rej{background:#fce4ec;color:#c62828;}
+
+/* 流程图模拟 */
+.flow-mock{display:flex;align-items:center;gap:0;flex-wrap:wrap;padding:10px 0;}
+.fm-node{display:flex;flex-direction:column;align-items:center;min-width:50px;}
+.fm-line{width:28px;height:2px;background:#bbb;margin-bottom:14px;}
+.fm-line.done{background:#66bb6a;}.fm-line.active{background:#42a5f5;}
+
+/* session 模拟 */
+.session-mock{border:2px dashed #00838f;border-radius:10px;padding:10px;background:#e0f7fa;}
+.session-hd{font-size:11px;font-weight:600;color:#00838f;margin-bottom:6px;}
+.session-msg{font-size:11px;color:#555;padding:2px 0;}
+.session-msg .who{font-weight:600;color:#333;}
+
+/* 泳道 */
+.lane-mock{border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;}
+.lane-row{display:flex;border-bottom:1px solid #e0e0e0;min-height:50px;}
+.lane-row:last-child{border-bottom:none;}
+.lane-label{width:80px;background:#f5f7fa;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#555;border-right:1px solid #e0e0e0;}
+.lane-content{flex:1;display:flex;align-items:center;padding:8px 12px;gap:8px;}
+
+.section-title{font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid #e4e8ec;}
+.phase-tag{display:inline-block;font-size:9px;padding:1px 6px;border-radius:4px;font-weight:600;margin-left:6px;}
+.phase1{background:#e8f5e9;color:#2e7d32;}.phase2{background:#e3f2fd;color:#1565c0;}.phase3{background:#f3e5f5;color:#6a1b9a;}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>BPMN 2.0 对象展示</h1>
+  <div class="sub">每种 BPMN 对象在 Quantalithos AI 中的实际呈现</div>
+</div>
+
+<div class="tabs">
+  <div class="tab on" onclick="st(0)">① 事件 Events</div>
+  <div class="tab" onclick="st(1)">② 活动 Activities</div>
+  <div class="tab" onclick="st(2)">③ 网关 Gateways</div>
+  <div class="tab" onclick="st(3)">④ 连接 + 泳道</div>
+  <div class="tab" onclick="st(4)">⑤ 完整场景</div>
+</div>
+
+<div class="panels">
+
+<!-- ===== 第一部分：事件 ===== -->
+<div class="panel on" id="p0">
+<div class="section-title">事件（Events）— 流程中"发生的事情"</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="ev-circle ev-start">○</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">单细线圆</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">开始事件 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">Start Event (none)</div>
+    <div class="obj-desc">流程从这里开始。只有出口没有入口。每个 ProcessDefinition 有且只有一个。</div>
+    <div class="obj-scene"><b>场景：</b>项目启动、阶段开始、Agent 工作流（如 TDD）开始</div>
+    <div class="ui-mock">
+      <div class="ui-label">在进度页中的呈现</div>
+      <div class="progress-bar">
+        <div class="p-node"><div class="p-dot done" style="background:#43a047;border:2px solid #2e7d32;width:18px;height:18px;font-size:0;"></div><div class="p-lbl">开始</div></div>
+        <div class="p-line done"></div>
+        <div class="p-node"><div class="p-dot done">✓</div><div class="p-lbl">目标校准</div></div>
+        <div class="p-line done"></div>
+        <div class="p-node"><div class="p-dot run">2</div><div class="p-lbl">需求理解</div></div>
+        <div class="p-line"></div>
+        <div class="p-node"><div class="p-dot wait">3</div><div class="p-lbl">方案拆解</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="ev-circle ev-end"></div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">单粗线圆</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">结束事件 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">End Event (none)</div>
+    <div class="obj-desc">流程正常结束。只有入口没有出口。token 到达这里被消费。</div>
+    <div class="obj-scene"><b>场景：</b>阶段完成、TDD 工作流所有测试通过后结束</div>
+    <div class="ui-mock">
+      <div class="ui-label">在进度页中的呈现</div>
+      <div class="progress-bar">
+        <div class="p-node"><div class="p-dot done">✓</div><div class="p-lbl">验收</div></div>
+        <div class="p-line done"></div>
+        <div class="p-node"><div class="p-dot done">✓</div><div class="p-lbl">发布</div></div>
+        <div class="p-line done"></div>
+        <div class="p-node"><div class="p-dot done" style="border:3px solid #333;background:#e8f5e9;width:18px;height:18px;font-size:0;"></div><div class="p-lbl">完成</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="ev-circle ev-end-term">✖</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">粗线圆 + 终止标记</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">终止结束事件 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">End Event (terminate)</div>
+    <div class="obj-desc">立即终止整个流程（含所有并行分支）。和普通 End 的区别：普通 End 只结束当前路径，Terminate 杀掉所有。</div>
+    <div class="obj-scene"><b>场景：</b>用户取消项目、严重错误导致流程中止</div>
+    <div class="ui-mock">
+      <div class="ui-label">在聊天区的呈现</div>
+      <div style="background:#ffebee;border:1px solid #ef9a9a;border-radius:8px;padding:8px 12px;font-size:12px;color:#c62828;">
+        ⛔ 项目已取消 · 所有进行中的任务已终止 · 由用户操作触发
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="ev-circle ev-boundary">⏱</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">虚线圆 + 附着在活动上</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">边界定时事件 <span class="phase-tag phase2">Phase 2</span></div>
+    <div class="obj-name-en">Boundary Event (timer)</div>
+    <div class="obj-desc">附着在活动节点上。当活动执行超过指定时间时触发，走超时分支。可以是中断（终止活动）或非中断（活动继续）。</div>
+    <div class="obj-scene"><b>场景：</b>Agent 执行任务超时 → 通知 TL 介入；门禁审批超时 → 自动通过</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现</div>
+      <div class="flow-mock">
+        <div class="fm-node">
+          <div class="act-box" style="position:relative;">
+            👨‍💻 编码实现
+            <div style="position:absolute;bottom:-10px;right:-10px;width:20px;height:20px;border-radius:50%;border:2px dashed #e65100;background:#fff3e0;display:flex;align-items:center;justify-content:center;font-size:8px;">⏱</div>
+          </div>
+          <div class="p-lbl">BE-1 · 30min</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin:0 8px;">
+          <div style="display:flex;align-items:center;"><div style="width:40px;height:2px;background:#666;"></div><span style="font-size:9px;color:#666;">→ 正常</span></div>
+          <div style="display:flex;align-items:center;"><div style="width:40px;height:2px;background:#e65100;"></div><span style="font-size:9px;color:#e65100;">→ 超时</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div class="act-box" style="font-size:11px;">代码审查</div>
+          <div class="act-box" style="font-size:11px;border-color:#e65100;">⚠️ TL 介入</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="ev-circle ev-boundary">⚡</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">虚线圆 + 错误标记</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">边界错误事件 <span class="phase-tag phase2">Phase 2</span></div>
+    <div class="obj-name-en">Boundary Event (error)</div>
+    <div class="obj-desc">附着在活动节点上。当活动执行失败时触发，走错误处理分支。始终是中断型（终止活动）。</div>
+    <div class="obj-scene"><b>场景：</b>Agent LLM 调用 3 次重试后仍失败 → 走错误分支 → 通知 TL</div>
+    <div class="ui-mock">
+      <div class="ui-label">在聊天区的呈现</div>
+      <div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:8px 12px;font-size:12px;">
+        <div style="font-weight:600;color:#e65100;margin-bottom:4px;">⚡ 任务执行异常</div>
+        <div style="color:#666;">TASK-003 编码实现 · backend-dev-1 · LLM 调用失败（3次重试后）</div>
+        <div style="color:#888;font-size:11px;margin-top:4px;">已通知 Tech Lead 介入处理</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="ev-circle ev-inter">✉</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">双细线圆 + 信封</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">中间消息事件 <span class="phase-tag phase3">Phase 3</span></div>
+    <div class="obj-name-en">Intermediate Event (message catch)</div>
+    <div class="obj-desc">流程暂停，等待收到特定消息后继续。捕获型（被动等待）。</div>
+    <div class="obj-scene"><b>场景：</b>发布阶段等待用户确认"可以上线"的消息</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现</div>
+      <div class="flow-mock">
+        <div class="fm-node"><div class="act-box" style="font-size:11px;">预检查</div><div class="p-lbl">DevOps</div></div>
+        <div class="fm-line done"></div>
+        <div class="fm-node"><div class="ev-circle ev-inter" style="animation:gl 1.8s ease-in-out infinite;">✉</div><div class="p-lbl" style="color:#1565c0;">等待确认</div></div>
+        <div class="fm-line"></div>
+        <div class="fm-node"><div class="act-box" style="font-size:11px;">执行发布</div><div class="p-lbl">DevOps</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="ev-circle ev-inter">⏱</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">双细线圆 + 时钟</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">中间定时事件 <span class="phase-tag phase2">Phase 2</span></div>
+    <div class="obj-name-en">Intermediate Event (timer catch)</div>
+    <div class="obj-desc">流程暂停，等待指定时间到达后继续。用于"等一段时间再做下一步"。</div>
+    <div class="obj-scene"><b>场景：</b>发布后进入观察窗口（等待 10 分钟），观察期结束后检查监控指标</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现</div>
+      <div class="flow-mock">
+        <div class="fm-node"><div class="act-box" style="font-size:11px;">执行发布</div><div class="p-lbl">DevOps</div></div>
+        <div class="fm-line done"></div>
+        <div class="fm-node"><div class="ev-circle ev-inter" style="animation:gl 1.8s ease-in-out infinite;">⏱</div><div class="p-lbl" style="color:#1565c0;">观察 10min</div></div>
+        <div class="fm-line"></div>
+        <div class="fm-node"><div class="act-box" style="font-size:11px;">检查指标</div><div class="p-lbl">DevOps</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ===== 第二部分：活动 ===== -->
+<div class="panel" id="p1">
+<div class="section-title">活动（Activities）— 流程中"要做的事"</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="act-box">📝 任务</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">圆角矩形</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">抽象任务 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">Abstract Task</div>
+    <div class="obj-desc">最基础的活动类型。由 Agent 执行，flow 构造 FlowMessage 发给 runtime，Agent 通过 think→act 循环完成。</div>
+    <div class="obj-scene"><b>场景：</b>编码实现、写测试、写文档、代码审查</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图 + 聊天区的呈现</div>
+      <div class="flow-mock">
+        <div class="fm-node"><div class="ev-circle ev-start" style="width:18px;height:18px;font-size:0;"></div></div>
+        <div class="fm-line done"></div>
+        <div class="fm-node">
+          <div class="act-box" style="background:#e8f5e9;border-color:#43a047;">✓ 写测试</div>
+          <div class="p-lbl">BE-1 · 12s</div>
+        </div>
+        <div class="fm-line done"></div>
+        <div class="fm-node">
+          <div class="act-box" style="background:#e3f2fd;border-color:#1565c0;box-shadow:0 0 0 3px rgba(21,101,192,.15);">🔨 编码实现</div>
+          <div class="p-lbl" style="color:#1565c0;">BE-1 · 执行中</div>
+        </div>
+        <div class="fm-line"></div>
+        <div class="fm-node">
+          <div class="act-box">运行测试</div>
+          <div class="p-lbl">BE-1</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 12px;font-size:12px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          <div style="width:24px;height:24px;border-radius:50%;background:#e65100;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;">B1</div>
+          <span style="font-weight:500;">后端开发-1</span>
+          <span style="font-size:10px;color:#999;">09:15</span>
+        </div>
+        <div style="color:#555;">已完成标签模型实现，12 个测试全部通过。提交代码审查。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="act-box act-user"><span class="act-icon">👤</span> 用户任务</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">圆角矩形 + 人形图标</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">用户任务 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">User Task</div>
+    <div class="obj-desc">需要人类用户操作才能完成的任务。流程暂停，等待用户在界面上做出决定。这就是我们的"门禁"。</div>
+    <div class="obj-scene"><b>场景：</b>需求确认门禁、验收审批、发布确认。用户在聊天区看到门禁卡片，点击"通过"或"驳回"。</div>
+    <div class="ui-mock">
+      <div class="ui-label">在聊天区的呈现 — 门禁卡片</div>
+      <div class="gate-card">
+        <div class="gate-hd">🔒 需求确认门禁 <span style="margin-left:auto;font-size:10px;color:#999;">⏰ 7天过期</span></div>
+        <div class="gate-desc">
+          需求理解阶段已完成，产出以下文档：<br>
+          📄 PRD v1.0 · 📄 需求摘要 · 📄 NFR 初始画像
+        </div>
+        <div class="gate-btns">
+          <div class="gate-btn ok">✅ 确认通过</div>
+          <div class="gate-btn rej">❌ 需要修改</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <div class="ui-label">在流程图中的呈现</div>
+        <div class="flow-mock">
+          <div class="fm-node">
+            <div class="act-box" style="background:#e8f5e9;border-color:#43a047;">✓ 写 PRD</div>
+            <div class="p-lbl">TL</div>
+          </div>
+          <div class="fm-line done"></div>
+          <div class="fm-node">
+            <div class="act-box act-user" style="box-shadow:0 0 0 3px rgba(21,101,192,.15);">👤 用户确认</div>
+            <div class="p-lbl" style="color:#f57c00;">等待用户</div>
+          </div>
+          <div class="fm-line"></div>
+          <div class="fm-node">
+            <div class="act-box">方案拆解</div>
+            <div class="p-lbl">TL</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="act-box act-service"><span class="act-icon">⚙️</span> 服务任务</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">圆角矩形 + 齿轮图标</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">服务任务 <span class="phase-tag phase2">Phase 2</span></div>
+    <div class="obj-name-en">Service Task</div>
+    <div class="obj-desc">系统自动执行的任务，不需要 Agent 或用户参与。由 flow 直接调用外部服务完成。</div>
+    <div class="obj-scene"><b>场景：</b>自动运行 CI/CD pipeline、自动部署到 staging、自动运行集成测试</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图 + 聊天区的呈现</div>
+      <div class="flow-mock">
+        <div class="fm-node">
+          <div class="act-box" style="background:#e8f5e9;border-color:#43a047;">✓ 代码合并</div>
+          <div class="p-lbl">TL</div>
+        </div>
+        <div class="fm-line done"></div>
+        <div class="fm-node">
+          <div class="act-box act-service" style="box-shadow:0 0 0 3px rgba(230,81,0,.15);">⚙️ 运行 CI</div>
+          <div class="p-lbl" style="color:#e65100;">自动执行</div>
+        </div>
+        <div class="fm-line"></div>
+        <div class="fm-node">
+          <div class="act-box">部署 staging</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:8px 12px;font-size:12px;">
+        <div style="font-weight:500;color:#e65100;">⚙️ CI Pipeline 运行中</div>
+        <div style="color:#888;font-size:11px;margin-top:2px;">build ✓ · lint ✓ · test (42/50)... · coverage pending</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="act-box act-call"><span class="act-icon">➕</span> 调用活动</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">粗边矩形 + 加号</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">调用活动 <span class="phase-tag phase2">Phase 2</span></div>
+    <div class="obj-name-en">Call Activity</div>
+    <div class="obj-desc">启动一个子流程。父流程暂停，等子流程完成后继续。子流程有独立的 ProcessInstance。这就是我们的"阶段嵌套"。</div>
+    <div class="obj-scene"><b>场景：</b>Pipeline 的每个阶段都是一个 CallActivity，点击展开可以看到阶段内部的详细流程。</div>
+    <div class="ui-mock">
+      <div class="ui-label">在进度页的呈现 — 点击阶段展开子流程</div>
+      <div style="margin-bottom:8px;">
+        <div class="progress-bar">
+          <div class="p-node"><div class="p-dot done">✓</div><div class="p-lbl">校准</div></div>
+          <div class="p-line done"></div>
+          <div class="p-node"><div class="p-dot done">✓</div><div class="p-lbl">需求</div></div>
+          <div class="p-line done"></div>
+          <div class="p-node"><div class="p-dot run" style="border:3px solid #1565c0;background:#e3f2fd;color:#1565c0;font-size:8px;">➕</div><div class="p-lbl" style="color:#1565c0;">迭代开发</div></div>
+          <div class="p-line"></div>
+          <div class="p-node"><div class="p-dot wait">4</div><div class="p-lbl">验收</div></div>
+        </div>
+      </div>
+      <div style="border:2px solid #1565c0;border-radius:8px;padding:10px;background:#f0f7ff;">
+        <div style="font-size:10px;color:#1565c0;font-weight:600;margin-bottom:6px;">▼ 迭代开发 · 子流程展开</div>
+        <div class="flow-mock">
+          <div class="fm-node"><div class="ev-circle ev-start" style="width:14px;height:14px;font-size:0;"></div></div>
+          <div class="fm-line done"></div>
+          <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;background:#e8f5e9;border-color:#43a047;">✓ 编码</div></div>
+          <div class="fm-line done"></div>
+          <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;background:#e3f2fd;border-color:#1565c0;">🔍 审查</div></div>
+          <div class="fm-line"></div>
+          <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;">测试</div></div>
+          <div class="fm-line"></div>
+          <div class="fm-node"><div class="ev-circle ev-end" style="width:14px;height:14px;"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="act-box act-adhoc"><span class="act-icon">〜</span> Ad-Hoc</div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">虚线矩形 + 波浪号</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">Ad-Hoc 子流程 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">Ad-Hoc Sub-Process</div>
+    <div class="obj-desc">内部活动没有固定顺序，参与者自由讨论。这就是我们的"session"（多人协作会议）。</div>
+    <div class="obj-scene"><b>场景：</b>头脑风暴、设计评审、需求讨论。多个 Agent 自由发言，由主持人总结。</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图 + 聊天区的呈现</div>
+      <div class="flow-mock" style="margin-bottom:8px;">
+        <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;background:#e8f5e9;border-color:#43a047;">✓ 收集需求</div></div>
+        <div class="fm-line done"></div>
+        <div class="fm-node">
+          <div class="act-box act-adhoc" style="box-shadow:0 0 0 3px rgba(0,131,143,.15);">〜 头脑风暴</div>
+          <div class="p-lbl" style="color:#00838f;">4人参与 · 进行中</div>
+        </div>
+        <div class="fm-line"></div>
+        <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;">写 PRD</div></div>
+      </div>
+      <div class="session-mock">
+        <div class="session-hd">🗣 头脑风暴 · 评论功能技术方案</div>
+        <div class="session-msg"><span class="who">后端-1：</span>建议 REST API + 30 秒轮询。</div>
+        <div class="session-msg"><span class="who">前端-1：</span>同意轮询，评论列表用虚拟滚动。</div>
+        <div class="session-msg"><span class="who">测试-1：</span>需要测试并发评论和 XSS。</div>
+        <div class="session-msg"><span class="who">TL：</span>总结：REST + 轮询 + XSS 过滤。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="act-box" style="position:relative;">🔄 TDD 循环<span class="act-loop">↻</span></div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">矩形 + 底部循环标记</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">循环标记 <span class="phase-tag phase2">Phase 2</span></div>
+    <div class="obj-name-en">Loop Marker</div>
+    <div class="obj-desc">活动可以重复执行，直到满足退出条件。底部有循环箭头标记。</div>
+    <div class="obj-scene"><b>场景：</b>TDD 循环（写测试→写代码→运行→不通过→再写代码→运行→通过→退出）。Phase 1 用 ExclusiveGateway 回退实现同等效果。</div>
+    <div class="ui-mock">
+      <div class="ui-label">在 Agent 执行面板的呈现</div>
+      <div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px;">
+        <div style="font-size:11px;font-weight:600;margin-bottom:6px;">🔄 TDD 循环 · 第 3 轮</div>
+        <div style="font-size:11px;color:#666;">
+          <div>轮 1：写测试 → 写代码 → 运行 ❌ 2/5 failed</div>
+          <div>轮 2：修改代码 → 运行 ❌ 1/5 failed</div>
+          <div style="color:#2e7d32;font-weight:500;">轮 3：修改代码 → 运行 ✅ 5/5 passed → 退出循环</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ===== 第三部分：网关 ===== -->
+<div class="panel" id="p2">
+<div class="section-title">网关（Gateways）— 流程的分支与合并</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="gw gw-xor"><div class="gw-inner">✕</div></div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">菱形 + X</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">排他网关 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">Exclusive Gateway (XOR)</div>
+    <div class="obj-desc">只走一条分支。评估条件，走第一个为 true 的出口。都不满足走 default。合并时任一分支到达即通过。</div>
+    <div class="obj-scene"><b>场景：</b>代码审查通过/打回、测试通过/失败、门禁确认/驳回</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现 — 代码审查分支</div>
+      <div style="display:flex;align-items:flex-start;gap:0;padding:10px 0;">
+        <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;background:#e8f5e9;border-color:#43a047;">✓ 编码</div><div class="p-lbl">BE-1</div></div>
+        <div class="fm-line done" style="margin-top:12px;"></div>
+        <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;background:#e3f2fd;border-color:#1565c0;">🔍 审查</div><div class="p-lbl">TL</div></div>
+        <div class="fm-line active" style="margin-top:12px;"></div>
+        <div class="fm-node" style="position:relative;">
+          <div class="gw gw-xor" style="width:28px;height:28px;"><div class="gw-inner" style="font-size:9px;">✕</div></div>
+          <div class="p-lbl">审查结果</div>
+          <!-- 两条出口 -->
+          <div style="position:absolute;left:calc(50% + 20px);top:-8px;display:flex;align-items:center;">
+            <div style="width:30px;height:2px;background:#43a047;"></div>
+            <div style="font-size:9px;color:#43a047;white-space:nowrap;">通过 →</div>
+            <div class="act-box" style="font-size:9px;padding:2px 6px;margin-left:4px;">测试</div>
+          </div>
+          <div style="position:absolute;left:calc(50% + 20px);top:24px;display:flex;align-items:center;">
+            <div style="width:30px;height:2px;background:#e53935;"></div>
+            <div style="font-size:9px;color:#e53935;white-space:nowrap;">打回 →</div>
+            <div class="act-box" style="font-size:9px;padding:2px 6px;margin-left:4px;border-color:#e53935;">返回编码</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:30px;font-size:11px;color:#888;line-height:1.6;">
+        <b>token 语义：</b>token 到达菱形后，评估 TL 的 NodeResult.output.verdict：<br>
+        · verdict == "approved" → 走"通过"分支 → 进入测试<br>
+        · verdict == "needs_revision" → 走"打回"分支 → 回到编码（Agent 重新执行）
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="gw gw-and"><div class="gw-inner">+</div></div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">菱形 + 加号</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">并行网关 <span class="phase-tag phase2">Phase 2</span></div>
+    <div class="obj-name-en">Parallel Gateway (AND)</div>
+    <div class="obj-desc">分支时：同时启动所有出口分支（token 分裂）。合并时：等待所有入口分支完成才通过（token 合并）。</div>
+    <div class="obj-scene"><b>场景：</b>多任务并行执行（TASK-003 和 TASK-004 无依赖，同时开发）</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现 — 并行开发</div>
+      <div style="text-align:center;padding:10px 0;">
+        <div style="display:inline-flex;flex-direction:column;align-items:center;gap:8px;">
+          <!-- fork -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="act-box" style="font-size:10px;padding:4px 8px;background:#e8f5e9;border-color:#43a047;">✓ 方案拆解</div>
+            <div style="width:20px;height:2px;background:#66bb6a;"></div>
+            <div class="gw gw-and" style="width:24px;height:24px;"><div class="gw-inner" style="font-size:8px;">+</div></div>
+          </div>
+          <!-- 分支 -->
+          <div style="display:flex;gap:40px;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+              <div style="width:2px;height:12px;background:#42a5f5;"></div>
+              <div class="act-box" style="font-size:10px;padding:4px 8px;background:#e3f2fd;border-color:#1565c0;">🔨 T-003 标签</div>
+              <div class="p-lbl">BE-1 · 执行中</div>
+              <div style="width:2px;height:12px;background:#ddd;"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+              <div style="width:2px;height:12px;background:#42a5f5;"></div>
+              <div class="act-box" style="font-size:10px;padding:4px 8px;background:#e3f2fd;border-color:#1565c0;">🔨 T-004 搜索</div>
+              <div class="p-lbl">BE-2 · 执行中</div>
+              <div style="width:2px;height:12px;background:#ddd;"></div>
+            </div>
+          </div>
+          <!-- join -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="gw gw-and" style="width:24px;height:24px;"><div class="gw-inner" style="font-size:8px;">+</div></div>
+            <div style="width:20px;height:2px;background:#ddd;"></div>
+            <div class="act-box" style="font-size:10px;padding:4px 8px;">集成测试</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#888;line-height:1.6;">
+        <b>token 语义：</b>fork 时 1 个 token 分裂为 2 个，两个 Agent 同时执行。<br>
+        join 时必须等 T-003 和 T-004 都完成，2 个 token 合并为 1 个，才能进入集成测试。<br>
+        <span style="color:#c62828;">⚠️ 如果 join 少等一个分支 = 死锁或提前推进。</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="gw gw-or"><div class="gw-inner">○</div></div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">菱形 + 圆圈</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">包含网关 <span class="phase-tag phase3">Phase 3</span></div>
+    <div class="obj-name-en">Inclusive Gateway (OR)</div>
+    <div class="obj-desc">分支时：评估所有条件，走所有为 true 的出口（可能走 1 条也可能走多条）。合并时：等待所有已激活的分支到达。</div>
+    <div class="obj-scene"><b>场景：</b>根据风险等级，可能同时触发安全审查 + 性能测试 + 合规检查（满足哪些条件就走哪些分支）</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现</div>
+      <div style="text-align:center;padding:10px 0;">
+        <div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="act-box" style="font-size:10px;padding:4px 8px;">风险评估</div>
+            <div style="width:20px;height:2px;background:#666;"></div>
+            <div class="gw gw-or" style="width:24px;height:24px;"><div class="gw-inner" style="font-size:8px;">○</div></div>
+          </div>
+          <div style="display:flex;gap:20px;font-size:10px;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+              <div style="color:#7b1fa2;font-size:9px;">risk > high</div>
+              <div class="act-box" style="font-size:9px;padding:2px 6px;background:#e3f2fd;">安全审查</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+              <div style="color:#7b1fa2;font-size:9px;">perf_sensitive</div>
+              <div class="act-box" style="font-size:9px;padding:2px 6px;background:#fff3e0;">性能测试</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+              <div style="color:#7b1fa2;font-size:9px;">compliance</div>
+              <div class="act-box" style="font-size:9px;padding:2px 6px;background:#f3e5f5;">合规检查</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#888;">和 Parallel 的区别：Parallel 总是走所有分支，Inclusive 根据条件决定走哪些。</div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape"><div class="gw gw-ev"><div class="gw-inner">☆</div></div></div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">菱形 + 五角星</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">事件网关 <span class="phase-tag phase3">Phase 3</span></div>
+    <div class="obj-name-en">Event-based Gateway</div>
+    <div class="obj-desc">流程暂停，等待多个事件中的第一个到达，由到达的事件决定走哪条分支。和 Exclusive 的区别：XOR 评估数据条件，Event-based 等待外部事件。</div>
+    <div class="obj-scene"><b>场景：</b>发布后等待：用户确认"继续" 或 监控告警触发 或 超时 — 哪个先到走哪条路</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现</div>
+      <div style="text-align:center;padding:10px 0;">
+        <div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="act-box" style="font-size:10px;padding:4px 8px;">发布完成</div>
+            <div style="width:20px;height:2px;background:#666;"></div>
+            <div class="gw gw-ev" style="width:24px;height:24px;"><div class="gw-inner" style="font-size:8px;">☆</div></div>
+          </div>
+          <div style="display:flex;gap:20px;font-size:10px;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+              <div class="ev-circle ev-inter" style="width:22px;height:22px;font-size:8px;">✉</div>
+              <div style="font-size:9px;color:#666;">用户确认</div>
+              <div class="act-box" style="font-size:9px;padding:2px 6px;background:#e8f5e9;">继续</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+              <div class="ev-circle ev-inter" style="width:22px;height:22px;font-size:8px;">⚡</div>
+              <div style="font-size:9px;color:#666;">监控告警</div>
+              <div class="act-box" style="font-size:9px;padding:2px 6px;background:#ffebee;">回滚</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+              <div class="ev-circle ev-inter" style="width:22px;height:22px;font-size:8px;">⏱</div>
+              <div style="font-size:9px;color:#666;">超时 30min</div>
+              <div class="act-box" style="font-size:9px;padding:2px 6px;background:#fff3e0;">自动继续</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ===== 第四部分：连接对象 + 泳道 ===== -->
+<div class="panel" id="p3">
+<div class="section-title">连接对象 + 泳道 — 流程的"线"和"职责划分"</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape">
+      <div class="conn"><div class="conn-line"></div><div class="conn-arrow">▶</div></div>
+    </div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">实线箭头</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">顺序流 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">Sequence Flow</div>
+    <div class="obj-desc">最基础的连接线。表示"做完 A 接着做 B"。同一个 Pool 内的执行顺序。</div>
+    <div class="obj-scene"><b>场景：</b>所有步骤之间的默认连接。编码 → 审查 → 测试。</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现</div>
+      <div class="flow-mock">
+        <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;background:#e8f5e9;border-color:#43a047;">✓ 编码</div></div>
+        <div style="display:flex;align-items:center;margin-bottom:14px;"><div style="width:40px;height:2px;background:#66bb6a;"></div><div style="font-size:10px;color:#666;">▶</div></div>
+        <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;background:#e3f2fd;border-color:#1565c0;">🔍 审查</div></div>
+        <div style="display:flex;align-items:center;margin-bottom:14px;"><div style="width:40px;height:2px;background:#ddd;"></div><div style="font-size:10px;color:#ccc;">▶</div></div>
+        <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;">测试</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape">
+      <div class="conn"><div class="conn-cond" style="margin-left:10px;"></div><div class="conn-arrow">▶</div></div>
+    </div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">实线 + 菱形起点</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">条件顺序流 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">Conditional Sequence Flow</div>
+    <div class="obj-desc">带条件的连接线。只有条件为 true 时 token 才走这条路。通常从网关出发。</div>
+    <div class="obj-scene"><b>场景：</b>审查通过（verdict == "approved"）→ 进入测试；审查打回（verdict == "needs_revision"）→ 返回编码</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现 — 条件标签</div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 0;">
+        <div class="gw gw-xor" style="width:24px;height:24px;"><div class="gw-inner" style="font-size:8px;">✕</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:40px;height:2px;background:#43a047;"></div>
+            <div style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;">approved</div>
+            <div style="font-size:10px;color:#666;">▶</div>
+            <div class="act-box" style="font-size:9px;padding:2px 6px;">测试</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:40px;height:2px;background:#e53935;"></div>
+            <div style="font-size:9px;background:#ffebee;color:#c62828;padding:1px 6px;border-radius:4px;">needs_revision</div>
+            <div style="font-size:10px;color:#666;">▶</div>
+            <div class="act-box" style="font-size:9px;padding:2px 6px;border-color:#e53935;">返回编码</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape">
+      <div class="conn"><div class="conn-default" style="margin-left:10px;"></div><div class="conn-arrow">▶</div></div>
+    </div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">实线 + 斜线标记</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">默认顺序流 <span class="phase-tag phase1">Phase 1</span></div>
+    <div class="obj-name-en">Default Sequence Flow</div>
+    <div class="obj-desc">当网关的所有条件出口都不满足时，走这条默认路径。防止 token 卡死在网关。</div>
+    <div class="obj-scene"><b>场景：</b>审查结果既不是 approved 也不是 needs_revision（异常情况）→ 走默认路径 → 通知 TL 人工处理</div>
+    <div class="ui-mock">
+      <div class="ui-label">在流程图中的呈现</div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 0;">
+        <div class="gw gw-xor" style="width:24px;height:24px;"><div class="gw-inner" style="font-size:8px;">✕</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:40px;height:2px;background:#43a047;"></div>
+            <div style="font-size:9px;color:#43a047;">approved →</div>
+            <div class="act-box" style="font-size:9px;padding:2px 6px;">测试</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="width:40px;height:2px;background:#e53935;"></div>
+            <div style="font-size:9px;color:#e53935;">rejected →</div>
+            <div class="act-box" style="font-size:9px;padding:2px 6px;">返回编码</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="position:relative;width:40px;height:2px;background:#999;"><div style="position:absolute;left:6px;top:-6px;font-size:10px;color:#999;">/</div></div>
+            <div style="font-size:9px;color:#999;font-style:italic;">default →</div>
+            <div class="act-box" style="font-size:9px;padding:2px 6px;border-color:#999;color:#999;">TL 人工处理</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="obj-row">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape">
+      <div class="conn"><div class="conn-msg"></div><div class="conn-arrow" style="color:#999;">▷</div></div>
+    </div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">虚线空心箭头</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">消息流 <span style="font-size:9px;color:#999;font-weight:400;">不需要</span></div>
+    <div class="obj-name-en">Message Flow</div>
+    <div class="obj-desc">不同 Pool（组织/系统）之间的消息传递。我们是单系统内部协作，不跨组织，所以不需要。</div>
+    <div class="obj-scene"><b>不适用原因：</b>flow → runtime 的通信用 FlowMessage（HTTP），不是 BPMN 消息流。BPMN 消息流是建模概念，我们的通信是实现层面。</div>
+  </div>
+</div>
+
+<div class="obj-row" style="margin-top:24px;">
+  <div class="obj-left">
+    <div class="obj-label">BPMN 图形</div>
+    <div class="bpmn-shape" style="width:100%;">
+      <div style="border:1px solid #999;border-radius:4px;overflow:hidden;width:160px;">
+        <div style="background:#f5f5f5;padding:2px 6px;font-size:9px;border-bottom:1px solid #ddd;">Pool: 项目团队</div>
+        <div style="display:flex;font-size:8px;">
+          <div style="width:40px;background:#fafafa;border-right:1px solid #ddd;padding:4px;text-align:center;">TL</div>
+          <div style="flex:1;padding:4px;text-align:center;">...</div>
+        </div>
+        <div style="display:flex;font-size:8px;border-top:1px solid #ddd;">
+          <div style="width:40px;background:#fafafa;border-right:1px solid #ddd;padding:4px;text-align:center;">Dev</div>
+          <div style="flex:1;padding:4px;text-align:center;">...</div>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:#999;margin-top:4px;">Pool + Lane</div>
+  </div>
+  <div class="obj-right">
+    <div class="obj-name">泳道 <span class="phase-tag phase2">Phase 2</span></div>
+    <div class="obj-name-en">Pool + Lane</div>
+    <div class="obj-desc">Pool 表示一个参与者（我们只有一个 Pool：项目团队）。Lane 是 Pool 内部的角色划分，让流程图按角色分行显示。</div>
+    <div class="obj-scene"><b>场景：</b>在进度页的详细流程图中，按角色分行展示谁在做什么。</div>
+    <div class="ui-mock">
+      <div class="ui-label">在进度页的呈现 — 泳道视图</div>
+      <div class="lane-mock">
+        <div class="lane-row">
+          <div class="lane-label">👨‍💼 TL</div>
+          <div class="lane-content">
+            <div class="act-box" style="font-size:9px;padding:3px 6px;background:#e8f5e9;border-color:#43a047;">✓ 方案拆解</div>
+            <div style="width:20px;height:2px;background:#66bb6a;"></div>
+            <div style="width:20px;"></div>
+            <div style="width:20px;"></div>
+            <div class="act-box" style="font-size:9px;padding:3px 6px;background:#e3f2fd;border-color:#1565c0;">🔍 代码审查</div>
+          </div>
+        </div>
+        <div class="lane-row">
+          <div class="lane-label">👨‍💻 Dev</div>
+          <div class="lane-content">
+            <div style="width:80px;"></div>
+            <div class="act-box" style="font-size:9px;padding:3px 6px;background:#e8f5e9;border-color:#43a047;">✓ 编码实现</div>
+          </div>
+        </div>
+        <div class="lane-row">
+          <div class="lane-label">🧪 QA</div>
+          <div class="lane-content">
+            <div style="width:200px;"></div>
+            <div class="act-box" style="font-size:9px;padding:3px 6px;">任务测试</div>
+          </div>
+        </div>
+        <div class="lane-row">
+          <div class="lane-label">👤 用户</div>
+          <div class="lane-content">
+            <div style="width:280px;"></div>
+            <div class="act-box act-user" style="font-size:9px;padding:3px 6px;">👤 验收确认</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ===== 第五部分：完整场景串联 ===== -->
+<div class="panel" id="p4">
+<div class="section-title">完整场景 — 博客项目"迭代开发"阶段</div>
+
+<div style="font-size:12px;color:#666;margin-bottom:16px;line-height:1.6;">
+  把前面所有 BPMN 对象串在一个真实场景中：博客项目进入"迭代开发"阶段，TL 拆出 3 个任务（T-003 标签、T-004 搜索、T-005 评论），
+  其中 T-003 和 T-004 可以并行，T-005 依赖 T-003。每个任务走 TDD 工作流（编码→审查→测试），审查有通过/打回分支。
+</div>
+
+<!-- Pipeline 进度条 -->
+<div class="obj-row" style="flex-direction:column;">
+  <div style="font-size:12px;font-weight:600;margin-bottom:10px;">① Pipeline 进度（每个阶段 = CallActivity）</div>
+  <div class="progress-bar" style="justify-content:center;gap:0;">
+    <div class="p-node"><div class="ev-circle ev-start" style="width:16px;height:16px;font-size:0;"></div></div>
+    <div class="p-line done"></div>
+    <div class="p-node"><div class="p-dot done" style="font-size:8px;">✓</div><div class="p-lbl">校准</div></div>
+    <div class="p-line done"></div>
+    <div class="p-node"><div class="p-dot done" style="font-size:8px;">✓</div><div class="p-lbl">需求</div></div>
+    <div class="p-line done"></div>
+    <div class="p-node"><div class="p-dot done" style="font-size:8px;">✓</div><div class="p-lbl">方案</div></div>
+    <div class="p-line done"></div>
+    <div class="p-node"><div class="p-dot run" style="font-size:7px;border:3px solid #1565c0;background:#e3f2fd;color:#1565c0;">➕</div><div class="p-lbl" style="color:#1565c0;font-weight:600;">迭代开发</div></div>
+    <div class="p-line"></div>
+    <div class="p-node"><div class="p-dot wait" style="font-size:8px;">5</div><div class="p-lbl">验收</div></div>
+    <div class="p-line"></div>
+    <div class="p-node"><div class="p-dot wait" style="font-size:8px;">6</div><div class="p-lbl">发布</div></div>
+    <div class="p-line"></div>
+    <div class="p-node"><div class="ev-circle ev-end" style="width:16px;height:16px;"></div></div>
+  </div>
+</div>
+
+<!-- 展开的子流程 -->
+<div class="obj-row" style="flex-direction:column;border:2px solid #1565c0;background:#f8fbff;">
+  <div style="font-size:12px;font-weight:600;color:#1565c0;margin-bottom:12px;">② 迭代开发 · 子流程展开（CallActivity 内部）</div>
+
+  <!-- 泳道视图 -->
+  <div class="lane-mock" style="margin-bottom:16px;">
+    <!-- TL 泳道 -->
+    <div class="lane-row" style="min-height:70px;">
+      <div class="lane-label">👨‍💼 TL</div>
+      <div class="lane-content" style="flex-wrap:wrap;gap:6px;">
+        <div class="act-box" style="font-size:9px;padding:3px 6px;background:#e8f5e9;border-color:#43a047;">✓ 任务拆解</div>
+        <div style="width:60px;"></div>
+        <div class="act-box" style="font-size:9px;padding:3px 6px;background:#e3f2fd;border-color:#1565c0;">🔍 审查 T-003</div>
+        <div style="width:20px;"></div>
+        <div class="act-box" style="font-size:9px;padding:3px 6px;">审查 T-004</div>
+      </div>
+    </div>
+    <!-- Dev 泳道 -->
+    <div class="lane-row" style="min-height:70px;">
+      <div class="lane-label">👨‍💻 Dev</div>
+      <div class="lane-content" style="flex-wrap:wrap;gap:6px;">
+        <div style="width:80px;"></div>
+        <!-- 并行标记 -->
+        <div class="gw gw-and" style="width:20px;height:20px;"><div class="gw-inner" style="font-size:7px;">+</div></div>
+        <div class="act-box" style="font-size:9px;padding:3px 6px;background:#e8f5e9;border-color:#43a047;">✓ T-003 编码<br><span style="font-size:8px;color:#888;">BE-1</span></div>
+        <div class="act-box" style="font-size:9px;padding:3px 6px;background:#e3f2fd;border-color:#1565c0;">🔨 T-004 编码<br><span style="font-size:8px;color:#888;">BE-2</span></div>
+        <div style="width:40px;"></div>
+        <div class="act-box" style="font-size:9px;padding:3px 6px;border-color:#ddd;color:#999;">T-005 编码<br><span style="font-size:8px;">等待 T-003</span></div>
+      </div>
+    </div>
+    <!-- QA 泳道 -->
+    <div class="lane-row" style="min-height:50px;">
+      <div class="lane-label">🧪 QA</div>
+      <div class="lane-content" style="gap:6px;">
+        <div style="width:300px;"></div>
+        <div class="act-box" style="font-size:9px;padding:3px 6px;border-color:#ddd;color:#999;">测试 T-003</div>
+        <div class="act-box" style="font-size:9px;padding:3px 6px;border-color:#ddd;color:#999;">测试 T-004</div>
+      </div>
+    </div>
+    <!-- 用户泳道 -->
+    <div class="lane-row" style="min-height:50px;">
+      <div class="lane-label">👤 用户</div>
+      <div class="lane-content">
+        <div style="width:420px;"></div>
+        <div class="act-box act-user" style="font-size:9px;padding:3px 6px;border-color:#ddd;color:#999;">👤 验收确认</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 关键 BPMN 对象标注 -->
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+    <div style="font-size:10px;background:#e8f5e9;padding:2px 8px;border-radius:4px;color:#2e7d32;">✓ StartEvent</div>
+    <div style="font-size:10px;background:#e3f2fd;padding:2px 8px;border-radius:4px;color:#1565c0;">+ ParallelGateway</div>
+    <div style="font-size:10px;background:#fff3e0;padding:2px 8px;border-radius:4px;color:#e65100;">✕ ExclusiveGateway</div>
+    <div style="font-size:10px;background:#e0f7fa;padding:2px 8px;border-radius:4px;color:#00838f;">〜 AdHoc (session)</div>
+    <div style="font-size:10px;background:#f3e5f5;padding:2px 8px;border-radius:4px;color:#6a1b9a;">👤 UserTask (门禁)</div>
+    <div style="font-size:10px;background:#fce4ec;padding:2px 8px;border-radius:4px;color:#c62828;">⊕ EndEvent</div>
+  </div>
+</div>
+
+<!-- 审查分支详情 -->
+<div class="obj-row" style="flex-direction:column;">
+  <div style="font-size:12px;font-weight:600;margin-bottom:10px;">③ T-003 代码审查 · ExclusiveGateway 分支</div>
+  <div style="display:flex;align-items:flex-start;gap:0;padding:10px 0;flex-wrap:wrap;justify-content:center;">
+    <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;background:#e8f5e9;border-color:#43a047;">✓ BE-1 编码</div><div class="p-lbl">TDD 工作流</div></div>
+    <div class="fm-line done" style="margin-top:12px;"></div>
+    <div class="fm-node"><div class="act-box" style="font-size:10px;padding:4px 8px;background:#e3f2fd;border-color:#1565c0;">🔍 TL 审查</div><div class="p-lbl" style="color:#1565c0;">执行中</div></div>
+    <div class="fm-line active" style="margin-top:12px;"></div>
+    <div class="fm-node">
+      <div class="gw gw-xor" style="width:28px;height:28px;"><div class="gw-inner" style="font-size:9px;">✕</div></div>
+      <div class="p-lbl">审查结果</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-left:8px;">
+      <div style="display:flex;align-items:center;gap:4px;">
+        <div style="width:30px;height:2px;background:#43a047;"></div>
+        <div style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;">approved</div>
+        <div style="font-size:9px;">▶</div>
+        <div class="act-box" style="font-size:9px;padding:2px 6px;">QA 测试</div>
+        <div style="font-size:9px;">▶</div>
+        <div class="act-box act-user" style="font-size:9px;padding:2px 6px;">👤 验收</div>
+        <div style="font-size:9px;">▶</div>
+        <div class="ev-circle ev-end" style="width:14px;height:14px;"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <div style="width:30px;height:2px;background:#e53935;"></div>
+        <div style="font-size:9px;background:#ffebee;color:#c62828;padding:1px 6px;border-radius:4px;">needs_revision</div>
+        <div style="font-size:9px;">▶</div>
+        <div class="act-box" style="font-size:9px;padding:2px 6px;border-color:#e53935;">↩ 返回编码</div>
+        <div style="font-size:9px;color:#999;">（回到 BE-1 编码节点）</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 聊天区实际呈现 -->
+<div class="obj-row" style="flex-direction:column;">
+  <div style="font-size:12px;font-weight:600;margin-bottom:10px;">④ 聊天区实际呈现</div>
+  <div style="max-width:500px;display:flex;flex-direction:column;gap:8px;">
+    <!-- 系统消息 -->
+    <div style="text-align:center;font-size:10px;color:#999;">── 迭代开发阶段开始 ──</div>
+
+    <!-- TL 消息 -->
+    <div style="display:flex;gap:6px;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#388e3c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;">TL</div>
+      <div>
+        <div style="font-size:10px;color:#999;">Tech Lead · 09:00</div>
+        <div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;margin-top:2px;">
+          任务拆解完成，3 个任务已创建。T-003 和 T-004 无依赖可并行，T-005 依赖 T-003。
+        </div>
+        <!-- 工单卡片 -->
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <div style="background:#f7f7f7;border:1px solid #eee;border-radius:6px;padding:4px 8px;font-size:10px;">
+            <span style="color:#1565c0;font-weight:600;">T-003</span> 标签系统 <span style="background:#e3f2fd;color:#1565c0;padding:0 4px;border-radius:4px;font-size:9px;">开发中</span>
+          </div>
+          <div style="background:#f7f7f7;border:1px solid #eee;border-radius:6px;padding:4px 8px;font-size:10px;">
+            <span style="color:#1565c0;font-weight:600;">T-004</span> 搜索 <span style="background:#e3f2fd;color:#1565c0;padding:0 4px;border-radius:4px;font-size:9px;">开发中</span>
+          </div>
+          <div style="background:#f7f7f7;border:1px solid #eee;border-radius:6px;padding:4px 8px;font-size:10px;">
+            <span style="color:#1565c0;font-weight:600;">T-005</span> 评论 <span style="background:#f5f5f5;color:#999;padding:0 4px;border-radius:4px;font-size:9px;">等待</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 并行执行系统消息 -->
+    <div style="text-align:center;font-size:10px;color:#1565c0;">── ⊕ 并行执行：T-003 (BE-1) + T-004 (BE-2) ──</div>
+
+    <!-- BE-1 完成 -->
+    <div style="display:flex;gap:6px;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#e65100;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;">B1</div>
+      <div>
+        <div style="font-size:10px;color:#999;">后端开发-1 · 09:15</div>
+        <div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;margin-top:2px;">
+          T-003 标签系统编码完成，12 个测试全部通过。提交代码审查。
+        </div>
+      </div>
+    </div>
+
+    <!-- TL 审查 -->
+    <div style="display:flex;gap:6px;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#388e3c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;">TL</div>
+      <div>
+        <div style="font-size:10px;color:#999;">Tech Lead · 09:20</div>
+        <div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 12px;font-size:12px;margin-top:2px;">
+          T-003 代码审查通过 ✅ 代码质量良好，测试覆盖充分。
+        </div>
+      </div>
+    </div>
+
+    <!-- 审查通过系统消息 -->
+    <div style="text-align:center;font-size:10px;color:#43a047;">── ✕→approved · T-003 进入测试 ──</div>
+
+    <!-- 门禁卡片 -->
+    <div class="gate-card" style="max-width:400px;">
+      <div class="gate-hd">🔒 验收确认 <span style="margin-left:auto;font-size:10px;color:#999;">⏰ 7天</span></div>
+      <div class="gate-desc">
+        所有任务已完成，请验收：<br>
+        📄 T-003 标签系统 ✅ · T-004 搜索 ✅ · T-005 评论 ✅
+      </div>
+      <div class="gate-btns">
+        <div class="gate-btn ok">✅ 确认通过</div>
+        <div class="gate-btn rej">❌ 需要修改</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BPMN 对象使用统计 -->
+<div class="obj-row" style="flex-direction:column;">
+  <div style="font-size:12px;font-weight:600;margin-bottom:10px;">⑤ 本场景使用的 BPMN 对象统计</div>
+  <table style="font-size:11px;border-collapse:collapse;width:100%;">
+    <tr style="background:#f5f7fa;"><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e0e0e0;">BPMN 对象</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e0e0e0;">出现位置</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e0e0e0;">Phase</th></tr>
+    <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">StartEvent</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">Pipeline 起点 + 子流程起点</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;"><span class="phase-tag phase1">1</span></td></tr>
+    <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">EndEvent</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">Pipeline 终点 + 子流程终点</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;"><span class="phase-tag phase1">1</span></td></tr>
+    <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">Abstract Task</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">编码、审查、测试、任务拆解</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;"><span class="phase-tag phase1">1</span></td></tr>
+    <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">UserTask</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">验收确认门禁</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;"><span class="phase-tag phase1">1</span></td></tr>
+    <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">CallActivity</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">Pipeline 每个阶段</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;"><span class="phase-tag phase2">2</span></td></tr>
+    <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">ExclusiveGateway</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">审查通过/打回分支</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;"><span class="phase-tag phase1">1</span></td></tr>
+    <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">ParallelGateway</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">T-003 + T-004 并行</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;"><span class="phase-tag phase2">2</span></td></tr>
+    <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">SequenceFlow</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">所有节点间连线</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;"><span class="phase-tag phase1">1</span></td></tr>
+    <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">ConditionalFlow</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">审查网关出口条件</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;"><span class="phase-tag phase1">1</span></td></tr>
+    <tr><td style="padding:4px 10px;">Lane</td><td style="padding:4px 10px;">TL / Dev / QA / 用户 泳道</td><td style="padding:4px 10px;"><span class="phase-tag phase2">2</span></td></tr>
+  </table>
+</div>
+
+</div>
+
+</div><!-- panels end -->
+
+<script>
+function st(n){
+  document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('on',i===n);});
+  document.querySelectorAll('.panel').forEach((p,i)=>{p.classList.toggle('on',i===n);});
+}
+</script>
+</body>
+</html>

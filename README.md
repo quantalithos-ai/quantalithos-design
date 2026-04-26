@@ -8,10 +8,11 @@ AI 驱动的软件研发协作平台。所有员工均为 AI Agent，用户以�
 
 | 项目 | 说明 |
 |------|------|
-| **quantalithos-runtime** | Agent 运行时 — Agent 生命周期、LLM 调用、工具系统、记忆、角色定义 |
-| **quantalithos-flow** | 流程编排引擎 — BPMN 2.0 流程引擎、门禁控制、交接包、任务调度 |
+| **quantalithos-core** | 核心共享库 — BPMN 引擎（visitor 模式）、通信协议（FlowMessage/NodeResult）、共享数据模型、JSON Schema |
+| **quantalithos-runtime** | Agent 运行时 — Agent 生命周期、LLM 调用、工具系统、记忆、三级控制（依赖 core） |
+| **quantalithos-flow** | 流程编排引擎 — BPMN 2.0 流程编排、门禁控制、交接包、任务调度（依赖 core） |
 | **quantalithos-platform** | 平台数据服务 — 项目管理、工单管理、产物管理、Agent 配置、快照、知识库 |
-| **quantalithos-sdk** | 跨平台客户端 SDK — Rust 模块化 crate，支持 WASM/Tauri/UniFFI 绑定 |
+| **quantalithos-sdk** | 跨平台客户端 SDK — Rust 模块化 crate，支持 WASM/Tauri/UniFFI 绑定（对齐 core schemas） |
 | **quantalithos-chat** | 聊天前端 — 私聊/群聊界面、看板、门禁确认、产物预览（Vue 3） |
 | **quantalithos-gate** | API 网关 — 认证授权、WebSocket、请求路由、权限控制 |
 | **quantalithos-sync** | 工作区同步工具 — Rust CLI，manifest 驱动、多源拉取/推送、跨机器恢复 |
@@ -24,7 +25,7 @@ quantalithos-chat (聊天前端 Vue 3)
       │
       │ sdk-wasm (WASM 绑定)
       │
-quantalithos-sdk (跨平台 SDK Rust)
+quantalithos-sdk (跨平台 SDK Rust, 对齐 core schemas)
       │
       │ HTTP/WebSocket
       ▼
@@ -33,16 +34,20 @@ quantalithos-gate (API 网关)
       ├──────────────┬──────────────┐
       │              │              │
       ▼              ▼              ▼
-quantalithos-runtime  quantalithos-flow   quantalithos-platform
-(Agent 运行时)   (流程引擎)     (平台数据服务)
-      │              │              │
-      └──────────────┴──────────────┘
-                     │
+quantalithos-flow   quantalithos-runtime  quantalithos-platform
+(流程引擎)          (Agent 运行时)         (平台数据服务)
+      │              │
+      └──────┬───────┘
+             │ pip install
+             ▼
+      quantalithos-core
+      (BPMN 引擎 + 协议 + 模型)
+
               ┌──────┴──────┐
               │             │
               ▼             ▼
         quantalithos-sync  quantalithos-infra
-        (工作区同步)   (基础设施)
+        (工作区同步)        (基础设施)
 ```
 
 ## 六阶段流程
@@ -67,6 +72,7 @@ quantalithos-ai/
 │   └── research/            # 技术调研与学习资料
 │
 └── projects/                # 各子项目文档
+    ├── quantalithos-core/        # BPMN 引擎 / 协议 / 共享模型
     ├── quantalithos-runtime/     # 需求 / 设计 / 原型
     ├── quantalithos-flow/
     ├── quantalithos-chat/

@@ -522,3 +522,447 @@ BPMN 2.0 定义了三个建模层次，从简单到复杂：
 - OMG BPMN 2.0 Specification: formal/2013-12-09 (532 pages)
 - ISO/IEC 19510:2013 Information technology — Object Management Group Business Process Model and Notation
 - OMG 官网：https://www.omg.org/bpmn/
+
+---
+
+## 十、四种图类型（BPMN 2.0 官方定义）
+
+BPMN 2.0 规范定义了四种图类型，每种从不同视角描述业务流程：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  1. Process Diagram（流程图）                                    │
+│     视角：一个参与者内部                                         │
+│     回答：这个人/系统内部怎么做？                                │
+│     元素：Activity + Gateway + Event + Sequence Flow            │
+│     图形：                                                      │
+│       ○ → □ → ◇ → □ → ⊕                                       │
+│                                                                 │
+│  2. Collaboration Diagram（协作图）                              │
+│     视角：多个参与者之间                                         │
+│     回答：多个人/系统之间怎么配合？                              │
+│     元素：多个 Pool + 每个 Pool 内的 Process + Message Flow      │
+│     图形：                                                      │
+│       ┌─ Pool A ──────────────────┐                             │
+│       │ ○ → □ → □ ────────────── │                             │
+│       └───────────────┬───────────┘                             │
+│                       │ ─ ─ ─ ▷ (Message Flow)                  │
+│       ┌───────────────▼───────────┐                             │
+│       │ ○ → □ → □ ────────────── │                             │
+│       └─ Pool B ──────────────────┘                             │
+│                                                                 │
+│  3. Choreography Diagram（编排图）                               │
+│     视角：参与者之间的消息交换顺序                               │
+│     回答：谁先给谁发消息？消息的顺序是什么？                     │
+│     元素：Choreography Task（两个参与者之间的一次交互）           │
+│     图形：                                                      │
+│       ┌─ A ─┐    ┌─ B ─┐    ┌─ A ─┐                           │
+│       │     │ →  │     │ →  │     │                            │
+│       │ 请求 │    │ 回复 │    │ 确认 │                           │
+│       │     │    │     │    │     │                            │
+│       └─ B ─┘    └─ A ─┘    └─ B ─┘                           │
+│     不关注每个人内部做什么，只关注消息交换顺序                    │
+│                                                                 │
+│  4. Conversation Diagram（对话图）                               │
+│     视角：协作的简化/聚合视图                                    │
+│     回答：哪些参与者之间有哪些对话？                             │
+│     元素：Conversation Node（六边形）+ Participant               │
+│     图形：                                                      │
+│       ○ TL                                                      │
+│       │                                                         │
+│       ⬡ 需求讨论                                                │
+│      ╱ ╲                                                        │
+│     ○    ○                                                      │
+│    BE   FE                                                      │
+│     把多个 Message Flow 聚合为一个"对话"                         │
+│     不定义消息顺序（那是 Choreography 的事）                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**四种图的关系：**
+
+```
+Process（内部视角）
+  "TL 内部：收集需求 → 写 PRD → 提交评审"
+
+Collaboration（交互视角）
+  "TL 写完 PRD → 发给全员评审 → 收到反馈 → 修改"
+  = 多个 Process + 它们之间的 Message Flow
+
+Choreography（消息视角）
+  "TL 发 PRD → 全员回复意见 → TL 发修改版 → 全员确认"
+  = 只看消息交换顺序，不看每个人内部做什么
+
+Conversation（聚合视角）
+  "TL 和全员之间有一个'需求评审'对话"
+  = 把上面的多个消息聚合为一个逻辑单元
+```
+
+**与我们设计的映射：**
+
+| BPMN 图类型 | 我们的对应 | 说明 |
+|------------|-----------|------|
+| Process | ProcessDefinition | 阶段内流程、Agent 级工作流 |
+| Collaboration | 项目群聊中的多 Agent 协作 | 多个 Agent 各自执行 + 消息交互 |
+| Choreography | 暂不使用 | Phase 3 考虑 |
+| Conversation | Session（近似） | 多人讨论的聚合单元 |
+
+---
+
+## 十一、Collaboration Diagram 详细
+
+### 11.1 核心元素
+
+```
+Pool（池）：
+  表示一个参与者（人、系统、角色）
+  每个 Pool 内部可以有完整的 Process
+  Pool 之间不能有 Sequence Flow（只能有 Message Flow）
+
+  ┌─────────────────────────────────────────┐
+  │  Tech Lead                              │
+  │  ○ → □ 收集需求 → □ 写 PRD → ⊕         │
+  └─────────────────────────────────────────┘
+
+Message Flow（消息流）：
+  连接不同 Pool 之间的消息传递
+  虚线 + 空心箭头
+  表示"A 发了一条消息给 B"
+
+  ┌─ TL ────────────────────────────────────┐
+  │  ○ → □ 写 PRD → □ 发送 PRD ──────────  │
+  └──────────────────────────────┬──────────┘
+                                 │
+                          ─ ─ ─ ─▷ (Message Flow: PRD 文档)
+                                 │
+  ┌─ 后端开发 ───────────────────▼──────────┐
+  │  ○ → □ 收到 PRD → □ 评审 → □ 回复意见   │
+  └─────────────────────────────────────────┘
+```
+
+### 11.2 博客项目的 Collaboration 示例
+
+```
+TASK-003 标签系统的完整协作：
+
+┌─ TL ──────────────────────────────────────────────────────┐
+│  ○ → □ 创建任务 ──────────────────── □ 审查代码 → □ 结论  │
+└──────────┬────────────────────────────────↑───────────────┘
+           │                                │
+     ─ ─ ─ ▷ 任务分配                ─ ─ ─ ▷ 代码提交
+           │                                │
+┌──────────▼────────────────────────────────┴───────────────┐
+│  ○ → □ 读任务 → □ 写测试 → □ 写代码 → □ 提交 ──────────  │
+└─ 后端开发-1 ──────────────────────────────────┬───────────┘
+                                                │
+                                          ─ ─ ─ ▷ 审查通过
+                                                │
+┌───────────────────────────────────────────────▼───────────┐
+│  ○ → □ 读任务 → □ 执行测试 → □ 提交报告 → ⊕              │
+└─ 测试-1 ─────────────────────────────────────────────────┘
+
+每个 Pool = 一个 Agent 的 Process
+Pool 之间的虚线 = FlowMessage / NodeResult / 工单状态变更
+```
+
+---
+
+## 十二、Conversation Diagram 详细
+
+### 12.1 核心元素
+
+```
+Conversation Node（对话节点）：
+  图形：六边形 ⬡
+  表示一组参与者之间的一次逻辑对话
+  聚合了多个 Message Flow
+
+  属性：
+    id: string
+    name: string
+    participantRefs: [参与者列表]
+    messageFlowRefs: [消息流列表]
+    correlationKeys: [关联键]
+
+Sub-Conversation（子对话）：
+  图形：六边形 + 加号 ⬡+
+  内部包含多个 Conversation Node
+
+Participant（参与者）：
+  图形：矩形（和 Pool 一样）
+  通过连线连接到 Conversation Node
+```
+
+### 12.2 博客项目的 Conversation 示例
+
+```
+博客项目的所有"对话"：
+
+  ○ TL ─────────── ⬡ 需求讨论 ─────────── ○ 用户
+                    │
+                    ├──────────────────── ○ 后端开发
+                    ├──────────────────── ○ 前端开发
+                    └──────────────────── ○ 测试
+
+  ○ TL ─────────── ⬡ 设计评审 ─────────── ○ 后端开发
+                    │
+                    ├──────────────────── ○ 前端开发
+                    └──────────────────── ○ 测试
+
+  ○ 后端开发 ────── ⬡ 代码审查 ─────────── ○ TL
+
+  ○ 后端开发 ────── ⬡ 技术咨询 ─────────── ○ TL
+                    （ask_teammate）
+
+每个 ⬡ = 我们的一次 session 或一组相关的消息交换
+```
+
+### 12.3 Correlation（消息关联）
+
+```
+问题：
+  群聊里同时有多个 session 在进行
+  Agent 收到一条消息，怎么知道属于哪个 session？
+
+BPMN 的解决方案：Correlation Key
+
+  Correlation Key = 一组属性，用于匹配消息属于哪个对话
+
+  例：
+    session_id = "brainstorm-001"
+    所有属于这次头脑风暴的消息都带 session_id = "brainstorm-001"
+    收到消息时，用 session_id 匹配到对应的 Conversation
+
+  映射到我们的设计：
+    FlowMessage.payload 里的 process_instance_id 就是 Correlation Key
+    ChatMessage 里的 session_id 也是 Correlation Key
+    runtime 收到消息时，用这些 ID 匹配到对应的状态栈条目
+```
+
+---
+
+## 十三、边界事件详细
+
+### 13.1 概念
+
+```
+边界事件 = 附着在活动边框上的中间事件
+当活动执行过程中，如果边界事件触发，活动被中断（或不中断）
+
+两种类型：
+  中断型（Interrupting）：事件触发后，活动被终止
+    图形：实线圆 ◎
+  非中断型（Non-Interrupting）：事件触发后，活动继续执行，同时启动另一条路径
+    图形：虚线圆 ◎̤
+```
+
+### 13.2 Timer Boundary Event（定时边界事件）
+
+```
+例：TL 写 PRD，如果 2 小时没完成，发通知提醒
+
+  ┌──────────────────┐
+  │                  │
+  │  write_prd       ◎⏱ 2h  ← 非中断型定时边界事件
+  │  (TL 写 PRD)     │
+  │                  │
+  └────────┬─────────┘
+           │                    │
+           │ 正常完成            │ 2 小时触发
+           ▼                    ▼
+      review_prd           发送提醒通知
+                           （不中断 write_prd）
+
+映射到我们的设计：
+  flow 在下发 FlowMessage 时记录开始时间
+  定时器检查：如果超过 2 小时未收到 NodeResult → 发通知
+  Phase 1 用简单的超时检查
+  Phase 2 用 BPMN Timer Boundary Event 建模
+```
+
+### 13.3 Error Boundary Event（错误边界事件）
+
+```
+例：部署时如果出错，触发回滚
+
+  ┌──────────────────┐
+  │                  │
+  │  execute_deploy  ◎✕  ← 中断型错误边界事件
+  │  (DevOps 部署)   │
+  │                  │
+  └────────┬─────────┘
+           │                    │
+           │ 正常完成            │ 部署出错
+           ▼                    ▼
+      smoke_test           rollback
+                           （中断 deploy，执行回滚）
+
+映射到我们的设计：
+  Agent 上报 NodeResult(failed) → flow 检查是否有 Error Boundary
+  有 → 走 Error Boundary 的路径（回滚）
+  没有 → 按 on_fail 处理
+```
+
+---
+
+## 十四、Multi-Instance 详细
+
+### 14.1 概念
+
+```
+Multi-Instance = 一个活动创建多个实例，并行或顺序执行
+
+并行多实例（Parallel Multi-Instance）：
+  图形：活动底部 ≡（三条横线）
+  所有实例同时启动，全部完成后继续
+
+  例：5 个任务并行开发
+  ┌──────────────┐
+  │  implement   │
+  │              │
+  │      ≡       │  ← 并行多实例
+  │  collection: │
+  │  [T1,T2,T3,  │
+  │   T4,T5]     │
+  └──────────────┘
+  = 同时创建 5 个 implement 实例，分别处理 T1~T5
+
+顺序多实例（Sequential Multi-Instance）：
+  图形：活动底部 |||（三条竖线）
+  实例依次执行，一个完成后启动下一个
+
+  例：TL 依次审查每个模块
+  ┌──────────────┐
+  │  code_review │
+  │              │
+  │     |||      │  ← 顺序多实例
+  │  collection: │
+  │  [T1,T2,T3]  │
+  └──────────────┘
+  = 先审查 T1，完成后审查 T2，再审查 T3
+
+映射到我们的设计：
+  并行多实例 = platform 的任务依赖调度（无依赖的任务同时启动）
+  顺序多实例 = platform 的任务依赖调度（有依赖的任务按顺序）
+  Phase 2 在 ProcessDefinition 中用 Multi-Instance 标记建模
+```
+
+---
+
+## 十五、Call Activity 详细
+
+```
+Call Activity = 调用另一个 ProcessDefinition
+
+图形：粗边框矩形
+  ┌━━━━━━━━━━━━━━┐
+  │  implement   │  ← 粗边框 = Call Activity
+  │              │
+  │  calls:      │
+  │  tdd_workflow│
+  └━━━━━━━━━━━━━━┘
+
+与 Sub-Process 的区别：
+  Sub-Process：内部流程定义在当前 ProcessDefinition 里（嵌入式）
+  Call Activity：引用外部的 ProcessDefinition（可复用）
+
+例：
+  iterative_development 流程中的 implement 节点
+  是一个 Call Activity，调用 tdd_workflow
+
+  iterative_development:
+    ○ → ┌━ implement ━┐ → □ code_review → □ testing → ⊕
+         │ calls:      │
+         │ tdd_workflow │
+         └━━━━━━━━━━━━━┘
+              │
+              ▼ 展开
+         tdd_workflow:
+           ○ → □ read_task → □ write_test → □ run_red
+             → □ write_code → □ run_green → □ refactor → ⊕
+
+映射到我们的设计：
+  FlowMessage.payload.process_id = "tdd_workflow"
+  runtime 的 WorkflowEngine 加载 tdd_workflow 的 ProcessDefinition
+  按 nodes + edges 逐步执行
+```
+
+---
+
+## 十六、Event Sub-Process 详细
+
+```
+Event Sub-Process = 由事件触发的子流程，不在主流程线上
+
+图形：虚线边框矩形 + 开始事件
+  ┌─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┐
+  │  ○✕ → □ 记录错误 → □ 通知 TL  │  ← 虚线边框 = Event Sub-Process
+  │  (Error Start Event)           │     ○✕ = Error Start Event
+  └─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘
+
+与 Boundary Event 的区别：
+  Boundary Event：附着在某个特定活动上
+  Event Sub-Process：附着在整个流程上（全局错误处理）
+
+例：
+  整个 iterative_development 流程中，
+  任何节点抛出未处理的错误 → 触发全局错误处理
+
+  iterative_development:
+    ○ → □ implement → □ code_review → □ testing → ⊕
+
+    ┌─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┐
+    │  ○✕ → □ log_error → □ notify_tl → ⊕    │  ← 全局错误处理
+    └─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘
+
+映射到我们的设计：
+  Phase 1：flow 的 EventLoop 统一处理 NodeResult(failed)
+  Phase 2：在 ProcessDefinition 中用 Event Sub-Process 建模
+```
+
+---
+
+## 十七、Token 执行语义
+
+```
+BPMN 用 Token 描述流程执行：
+
+  流程开始时，Start Event 产生一个 Token
+  Token 沿着 Sequence Flow 移动
+  到达 Activity → Activity 开始执行
+  Activity 完成 → Token 继续移动
+  到达 End Event → Token 消失，流程结束
+
+并行网关的 Token 行为：
+
+  Parallel Gateway (Diverging)：
+    一个 Token 进入 → 分裂为 N 个 Token（每个出口一个）
+    
+    ─── Token ──→ ◇+ ──→ Token A
+                   ├──→ Token B
+                   └──→ Token C
+
+  Parallel Gateway (Converging)：
+    等待所有入口的 Token 到达 → 合并为一个 Token
+    
+    Token A ──→ ◇+ ──→ Token
+    Token B ──→
+    Token C ──→
+
+包含网关的 Token 行为：
+
+  Inclusive Gateway (Diverging)：
+    一个 Token 进入 → 分裂为 1~N 个 Token（满足条件的出口各一个）
+
+  Inclusive Gateway (Converging)：
+    等待所有已激活的入口 Token 到达 → 合并
+
+映射到我们的设计：
+  Token = ProcessInstance.node_states 中状态为 "running" 的节点
+  并行分裂 = 多个节点同时变为 "running"
+  并行合并 = 检查所有入口节点是否都 "completed"
+  Phase 1 用 node_states dict 模拟 Token
+  Phase 2 考虑显式的 Token 对象
+```

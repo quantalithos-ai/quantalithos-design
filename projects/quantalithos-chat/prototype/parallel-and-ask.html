@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>并行执行 + 跨 Agent 协作 · Quantalithos AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;background:#f0f0f0;height:100vh;}
+.app{display:flex;height:100vh;}
+.nav{width:56px;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;flex-shrink:0;}
+.ni{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8888aa;}.ni.on{background:#3d3d5c;color:#fff;}
+.nav-sp{flex:1;}.nav-av{width:32px;height:32px;border-radius:50%;background:#1565c0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;}
+.conv{width:260px;background:#fff;border-right:1px solid #e8e8e8;flex-shrink:0;}
+.conv-hd{padding:14px 16px;font-size:14px;font-weight:600;color:#333;border-bottom:1px solid #f0f0f0;}
+.conv-items{overflow-y:auto;}
+.conv-lbl{padding:8px 16px 4px;font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px;}
+.ci{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;}.ci.on{background:#e3f2fd;}
+.ci-av{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex-shrink:0;}
+.ci-info{flex:1;min-width:0;}.ci-name{font-size:13px;font-weight:500;color:#333;}.ci-pre{font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.main{flex:1;display:flex;flex-direction:column;background:#f5f7fa;}
+.main-hd{padding:14px 20px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:10px;}
+.main-hd h2{font-size:15px;font-weight:600;color:#333;}.main-hd .sub{font-size:11px;color:#999;}
+.main-hd .stage{margin-left:auto;font-size:10px;background:#e3f2fd;color:#1565c0;padding:3px 10px;border-radius:12px;font-weight:500;}
+
+.messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:10px;}
+.msg{display:flex;gap:8px;max-width:85%;}.msg.bot{align-self:flex-start;}
+.msg-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:600;}
+.msg-body{display:flex;flex-direction:column;gap:2px;flex:1;}
+.msg-name{font-size:10px;color:#999;display:flex;align-items:center;gap:4px;}
+.msg-role{font-size:9px;background:#f0f0f0;color:#888;padding:0 4px;border-radius:3px;}
+.msg-text{padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;color:#333;background:#fff;border:1px solid #e8e8e8;border-top-left-radius:4px;}
+.sys-msg{text-align:center;font-size:11px;color:#999;padding:4px 0;}
+
+/* ask_teammate 卡片 */
+.ask-card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;border-left:4px solid #1565c0;}
+.ask-hd{padding:8px 12px;display:flex;align-items:center;gap:6px;background:#f0f7ff;font-size:11px;font-weight:500;color:#1565c0;}
+.ask-body{padding:10px 12px;font-size:12px;color:#555;line-height:1.5;}
+.ask-reply{padding:8px 12px;border-top:1px solid #f0f0f0;background:#f8fdf8;font-size:12px;color:#2e7d32;line-height:1.5;}
+.ask-reply .from{font-weight:600;color:#388e3c;}
+.ask-waiting{padding:8px 12px;border-top:1px solid #f0f0f0;background:#fff8e1;font-size:11px;color:#f57c00;display:flex;align-items:center;gap:6px;}
+.ask-waiting .dots{display:flex;gap:3px;}
+.ask-waiting .dots span{width:4px;height:4px;background:#f57c00;border-radius:50%;animation:bounce .6s infinite alternate;}
+.ask-waiting .dots span:nth-child(2){animation-delay:.2s;}
+.ask-waiting .dots span:nth-child(3){animation-delay:.4s;}
+@keyframes bounce{to{transform:translateY(-4px);opacity:.3;}}
+
+/* 并行状态面板 */
+.parallel-panel{background:#fff;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;max-width:500px;}
+.parallel-hd{padding:10px 14px;display:flex;align-items:center;gap:8px;background:#fafbfc;border-bottom:1px solid #f0f0f0;font-size:12px;font-weight:600;color:#333;}
+.parallel-hd .badge{font-size:9px;padding:2px 8px;border-radius:10px;font-weight:500;}
+.parallel-hd .badge.running{background:#e3f2fd;color:#1565c0;}
+.parallel-hd .badge.done{background:#e8f5e9;color:#2e7d32;}
+.parallel-body{padding:0;}
+.parallel-task{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f5f5f5;}
+.parallel-task:last-child{border-bottom:none;}
+.pt-av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:600;}
+.pt-info{flex:1;}
+.pt-name{font-size:11px;font-weight:500;color:#333;}
+.pt-status{font-size:10px;color:#888;margin-top:1px;}
+.pt-bar{width:80px;height:4px;background:#eee;border-radius:2px;overflow:hidden;}
+.pt-bar-fill{height:100%;border-radius:2px;transition:width .5s;}
+
+/* 依赖提示 */
+.dep-card{background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:8px 12px;font-size:11px;color:#e65100;display:flex;align-items:center;gap:6px;}
+
+.input-area{padding:12px 20px;background:#fff;border-top:1px solid #e8e8e8;display:flex;gap:10px;align-items:flex-end;}
+.input-area textarea{flex:1;padding:10px 14px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;resize:none;outline:none;font-family:inherit;min-height:40px;}
+.send-btn{width:36px;height:36px;border-radius:50%;background:#1565c0;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="nav"><div class="ni on">💬</div><div class="ni">📊</div><div class="ni">📈</div><div class="nav-sp"></div><div class="nav-av">A</div></div>
+  <div class="conv">
+    <div class="conv-hd">消息</div>
+    <div class="conv-items">
+      <div class="conv-lbl">项目</div>
+      <div class="ci on"><div class="ci-av" style="background:#388e3c;border-radius:6px;font-size:10px;">博客</div><div class="ci-info"><div class="ci-name">博客系统</div><div class="ci-pre">BE-1, FE-1 并行执行中...</div></div></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="main-hd">
+      <div class="ci-av" style="background:#388e3c;width:28px;height:28px;border-radius:6px;font-size:10px;">博客</div>
+      <div><h2>博客系统 · 项目群聊</h2><div class="sub">TL, BE-1, FE-1, QA-1</div></div>
+      <div class="stage">阶段 3 · 迭代开发</div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="sys-msg">── ⊕ 并行执行开始：T-003 (BE-1) + T-004 (FE-1) ──</div>
+
+      <!-- 并行状态面板 -->
+      <div style="display:flex;justify-content:center;">
+        <div class="parallel-panel" id="parallelPanel">
+          <div class="parallel-hd">
+            ⊕ 并行任务
+            <span class="badge running" id="parallelBadge">2 个执行中</span>
+          </div>
+          <div class="parallel-body">
+            <div class="parallel-task" id="pt003">
+              <div class="pt-av" style="background:#e65100;">B1</div>
+              <div class="pt-info">
+                <div class="pt-name">T-003 标签系统</div>
+                <div class="pt-status" id="pt003status">🔨 编码中...</div>
+              </div>
+              <div class="pt-bar"><div class="pt-bar-fill" id="pt003bar" style="width:20%;background:#1565c0;"></div></div>
+            </div>
+            <div class="parallel-task" id="pt004">
+              <div class="pt-av" style="background:#1565c0;">F1</div>
+              <div class="pt-info">
+                <div class="pt-name">T-004 搜索功能</div>
+                <div class="pt-status" id="pt004status">🔨 编码中...</div>
+              </div>
+              <div class="pt-bar"><div class="pt-bar-fill" id="pt004bar" style="width:15%;background:#1565c0;"></div></div>
+            </div>
+            <div class="parallel-task" id="pt005" style="opacity:.5;">
+              <div class="pt-av" style="background:#ddd;color:#999;">B1</div>
+              <div class="pt-info">
+                <div class="pt-name">T-005 评论系统</div>
+                <div class="pt-status" id="pt005status">⏳ 等待 T-003 完成</div>
+              </div>
+              <div class="pt-bar"><div class="pt-bar-fill" id="pt005bar" style="width:0%;background:#ddd;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea placeholder="输入消息..." rows="1"></textarea>
+      <button class="send-btn">↑</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const msgs = document.getElementById('messages');
+
+function addMsg(av, color, name, role, text) {
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.innerHTML = `
+    <div class="msg-av" style="background:${color};">${av}</div>
+    <div class="msg-body">
+      <div class="msg-name">${name} <span class="msg-role">${role}</span></div>
+      <div class="msg-text">${text}</div>
+    </div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addSys(text, color) {
+  const div = document.createElement('div');
+  div.className = 'sys-msg';
+  if (color) div.style.color = color;
+  div.textContent = text;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addAsk(fromAv, fromColor, fromName, toName, question) {
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.style.maxWidth = '100%';
+  div.innerHTML = `
+    <div class="msg-av" style="background:${fromColor};">${fromAv}</div>
+    <div class="msg-body" style="max-width:400px;">
+      <div class="msg-name">${fromName} <span class="msg-role">ask_teammate → ${toName}</span></div>
+      <div class="ask-card" id="ask1">
+        <div class="ask-hd">❓ ask_teammate → @${toName}</div>
+        <div class="ask-body">${question}</div>
+        <div class="ask-waiting" id="askWaiting">
+          <div class="dots"><span></span><span></span><span></span></div>
+          等待 ${toName} 回复...
+        </div>
+      </div>
+    </div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addAskReply(toName, reply) {
+  const waiting = document.getElementById('askWaiting');
+  if (waiting) {
+    waiting.outerHTML = `
+      <div class="ask-reply">
+        <span class="from">${toName} 回复：</span><br>${reply}
+      </div>`;
+  }
+}
+
+function updateProgress(taskId, status, percent, barColor) {
+  document.getElementById(taskId + 'status').textContent = status;
+  document.getElementById(taskId + 'bar').style.width = percent + '%';
+  if (barColor) document.getElementById(taskId + 'bar').style.background = barColor;
+}
+
+// 模拟并行执行时间线
+const timeline = [
+  // BE-1 开始编码
+  { delay: 1000, fn: () => {
+    addMsg('B1', '#e65100', '后端开发-1', 'T-003 编码', '开始实现标签系统，先写数据模型和 API。');
+    updateProgress('pt003', '🔨 编码中 · 写数据模型', 30, '#1565c0');
+  }},
+
+  // FE-1 开始编码
+  { delay: 1500, fn: () => {
+    addMsg('F1', '#1565c0', '前端开发-1', 'T-004 编码', '开始实现搜索功能，先做搜索组件和 API 对接。');
+    updateProgress('pt004', '🔨 编码中 · 搜索组件', 25, '#1565c0');
+  }},
+
+  // FE-1 遇到问题，ask_teammate BE-1
+  { delay: 2500, fn: () => {
+    addAsk('F1', '#1565c0', '前端开发-1', 'BE-1',
+      '搜索 API 的返回格式是什么？我需要知道分页参数和排序字段的结构，才能对接前端。');
+    updateProgress('pt004', '⏸ 等待 BE-1 回复', 30, '#f57c00');
+    addSys('── FE-1 暂停执行，等待 BE-1 回复 ──', '#f57c00');
+  }},
+
+  // BE-1 继续编码（不受影响）
+  { delay: 1500, fn: () => {
+    addMsg('B1', '#e65100', '后端开发-1', 'T-003 编码', 'API 端点实现完成，开始写测试。');
+    updateProgress('pt003', '🔨 编码中 · 写测试', 60, '#1565c0');
+  }},
+
+  // BE-1 回复 FE-1 的问题
+  { delay: 2000, fn: () => {
+    addAskReply('BE-1',
+      '搜索 API 返回格式：<br><code>{ items: [...], total: number, page: number, page_size: number }</code><br>排序字段：<code>sort=created_at:desc</code>，支持 title / created_at / updated_at');
+    addSys('── BE-1 已回复，FE-1 恢复执行 ──', '#43a047');
+    updateProgress('pt004', '🔨 编码中 · 对接 API', 40, '#1565c0');
+  }},
+
+  // FE-1 继续
+  { delay: 2000, fn: () => {
+    addMsg('F1', '#1565c0', '前端开发-1', 'T-004 编码', '搜索组件和 API 对接完成，开始写分页和排序。');
+    updateProgress('pt004', '🔨 编码中 · 分页排序', 65, '#1565c0');
+  }},
+
+  // BE-1 完成
+  { delay: 1500, fn: () => {
+    addMsg('B1', '#e65100', '后端开发-1', 'T-003 完成', 'TASK-003 标签系统完成 ✅<br>3 个文件，12 个测试通过。提交审查 → @TL');
+    updateProgress('pt003', '✅ 完成 · 提交审查', 100, '#43a047');
+    addSys('── ✅ T-003 完成 · 进入审查 ──', '#43a047');
+  }},
+
+  // T-005 解锁
+  { delay: 1000, fn: () => {
+    const dep = document.createElement('div');
+    dep.style.display = 'flex';
+    dep.style.justifyContent = 'center';
+    dep.innerHTML = `<div class="dep-card">🔓 T-003 完成 → T-005（评论系统）依赖已满足，可以开始执行</div>`;
+    msgs.appendChild(dep);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    document.getElementById('pt005').style.opacity = '1';
+    updateProgress('pt005', '🔨 编码中...', 10, '#1565c0');
+    document.querySelector('#pt005 .pt-av').style.background = '#e65100';
+    document.querySelector('#pt005 .pt-av').style.color = '#fff';
+  }},
+
+  // FE-1 完成
+  { delay: 2000, fn: () => {
+    addMsg('F1', '#1565c0', '前端开发-1', 'T-004 完成', 'TASK-004 搜索功能完成 ✅<br>搜索组件 + 分页 + 排序 + 高亮，8 个测试通过。提交审查 → @TL');
+    updateProgress('pt004', '✅ 完成 · 提交审查', 100, '#43a047');
+    addSys('── ✅ T-004 完成 · 进入审查 ──', '#43a047');
+  }},
+
+  // 更新并行面板
+  { delay: 500, fn: () => {
+    document.getElementById('parallelBadge').className = 'badge running';
+    document.getElementById('parallelBadge').textContent = '1 个执行中 · 2 个已完成';
+  }},
+
+  // BE-1 继续 T-005
+  { delay: 1500, fn: () => {
+    addMsg('B1', '#e65100', '后端开发-1', 'T-005 编码', '开始实现评论系统，复用标签系统的 API 模式。');
+    updateProgress('pt005', '🔨 编码中 · 评论模型', 40, '#1565c0');
+  }},
+
+  // 全部完成
+  { delay: 2000, fn: () => {
+    addMsg('B1', '#e65100', '后端开发-1', 'T-005 完成', 'TASK-005 评论系统完成 ✅<br>评论 CRUD + XSS 过滤 + 虚拟滚动支持，10 个测试通过。');
+    updateProgress('pt005', '✅ 完成', 100, '#43a047');
+    document.getElementById('parallelBadge').className = 'badge done';
+    document.getElementById('parallelBadge').textContent = '全部完成';
+    addSys('── ⊕ 并行任务全部完成 · 3/3 ──', '#43a047');
+    addSys('── 进入集成测试 ──');
+  }},
+];
+
+// 自动播放
+let i = 0;
+function play() {
+  if (i >= timeline.length) return;
+  const step = timeline[i];
+  setTimeout(() => { step.fn(); i++; play(); }, step.delay);
+}
+setTimeout(play, 500);
+</script>
+</body>
+</html>

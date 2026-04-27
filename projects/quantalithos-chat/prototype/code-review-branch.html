@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代码审查分支 · Quantalithos AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;background:#f0f0f0;height:100vh;}
+.app{display:flex;height:100vh;}
+.nav{width:56px;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;flex-shrink:0;}
+.ni{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8888aa;}.ni.on{background:#3d3d5c;color:#fff;}
+.nav-sp{flex:1;}.nav-av{width:32px;height:32px;border-radius:50%;background:#1565c0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;}
+.conv{width:260px;background:#fff;border-right:1px solid #e8e8e8;flex-shrink:0;}
+.conv-hd{padding:14px 16px;font-size:14px;font-weight:600;color:#333;border-bottom:1px solid #f0f0f0;}
+.conv-items{overflow-y:auto;}
+.conv-lbl{padding:8px 16px 4px;font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px;}
+.ci{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;}.ci.on{background:#e3f2fd;}
+.ci-av{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex-shrink:0;}
+.ci-info{flex:1;min-width:0;}.ci-name{font-size:13px;font-weight:500;color:#333;}.ci-pre{font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.main{flex:1;display:flex;flex-direction:column;background:#f5f7fa;}
+.main-hd{padding:14px 20px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:10px;}
+.main-hd h2{font-size:15px;font-weight:600;color:#333;}.main-hd .sub{font-size:11px;color:#999;}
+.main-hd .stage{margin-left:auto;font-size:10px;background:#e3f2fd;color:#1565c0;padding:3px 10px;border-radius:12px;font-weight:500;}
+
+.messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;}
+.msg{display:flex;gap:8px;max-width:85%;}.msg.bot{align-self:flex-start;}
+.msg-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:600;}
+.msg-body{display:flex;flex-direction:column;gap:2px;flex:1;}
+.msg-name{font-size:10px;color:#999;display:flex;align-items:center;gap:4px;}
+.msg-role{font-size:9px;background:#f0f0f0;color:#888;padding:0 4px;border-radius:3px;}
+.msg-text{padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;color:#333;background:#fff;border:1px solid #e8e8e8;border-top-left-radius:4px;}
+.sys-msg{text-align:center;font-size:11px;color:#999;padding:4px 0;}
+
+/* 审查卡片 */
+.review-card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;max-width:450px;}
+.review-hd{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f0f0f0;}
+.review-verdict{font-size:12px;font-weight:600;padding:3px 10px;border-radius:6px;}
+.review-verdict.approved{background:#e8f5e9;color:#2e7d32;}
+.review-verdict.rejected{background:#fce4ec;color:#c62828;}
+.review-body{padding:12px 14px;font-size:12px;color:#555;line-height:1.6;}
+.review-files{margin-top:8px;}
+.review-file{display:flex;align-items:center;gap:6px;padding:4px 8px;background:#f8f9fb;border-radius:4px;margin:2px 0;font-size:11px;font-family:'SF Mono',Monaco,monospace;}
+.review-file .status{font-size:10px;}
+.review-comments{margin-top:10px;border-top:1px solid #f0f0f0;padding-top:10px;}
+.review-comment{padding:6px 0;font-size:11px;color:#555;}
+.review-comment .loc{color:#1565c0;font-family:'SF Mono',Monaco,monospace;font-size:10px;}
+
+/* 流程图 */
+.flow-diagram{display:flex;align-items:flex-start;gap:0;padding:12px 14px;background:#fafbfc;border-top:1px solid #f0f0f0;overflow-x:auto;}
+.fd-node{display:flex;flex-direction:column;align-items:center;min-width:60px;}
+.fd-box{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:500;border:2px solid #90a4ae;background:#fff;white-space:nowrap;}
+.fd-box.done{border-color:#43a047;background:#e8f5e9;color:#2e7d32;}
+.fd-box.run{border-color:#1565c0;background:#e3f2fd;color:#1565c0;box-shadow:0 0 0 3px rgba(21,101,192,.1);}
+.fd-box.fail{border-color:#e53935;background:#ffebee;color:#c62828;}
+.fd-box.wait{border-color:#ddd;color:#999;}
+.fd-gw{width:24px;height:24px;background:#fff;border:2px solid #f57c00;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;}
+.fd-gw-inner{transform:rotate(-45deg);font-size:9px;font-weight:700;color:#f57c00;}
+.fd-lbl{font-size:8px;color:#888;margin-top:3px;}
+.fd-line{width:20px;height:2px;background:#ddd;margin-top:10px;margin-bottom:14px;}.fd-line.done{background:#66bb6a;}.fd-line.fail{background:#ef9a9a;}
+.fd-branch{display:flex;flex-direction:column;gap:6px;margin-left:4px;}
+.fd-branch-line{display:flex;align-items:center;gap:4px;font-size:9px;}
+.fd-branch-line .line{width:24px;height:2px;}
+
+.input-area{padding:12px 20px;background:#fff;border-top:1px solid #e8e8e8;display:flex;gap:10px;align-items:flex-end;}
+.input-area textarea{flex:1;padding:10px 14px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;resize:none;outline:none;font-family:inherit;min-height:40px;}
+.send-btn{width:36px;height:36px;border-radius:50%;background:#1565c0;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="nav"><div class="ni on">💬</div><div class="ni">📊</div><div class="ni">📈</div><div class="nav-sp"></div><div class="nav-av">A</div></div>
+  <div class="conv">
+    <div class="conv-hd">消息</div>
+    <div class="conv-items">
+      <div class="conv-lbl">项目</div>
+      <div class="ci on"><div class="ci-av" style="background:#388e3c;border-radius:6px;font-size:10px;">博客</div><div class="ci-info"><div class="ci-name">博客系统</div><div class="ci-pre">TL: 代码审查中...</div></div></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="main-hd">
+      <div class="ci-av" style="background:#388e3c;width:28px;height:28px;border-radius:6px;font-size:10px;">博客</div>
+      <div><h2>博客系统 · 项目群聊</h2><div class="sub">TL, BE-1, FE-1, QA-1</div></div>
+      <div class="stage">阶段 3 · 迭代开发</div>
+    </div>
+
+    <div class="messages" id="messages">
+      <!-- BE-1 编码完成 -->
+      <div class="msg bot">
+        <div class="msg-av" style="background:#e65100;">B1</div>
+        <div class="msg-body">
+          <div class="msg-name">后端开发-1 <span class="msg-role">完成</span></div>
+          <div class="msg-text">TASK-003 标签系统实现完成 ✅<br>3 个文件修改，12 个测试通过。提交代码审查 → @Tech Lead</div>
+        </div>
+      </div>
+
+      <div class="sys-msg">── 🔍 代码审查开始 · TL 审查 T-003 ──</div>
+
+      <!-- TL 审查 — 第一次：打回 -->
+      <div class="msg bot" style="max-width:100%;">
+        <div class="msg-av" style="background:#388e3c;">TL</div>
+        <div class="msg-body" style="max-width:450px;">
+          <div class="msg-name">Tech Lead <span class="msg-role">代码审查</span></div>
+          <div class="review-card">
+            <div class="review-hd">
+              <span>🔍 代码审查 · TASK-003</span>
+              <span class="review-verdict rejected">❌ 需要修改</span>
+            </div>
+            <div class="review-body">
+              <div class="review-files">
+                <div class="review-file"><span class="status">✅</span> src/models/tag.py</div>
+                <div class="review-file"><span class="status">⚠️</span> src/api/tags.py</div>
+                <div class="review-file"><span class="status">✅</span> src/api/article_tags.py</div>
+              </div>
+              <div class="review-comments">
+                <div class="review-comment">
+                  <span class="loc">src/api/tags.py:23</span><br>
+                  标签名称缺少唯一性校验，重复创建同名标签不会报错。
+                </div>
+                <div class="review-comment">
+                  <span class="loc">src/api/tags.py:45</span><br>
+                  删除标签时没有检查是否有文章关联，应该先解除关联或拒绝删除。
+                </div>
+              </div>
+            </div>
+            <!-- 流程图：显示当前在"打回"分支 -->
+            <div class="flow-diagram">
+              <div class="fd-node"><div class="fd-box done">✓ 编码</div><div class="fd-lbl">BE-1</div></div>
+              <div class="fd-line done"></div>
+              <div class="fd-node"><div class="fd-box fail">🔍 审查</div><div class="fd-lbl">TL</div></div>
+              <div class="fd-line fail"></div>
+              <div class="fd-node">
+                <div class="fd-gw"><div class="fd-gw-inner">✕</div></div>
+                <div class="fd-lbl">结果</div>
+              </div>
+              <div class="fd-branch">
+                <div class="fd-branch-line"><div class="line" style="background:#ddd;width:24px;height:2px;"></div><span style="color:#999;">通过 → 测试</span></div>
+                <div class="fd-branch-line"><div class="line" style="background:#e53935;width:24px;height:2px;"></div><span style="color:#e53935;font-weight:600;">打回 → 返回编码 ←</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sys-msg" style="color:#e53935;">── ✕ 审查打回 · BE-1 需要修改 ──</div>
+
+      <!-- BE-1 收到打回，修改代码 -->
+      <div class="msg bot">
+        <div class="msg-av" style="background:#e65100;">B1</div>
+        <div class="msg-body">
+          <div class="msg-name">后端开发-1 <span class="msg-role">修改中</span></div>
+          <div class="msg-text">收到审查意见，开始修改：<br>1. 添加标签名称唯一性校验<br>2. 删除标签前检查文章关联</div>
+        </div>
+      </div>
+
+      <div class="msg bot">
+        <div class="msg-av" style="background:#e65100;">B1</div>
+        <div class="msg-body">
+          <div class="msg-name">后端开发-1 <span class="msg-role">修改完成</span></div>
+          <div class="msg-text">修改完成 ✅<br>• 标签名称唯一性校验（重复时返回 409）<br>• 删除前检查关联（有关联时返回 400）<br>• 新增 2 个测试用例（共 14 个，全部通过）<br><br>重新提交审查 → @Tech Lead</div>
+        </div>
+      </div>
+
+      <div class="sys-msg">── 🔍 代码审查（第 2 次）· TL 审查 T-003 ──</div>
+
+      <!-- TL 审查 — 第二次：通过 -->
+      <div class="msg bot" style="max-width:100%;">
+        <div class="msg-av" style="background:#388e3c;">TL</div>
+        <div class="msg-body" style="max-width:450px;">
+          <div class="msg-name">Tech Lead <span class="msg-role">代码审查</span></div>
+          <div class="review-card">
+            <div class="review-hd">
+              <span>🔍 代码审查（第 2 次）· TASK-003</span>
+              <span class="review-verdict approved">✅ 通过</span>
+            </div>
+            <div class="review-body">
+              <div class="review-files">
+                <div class="review-file"><span class="status">✅</span> src/models/tag.py</div>
+                <div class="review-file"><span class="status">✅</span> src/api/tags.py <span style="font-size:9px;color:#43a047;">（已修复）</span></div>
+                <div class="review-file"><span class="status">✅</span> src/api/article_tags.py</div>
+                <div class="review-file"><span class="status">✅</span> tests/test_tags.py <span style="font-size:9px;color:#43a047;">（+2 用例）</span></div>
+              </div>
+              <div class="review-comments">
+                <div class="review-comment" style="color:#2e7d32;">
+                  代码质量良好，唯一性校验和关联检查实现正确。14 个测试全部通过。
+                </div>
+              </div>
+            </div>
+            <!-- 流程图：显示通过分支 -->
+            <div class="flow-diagram">
+              <div class="fd-node"><div class="fd-box done">✓ 编码</div><div class="fd-lbl">BE-1</div></div>
+              <div class="fd-line done"></div>
+              <div class="fd-node"><div class="fd-box done">✓ 审查</div><div class="fd-lbl">TL ×2</div></div>
+              <div class="fd-line done"></div>
+              <div class="fd-node">
+                <div class="fd-gw" style="border-color:#43a047;"><div class="fd-gw-inner" style="color:#43a047;">✕</div></div>
+                <div class="fd-lbl">通过</div>
+              </div>
+              <div class="fd-line done"></div>
+              <div class="fd-node"><div class="fd-box run">🧪 测试</div><div class="fd-lbl">QA-1</div></div>
+              <div class="fd-line"></div>
+              <div class="fd-node"><div class="fd-box wait">⊕</div><div class="fd-lbl">完成</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sys-msg" style="color:#43a047;">── ✕→approved · T-003 进入测试 ──</div>
+
+      <!-- QA 开始测试 -->
+      <div class="msg bot">
+        <div class="msg-av" style="background:#b71c1c;">Q1</div>
+        <div class="msg-body">
+          <div class="msg-name">测试-1 <span class="msg-role">测试中</span></div>
+          <div class="msg-text">开始测试 TASK-003 标签系统...<br>• 功能测试：标签 CRUD + 文章关联<br>• 边界测试：重复标签名、删除有关联的标签<br>• 安全测试：XSS 防护</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea placeholder="输入消息..." rows="1"></textarea>
+      <button class="send-btn">↑</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

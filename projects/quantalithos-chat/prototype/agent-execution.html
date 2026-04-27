@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 实时执行 · Quantalithos AI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC',sans-serif;background:#f0f0f0;height:100vh;}
+.app{display:flex;height:100vh;}
+
+.nav{width:56px;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;flex-shrink:0;}
+.ni{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:#8888aa;}.ni.on{background:#3d3d5c;color:#fff;}
+.nav-sp{flex:1;}.nav-av{width:32px;height:32px;border-radius:50%;background:#1565c0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;}
+
+.conv{width:260px;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;flex-shrink:0;}
+.conv-hd{padding:14px 16px;font-size:14px;font-weight:600;color:#333;border-bottom:1px solid #f0f0f0;}
+.conv-items{flex:1;overflow-y:auto;}
+.conv-lbl{padding:8px 16px 4px;font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px;}
+.ci{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;}.ci.on{background:#e3f2fd;}
+.ci-av{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex-shrink:0;}
+.ci-info{flex:1;min-width:0;}.ci-name{font-size:13px;font-weight:500;color:#333;}.ci-pre{font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.main{flex:1;display:flex;flex-direction:column;background:#f5f7fa;}
+.main-hd{padding:14px 20px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:10px;}
+.main-hd h2{font-size:15px;font-weight:600;color:#333;}.main-hd .sub{font-size:11px;color:#999;}
+.main-hd .stage{margin-left:auto;font-size:10px;background:#e3f2fd;color:#1565c0;padding:3px 10px;border-radius:12px;font-weight:500;}
+
+.messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;}
+
+.msg{display:flex;gap:8px;max-width:85%;}.msg.bot{align-self:flex-start;}
+.msg-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:600;}
+.msg-body{display:flex;flex-direction:column;gap:2px;flex:1;}
+.msg-name{font-size:10px;color:#999;display:flex;align-items:center;gap:4px;}
+.msg-role{font-size:9px;background:#f0f0f0;color:#888;padding:0 4px;border-radius:3px;}
+.msg-text{padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;color:#333;background:#fff;border:1px solid #e8e8e8;border-top-left-radius:4px;}
+.sys-msg{text-align:center;font-size:11px;color:#999;padding:4px 0;}
+
+/* Agent 执行面板 */
+.exec-panel{background:#fff;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;max-width:500px;}
+.exec-header{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f0f0f0;background:#fafbfc;}
+.exec-agent{font-size:12px;font-weight:600;color:#333;}
+.exec-task{font-size:10px;color:#888;margin-left:4px;}
+.exec-status{margin-left:auto;font-size:9px;padding:2px 8px;border-radius:10px;font-weight:500;}
+.exec-status.running{background:#e3f2fd;color:#1565c0;animation:pulse 2s infinite;}
+.exec-status.done{background:#e8f5e9;color:#2e7d32;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.6;}}
+
+.exec-body{padding:0;}
+.exec-step{padding:10px 14px;border-bottom:1px solid #f5f5f5;font-size:12px;}
+.exec-step:last-child{border-bottom:none;}
+.exec-step-hd{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-weight:500;color:#333;}
+.exec-step-hd .icon{font-size:14px;}
+.exec-step-hd .label{font-size:10px;padding:1px 6px;border-radius:4px;}
+.think-label{background:#e3f2fd;color:#1565c0;}
+.act-label{background:#fff3e0;color:#e65100;}
+.result-label{background:#e8f5e9;color:#2e7d32;}
+
+.exec-step-body{color:#555;line-height:1.5;padding-left:20px;}
+.exec-step-body code{background:#f5f5f5;padding:1px 4px;border-radius:3px;font-size:11px;font-family:'SF Mono',Monaco,monospace;}
+
+/* 工具调用卡片 */
+.tool-call{background:#f8f9fb;border:1px solid #e8e8e8;border-radius:8px;padding:8px 10px;margin:4px 0;}
+.tool-name{font-size:11px;font-weight:600;color:#e65100;display:flex;align-items:center;gap:4px;}
+.tool-name .icon{font-size:12px;}
+.tool-args{font-size:10px;color:#888;margin-top:2px;font-family:'SF Mono',Monaco,monospace;}
+.tool-result{font-size:10px;color:#2e7d32;margin-top:4px;padding-top:4px;border-top:1px solid #eee;}
+.tool-result.error{color:#c62828;}
+
+/* 流式文本 */
+.streaming{position:relative;}
+.streaming::after{content:'▊';animation:blink 1s infinite;color:#1565c0;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+
+/* 进度条 */
+.workflow-progress{display:flex;align-items:center;gap:0;padding:6px 14px;background:#fafbfc;border-top:1px solid #f0f0f0;}
+.wp-node{display:flex;flex-direction:column;align-items:center;}
+.wp-dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:600;}
+.wp-dot.done{background:#43a047;}.wp-dot.run{background:#1565c0;animation:pulse 2s infinite;}.wp-dot.wait{background:#dde1e6;color:#999;}
+.wp-lbl{font-size:7px;color:#888;margin-top:2px;white-space:nowrap;}
+.wp-line{width:16px;height:2px;background:#dde1e6;margin-bottom:12px;}.wp-line.done{background:#66bb6a;}
+
+.input-area{padding:12px 20px;background:#fff;border-top:1px solid #e8e8e8;display:flex;gap:10px;align-items:flex-end;}
+.input-area textarea{flex:1;padding:10px 14px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;resize:none;outline:none;font-family:inherit;min-height:40px;}
+.send-btn{width:36px;height:36px;border-radius:50%;background:#1565c0;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="nav">
+    <div class="ni on">💬</div><div class="ni">📊</div><div class="ni">📈</div>
+    <div class="nav-sp"></div><div class="nav-av">A</div>
+  </div>
+  <div class="conv">
+    <div class="conv-hd">消息</div>
+    <div class="conv-items">
+      <div class="conv-lbl">置顶</div>
+      <div class="ci"><div class="ci-av" style="background:#7b1fa2;">🤖</div><div class="ci-info"><div class="ci-name">Assistant</div><div class="ci-pre">项目创建成功</div></div></div>
+      <div class="conv-lbl">项目</div>
+      <div class="ci on"><div class="ci-av" style="background:#388e3c;border-radius:6px;font-size:10px;">博客</div><div class="ci-info"><div class="ci-name">博客系统</div><div class="ci-pre">BE-1 正在执行 TASK-003...</div></div></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="main-hd">
+      <div class="ci-av" style="background:#388e3c;width:28px;height:28px;border-radius:6px;font-size:10px;">博客</div>
+      <div><h2>博客系统 · 项目群聊</h2><div class="sub">TL, BE-1, FE-1, QA-1</div></div>
+      <div class="stage">阶段 3 · 迭代开发</div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="sys-msg">── 迭代开发阶段开始 ──</div>
+
+      <div class="msg bot">
+        <div class="msg-av" style="background:#388e3c;">TL</div>
+        <div class="msg-body">
+          <div class="msg-name">Tech Lead <span class="msg-role">任务拆解</span></div>
+          <div class="msg-text">任务拆解完成，3 个任务已创建。<br>T-003（标签系统）和 T-004（搜索）可并行，T-005（评论）依赖 T-003。</div>
+        </div>
+      </div>
+
+      <div class="sys-msg">── ⊕ 并行执行：T-003 (BE-1) + T-004 (FE-1) ──</div>
+
+      <!-- BE-1 执行面板 -->
+      <div class="msg bot" style="max-width:100%;">
+        <div class="msg-av" style="background:#e65100;">B1</div>
+        <div class="msg-body" style="max-width:500px;">
+          <div class="msg-name">后端开发-1 <span class="msg-role">TASK-003 标签系统</span></div>
+          <div class="exec-panel" id="execPanel">
+            <div class="exec-header">
+              <span class="exec-agent">🔨 BE-1 执行中</span>
+              <span class="exec-task">TASK-003 · TDD 工作流</span>
+              <span class="exec-status running" id="execStatus">执行中</span>
+            </div>
+
+            <!-- TDD 工作流进度 -->
+            <div class="workflow-progress" id="wfProgress">
+              <div class="wp-node"><div class="wp-dot run" id="wp1">1</div><div class="wp-lbl">写测试</div></div>
+              <div class="wp-line" id="wl1"></div>
+              <div class="wp-node"><div class="wp-dot wait" id="wp2">2</div><div class="wp-lbl">运行(红)</div></div>
+              <div class="wp-line" id="wl2"></div>
+              <div class="wp-node"><div class="wp-dot wait" id="wp3">3</div><div class="wp-lbl">写代码</div></div>
+              <div class="wp-line" id="wl3"></div>
+              <div class="wp-node"><div class="wp-dot wait" id="wp4">4</div><div class="wp-lbl">运行(绿)</div></div>
+              <div class="wp-line" id="wl4"></div>
+              <div class="wp-node"><div class="wp-dot wait" id="wp5">◇</div><div class="wp-lbl">检查</div></div>
+            </div>
+
+            <div class="exec-body" id="execBody">
+              <!-- 动态填充 -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea placeholder="输入消息..." rows="1"></textarea>
+      <button class="send-btn">↑</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const execBody = document.getElementById('execBody');
+const msgs = document.getElementById('messages');
+let stepIndex = 0;
+
+// 模拟 TDD 工作流的 think→act 序列
+const steps = [
+  // Step 1: 写测试
+  { type: 'think', text: '需要为标签系统编写单元测试。先创建测试文件，测试标签的 CRUD 操作。', delay: 1200 },
+  { type: 'tool', name: 'file_write', args: 'tests/test_tags.py', result: '✅ 文件已创建（42 行）', delay: 800 },
+  { type: 'tool', name: 'file_write', args: 'tests/test_tag_api.py', result: '✅ 文件已创建（38 行）', delay: 600 },
+  { type: 'step_complete', text: '测试文件已创建：test_tags.py + test_tag_api.py', wp: 1, delay: 400 },
+
+  // Step 2: 运行测试（红灯）
+  { type: 'think', text: '运行测试确认失败（红灯阶段）。', delay: 800 },
+  { type: 'tool', name: 'code_execute', args: 'pytest tests/test_tags.py -v', result: '❌ 12 tests, 12 failed（模块不存在）', isError: true, delay: 1000 },
+  { type: 'step_complete', text: '确认红灯：12 个测试全部失败（预期行为）', wp: 2, delay: 400 },
+
+  // Step 3: 写代码
+  { type: 'think', text: '开始实现标签模型和 API。先创建数据模型，再实现 CRUD 端点。', delay: 1000 },
+  { type: 'tool', name: 'file_write', args: 'src/models/tag.py', result: '✅ Tag 模型（id, name, slug, created_at）', delay: 800 },
+  { type: 'tool', name: 'file_write', args: 'src/api/tags.py', result: '✅ CRUD API（create, get, list, update, delete）', delay: 1000 },
+  { type: 'tool', name: 'file_write', args: 'src/api/article_tags.py', result: '✅ 文章-标签关联 API', delay: 600 },
+  { type: 'step_complete', text: '编码完成：3 个文件，Tag 模型 + CRUD API + 关联 API', wp: 3, delay: 400 },
+
+  // Step 4: 运行测试（绿灯）
+  { type: 'think', text: '运行测试确认通过（绿灯阶段）。', delay: 800 },
+  { type: 'tool', name: 'code_execute', args: 'pytest tests/test_tags.py -v', result: '✅ 12 tests, 12 passed, 0 failed', delay: 1200 },
+  { type: 'step_complete', text: '确认绿灯：12 个测试全部通过 ✅', wp: 4, delay: 400 },
+
+  // Step 5: 网关检查 → 通过
+  { type: 'gateway', text: 'ExclusiveGateway: passed == true → 走 pass 分支', wp: 5, delay: 600 },
+
+  // 完成
+  { type: 'done', text: 'TASK-003 标签系统实现完成。3 个文件修改，12 个测试通过。提交代码审查。', delay: 800 },
+];
+
+function addStep(step) {
+  const div = document.createElement('div');
+  div.className = 'exec-step';
+
+  if (step.type === 'think') {
+    div.innerHTML = `
+      <div class="exec-step-hd"><span class="icon">🧠</span> <span class="label think-label">think</span></div>
+      <div class="exec-step-body streaming" id="stream${stepIndex}">${step.text}</div>`;
+  } else if (step.type === 'tool') {
+    div.innerHTML = `
+      <div class="exec-step-hd"><span class="icon">🔧</span> <span class="label act-label">act</span></div>
+      <div class="exec-step-body">
+        <div class="tool-call">
+          <div class="tool-name"><span class="icon">⚡</span> ${step.name}</div>
+          <div class="tool-args">${step.args}</div>
+          <div class="tool-result ${step.isError ? 'error' : ''}">${step.result}</div>
+        </div>
+      </div>`;
+  } else if (step.type === 'step_complete') {
+    div.innerHTML = `
+      <div class="exec-step-hd"><span class="icon">✅</span> <span class="label result-label">step_complete</span></div>
+      <div class="exec-step-body">${step.text}</div>`;
+    // 更新工作流进度
+    updateProgress(step.wp);
+  } else if (step.type === 'gateway') {
+    div.innerHTML = `
+      <div class="exec-step-hd"><span class="icon">◇</span> <span class="label" style="background:#fff3e0;color:#e65100;">gateway</span></div>
+      <div class="exec-step-body">${step.text}</div>`;
+    updateProgress(step.wp);
+  } else if (step.type === 'done') {
+    // 不在面板内显示，在群聊中显示
+    return;
+  }
+
+  execBody.appendChild(div);
+  execBody.scrollTop = execBody.scrollHeight;
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function updateProgress(completedStep) {
+  for (let i = 1; i <= completedStep; i++) {
+    const dot = document.getElementById('wp' + i);
+    if (dot) { dot.className = 'wp-dot done'; dot.textContent = '✓'; }
+    const line = document.getElementById('wl' + (i - 1));
+    if (line) line.className = 'wp-line done';
+  }
+  // 下一步高亮
+  const next = document.getElementById('wp' + (completedStep + 1));
+  if (next && next.className.includes('wait')) {
+    next.className = 'wp-dot run';
+  }
+}
+
+function finishExecution() {
+  document.getElementById('execStatus').className = 'exec-status done';
+  document.getElementById('execStatus').textContent = '已完成';
+
+  // 在群聊中添加完成消息
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.innerHTML = `
+    <div class="msg-av" style="background:#e65100;">B1</div>
+    <div class="msg-body">
+      <div class="msg-name">后端开发-1 <span class="msg-role">完成</span></div>
+      <div class="msg-text">TASK-003 标签系统实现完成 ✅<br>3 个文件修改，12 个测试全部通过。<br>提交代码审查 → @Tech Lead</div>
+    </div>`;
+  msgs.appendChild(div);
+
+  // 系统消息
+  const sys = document.createElement('div');
+  sys.className = 'sys-msg';
+  sys.textContent = '── ✅ T-003 完成 · 进入代码审查 ──';
+  msgs.appendChild(sys);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// 自动播放
+function playSteps() {
+  if (stepIndex >= steps.length) {
+    finishExecution();
+    return;
+  }
+
+  const step = steps[stepIndex];
+  addStep(step);
+  stepIndex++;
+
+  setTimeout(playSteps, step.delay + 300);
+}
+
+// 延迟 1 秒开始播放
+setTimeout(playSteps, 1000);
+</script>
+</body>
+</html>

@@ -16,39 +16,41 @@ AI 驱动的软件研发协作平台。所有员工均为 AI Agent，用户以�
 | **quantalithos-chat** | 聊天前端 — 私聊/群聊界面、门禁确认、Agent 实时执行（Vue 3） |
 | **quantalithos-console** | 云端管理后台 — 项目管理、Agent 配置、流程编辑、产物管理、设计系统、监控（Vue 3） |
 | **quantalithos-gate** | API 网关 — 认证授权、WebSocket、请求路由、权限控制 |
+| **quantalithos-sandbox** | 项目沙箱 — 三种模式（dev/preview/build），Docker 容器化，Agent 隔离执行 |
+| **quantalithos-runner** | 跨平台运行器 — 用户体验 AI 开发的应用（WebView + 原生桥接） |
 | **quantalithos-sync** | 工作区同步工具 — Rust CLI，manifest 驱动、多源拉取/推送 |
-| **quantalithos-infra** | 基础设施 — Docker/K8s、CI/CD、监控告警、数据库迁移 |
+| **quantalithos-infra** | 基础设施 — Docker/K8s、CI/CD、Gitea、监控告警、数据库迁移 |
 
 ## 架构总览
 
 ```
-quantalithos-chat (聊天前端)    quantalithos-console (管理后台)
-      │                              │
-      │ sdk-wasm (WASM 绑定)         │ sdk-wasm
-      │                              │
+quantalithos-chat (聊天前端)    quantalithos-console (管理后台)    quantalithos-runner (运行器)
+      │                              │                                  │
+      │ sdk-wasm (WASM 绑定)         │ sdk-wasm                         │ sdk (原生/UniFFI)
+      │                              │                                  │
 quantalithos-sdk (跨平台 SDK Rust, 对齐 core schemas)
       │
       │ HTTP/WebSocket
       ▼
 quantalithos-gate (API 网关)
       │
-      ├──────────────┬──────────────┐
-      │              │              │
-      ▼              ▼              ▼
-quantalithos-flow   quantalithos-runtime  quantalithos-platform
-(流程引擎)          (Agent 运行时)         (平台数据服务)
-      │              │
-      └──────┬───────┘
-             │ pip install
+      ├──────────────┬──────────────┬──────────────┐
+      │              │              │              │
+      ▼              ▼              ▼              ▼
+quantalithos-flow   quantalithos-runtime  quantalithos-platform  quantalithos-sandbox
+(流程引擎)          (Agent 运行时)         (平台数据服务)          (项目沙箱)
+      │              │       │                                    │
+      └──────┬───────┘       │ SandboxProvider                   │
+             │ pip install   └────────────────────────────────────┘
              ▼
       quantalithos-core
-      (BPMN 引擎 + 协议 + 模型)
+      (BPMN 引擎 + 协议 + 模型 + SandboxProvider 接口)
 
               ┌──────┴──────┐
               │             │
               ▼             ▼
         quantalithos-sync  quantalithos-infra
-        (工作区同步)        (基础设施)
+        (工作区同步)        (基础设施 + Gitea)
 ```
 
 ## 六阶段流程
@@ -75,12 +77,14 @@ quantalithos-ai/
 └── projects/                # 各子项目文档
     ├── quantalithos-core/        # BPMN 引擎 / 协议 / 共享模型
     ├── quantalithos-runtime/     # Agent 运行时
-    ├── quantalithos-flow/
-    ├── quantalithos-chat/
+    ├── quantalithos-flow/        # 流程编排引擎
+    ├── quantalithos-platform/    # 平台数据服务
+    ├── quantalithos-sdk/         # 跨平台客户端 SDK
+    ├── quantalithos-chat/        # 聊天前端
     ├── quantalithos-console/     # 云端管理后台
-    ├── quantalithos-platform/
-    ├── quantalithos-sdk/
-    ├── quantalithos-gate/
-    ├── quantalithos-sync/
-    └── quantalithos-infra/
+    ├── quantalithos-gate/        # API 网关
+    ├── quantalithos-sandbox/     # 项目沙箱环境
+    ├── quantalithos-runner/      # 跨平台运行器
+    ├── quantalithos-sync/        # 工作区同步
+    └── quantalithos-infra/       # 基础设施
 ```

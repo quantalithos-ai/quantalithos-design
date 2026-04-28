@@ -19,6 +19,7 @@ AI 驱动的软件研发协作平台。所有员工均为 AI Agent，用户以�
 | **quantalithos-sandbox** | 项目沙箱 — 三种模式（dev/preview/build），Docker 容器化，Agent 隔离执行 |
 | **quantalithos-runner** | 跨平台运行器 — 用户体验 AI 开发的应用（WebView + 原生桥接） |
 | **quantalithos-sync** | 工作区同步工具 — Rust CLI，manifest 驱动、多源拉取/推送 |
+| **quantalithos-marketplace** | 资产市场 — 流程模板、技能包、角色定义、应用作品的发布/搜索/下载 |
 | **quantalithos-infra** | 基础设施 — Docker/K8s、CI/CD、Gitea、监控告警、数据库迁移 |
 
 ## 架构总览
@@ -51,6 +52,9 @@ quantalithos-flow   quantalithos-runtime  quantalithos-platform  quantalithos-sa
               ▼             ▼
         quantalithos-sync  quantalithos-infra
         (工作区同步)        (基础设施 + Gitea)
+
+                     quantalithos-marketplace
+                     (资产市场 — Phase 2)
 ```
 
 ## 六阶段流程
@@ -86,5 +90,6 @@ quantalithos-ai/
     ├── quantalithos-sandbox/     # 项目沙箱环境
     ├── quantalithos-runner/      # 跨平台运行器
     ├── quantalithos-sync/        # 工作区同步
+    ├── quantalithos-marketplace/ # 资产市场
     └── quantalithos-infra/       # 基础设施
 ```

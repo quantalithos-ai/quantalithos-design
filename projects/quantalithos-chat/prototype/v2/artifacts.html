@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Chat — 产物列表</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="components.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- Left Navigation -->
+  <nav class="nav-bar">
+    <div class="nav-item" data-page="chat" title="聊天">💬</div>
+    <div class="nav-item" data-page="progress" title="进度">📊</div>
+    <div class="nav-item" data-page="kanban" title="看板">📋</div>
+    <div class="nav-item active" data-page="artifacts" title="产物">📁</div>
+    <div class="nav-spacer"></div>
+    <div class="nav-item" title="设置">⚙️</div>
+    <div class="nav-avatar">A</div>
+  </nav>
+
+  <!-- Artifact List Panel -->
+  <aside class="conv-panel" style="width:280px;">
+    <div class="conv-header">
+      产物
+      <span class="action" style="font-size:13px;">筛选</span>
+    </div>
+
+    <!-- Type Filter -->
+    <div style="padding:8px 12px;display:flex;gap:6px;flex-wrap:wrap;">
+      <span class="filter-chip active" onclick="filterArtifacts('all', this)">全部</span>
+      <span class="filter-chip" onclick="filterArtifacts('prd', this)">📄 PRD</span>
+      <span class="filter-chip" onclick="filterArtifacts('design_doc', this)">📐 设计</span>
+      <span class="filter-chip" onclick="filterArtifacts('code', this)">💻 代码</span>
+      <span class="filter-chip" onclick="filterArtifacts('test_report', this)">🧪 测试</span>
+    </div>
+
+    <!-- Artifact List -->
+    <div class="artifact-list" id="artifactList" style="flex:1;overflow-y:auto;padding:4px 8px;"></div>
+  </aside>
+
+  <!-- Preview Area -->
+  <main class="main-content" style="padding:0;">
+    <div class="main-header" id="previewHeader">
+      <span class="title">选择产物查看</span>
+      <span class="subtitle"></span>
+      <div class="actions">
+        <button class="filter-chip" onclick="downloadArtifact()">⬇ 下载</button>
+      </div>
+    </div>
+
+    <div style="flex:1;overflow:auto;padding:24px;" id="previewArea">
+      <div class="empty-state">
+        <div class="empty-icon">📂</div>
+        <div class="empty-text">从左侧选择一个产物查看内容</div>
+      </div>
+    </div>
+
+    <!-- Version History -->
+    <div style="border-top:1px solid var(--color-border);padding:12px 24px;background:#fff;" id="versionBar">
+      <div style="font-size:11px;font-weight:600;color:var(--color-text-muted);margin-bottom:6px;">版本历史</div>
+      <div style="display:flex;gap:8px;" id="versionList"></div>
+    </div>
+  </main>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+// --- Artifact Content (Mock) ---
+const ARTIFACT_CONTENT = {
+  'art-001': {
+    title: '博客系统 PRD v1.0',
+    type: 'markdown',
+    content: `# 个人博客系统 — 产品需求文档
+
+## 1. 项目概述
+
+### 1.1 项目目标
+构建一个功能完整的个人博客系统，支持文章发布、标签分类、评论互动和全文搜索。
+
+### 1.2 目标用户
+- 个人博主（内容创作者）
+- 读者（内容消费者）
+
+## 2. 功能需求
+
+### 2.1 文章管理
+- 创建、编辑、删除文章
+- Markdown 编辑器
+- 文章状态：草稿 / 已发布 / 已归档
+- 封面图片上传
+
+### 2.2 标签系统
+- 创建和管理标签
+- 文章可关联多个标签
+- 按标签筛选文章
+- 标签云展示
+
+### 2.3 评论系统
+- 匿名评论（无需登录）
+- 评论审核机制
+- 嵌套回复（最多 2 层）
+- 评论通知
+
+### 2.4 搜索功能
+- 全文搜索（标题 + 正文）
+- 搜索结果高亮
+- 搜索建议
+
+## 3. 非功能需求
+
+| 指标 | 要求 |
+|------|------|
+| 首屏加载 | < 2s |
+| API 响应 | < 200ms |
+| 并发用户 | 100+ |
+| 可用性 | 99.5% |
+
+## 4. 验收标准
+
+- [ ] 文章 CRUD 功能正常
+- [ ] 标签关联和筛选正常
+- [ ] 评论发布和展示正常
+- [ ] 搜索结果准确
+- [ ] 所有单元测试通过
+- [ ] 性能指标达标`,
+    versions: [
+      { version: 'v1.0', date: '04-25', author: 'TL', note: '初始版本' },
+    ]
+  },
+  'art-002': {
+    title: '技术方案',
+    type: 'markdown',
+    content: `# 博客系统 — 技术方案
+
+## 1. 技术选型
+
+| 层级 | 技术 | 理由 |
+|------|------|------|
+| 后端框架 | Axum (Rust) | 高性能、类型安全 |
+| 数据库 | PostgreSQL | 全文搜索支持好 |
+| ORM | SQLx | 编译时 SQL 校验 |
+| 前端 | Vue 3 + Vite | 轻量、生态好 |
+| 样式 | Tailwind CSS | 快速开发 |
+
+## 2. 数据模型
+
+\`\`\`sql
+CREATE TABLE articles (
+  id UUID PRIMARY KEY,
+  title VARCHAR(200) NOT NULL,
+  content TEXT NOT NULL,
+  status VARCHAR(20) DEFAULT 'draft',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE tags (
+  id UUID PRIMARY KEY,
+  name VARCHAR(50) UNIQUE NOT NULL
+);
+
+CREATE TABLE article_tags (
+  article_id UUID REFERENCES articles(id),
+  tag_id UUID REFERENCES tags(id),
+  PRIMARY KEY (article_id, tag_id)
+);
+\`\`\`
+
+## 3. API 设计
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/articles | 文章列表 |
+| POST | /api/articles | 创建文章 |
+| GET | /api/articles/:id | 文章详情 |
+| PUT | /api/articles/:id | 更新文章 |
+| DELETE | /api/articles/:id | 删除文章 |
+| GET | /api/tags | 标签列表 |
+| GET | /api/search?q= | 搜索 |
+
+## 4. 任务拆解
+
+| ID | 任务 | 依赖 | 负责人 | 预估 |
+|----|------|------|--------|------|
+| TASK-001 | 项目脚手架 | 无 | BE-1 | 15min |
+| TASK-002 | 文章 CRUD | 001 | BE-1 | 30min |
+| TASK-003 | 标签系统 | 002 | BE-1 | 20min |
+| TASK-004 | 评论系统 | 002 | FE-1 | 25min |
+| TASK-005 | 搜索功能 | 003,004 | BE-1 | 20min |`,
+    versions: [
+      { version: 'v1.0', date: '04-26', author: 'TL', note: '初始版本' },
+    ]
+  },
+  'art-003': {
+    title: '项目脚手架代码',
+    type: 'code',
+    content: `// src/main.rs
+use axum::{Router, routing::get};
+use std::net::SocketAddr;
+
+mod models;
+mod handlers;
+mod db;
+
+#[tokio::main]
+async fn main() {
+    // 初始化日志
+    tracing_subscriber::init();
+
+    // 数据库连接
+    let pool = db::create_pool().await;
+
+    // 路由
+    let app = Router::new()
+        .route("/health", get(|| async { "ok" }))
+        .nest("/api", handlers::api_router())
+        .with_state(pool);
+
+    // 启动服务
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    tracing::info!("listening on ", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}`,
+    versions: [
+      { version: 'commit 1', date: '04-27 09:10', author: 'BE-1', note: 'feat: init project scaffold' },
+      { version: 'commit 2', date: '04-27 09:15', author: 'BE-1', note: 'feat: add db connection pool' },
+      { version: 'commit 3', date: '04-27 09:20', author: 'BE-1', note: 'feat: add health check endpoint' },
+    ]
+  },
+  'art-004': {
+    title: '标签系统代码',
+    type: 'code',
+    content: `// src/models/tag.rs
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+use uuid::Uuid;
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Tag {
+    pub id: Uuid,
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateTag {
+    pub name: String,
+}
+
+// src/handlers/tags.rs
+use axum::{Json, extract::State};
+use crate::models::tag::{Tag, CreateTag};
+use crate::db::Pool;
+
+pub async fn list_tags(State(pool): State<Pool>) -> Json<Vec<Tag>> {
+    let tags = sqlx::query_as::<_, Tag>("SELECT * FROM tags ORDER BY name")
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default();
+    Json(tags)
+}
+
+pub async fn create_tag(
+    State(pool): State<Pool>,
+    Json(input): Json<CreateTag>,
+) -> Json<Tag> {
+    let tag = sqlx::query_as::<_, Tag>(
+        "INSERT INTO tags (id, name) VALUES ($1, $2) RETURNING *"
+    )
+    .bind(Uuid::new_v4())
+    .bind(&input.name)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    Json(tag)
+}`,
+    versions: [
+      { version: 'commit 1', date: '04-29 09:35', author: 'BE-1', note: 'feat: add tag model and CRUD' },
+      { version: 'commit 2', date: '04-29 10:00', author: 'BE-1', note: 'feat: add article-tag relation' },
+    ]
+  },
+  'art-005': {
+    title: '单元测试报告',
+    type: 'test',
+    content: `运行时间: 2026-04-29 10:12:03
+框架: cargo test
+总计: 12 个测试
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✅ test_create_article .......................... 3ms
+  ✅ test_get_article ............................. 2ms
+  ✅ test_update_article .......................... 4ms
+  ✅ test_delete_article .......................... 2ms
+  ✅ test_list_articles ........................... 5ms
+  ✅ test_create_tag .............................. 2ms
+  ✅ test_list_tags ............................... 3ms
+  ✅ test_add_tag_to_article ...................... 4ms
+  ✅ test_remove_tag_from_article ................. 3ms
+  ✅ test_filter_by_tag ........................... 6ms
+  ✅ test_tag_name_unique ......................... 2ms
+  ✅ test_tag_name_validation ..................... 1ms
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+结果: 12 passed, 0 failed
+覆盖率: 87.3% (lines)
+耗时: 1.2s`,
+    versions: [
+      { version: 'run-1', date: '04-29 10:12', author: 'BE-1', note: '12 passed, 0 failed' },
+    ]
+  },
+};
+
+// --- Filter ---
+let currentTypeFilter = 'all';
+
+function filterArtifacts(type, el) {
+  currentTypeFilter = type;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderArtifactList();
+}
+
+// --- Render List ---
+function renderArtifactList() {
+  const container = document.getElementById('artifactList');
+  const items = currentTypeFilter === 'all'
+    ? MOCK.artifacts
+    : MOCK.artifacts.filter(a => a.type === currentTypeFilter);
+
+  container.innerHTML = items.map(art => `
+    <div class="artifact-item ${art.id === selectedArtifact ? 'active' : ''}" onclick="selectArtifact('${art.id}')">
+      <span class="art-icon">${art.icon}</span>
+      <div class="art-info">
+        <div class="art-name">${art.name}</div>
+        <div class="art-meta">${art.created_by} · ${art.created_at} · ${art.version}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// --- Select & Preview ---
+let selectedArtifact = null;
+
+function selectArtifact(artId) {
+  selectedArtifact = artId;
+  renderArtifactList();
+
+  const art = MOCK.artifacts.find(a => a.id === artId);
+  const content = ARTIFACT_CONTENT[artId];
+  if (!art || !content) return;
+
+  // Update header
+  document.getElementById('previewHeader').querySelector('.title').textContent = content.title;
+  document.getElementById('previewHeader').querySelector('.subtitle').textContent = `${art.type} · ${art.created_by} · ${art.created_at}`;
+
+  // Render preview
+  const preview = document.getElementById('previewArea');
+  if (content.type === 'markdown') {
+    // Simple markdown-like rendering
+    const html = content.content
+      .replace(/^### (.+)$/gm, '<h4 style="margin:16px 0 8px;font-size:14px;">$1</h4>')
+      .replace(/^## (.+)$/gm, '<h3 style="margin:20px 0 10px;font-size:16px;border-bottom:1px solid #eee;padding-bottom:6px;">$1</h3>')
+      .replace(/^# (.+)$/gm, '<h2 style="margin:24px 0 12px;font-size:20px;">$1</h2>')
+      .replace(/\| (.+)/g, (match) => `<div style="font-family:var(--font-mono);font-size:12px;color:#666;padding:2px 0;">${match}</div>`)
+      .replace(/^- \[[ x]\] (.+)$/gm, (m, text) => {
+        const checked = m.includes('[x]');
+        return `<div style="padding:2px 0;font-size:13px;"><input type="checkbox" ${checked ? 'checked' : ''} disabled> ${text}</div>`;
+      })
+      .replace(/^- (.+)$/gm, '<div style="padding:2px 0 2px 16px;font-size:13px;">• $1</div>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:12px;">$1</code>');
+    preview.innerHTML = `<div style="max-width:720px;line-height:1.7;font-size:14px;">${html}</div>`;
+  } else if (content.type === 'code') {
+    preview.innerHTML = `<pre style="background:#1e1e1e;color:#d4d4d4;padding:20px;border-radius:8px;font-family:var(--font-mono);font-size:12px;line-height:1.6;overflow:auto;white-space:pre-wrap;">${escapeHtml(content.content)}</pre>`;
+  } else if (content.type === 'test') {
+    preview.innerHTML = `<pre style="background:#1a1a2e;color:#e0e0e0;padding:20px;border-radius:8px;font-family:var(--font-mono);font-size:12px;line-height:1.8;overflow:auto;white-space:pre-wrap;">${content.content.replace(/✅/g, '<span style="color:#43a047;">✅</span>')}</pre>`;
+  }
+
+  // Render versions
+  const versionList = document.getElementById('versionList');
+  versionList.innerHTML = content.versions.map((v, i) => `
+    <div style="padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;${i === 0 ? 'background:var(--color-primary-light);color:var(--color-primary);font-weight:500;' : 'background:#f5f5f5;color:#666;'}">
+      ${v.version} · ${v.date}
+    </div>
+  `).join('');
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function downloadArtifact() {
+  alert('下载功能在实际应用中会触发文件下载');
+}
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', () => {
+  renderArtifactList();
+});
+</script>
+</body>
+</html>

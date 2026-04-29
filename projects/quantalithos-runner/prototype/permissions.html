@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Runner — 权限管理</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Runner</span>
+    <span class="title" style="font-size:15px;font-weight:600;">权限管理</span>
+  </header>
+
+  <main class="main-content" id="permContent"></main>
+
+  <div id="tabbar"></div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.getElementById('permContent');
+  const appIds = Object.keys(MOCK.permissions);
+
+  container.innerHTML = appIds.map(appId => {
+    const app = getApp(appId);
+    const perms = MOCK.permissions[appId];
+    if (!app || !perms) return '';
+
+    const enabledCount = perms.filter(p => p.enabled).length;
+
+    return `
+      <div style="margin-bottom:24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <span style="font-size:24px;">${app.icon}</span>
+          <div>
+            <div style="font-size:14px;font-weight:600;">${app.name}</div>
+            <div style="font-size:11px;color:var(--color-text-muted);">${enabledCount}/${perms.length} 权限已授权</div>
+          </div>
+        </div>
+        <div style="background:var(--color-card);border-radius:var(--radius-md);padding:4px 14px;border:1px solid var(--color-border);">
+          ${perms.map(p => `
+            <div class="perm-item">
+              <span class="perm-icon">${p.icon}</span>
+              <div class="perm-info">
+                <div class="perm-name">${p.name}</div>
+                <div class="perm-desc">${p.desc}</div>
+              </div>
+              <div class="perm-toggle ${p.enabled ? 'on' : ''}" onclick="this.classList.toggle('on')"></div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+});
+</script>
+</body>
+</html>

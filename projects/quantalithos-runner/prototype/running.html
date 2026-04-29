@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Runner — 运行中</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar" style="height:40px;padding:0 12px;">
+    <span class="back-btn" onclick="history.back()" style="font-size:16px;">←</span>
+    <span class="title" style="font-size:13px;" id="runTitle">个人博客</span>
+    <div class="actions" style="gap:2px;">
+      <div class="icon-btn" style="width:30px;height:30px;font-size:14px;" onclick="refreshApp()">🔄</div>
+      <div class="icon-btn" style="width:30px;height:30px;font-size:14px;" onclick="location.href='devtools.html'">🐛</div>
+      <div class="icon-btn" style="width:30px;height:30px;font-size:14px;" onclick="toggleFullscreen()">⛶</div>
+    </div>
+  </header>
+
+  <!-- WebView Container -->
+  <div class="webview-container" style="flex:1;border-radius:0;border:none;">
+    <div class="webview-toolbar">
+      <span style="cursor:pointer;">←</span>
+      <span style="cursor:pointer;">→</span>
+      <div class="url-bar">localhost:4001</div>
+      <span style="cursor:pointer;">⟳</span>
+    </div>
+
+    <!-- Simulated App UI -->
+    <div class="webview-body" id="webviewBody">
+      <div style="max-width:400px;margin:0 auto;">
+        <!-- Simulated Blog App -->
+        <div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:24px;border-radius:12px;color:#fff;margin-bottom:16px;">
+          <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">我的博客</h1>
+          <p style="font-size:12px;opacity:0.8;">3 篇文章 · 5 个标签</p>
+        </div>
+
+        <!-- Article List -->
+        <div style="margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#333;">最新文章</div>
+          <div style="background:#fff;border-radius:8px;padding:12px;margin-bottom:8px;border:1px solid #e2e8f0;">
+            <div style="font-size:13px;font-weight:500;margin-bottom:4px;">Rust 异步编程入门</div>
+            <div style="font-size:11px;color:#64748b;">2026-04-29 · 阅读 3 分钟</div>
+            <div style="display:flex;gap:4px;margin-top:6px;">
+              <span style="padding:2px 6px;background:#eef2ff;color:#6366f1;border-radius:4px;font-size:10px;">Rust</span>
+              <span style="padding:2px 6px;background:#ecfdf5;color:#10b981;border-radius:4px;font-size:10px;">教程</span>
+            </div>
+          </div>
+          <div style="background:#fff;border-radius:8px;padding:12px;margin-bottom:8px;border:1px solid #e2e8f0;">
+            <div style="font-size:13px;font-weight:500;margin-bottom:4px;">Vue 3 组合式 API 实践</div>
+            <div style="font-size:11px;color:#64748b;">2026-04-27 · 阅读 5 分钟</div>
+            <div style="display:flex;gap:4px;margin-top:6px;">
+              <span style="padding:2px 6px;background:#eef2ff;color:#6366f1;border-radius:4px;font-size:10px;">Vue</span>
+              <span style="padding:2px 6px;background:#fef3c7;color:#f59e0b;border-radius:4px;font-size:10px;">前端</span>
+            </div>
+          </div>
+          <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #e2e8f0;">
+            <div style="font-size:13px;font-weight:500;margin-bottom:4px;">Docker 容器化部署指南</div>
+            <div style="font-size:11px;color:#64748b;">2026-04-25 · 阅读 8 分钟</div>
+            <div style="display:flex;gap:4px;margin-top:6px;">
+              <span style="padding:2px 6px;background:#fee2e2;color:#ef4444;border-radius:4px;font-size:10px;">DevOps</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="webview-statusbar">
+      <span>● 运行中</span>
+      <span>RAM: 24 MB</span>
+      <span>网络: 正常</span>
+      <span style="margin-left:auto;">v0.3</span>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const appId = params.get('id') || 'blog';
+  const app = getApp(appId) || MOCK.apps[0];
+  document.getElementById('runTitle').textContent = app.name;
+});
+
+function refreshApp() {
+  const body = document.getElementById('webviewBody');
+  body.style.opacity = '0.5';
+  setTimeout(() => { body.style.opacity = '1'; }, 500);
+}
+
+function toggleFullscreen() {
+  alert('全屏模式（原型演示）');
+}
+</script>
+</body>
+</html>

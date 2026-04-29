@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Console — 项目仪表盘</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <span class="logo">◆ Quantalithos</span>
+    <div class="breadcrumb">
+      <span>博客系统</span>
+      <span class="sep">/</span>
+      <span class="current">仪表盘</span>
+    </div>
+    <input class="search" type="text" placeholder="搜索工单、Agent、产物...">
+    <div class="notification">🔔<span class="dot"></span></div>
+    <div class="user-avatar">A</div>
+  </header>
+
+  <!-- Body -->
+  <div class="app-body">
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <div>
+          <div class="page-title">项目仪表盘</div>
+          <div class="page-desc">个人博客系统 · 迭代开发阶段</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" onclick="location.href='workitems.html'">📋 查看工单</button>
+          <button class="btn btn-primary">⚡ 快速操作</button>
+        </div>
+      </div>
+
+      <!-- Pipeline -->
+      <div class="card">
+        <div class="card-header">📊 流程进度</div>
+        <div class="card-body" id="pipelineContainer"></div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stat-grid" id="statsGrid"></div>
+
+      <!-- Two Column: Agents + Activity -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <!-- Agent Status -->
+        <div class="card">
+          <div class="card-header">🤖 Agent 状态</div>
+          <div class="card-body" id="agentList"></div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card">
+          <div class="card-header">🕐 最近活动</div>
+          <div class="card-body" id="activityTimeline"></div>
+        </div>
+
+      </div>
+
+      <!-- Sandbox Status -->
+      <div class="card">
+        <div class="card-header">🐳 沙箱环境</div>
+        <div class="card-body" id="sandboxStatus"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Pipeline
+  renderPipeline(document.getElementById('pipelineContainer'));
+
+  // Stats
+  const completed = MOCK.workitems.filter(w => w.status === 'completed').length;
+  const total = MOCK.workitems.length;
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">任务完成</div>
+      <div class="stat-value" style="color:var(--color-primary);">${completed}/${total}</div>
+      <div class="stat-change up">↑ 今日完成 2 个</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Agent 在线</div>
+      <div class="stat-value" style="color:var(--color-success);">4</div>
+      <div class="stat-change">2 执行中 · 2 空闲</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">待审批</div>
+      <div class="stat-value" style="color:var(--color-warning);">1</div>
+      <div class="stat-change">迭代开发进度确认</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">产物</div>
+      <div class="stat-value">5</div>
+      <div class="stat-change">PRD · 技术方案 · 代码 · 测试</div>
+    </div>
+  `;
+
+  // Agent List
+  document.getElementById('agentList').innerHTML = MOCK.agents.map(a => `
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--color-border-light);">
+      <span class="agent-avatar ${a.css}">${a.name}</span>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:500;">${a.role_name}</div>
+        <div style="font-size:11px;color:var(--color-text-muted);">${a.task || '空闲中'}</div>
+      </div>
+      ${badge(a.status)}
+    </div>
+  `).join('');
+
+  // Activity Timeline
+  document.getElementById('activityTimeline').innerHTML = '<div class="timeline">' + MOCK.activities.map(a => `
+    <div class="timeline-item">
+      <div class="tl-dot">${a.icon}</div>
+      <div class="tl-content">
+        <div class="tl-title"><strong>${a.agent}</strong> ${a.action}</div>
+        <div class="tl-time">${a.time}</div>
+      </div>
+    </div>
+  `).join('') + '</div>';
+
+  // Sandbox
+  const running = MOCK.containers.filter(c => c.status === 'running').length;
+  const totalCpu = MOCK.containers.reduce((s, c) => s + parseInt(c.cpu), 0);
+  document.getElementById('sandboxStatus').innerHTML = `
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:var(--color-text-muted);">模式</span>
+        <span class="badge badge-success">dev</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:var(--color-text-muted);">容器</span>
+        <span style="font-size:13px;font-weight:600;">${running}/${MOCK.containers.length}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:var(--color-text-muted);">CPU</span>
+        <span style="font-size:13px;font-weight:600;">${totalCpu}%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:var(--color-text-muted);">RAM</span>
+        <span style="font-size:13px;font-weight:600;">416 MB</span>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn btn-sm btn-secondary" onclick="location.href='sandbox.html'">查看详情</button>
+        <button class="btn btn-sm btn-secondary">切换 preview</button>
+      </div>
+    </div>
+  `;
+});
+</script>
+</body>
+</html>

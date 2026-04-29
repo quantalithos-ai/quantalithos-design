@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Console — Agent 配置</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Quantalithos</span>
+    <div class="breadcrumb"><span>博客系统</span><span class="sep">/</span><span class="current">Agent 配置</span></div>
+    <input class="search" type="text" placeholder="搜索...">
+    <div class="notification">🔔</div>
+    <div class="user-avatar">A</div>
+  </header>
+
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main-content" style="padding:0;display:flex;flex-direction:column;">
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab-item active" onclick="switchTab('roles',this)">角色定义</div>
+        <div class="tab-item" onclick="switchTab('rules',this)">共享规则</div>
+        <div class="tab-item" onclick="switchTab('status',this)">运行状态</div>
+      </div>
+
+      <!-- Tab: Roles -->
+      <div id="tab-roles" style="flex:1;display:flex;overflow:hidden;">
+        <!-- Role List -->
+        <div style="width:240px;border-right:1px solid var(--color-border);overflow-y:auto;padding:12px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-muted);padding:6px 8px;">系统角色</div>
+          <div id="roleList"></div>
+        </div>
+
+        <!-- YAML Editor -->
+        <div style="flex:1;display:flex;flex-direction:column;">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--color-border);display:flex;align-items:center;gap:12px;">
+            <span style="font-size:13px;font-weight:600;" id="editorTitle">tech_lead.yaml</span>
+            <span class="badge badge-success" id="editorStatus">✓ 语法正确</span>
+            <div style="margin-left:auto;display:flex;gap:8px;">
+              <button class="btn btn-sm btn-secondary">重置</button>
+              <button class="btn btn-sm btn-primary">保存</button>
+            </div>
+          </div>
+          <div class="yaml-editor" style="flex:1;" id="yamlEditor"></div>
+
+          <!-- Scope Preview -->
+          <div style="border-top:1px solid var(--color-border);padding:12px 16px;background:#fafafa;">
+            <div style="font-size:11px;font-weight:600;color:var(--color-text-muted);margin-bottom:8px;">三级覆盖预览</div>
+            <div style="display:flex;gap:12px;font-size:11px;">
+              <div style="flex:1;padding:8px;background:#fff;border-radius:var(--radius-md);border:1px solid var(--color-border);">
+                <div style="font-weight:600;color:var(--color-text-muted);margin-bottom:4px;">System 基础</div>
+                <div style="color:#666;">tools: 11 个<br>constraints: 4 条<br>permissions: 标准</div>
+              </div>
+              <div style="display:flex;align-items:center;color:#ccc;">→</div>
+              <div style="flex:1;padding:8px;background:#fff;border-radius:var(--radius-md);border:1px solid var(--color-border);">
+                <div style="font-weight:600;color:var(--color-text-muted);margin-bottom:4px;">Project 覆盖</div>
+                <div style="color:#666;">tools: +1 (deploy)<br>constraints: 无变更<br>permissions: 扩展 deploy/</div>
+              </div>
+              <div style="display:flex;align-items:center;color:#ccc;">→</div>
+              <div style="flex:1;padding:8px;background:var(--color-primary-light);border-radius:var(--radius-md);border:1px solid var(--color-primary);">
+                <div style="font-weight:600;color:var(--color-primary);margin-bottom:4px;">最终结果</div>
+                <div style="color:#666;">tools: 12 个<br>constraints: 4 条<br>permissions: 含 deploy/</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Rules -->
+      <div id="tab-rules" style="flex:1;padding:20px;display:none;">
+        <div class="page-header" style="margin-bottom:16px;">
+          <div class="page-title" style="font-size:16px;">共享规则</div>
+          <div class="actions"><button class="btn btn-primary btn-sm">+ 创建规则</button></div>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>规则 ID</th><th>名称</th><th>类型</th><th>状态</th><th>适用角色</th><th>操作</th></tr></thead>
+            <tbody id="rulesTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Status -->
+      <div id="tab-status" style="flex:1;padding:20px;display:none;">
+        <div class="page-header" style="margin-bottom:16px;">
+          <div class="page-title" style="font-size:16px;">Agent 运行状态</div>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>Agent</th><th>角色</th><th>状态</th><th>当前任务</th><th>LLM 模型</th><th>Token 消耗</th></tr></thead>
+            <tbody id="statusTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+// --- YAML Content ---
+const YAML_CONTENT = {
+  tech_lead: `# 项目负责人角色定义
+role_id: tech_lead
+role_name: "项目负责人"
+description: "负责需求分析、技术方案设计、任务拆解和工作分配"
+
+shared_rules_include:
+  - communication
+  - verification
+  - review
+
+identity: |
+  你是项目负责人，负责需求分析、技术方案设计、
+  任务拆解和工作分配。
+  你需要主导项目从需求到交付的全流程，
+  但不直接实现代码。
+
+constraints:
+  - "不直接实现代码（由开发工程师完成）"
+  - "不跳过需求分析直接进入开发"
+  - "不在用户未确认时推进到下一阶段"
+  - "必须为每个任务指定明确的验收标准"
+
+tools:
+  - file_read
+  - file_write
+  - git_status
+  - git_diff
+  - search_docs
+  - task_create
+  - task_read
+  - workitem_transition
+  - workitem_assign
+  - ask_teammate
+  - send_chat_message
+
+workflows:
+  - review_workflow
+
+permissions:
+  read_paths:
+    - workspace/src/
+    - workspace/tests/
+    - docs/
+    - tasks/
+  write_paths:
+    - docs/
+    - tasks/
+  forbidden_paths:
+    - deploy/
+    - secrets/
+    - .env
+
+version: "1.0.0"
+created_by: system`,
+  backend_dev: `# 后端开发工程师角色定义
+role_id: backend_dev
+role_name: "后端开发工程师"
+extends: base_dev
+
+identity: |
+  你是后端开发工程师，负责服务端编码实现和 API 开发。
+
+tools:
+  - file_read
+  - file_write
+  - code_execute
+  - git_commit
+  - git_diff
+  - task_read
+  - workitem_transition
+  - ask_teammate
+  - send_chat_message
+
+workflows:
+  - tdd_workflow
+
+permissions:
+  read_paths:
+    - workspace/src/
+    - workspace/tests/
+    - docs/
+  write_paths:
+    - workspace/src/backend/
+    - workspace/tests/backend/
+  forbidden_paths:
+    - workspace/src/frontend/
+    - deploy/
+
+version: "1.0.0"
+created_by: system`,
+};
+
+let selectedRole = 'tech_lead';
+
+function renderRoleList() {
+  document.getElementById('roleList').innerHTML = MOCK.roles.map(r => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:var(--radius-md);cursor:pointer;transition:background 0.15s;${r.id === selectedRole ? 'background:var(--color-primary-light);' : ''}" onclick="selectRole('${r.id}')">
+      <span style="font-size:14px;">🤖</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:500;${r.id === selectedRole ? 'color:var(--color-primary);' : ''}">${r.name}</div>
+        <div style="font-size:10px;color:var(--color-text-muted);">${r.id}</div>
+      </div>
+      <span class="badge badge-neutral" style="font-size:9px;">${r.scope}</span>
+    </div>
+  `).join('');
+}
+
+function selectRole(roleId) {
+  selectedRole = roleId;
+  renderRoleList();
+  renderYaml(roleId);
+  document.getElementById('editorTitle').textContent = roleId + '.yaml';
+}
+
+function renderYaml(roleId) {
+  const content = YAML_CONTENT[roleId] || `# ${roleId}.yaml\n# 内容加载中...`;
+  const lines = content.split('\n');
+  document.getElementById('yamlEditor').innerHTML = `
+    <div class="editor-toolbar">
+      <span class="filename">${roleId}.yaml</span>
+      <span class="status valid">✓ Valid YAML</span>
+    </div>
+    <div class="editor-body">
+      ${lines.map((line, i) => {
+        let highlighted = escapeHtml(line);
+        // Simple syntax highlighting
+        if (line.trim().startsWith('#')) {
+          highlighted = `<span class="hl-comment">${escapeHtml(line)}</span>`;
+        } else if (line.match(/^\s*\w+:/)) {
+          const [key, ...rest] = line.split(':');
+          const val = rest.join(':');
+          highlighted = `<span class="hl-key">${escapeHtml(key)}</span>:${highlightValue(val)}`;
+        } else if (line.trim().startsWith('- ')) {
+          const prefix = line.match(/^(\s*- )/)[1];
+          const val = line.slice(prefix.length);
+          highlighted = `${escapeHtml(prefix)}${highlightValue(val)}`;
+        }
+        return `<div class="line"><span class="line-num">${i+1}</span><span class="line-content">${highlighted}</span></div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function highlightValue(val) {
+  val = val.trim();
+  if (!val) return '';
+  if (val === 'true' || val === 'false') return ` <span class="hl-bool">${val}</span>`;
+  if (val.match(/^\d+$/)) return ` <span class="hl-number">${val}</span>`;
+  if (val.startsWith('"') || val.startsWith("'")) return ` <span class="hl-string">${escapeHtml(val)}</span>`;
+  if (val === '|') return ' <span class="hl-string">|</span>';
+  return ` <span class="hl-string">${escapeHtml(val)}</span>`;
+}
+
+function escapeHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// --- Tabs ---
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-roles').style.display = tab === 'roles' ? 'flex' : 'none';
+  document.getElementById('tab-rules').style.display = tab === 'rules' ? 'block' : 'none';
+  document.getElementById('tab-status').style.display = tab === 'status' ? 'block' : 'none';
+}
+
+// --- Rules Table ---
+function renderRules() {
+  document.getElementById('rulesTable').innerHTML = MOCK.rules.map(r => `
+    <tr>
+      <td><code style="font-size:11px;">${r.id}</code></td>
+      <td style="font-weight:500;">${r.name}</td>
+      <td>${badge(r.type)}</td>
+      <td>${r.enabled ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-neutral">禁用</span>'}</td>
+      <td style="font-size:11px;color:var(--color-text-muted);">all</td>
+      <td><button class="btn btn-sm btn-secondary">编辑</button></td>
+    </tr>
+  `).join('');
+}
+
+// --- Status Table ---
+function renderStatus() {
+  const models = { 'tech-lead': 'claude-opus-4-20250514', 'backend-dev-1': 'claude-sonnet-4-20250514', 'frontend-dev-1': 'claude-sonnet-4-20250514', 'tester-1': 'claude-haiku' };
+  const tokens = { 'tech-lead': '12,400', 'backend-dev-1': '28,600', 'frontend-dev-1': '15,200', 'tester-1': '0' };
+  document.getElementById('statusTable').innerHTML = MOCK.agents.map(a => `
+    <tr>
+      <td><div style="display:flex;align-items:center;gap:8px;"><span class="agent-avatar ${a.css}">${a.name}</span>${a.id}</div></td>
+      <td>${a.role_name}</td>
+      <td>${badge(a.status)}</td>
+      <td style="font-size:12px;">${a.task || '—'}</td>
+      <td style="font-size:11px;font-family:var(--font-mono);">${models[a.id] || '—'}</td>
+      <td style="font-size:11px;">${tokens[a.id] || '0'} tokens</td>
+    </tr>
+  `).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderRoleList();
+  renderYaml(selectedRole);
+  renderRules();
+  renderStatus();
+});
+</script>
+</body>
+</html>

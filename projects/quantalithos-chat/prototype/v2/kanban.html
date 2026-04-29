@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Chat — 任务看板</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="components.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- Left Navigation -->
+  <nav class="nav-bar">
+    <div class="nav-item" data-page="chat" title="聊天">💬</div>
+    <div class="nav-item" data-page="progress" title="进度">📊</div>
+    <div class="nav-item active" data-page="kanban" title="看板">📋</div>
+    <div class="nav-item" data-page="artifacts" title="产物">📁</div>
+    <div class="nav-spacer"></div>
+    <div class="nav-item" title="设置">⚙️</div>
+    <div class="nav-avatar">A</div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content" style="padding:0;">
+
+    <!-- Header -->
+    <div class="main-header">
+      <span class="title">博客系统 · 任务看板</span>
+      <span class="subtitle">5 个工单 · 波次 1-3</span>
+      <div class="actions">
+        <span class="filter-chip active" onclick="filterBy('all')">全部</span>
+        <span class="filter-chip" onclick="filterBy('backend-dev-1')">BE-1</span>
+        <span class="filter-chip" onclick="filterBy('frontend-dev-1')">FE-1</span>
+      </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="kanban-board" id="kanbanBoard"></div>
+
+  </main>
+
+  <!-- Task Detail Panel -->
+  <aside class="detail-panel" id="taskDetail" style="display:none;">
+    <div class="panel-header">
+      工单详情
+      <span class="close-btn" onclick="document.getElementById('taskDetail').style.display='none'">✕</span>
+    </div>
+    <div class="panel-body" id="taskDetailBody"></div>
+  </aside>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+// --- Kanban Columns ---
+const COLUMNS = [
+  { id: 'pending', name: '待开始', statuses: ['pending'] },
+  { id: 'in_progress', name: '进行中', statuses: ['in_progress'] },
+  { id: 'in_review', name: '审查中', statuses: ['in_review'] },
+  { id: 'in_testing', name: '测试中', statuses: ['in_testing'] },
+  { id: 'completed', name: '已完成', statuses: ['completed'] },
+];
+
+let currentFilter = 'all';
+
+function filterBy(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-chip').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  renderKanban();
+}
+
+function renderKanban() {
+  const board = document.getElementById('kanbanBoard');
+  const items = currentFilter === 'all'
+    ? MOCK.workitems
+    : MOCK.workitems.filter(w => w.assignee === currentFilter);
+
+  board.innerHTML = COLUMNS.map(col => {
+    const colItems = items.filter(w => col.statuses.includes(w.status));
+    return `<div class="kanban-column">
+      <div class="kanban-column-header">
+        <span>${col.name}</span>
+        <span class="count">${colItems.length}</span>
+      </div>
+      <div class="kanban-column-body">
+        ${colItems.map(item => renderWorkitemCard(item)).join('')}
+        ${colItems.length === 0 ? '<div class="empty-state" style="padding:24px;"><div class="empty-text">暂无工单</div></div>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderWorkitemCard(item) {
+  const agent = MOCK.agents.find(a => a.id === item.assignee) || { name: '?', css: 'be' };
+  const depText = item.dependencies && item.dependencies.length > 0
+    ? `<div style="font-size:10px;color:#999;margin-top:6px;">依赖: ${item.dependencies.join(', ')}</div>`
+    : '';
+  const waveColor = item.wave === 1 ? '#43a047' : (item.wave === 2 ? '#1565c0' : '#f57c00');
+
+  return `<div class="workitem-card" onclick="showTaskDetail('${item.id}')">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <span style="font-size:10px;color:#999;font-family:var(--font-mono);">${item.id}</span>
+      <span style="margin-left:auto;font-size:9px;padding:1px 5px;border-radius:3px;background:${waveColor}15;color:${waveColor};font-weight:500;">W${item.wave}</span>
+    </div>
+    <div class="wi-title">${item.title}</div>
+    ${depText}
+    <div class="wi-meta" style="margin-top:8px;">
+      <div class="wi-avatar agent-avatar ${agent.css}" style="width:20px;height:20px;font-size:8px;">${agent.name}</div>
+      <span class="wi-id">${agent.name}</span>
+      <div class="wi-priority ${item.priority}"></div>
+    </div>
+  </div>`;
+}
+
+// --- Task Detail ---
+function showTaskDetail(taskId) {
+  const task = MOCK.workitems.find(w => w.id === taskId);
+  if (!task) return;
+
+  const panel = document.getElementById('taskDetail');
+  panel.style.display = 'flex';
+
+  const agent = MOCK.agents.find(a => a.id === task.assignee) || { name: '?', css: 'be', role_name: '未知' };
+
+  // Status flow
+  const allStatuses = ['pending', 'in_progress', 'in_review', 'in_testing', 'completed'];
+  const currentIdx = allStatuses.indexOf(task.status);
+
+  const body = document.getElementById('taskDetailBody');
+  body.innerHTML = `
+    <div class="panel-section">
+      <div style="font-size:11px;color:#999;font-family:var(--font-mono);margin-bottom:4px;">${task.id}</div>
+      <h3 style="font-size:16px;margin-bottom:8px;">${task.title}</h3>
+      ${renderStatusBadge(task.status)}
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">负责人</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${renderAgentAvatar(task.assignee, 28)}
+        <div>
+          <div style="font-size:12px;font-weight:500;">${agent.role_name}</div>
+          <div style="font-size:11px;color:#999;">${agent.name} (${agent.id})</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">状态流转</div>
+      <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+        ${allStatuses.map((s, i) => {
+          const isCurrent = i === currentIdx;
+          const isPast = i < currentIdx;
+          const bg = isPast ? 'var(--color-success-light)' : (isCurrent ? 'var(--color-primary-light)' : '#f5f5f5');
+          const color = isPast ? 'var(--color-success)' : (isCurrent ? 'var(--color-primary)' : '#999');
+          const label = { pending: '待开始', in_progress: '开发', in_review: '审查', in_testing: '测试', completed: '完成' }[s];
+          return `<span style="padding:3px 8px;border-radius:4px;font-size:10px;font-weight:500;background:${bg};color:${color};">${isPast ? '✓ ' : ''}${label}</span>
+            ${i < allStatuses.length - 1 ? '<span style="color:#ccc;">→</span>' : ''}`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">属性</div>
+      <div style="display:grid;grid-template-columns:80px 1fr;gap:6px;font-size:12px;">
+        <span style="color:#999;">类型</span><span>${task.type}</span>
+        <span style="color:#999;">优先级</span><span>${task.priority}</span>
+        <span style="color:#999;">波次</span><span>Wave ${task.wave}</span>
+        <span style="color:#999;">依赖</span><span>${task.dependencies?.join(', ') || '无'}</span>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">执行轨迹</div>
+      <div style="font-size:12px;color:#666;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:var(--color-success);">●</span>
+          <span>09:06 — 工单创建，分配给 ${agent.name}</span>
+        </div>
+        ${task.status !== 'pending' ? `<div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:var(--color-primary);">●</span>
+          <span>09:10 — 开始执行（TDD 工作流）</span>
+        </div>` : ''}
+        ${task.status === 'in_review' || task.status === 'completed' ? `<div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:var(--color-info);">●</span>
+          <span>10:15 — 提交代码审查</span>
+        </div>` : ''}
+        ${task.status === 'completed' ? `<div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:var(--color-success);">●</span>
+          <span>10:20 — 审查通过，标记完成</span>
+        </div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', () => {
+  renderKanban();
+});
+</script>
+</body>
+</html>

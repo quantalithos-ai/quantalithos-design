@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Console — Git 仓库</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Quantalithos</span>
+    <div class="breadcrumb"><span>博客系统</span><span class="sep">/</span><span class="current">Git 仓库</span></div>
+    <input class="search" type="text" placeholder="搜索文件...">
+    <div class="notification">🔔</div>
+    <div class="user-avatar">A</div>
+  </header>
+
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main-content" style="padding:0;display:flex;flex-direction:column;">
+
+      <!-- Repo Header -->
+      <div style="padding:14px 20px;border-bottom:1px solid var(--color-border);display:flex;align-items:center;gap:12px;background:#fff;">
+        <span style="font-size:14px;font-weight:600;">📦 blog-system</span>
+        <select style="padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:11px;">
+          <option>🌿 main</option>
+          <option>🌿 feature/tags</option>
+          <option>🌿 feature/comments</option>
+        </select>
+        <span style="font-size:11px;color:var(--color-text-muted);">最新提交：feat: add tag model and CRUD · 29 分钟前</span>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <button class="btn btn-sm btn-secondary">📋 4 commits</button>
+          <button class="btn btn-sm btn-secondary">🔀 0 PRs</button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab-item active" onclick="switchGitTab('code',this)">📁 代码</div>
+        <div class="tab-item" onclick="switchGitTab('commits',this)">📝 提交历史</div>
+        <div class="tab-item" onclick="switchGitTab('prs',this)">🔀 Pull Requests</div>
+      </div>
+
+      <!-- Code Tab -->
+      <div id="tab-code" style="flex:1;display:flex;overflow:hidden;">
+        <!-- File Tree -->
+        <div style="width:240px;border-right:1px solid var(--color-border);overflow-y:auto;padding:8px;" id="fileTree"></div>
+
+        <!-- File Content -->
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="padding:8px 16px;border-bottom:1px solid var(--color-border);display:flex;align-items:center;gap:8px;background:#fafafa;">
+            <span style="font-size:12px;font-family:var(--font-mono);color:var(--color-text-secondary);" id="filePath">src/main.rs</span>
+            <span style="font-size:10px;color:var(--color-text-muted);" id="fileSize">1.2 KB</span>
+            <div style="margin-left:auto;display:flex;gap:6px;">
+              <button class="btn btn-sm btn-secondary">History</button>
+              <button class="btn btn-sm btn-secondary">Raw</button>
+            </div>
+          </div>
+          <div class="code-viewer" style="flex:1;" id="codeViewer"></div>
+        </div>
+      </div>
+
+      <!-- Commits Tab -->
+      <div id="tab-commits" style="flex:1;padding:20px;display:none;overflow-y:auto;">
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>提交</th><th>信息</th><th>作者</th><th>时间</th><th>文件</th></tr></thead>
+            <tbody id="commitTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PRs Tab -->
+      <div id="tab-prs" style="flex:1;padding:20px;display:none;">
+        <div class="empty-state">
+          <div class="empty-icon">🔀</div>
+          <div class="empty-text">暂无 Pull Request</div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+// --- File Content Mock ---
+const FILE_CONTENTS = {
+  'src/main.rs': `use axum::{Router, routing::get};
+use std::net::SocketAddr;
+
+mod models;
+mod handlers;
+mod db;
+
+#[tokio::main]
+async fn main() {
+    // 初始化日志
+    tracing_subscriber::init();
+
+    // 数据库连接
+    let pool = db::create_pool().await;
+
+    // 路由
+    let app = Router::new()
+        .route("/health", get(|| async { "ok" }))
+        .nest("/api", handlers::api_router())
+        .with_state(pool);
+
+    // 启动服务
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    tracing::info!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+}`,
+  'src/models/tag.rs': `use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+use uuid::Uuid;
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Tag {
+    pub id: Uuid,
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateTag {
+    pub name: String,
+}
+
+impl Tag {
+    pub fn validate_name(name: &str) -> Result<(), &'static str> {
+        if name.is_empty() {
+            return Err("标签名不能为空");
+        }
+        if name.len() > 50 {
+            return Err("标签名不能超过 50 字符");
+        }
+        Ok(())
+    }
+}`,
+  'Cargo.toml': `[package]
+name = "blog-system"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"`,
+};
+
+let selectedFile = 'src/main.rs';
+
+// --- File Tree ---
+function renderFileTree() {
+  const container = document.getElementById('fileTree');
+  container.innerHTML = renderTreeItems(MOCK.gitFiles, 0);
+}
+
+function renderTreeItems(items, depth) {
+  return items.map(item => {
+    const indent = `<span class="indent" style="width:${depth * 16}px;"></span>`;
+    const icon = item.type === 'dir' ? '📁' : '📄';
+    const isActive = item.type === 'file' && getFilePath(item) === selectedFile;
+
+    let html = `<div class="file-tree-item ${isActive ? 'active' : ''}" onclick="selectFile('${getFilePath(item)}', '${item.size || ''}')" style="padding-left:${8 + depth * 16}px;">
+      <span style="font-size:12px;">${icon}</span>
+      <span style="font-size:12px;">${item.name}</span>
+      ${item.size ? `<span style="margin-left:auto;font-size:10px;color:var(--color-text-muted);">${item.size}</span>` : ''}
+    </div>`;
+
+    if (item.type === 'dir' && item.children) {
+      html += renderTreeItems(item.children, depth + 1);
+    }
+    return html;
+  }).join('');
+}
+
+function getFilePath(item) {
+  // Simplified — in real app would track full path
+  return item.name;
+}
+
+function selectFile(name, size) {
+  // Find content by matching filename
+  const key = Object.keys(FILE_CONTENTS).find(k => k.endsWith(name)) || Object.keys(FILE_CONTENTS)[0];
+  selectedFile = key;
+  document.getElementById('filePath').textContent = key;
+  document.getElementById('fileSize').textContent = size || '';
+  renderCode(key);
+  renderFileTree();
+}
+
+function renderCode(key) {
+  const content = FILE_CONTENTS[key] || '// 文件内容加载中...';
+  const lines = content.split('\n');
+  document.getElementById('codeViewer').innerHTML = lines.map((line, i) => `
+    <div class="code-line">
+      <span class="line-num">${i + 1}</span>
+      <span>${escapeHtml(line)}</span>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// --- Commits ---
+function renderCommits() {
+  document.getElementById('commitTable').innerHTML = MOCK.commits.map(c => `
+    <tr>
+      <td><code style="font-size:11px;color:var(--color-primary);">${c.hash}</code></td>
+      <td style="font-weight:500;">${c.msg}</td>
+      <td><div style="display:flex;align-items:center;gap:6px;"><span class="agent-avatar be" style="width:20px;height:20px;font-size:8px;">${c.author}</span><span style="font-size:11px;">${c.author}</span></div></td>
+      <td style="font-size:11px;color:var(--color-text-muted);">${c.time}</td>
+      <td style="font-size:11px;">${c.files} files</td>
+    </tr>
+  `).join('');
+}
+
+// --- Tabs ---
+function switchGitTab(tab, el) {
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-code').style.display = tab === 'code' ? 'flex' : 'none';
+  document.getElementById('tab-commits').style.display = tab === 'commits' ? 'block' : 'none';
+  document.getElementById('tab-prs').style.display = tab === 'prs' ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderFileTree();
+  renderCode(selectedFile);
+  renderCommits();
+});
+</script>
+</body>
+</html>

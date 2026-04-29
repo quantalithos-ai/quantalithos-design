@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Console — 沙箱监控</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Quantalithos</span>
+    <div class="breadcrumb"><span>博客系统</span><span class="sep">/</span><span class="current">沙箱监控</span></div>
+    <input class="search" type="text" placeholder="搜索...">
+    <div class="notification">🔔</div>
+    <div class="user-avatar">A</div>
+  </header>
+
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main-content">
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <div>
+          <div class="page-title">沙箱监控</div>
+          <div class="page-desc">blog-system · dev 模式</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" onclick="switchMode('preview')">切换 preview</button>
+          <button class="btn btn-secondary">暂停环境</button>
+          <button class="btn btn-danger btn-sm">销毁环境</button>
+        </div>
+      </div>
+
+      <!-- Mode Selector + Stats -->
+      <div class="card">
+        <div class="card-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+          <!-- Mode -->
+          <div style="display:flex;gap:8px;">
+            <span class="filter-chip active" id="mode-dev">🟢 dev</span>
+            <span class="filter-chip" id="mode-preview">preview</span>
+            <span class="filter-chip" id="mode-build">build</span>
+          </div>
+          <div style="width:1px;height:24px;background:var(--color-border);"></div>
+          <!-- Stats -->
+          <div style="display:flex;gap:16px;font-size:12px;">
+            <div><span style="color:var(--color-text-muted);">容器</span> <strong>3/4</strong> 运行中</div>
+            <div><span style="color:var(--color-text-muted);">CPU</span> <strong>16%</strong></div>
+            <div><span style="color:var(--color-text-muted);">RAM</span> <strong>416 MB</strong></div>
+            <div><span style="color:var(--color-text-muted);">磁盘</span> <strong>1.2 GB</strong></div>
+          </div>
+          <div style="margin-left:auto;font-size:11px;color:var(--color-text-muted);">运行时间：3h 15m</div>
+        </div>
+      </div>
+
+      <!-- Container Table -->
+      <div class="card">
+        <div class="card-header">
+          🐳 容器列表
+          <button class="btn btn-sm btn-secondary" style="margin-left:auto;">刷新</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>容器名称</th>
+              <th>镜像</th>
+              <th>状态</th>
+              <th>CPU</th>
+              <th>RAM</th>
+              <th>端口映射</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="containerTable"></tbody>
+        </table>
+      </div>
+
+      <!-- Port Mapping -->
+      <div class="card">
+        <div class="card-header">🔌 端口映射</div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;" id="portMap"></div>
+        </div>
+      </div>
+
+      <!-- Log Viewer -->
+      <div class="card">
+        <div class="card-header">
+          📜 容器日志
+          <div style="margin-left:auto;display:flex;gap:8px;">
+            <select id="logContainer" style="padding:3px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:11px;" onchange="switchLogContainer()">
+              <option value="blog-backend">blog-backend</option>
+              <option value="blog-postgres">blog-postgres</option>
+              <option value="blog-redis">blog-redis</option>
+            </select>
+            <button class="btn btn-sm btn-secondary" onclick="clearLogs()">清除</button>
+            <label style="font-size:11px;display:flex;align-items:center;gap:4px;">
+              <input type="checkbox" checked id="autoScroll"> 自动滚动
+            </label>
+          </div>
+        </div>
+        <div class="log-viewer" id="logViewer" style="height:240px;"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+// --- Container Table ---
+function renderContainers() {
+  document.getElementById('containerTable').innerHTML = MOCK.containers.map(c => {
+    const statusBadge = c.status === 'running'
+      ? '<span class="badge badge-success">● running</span>'
+      : '<span class="badge badge-neutral">○ stopped</span>';
+    return `<tr>
+      <td style="font-weight:500;font-family:var(--font-mono);font-size:12px;">${c.name}</td>
+      <td style="font-size:11px;color:var(--color-text-secondary);">${c.image}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:12px;">${c.cpu}</td>
+      <td style="font-size:12px;">${c.ram}</td>
+      <td style="font-size:11px;font-family:var(--font-mono);">${c.port}</td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          ${c.status === 'running'
+            ? '<button class="btn btn-sm btn-secondary">停止</button><button class="btn btn-sm btn-secondary">日志</button>'
+            : '<button class="btn btn-sm btn-primary">启动</button>'}
+          <button class="btn btn-sm btn-secondary">终端</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// --- Port Mapping ---
+function renderPorts() {
+  const ports = [
+    { service: 'backend', internal: '8080', external: '4001', status: 'active' },
+    { service: 'postgres', internal: '5432', external: '4002', status: 'active' },
+    { service: 'redis', internal: '6379', external: '4003', status: 'active' },
+    { service: 'frontend', internal: '3000', external: '4004', status: 'inactive' },
+  ];
+  document.getElementById('portMap').innerHTML = ports.map(p => `
+    <div style="padding:10px;border-radius:var(--radius-md);border:1px solid ${p.status === 'active' ? 'var(--color-success)' : 'var(--color-border)'};background:${p.status === 'active' ? 'var(--color-success-light)' : '#f9f9f9'};">
+      <div style="font-size:12px;font-weight:500;margin-bottom:4px;">${p.service}</div>
+      <div style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);">
+        :${p.external} → :${p.internal}
+      </div>
+      <div style="font-size:10px;color:${p.status === 'active' ? 'var(--color-success)' : 'var(--color-text-muted)'};">
+        ${p.status === 'active' ? '● 活跃' : '○ 未启动'}
+      </div>
+    </div>
+  `).join('');
+}
+
+// --- Log Viewer ---
+const LOG_LINES = {
+  'blog-backend': [
+    { time: '10:25:01', level: 'info', msg: 'Listening on 0.0.0.0:8080' },
+    { time: '10:25:02', level: 'info', msg: 'Database pool created (max_connections=10)' },
+    { time: '10:25:03', level: 'info', msg: 'GET /health → 200 (1ms)' },
+    { time: '10:25:15', level: 'info', msg: 'POST /api/tags → 201 (12ms)' },
+    { time: '10:25:16', level: 'info', msg: 'GET /api/tags → 200 (3ms)' },
+    { time: '10:25:30', level: 'info', msg: 'POST /api/articles/a1b2c3/tags → 200 (8ms)' },
+    { time: '10:26:01', level: 'info', msg: 'GET /api/articles?tag=rust → 200 (15ms)' },
+    { time: '10:26:15', level: 'warn', msg: 'Slow query detected: SELECT * FROM articles WHERE ... (45ms)' },
+    { time: '10:26:30', level: 'info', msg: 'GET /health → 200 (1ms)' },
+    { time: '10:27:00', level: 'info', msg: 'Connection pool stats: active=3, idle=7' },
+  ],
+  'blog-postgres': [
+    { time: '10:25:00', level: 'info', msg: 'PostgreSQL 16.2 started' },
+    { time: '10:25:00', level: 'info', msg: 'listening on IPv4 address "0.0.0.0", port 5432' },
+    { time: '10:25:01', level: 'info', msg: 'database system is ready to accept connections' },
+    { time: '10:25:02', level: 'info', msg: 'connection received: host=172.18.0.3 port=45678' },
+    { time: '10:26:15', level: 'warn', msg: 'duration: 45.123 ms  statement: SELECT * FROM articles WHERE ...' },
+  ],
+  'blog-redis': [
+    { time: '10:25:00', level: 'info', msg: 'Redis 7.2.4 started' },
+    { time: '10:25:00', level: 'info', msg: 'Ready to accept connections tcp' },
+    { time: '10:26:00', level: 'info', msg: 'DB 0: 3 keys (0 volatile)' },
+  ],
+};
+
+let currentLogContainer = 'blog-backend';
+
+function renderLogs() {
+  const viewer = document.getElementById('logViewer');
+  const lines = LOG_LINES[currentLogContainer] || [];
+  viewer.innerHTML = lines.map(l => {
+    const levelClass = l.level === 'warn' ? 'log-warn' : (l.level === 'error' ? 'log-error' : 'log-info');
+    return `<div class="log-line"><span class="log-time">${l.time}</span> <span class="${levelClass}">[${l.level.toUpperCase()}]</span> ${l.msg}</div>`;
+  }).join('');
+
+  if (document.getElementById('autoScroll').checked) {
+    viewer.scrollTop = viewer.scrollHeight;
+  }
+}
+
+function switchLogContainer() {
+  currentLogContainer = document.getElementById('logContainer').value;
+  renderLogs();
+}
+
+function clearLogs() {
+  document.getElementById('logViewer').innerHTML = '<div class="log-line" style="color:#6e7681;">日志已清除</div>';
+}
+
+function switchMode(mode) {
+  alert(`切换到 ${mode} 模式（原型演示 — 实际会触发容器重建）`);
+}
+
+// --- Simulate live logs ---
+let logInterval;
+function startLogSimulation() {
+  logInterval = setInterval(() => {
+    const viewer = document.getElementById('logViewer');
+    const now = new Date();
+    const time = now.toLocaleTimeString('zh-CN', { hour12: false });
+    const msgs = ['GET /health → 200 (1ms)', 'Connection pool stats: active=2, idle=8', 'GET /api/articles → 200 (5ms)'];
+    const msg = msgs[Math.floor(Math.random() * msgs.length)];
+    viewer.innerHTML += `<div class="log-line" style="animation:fadeIn 0.3s;"><span class="log-time">${time}</span> <span class="log-info">[INFO]</span> ${msg}</div>`;
+    if (document.getElementById('autoScroll').checked) {
+      viewer.scrollTop = viewer.scrollHeight;
+    }
+  }, 3000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderContainers();
+  renderPorts();
+  renderLogs();
+  startLogSimulation();
+});
+</script>
+</body>
+</html>

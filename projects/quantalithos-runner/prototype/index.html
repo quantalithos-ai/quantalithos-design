@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Runner</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Runner</span>
+    <input class="search" type="text" placeholder="搜索应用...">
+    <div class="icon-btn">⚙️</div>
+  </header>
+
+  <main class="main-content">
+    <div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:15px;font-weight:600;">我的应用</span>
+      <span style="font-size:12px;color:var(--color-text-muted);">6 个应用</span>
+    </div>
+    <div class="app-grid" id="appGrid"></div>
+  </main>
+
+  <div id="tabbar"></div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('appGrid').innerHTML = MOCK.apps.map(app => `
+    <div class="app-card animate-in" onclick="location.href='detail.html?id=${app.id}'" style="animation-delay:${MOCK.apps.indexOf(app)*0.05}s;">
+      <div class="app-icon">${app.icon}</div>
+      <div class="app-name">${app.name}</div>
+      <div class="app-version">${app.version}</div>
+      <span class="app-status ${app.status}">${statusLabel(app.status)}</span>
+    </div>
+  `).join('');
+});
+</script>
+</body>
+</html>

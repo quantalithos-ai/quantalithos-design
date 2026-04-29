@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Marketplace</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Marketplace</span>
+    <div class="nav-links">
+      <span class="nav-link active" data-page="browse">浏览</span>
+      <span class="nav-link" data-page="publish">发布</span>
+      <span class="nav-link" data-page="profile">我的</span>
+    </div>
+    <input class="search" type="text" placeholder="搜索流程模板、技能包、组件..." id="searchInput" oninput="filterAssets()">
+    <div class="user-avatar">A</div>
+  </header>
+
+  <main class="main-content">
+
+    <!-- Category Tabs -->
+    <div class="category-tabs" id="categoryTabs"></div>
+
+    <!-- Sort Bar -->
+    <div style="display:flex;align-items:center;margin-bottom:16px;">
+      <span style="font-size:12px;color:var(--color-text-muted);" id="resultCount">9 个资产</span>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <select style="padding:5px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:11px;" onchange="sortAssets(this.value)">
+          <option value="downloads">按下载量</option>
+          <option value="rating">按评分</option>
+          <option value="newest">最新发布</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Asset Grid -->
+    <div class="asset-grid" id="assetGrid"></div>
+
+  </main>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+let currentCategory = 'all';
+let currentSort = 'downloads';
+
+function renderCategories() {
+  document.getElementById('categoryTabs').innerHTML = MOCK.categories.map(c => `
+    <div class="category-tab ${c.id === currentCategory ? 'active' : ''}" onclick="selectCategory('${c.id}')">
+      ${c.icon} ${c.name}
+    </div>
+  `).join('');
+}
+
+function selectCategory(id) {
+  currentCategory = id;
+  renderCategories();
+  renderGrid();
+}
+
+function getFilteredAssets() {
+  let items = MOCK.assets;
+  if (currentCategory !== 'all') {
+    items = items.filter(a => a.type === currentCategory);
+  }
+  const query = document.getElementById('searchInput').value.toLowerCase();
+  if (query) {
+    items = items.filter(a => a.name.toLowerCase().includes(query) || a.desc.toLowerCase().includes(query) || a.tags.some(t => t.includes(query)));
+  }
+  if (currentSort === 'downloads') items.sort((a, b) => b.downloads - a.downloads);
+  else if (currentSort === 'rating') items.sort((a, b) => b.rating - a.rating);
+  return items;
+}
+
+function renderGrid() {
+  const items = getFilteredAssets();
+  document.getElementById('resultCount').textContent = `${items.length} 个资产`;
+  document.getElementById('assetGrid').innerHTML = items.map((a, i) => `
+    <div class="asset-card animate-in" onclick="location.href='detail.html?id=${a.id}'" style="animation-delay:${i*0.05}s;">
+      <div class="card-banner">${a.icon}</div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span class="badge ${typeBadgeClass(a.type)}">${typeLabel(a.type)}</span>
+          <span style="font-size:10px;color:var(--color-text-muted);">${a.version}</span>
+        </div>
+        <div class="card-title">${a.name}</div>
+        <div class="card-desc">${a.desc}</div>
+        <div class="card-meta">
+          ${renderStars(a.rating)}
+          <span class="downloads">⬇ ${a.downloads}</span>
+        </div>
+        <div class="card-tags">
+          ${a.tags.slice(0, 3).map(t => `<span class="tag">${t}</span>`).join('')}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterAssets() { renderGrid(); }
+function sortAssets(val) { currentSort = val; renderGrid(); }
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderCategories();
+  renderGrid();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Marketplace — 发布资产</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Marketplace</span>
+    <div class="nav-links">
+      <span class="nav-link" data-page="browse">浏览</span>
+      <span class="nav-link active" data-page="publish">发布</span>
+      <span class="nav-link" data-page="profile">我的</span>
+    </div>
+    <input class="search" type="text" placeholder="搜索...">
+    <div class="user-avatar">A</div>
+  </header>
+
+  <main class="main-content" style="max-width:640px;margin:0 auto;">
+
+    <div style="margin-bottom:24px;">
+      <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">发布资产</h1>
+      <p style="font-size:13px;color:var(--color-text-secondary);">将你的流程模板、技能包、角色定义或组件分享给社区</p>
+    </div>
+
+    <!-- Form -->
+    <div style="background:var(--color-card);border-radius:var(--radius-lg);border:1px solid var(--color-border);padding:24px;">
+
+      <div class="form-group">
+        <label>资产类型 *</label>
+        <select id="assetType">
+          <option value="">选择类型...</option>
+          <option value="process_template">🔀 流程模板</option>
+          <option value="skill">🧪 技能包</option>
+          <option value="role_definition">🧑‍💻 角色定义</option>
+          <option value="shared_rule">📜 共享规则</option>
+          <option value="component">🧩 UI 组件</option>
+          <option value="app">📱 应用作品</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>名称 *</label>
+        <input type="text" placeholder="如：TDD 工作流" id="assetName">
+      </div>
+
+      <div class="form-group">
+        <label>描述 *</label>
+        <textarea placeholder="简要描述这个资产的功能和适用场景..." id="assetDesc"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>版本</label>
+        <input type="text" placeholder="v1.0.0" value="v1.0.0" id="assetVersion">
+      </div>
+
+      <div class="form-group">
+        <label>标签（逗号分隔）</label>
+        <input type="text" placeholder="workflow, tdd, development" id="assetTags">
+      </div>
+
+      <!-- File Upload -->
+      <div class="form-group">
+        <label>上传文件 *</label>
+        <div style="border:2px dashed var(--color-border);border-radius:var(--radius-md);padding:32px;text-align:center;cursor:pointer;transition:all var(--transition);" onclick="simulateUpload()" id="uploadArea">
+          <div style="font-size:28px;margin-bottom:8px;">📁</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">点击或拖拽文件到此处</div>
+          <div style="font-size:11px;color:var(--color-text-muted);margin-top:4px;">支持 .yaml / .json / .zip</div>
+        </div>
+        <div id="uploadedFile" style="display:none;margin-top:8px;padding:10px;background:var(--color-success-light);border-radius:var(--radius-sm);font-size:12px;color:var(--color-success);display:none;">
+          ✅ tdd_workflow.yaml (2.1 KB)
+        </div>
+      </div>
+
+      <!-- Screenshots -->
+      <div class="form-group">
+        <label>截图（可选，最多 5 张）</label>
+        <div style="display:flex;gap:8px;">
+          <div style="width:80px;height:60px;border:2px dashed var(--color-border);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;color:var(--color-text-muted);">+</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:12px;margin-top:24px;padding-top:16px;border-top:1px solid var(--color-border);">
+        <button class="btn btn-secondary" onclick="saveDraft()">保存草稿</button>
+        <button class="btn btn-primary" style="margin-left:auto;" onclick="publishAsset()">🚀 发布</button>
+      </div>
+
+    </div>
+
+  </main>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+function simulateUpload() {
+  const area = document.getElementById('uploadArea');
+  const file = document.getElementById('uploadedFile');
+  area.style.borderColor = 'var(--color-success)';
+  area.innerHTML = '<div style="font-size:28px;margin-bottom:8px;">✅</div><div style="font-size:13px;color:var(--color-success);">文件已选择</div>';
+  file.style.display = 'block';
+}
+
+function saveDraft() {
+  alert('💾 已保存为草稿');
+}
+
+function publishAsset() {
+  const name = document.getElementById('assetName').value;
+  const type = document.getElementById('assetType').value;
+  if (!name || !type) {
+    alert('请填写必填字段（类型和名称）');
+    return;
+  }
+  if (confirm(`确认发布「${name}」到市场？\n\n发布后其他用户可以搜索和导入此资产。`)) {
+    alert('🚀 发布成功！资产已上架到市场。');
+    window.location.href = 'profile.html';
+  }
+}
+</script>
+</body>
+</html>

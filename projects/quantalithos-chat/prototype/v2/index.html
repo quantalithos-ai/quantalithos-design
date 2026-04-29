@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Chat</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="components.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- Left Navigation -->
+  <nav class="nav-bar">
+    <div class="nav-item active" data-page="chat" title="聊天">💬</div>
+    <div class="nav-item" data-page="progress" title="进度"><span class="badge">1</span>📊</div>
+    <div class="nav-item" data-page="kanban" title="看板">📋</div>
+    <div class="nav-item" data-page="artifacts" title="产物">📁</div>
+    <div class="nav-spacer"></div>
+    <div class="nav-item" title="设置">⚙️</div>
+    <div class="nav-avatar">A</div>
+  </nav>
+
+  <!-- Conversation List -->
+  <aside class="conv-panel">
+    <div class="conv-header">
+      消息
+      <span class="action">✏️</span>
+    </div>
+    <div class="conv-search">
+      <input type="text" placeholder="搜索会话...">
+    </div>
+    <div class="conv-items" id="convList"></div>
+  </aside>
+
+  <!-- Main Chat Area -->
+  <main class="main-content" id="chatMain">
+    <div class="main-header">
+      <span class="title" id="chatTitle">博客系统 · 项目群聊</span>
+      <span class="subtitle" id="chatSubtitle">4 位成员在线</span>
+      <div class="actions">
+        <button class="filter-chip active" onclick="toggleDetail()">📌 详情</button>
+      </div>
+    </div>
+
+    <div class="message-list" id="messageList"></div>
+
+    <div class="message-input-area">
+      <textarea rows="1" placeholder="输入消息... (Enter 发送)" id="msgInput"></textarea>
+      <button class="send-btn" onclick="sendMessage()">↑</button>
+    </div>
+  </main>
+
+  <!-- Detail Panel (toggleable) -->
+  <aside class="detail-panel" id="detailPanel">
+    <div class="panel-header">
+      执行状态
+      <span class="close-btn" onclick="toggleDetail()">✕</span>
+    </div>
+    <div class="panel-body">
+      <!-- Agent Status -->
+      <div class="panel-section">
+        <div class="panel-section-title">Agent 状态</div>
+        <div id="agentStatusList" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+
+      <!-- Current Tasks -->
+      <div class="panel-section">
+        <div class="panel-section-title">进行中的任务</div>
+        <div id="currentTasks" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="panel-section">
+        <div class="panel-section-title">项目统计</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="quickStats"></div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+// --- Render Conversation List ---
+function renderConvList() {
+  const container = document.getElementById('convList');
+  container.innerHTML = MOCK.conversations.map(conv => {
+    const avatarHtml = conv.avatarCss
+      ? `<div class="avatar agent-avatar ${conv.avatarCss}" style="width:36px;height:36px;font-size:12px">${conv.avatar}</div>`
+      : `<div class="avatar" style="width:36px;height:36px;border-radius:50%;background:#e3f2fd;display:flex;align-items:center;justify-content:center;font-size:16px">${conv.avatar}</div>`;
+    return `<div class="conv-item ${conv.id === 'group' ? 'active' : ''}" onclick="switchConv('${conv.id}')">
+      ${avatarHtml}
+      <div class="info">
+        <div class="name">${conv.name}</div>
+        <div class="preview">${conv.preview}</div>
+      </div>
+      <div class="meta">
+        <span class="time">${conv.time}</span>
+        ${conv.unread > 0 ? `<span class="unread">${conv.unread}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// --- Render Messages ---
+function renderMessages(convId) {
+  const container = document.getElementById('messageList');
+  const messages = MOCK.messages[convId] || [];
+  container.innerHTML = messages.map(msg => {
+    if (msg.type === 'system') {
+      return `<div class="message from-system"><div class="msg-body">${msg.content}</div></div>`;
+    }
+    if (msg.type === 'gate') {
+      return `<div class="message" style="max-width:90%;align-self:center">${renderGateCard(msg.gate)}</div>`;
+    }
+    if (msg.type === 'user') {
+      return `<div class="message from-user">
+        <div class="msg-body">${msg.content}</div>
+      </div>`;
+    }
+    // Agent message
+    const agent = MOCK.agents.find(a => a.id === msg.agent) || { name: msg.name, css: 'be' };
+    const toolsHtml = msg.toolCalls ? msg.toolCalls.map(tc => renderToolCall(tc)).join('') : '';
+    return `<div class="message">
+      ${renderAgentAvatar(msg.agent, 32)}
+      <div>
+        <div class="msg-name">${msg.name} · ${msg.time}</div>
+        <div class="msg-body">
+          ${msg.content}
+          ${toolsHtml}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+// --- Switch Conversation ---
+let currentConv = 'group';
+function switchConv(convId) {
+  currentConv = convId;
+  document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  const conv = MOCK.conversations.find(c => c.id === convId);
+  document.getElementById('chatTitle').textContent = conv.name;
+  document.getElementById('chatSubtitle').textContent = convId === 'group' ? '4 位成员在线' : '私聊';
+  renderMessages(convId);
+}
+
+// --- Send Message ---
+function sendMessage() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  // Add to mock
+  if (!MOCK.messages[currentConv]) MOCK.messages[currentConv] = [];
+  MOCK.messages[currentConv].push({ id: Date.now(), type: 'user', content: text, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) });
+  renderMessages(currentConv);
+
+  // Simulate agent reply
+  setTimeout(() => {
+    MOCK.messages[currentConv].push({
+      id: Date.now(), type: 'agent', agent: 'assistant', name: 'Assistant',
+      content: '收到你的消息。我正在处理中...',
+      time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'})
+    });
+    renderMessages(currentConv);
+  }, 1000);
+}
+
+// --- Detail Panel ---
+function toggleDetail() {
+  const panel = document.getElementById('detailPanel');
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+}
+
+function renderDetailPanel() {
+  // Agent status
+  const agentList = document.getElementById('agentStatusList');
+  agentList.innerHTML = MOCK.agents.map(a => `
+    <div style="display:flex;align-items:center;gap:10px;">
+      ${renderAgentAvatar(a.id, 28)}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:500;">${a.role_name}</div>
+        <div style="font-size:11px;color:#999;">${a.task || '空闲'}</div>
+      </div>
+      ${renderStatusBadge(a.status)}
+    </div>
+  `).join('');
+
+  // Current tasks
+  const tasks = document.getElementById('currentTasks');
+  const runningTasks = MOCK.workitems.filter(w => w.status === 'in_progress' || w.status === 'in_review');
+  tasks.innerHTML = runningTasks.map(t => `
+    <div class="workitem-card" style="padding:8px 10px;">
+      <div class="wi-title">${t.id} ${t.title}</div>
+      <div class="wi-meta">
+        <span class="wi-id">${t.assignee}</span>
+        ${renderStatusBadge(t.status)}
+      </div>
+    </div>
+  `).join('');
+
+  // Quick stats
+  const stats = document.getElementById('quickStats');
+  const completed = MOCK.workitems.filter(w => w.status === 'completed').length;
+  const total = MOCK.workitems.length;
+  stats.innerHTML = `
+    <div style="background:#f5f5f5;padding:8px;border-radius:6px;text-align:center;">
+      <div style="font-size:18px;font-weight:600;color:var(--color-primary);">${completed}/${total}</div>
+      <div style="font-size:10px;color:#999;">任务完成</div>
+    </div>
+    <div style="background:#f5f5f5;padding:8px;border-radius:6px;text-align:center;">
+      <div style="font-size:18px;font-weight:600;color:var(--color-success);">4</div>
+      <div style="font-size:10px;color:#999;">Agent 在线</div>
+    </div>
+    <div style="background:#f5f5f5;padding:8px;border-radius:6px;text-align:center;">
+      <div style="font-size:18px;font-weight:600;color:var(--color-warning);">1</div>
+      <div style="font-size:10px;color:#999;">待审批</div>
+    </div>
+    <div style="background:#f5f5f5;padding:8px;border-radius:6px;text-align:center;">
+      <div style="font-size:18px;font-weight:600;">5</div>
+      <div style="font-size:10px;color:#999;">产物</div>
+    </div>
+  `;
+}
+
+// --- Keyboard ---
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && document.activeElement.id === 'msgInput') {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', () => {
+  renderConvList();
+  renderMessages('group');
+  renderDetailPanel();
+});
+</script>
+</body>
+</html>

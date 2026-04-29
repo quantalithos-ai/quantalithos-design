@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Runner — 应用详情</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="back-btn" onclick="location.href='index.html'">←</span>
+    <span class="title" id="appTitle">应用详情</span>
+    <div class="actions">
+      <div class="icon-btn">⋯</div>
+    </div>
+  </header>
+
+  <main class="main-content" id="detailContent"></main>
+
+  <div id="tabbar"></div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const appId = params.get('id') || 'blog';
+  const app = getApp(appId) || MOCK.apps[0];
+
+  document.getElementById('appTitle').textContent = app.name;
+
+  const versions = MOCK.versions[appId] || [{ tag: app.version, date: '最近', note: '当前版本' }];
+  const perms = MOCK.permissions[appId] || [];
+
+  document.getElementById('detailContent').innerHTML = `
+    <!-- Hero -->
+    <div class="detail-hero">
+      <div class="hero-icon">${app.icon}</div>
+      <div class="hero-name">${app.name}</div>
+      <div class="hero-meta">${app.version} · ${app.developer} · ${app.tech}</div>
+    </div>
+
+    <!-- Actions -->
+    <div class="detail-actions">
+      <div class="btn btn-primary" onclick="location.href='running.html?id=${app.id}'">▶ 打开</div>
+      <div class="btn btn-secondary">${app.status === 'update' ? '🔄 更新' : '✓ 最新'}</div>
+      <div class="btn btn-danger">卸载</div>
+    </div>
+
+    <!-- Screenshots -->
+    <div class="detail-section">
+      <div class="section-title">截图预览</div>
+      <div class="screenshots">
+        <div class="screenshot">首页</div>
+        <div class="screenshot">文章详情</div>
+        <div class="screenshot">标签页</div>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="detail-section">
+      <div class="section-title">应用信息</div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">大小</div><div class="info-value">${app.size}</div></div>
+        <div class="info-item"><div class="info-label">最后更新</div><div class="info-value">${app.updated}</div></div>
+        <div class="info-item"><div class="info-label">技术栈</div><div class="info-value">${app.tech}</div></div>
+        <div class="info-item"><div class="info-label">开发者</div><div class="info-value">${app.developer}</div></div>
+      </div>
+    </div>
+
+    <!-- Permissions -->
+    ${perms.length > 0 ? `
+    <div class="detail-section">
+      <div class="section-title">权限 (${perms.filter(p=>p.enabled).length}/${perms.length})</div>
+      ${perms.map(p => `
+        <div class="perm-item">
+          <span class="perm-icon">${p.icon}</span>
+          <div class="perm-info">
+            <div class="perm-name">${p.name}</div>
+            <div class="perm-desc">${p.desc}</div>
+          </div>
+          <div class="perm-toggle ${p.enabled ? 'on' : ''}" onclick="this.classList.toggle('on')"></div>
+        </div>
+      `).join('')}
+    </div>` : ''}
+
+    <!-- Version History -->
+    <div class="detail-section">
+      <div class="section-title">版本历史</div>
+      ${versions.map(v => `
+        <div class="version-item">
+          <span class="ver-tag">${v.tag}</span>
+          <span class="ver-note">${v.note}</span>
+          <span class="ver-date">${v.date}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+});
+</script>
+</body>
+</html>

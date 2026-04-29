@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Console — 流程管理</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Quantalithos</span>
+    <div class="breadcrumb"><span>博客系统</span><span class="sep">/</span><span class="current">流程管理</span></div>
+    <input class="search" type="text" placeholder="搜索...">
+    <div class="notification">🔔</div>
+    <div class="user-avatar">A</div>
+  </header>
+
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main-content" style="padding:0;display:flex;flex-direction:column;">
+
+      <div class="tabs">
+        <div class="tab-item active" onclick="switchFlowTab('templates',this)">流程模板</div>
+        <div class="tab-item" onclick="switchFlowTab('instances',this)">运行实例</div>
+      </div>
+
+      <!-- Templates Tab -->
+      <div id="tab-templates" style="flex:1;display:flex;overflow:hidden;">
+
+        <!-- Template List -->
+        <div style="width:280px;border-right:1px solid var(--color-border);overflow-y:auto;padding:12px;">
+          <div style="display:flex;align-items:center;margin-bottom:12px;padding:0 4px;">
+            <span style="font-size:13px;font-weight:600;">流程模板</span>
+            <button class="btn btn-sm btn-primary" style="margin-left:auto;">+ 新建</button>
+          </div>
+          <div id="templateList"></div>
+        </div>
+
+        <!-- BPMN Viewer -->
+        <div style="flex:1;display:flex;flex-direction:column;">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--color-border);display:flex;align-items:center;gap:12px;">
+            <span style="font-size:13px;font-weight:600;" id="flowTitle">TDD 工作流</span>
+            <span class="badge badge-success" id="flowStatus">active</span>
+            <span style="font-size:11px;color:var(--color-text-muted);" id="flowMeta">7 节点 · agent 级</span>
+            <div style="margin-left:auto;display:flex;gap:8px;">
+              <button class="btn btn-sm btn-secondary">编辑 YAML</button>
+              <button class="btn btn-sm btn-secondary">导出</button>
+            </div>
+          </div>
+
+          <!-- SVG Canvas -->
+          <div style="flex:1;position:relative;overflow:auto;background:#fafafa;padding:24px;" id="bpmnCanvas">
+            <svg id="bpmnSvg" width="800" height="280" style="display:block;"></svg>
+          </div>
+
+          <!-- Node Info -->
+          <div style="border-top:1px solid var(--color-border);padding:12px 16px;background:#fff;" id="nodeInfo">
+            <div style="font-size:11px;color:var(--color-text-muted);">点击节点查看详情</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Instances Tab -->
+      <div id="tab-instances" style="flex:1;padding:20px;display:none;">
+        <div class="card">
+          <div class="card-header">运行中的流程实例</div>
+          <table class="data-table">
+            <thead><tr><th>实例 ID</th><th>流程</th><th>类型</th><th>状态</th><th>当前节点</th><th>启动时间</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><code style="font-size:11px;">pi-pipeline-001</code></td>
+                <td>standard_pipeline</td>
+                <td><span class="badge badge-info">pipeline</span></td>
+                <td><span class="badge badge-primary">running</span></td>
+                <td>development</td>
+                <td style="font-size:11px;color:var(--color-text-muted);">04-25 09:00</td>
+              </tr>
+              <tr>
+                <td><code style="font-size:11px;">pi-stage3-001</code></td>
+                <td>iterative_development</td>
+                <td><span class="badge badge-warning">stage</span></td>
+                <td><span class="badge badge-primary">running</span></td>
+                <td>implement</td>
+                <td style="font-size:11px;color:var(--color-text-muted);">04-27 09:00</td>
+              </tr>
+              <tr>
+                <td><code style="font-size:11px;">pi-tdd-003</code></td>
+                <td>tdd_workflow</td>
+                <td><span class="badge badge-neutral">agent</span></td>
+                <td><span class="badge badge-success">completed</span></td>
+                <td>end</td>
+                <td style="font-size:11px;color:var(--color-text-muted);">04-29 09:35</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let selectedTemplate = 'tdd_workflow';
+
+// --- BPMN Definitions ---
+const FLOW_DEFS = {
+  tdd_workflow: {
+    name: 'TDD 工作流', type: 'agent', status: 'active',
+    nodes: [
+      { id: 'start', type: 'event', x: 40, y: 120, label: '' },
+      { id: 'write_test', type: 'task', x: 120, y: 100, label: '写失败测试' },
+      { id: 'run_red', type: 'task', x: 280, y: 100, label: '运行测试(红)' },
+      { id: 'write_code', type: 'task', x: 440, y: 100, label: '写代码' },
+      { id: 'run_green', type: 'task', x: 600, y: 100, label: '运行测试(绿)' },
+      { id: 'check', type: 'gateway', x: 730, y: 120, label: '?' },
+      { id: 'end', type: 'event', x: 730, y: 220, label: '' },
+    ],
+    edges: [
+      { from: 'start', to: 'write_test' },
+      { from: 'write_test', to: 'run_red' },
+      { from: 'run_red', to: 'write_code' },
+      { from: 'write_code', to: 'run_green' },
+      { from: 'run_green', to: 'check' },
+      { from: 'check', to: 'end', label: 'pass' },
+      { from: 'check', to: 'write_code', label: 'fail' },
+    ],
+  },
+  standard_pipeline: {
+    name: '标准六阶段流程', type: 'pipeline', status: 'active',
+    nodes: [
+      { id: 'start', type: 'event', x: 30, y: 120, label: '' },
+      { id: 'alignment', type: 'task', x: 100, y: 100, label: '目标校准' },
+      { id: 'requirement', type: 'task', x: 240, y: 100, label: '需求理解' },
+      { id: 'design', type: 'task', x: 380, y: 100, label: '方案拆解' },
+      { id: 'development', type: 'task', x: 520, y: 100, label: '迭代开发' },
+      { id: 'acceptance', type: 'task', x: 660, y: 100, label: '验收确认' },
+      { id: 'end', type: 'event', x: 780, y: 120, label: '' },
+    ],
+    edges: [
+      { from: 'start', to: 'alignment' },
+      { from: 'alignment', to: 'requirement' },
+      { from: 'requirement', to: 'design' },
+      { from: 'design', to: 'development' },
+      { from: 'development', to: 'acceptance' },
+      { from: 'acceptance', to: 'end' },
+    ],
+  },
+};
+
+function renderTemplateList() {
+  document.getElementById('templateList').innerHTML = MOCK.flowTemplates.map(t => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:var(--radius-md);cursor:pointer;margin-bottom:4px;${t.id === selectedTemplate ? 'background:var(--color-primary-light);' : ''}" onclick="selectTemplate('${t.id}')">
+      <span style="font-size:14px;">${t.type === 'pipeline' ? '🔀' : (t.type === 'stage' ? '📋' : '🔧')}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:500;${t.id === selectedTemplate ? 'color:var(--color-primary);' : ''}">${t.name}</div>
+        <div style="font-size:10px;color:var(--color-text-muted);">${t.nodes} 节点 · ${t.type}</div>
+      </div>
+      ${badge(t.status)}
+    </div>
+  `).join('');
+}
+
+function selectTemplate(id) {
+  selectedTemplate = id;
+  renderTemplateList();
+  renderBpmn(id);
+}
+
+function renderBpmn(id) {
+  const def = FLOW_DEFS[id];
+  if (!def) {
+    document.getElementById('bpmnSvg').innerHTML = '<text x="200" y="140" fill="#999" font-size="14">暂无流程图预览</text>';
+    const t = MOCK.flowTemplates.find(x => x.id === id);
+    document.getElementById('flowTitle').textContent = t ? t.name : id;
+    document.getElementById('flowMeta').textContent = t ? `${t.nodes} 节点 · ${t.type} 级` : '';
+    return;
+  }
+
+  document.getElementById('flowTitle').textContent = def.name;
+  document.getElementById('flowStatus').textContent = def.status;
+  document.getElementById('flowMeta').textContent = `${def.nodes.length} 节点 · ${def.type} 级`;
+
+  let svg = '<defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#999"/></marker></defs>';
+
+  // Edges
+  def.edges.forEach(e => {
+    const from = def.nodes.find(n => n.id === e.from);
+    const to = def.nodes.find(n => n.id === e.to);
+    if (!from || !to) return;
+    const x1 = from.x + (from.type === 'task' ? 120 : 30);
+    const y1 = from.y + (from.type === 'task' ? 20 : 0);
+    const x2 = to.x;
+    const y2 = to.y + (to.type === 'task' ? 20 : 0);
+
+    // Curved path for back-edges
+    if (x2 < x1) {
+      svg += `<path d="M${x1},${y1} C${x1+40},${y1+60} ${x2-40},${y2+60} ${x2},${y2}" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#arrowhead)"/>`;
+    } else {
+      svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#999" stroke-width="1.5" marker-end="url(#arrowhead)"/>`;
+    }
+    if (e.label) {
+      const mx = (x1+x2)/2, my = (y1+y2)/2 - 8;
+      svg += `<text x="${mx}" y="${my}" font-size="10" fill="#999" text-anchor="middle">${e.label}</text>`;
+    }
+  });
+
+  // Nodes
+  def.nodes.forEach(n => {
+    if (n.type === 'event') {
+      svg += `<circle cx="${n.x+15}" cy="${n.y}" r="15" fill="#fff" stroke="#666" stroke-width="2" style="cursor:pointer;" onclick="showNodeInfo('${n.id}','event')"/>`;
+      svg += `<text x="${n.x+15}" y="${n.y+4}" text-anchor="middle" font-size="10" fill="#666">${n.id === 'start' ? '▶' : '■'}</text>`;
+    } else if (n.type === 'gateway') {
+      svg += `<rect x="${n.x}" y="${n.y-15}" width="30" height="30" fill="#fff" stroke="#666" stroke-width="2" transform="rotate(45,${n.x+15},${n.y})" style="cursor:pointer;" onclick="showNodeInfo('${n.id}','gateway')"/>`;
+      svg += `<text x="${n.x+15}" y="${n.y+4}" text-anchor="middle" font-size="10" fill="#666">✕</text>`;
+    } else {
+      svg += `<rect x="${n.x}" y="${n.y}" width="120" height="40" rx="6" fill="#fff" stroke="var(--color-primary)" stroke-width="2" style="cursor:pointer;" onclick="showNodeInfo('${n.id}','task')"/>`;
+      svg += `<text x="${n.x+60}" y="${n.y+24}" text-anchor="middle" font-size="11" fill="#333">${n.label}</text>`;
+    }
+  });
+
+  document.getElementById('bpmnSvg').innerHTML = svg;
+}
+
+function showNodeInfo(nodeId, type) {
+  const info = document.getElementById('nodeInfo');
+  const labels = { event: '事件节点', gateway: '排他网关', task: '任务节点' };
+  const def = FLOW_DEFS[selectedTemplate];
+  const node = def ? def.nodes.find(n => n.id === nodeId) : null;
+  info.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div>
+        <div style="font-size:12px;font-weight:600;">${node?.label || nodeId}</div>
+        <div style="font-size:11px;color:var(--color-text-muted);">${labels[type]} · ID: ${nodeId}</div>
+      </div>
+      <span class="badge badge-neutral" style="margin-left:auto;">${type}</span>
+    </div>
+  `;
+}
+
+function switchFlowTab(tab, el) {
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-templates').style.display = tab === 'templates' ? 'flex' : 'none';
+  document.getElementById('tab-instances').style.display = tab === 'instances' ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderTemplateList();
+  renderBpmn(selectedTemplate);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Marketplace — 个人中心</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Marketplace</span>
+    <div class="nav-links">
+      <span class="nav-link" data-page="browse">浏览</span>
+      <span class="nav-link" data-page="publish">发布</span>
+      <span class="nav-link active" data-page="profile">我的</span>
+    </div>
+    <input class="search" type="text" placeholder="搜索...">
+    <div class="user-avatar">A</div>
+  </header>
+
+  <main class="main-content">
+
+    <!-- Profile Header -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:20px;background:var(--color-card);border-radius:var(--radius-lg);border:1px solid var(--color-border);">
+      <div style="width:56px;height:56px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;">A</div>
+      <div>
+        <div style="font-size:16px;font-weight:700;">Aris</div>
+        <div style="font-size:12px;color:var(--color-text-secondary);">1 个发布 · 3 个收藏 · 加入于 2026-04</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:16px;text-align:center;">
+        <div><div style="font-size:20px;font-weight:700;color:var(--color-primary);">156</div><div style="font-size:10px;color:var(--color-text-muted);">总下载</div></div>
+        <div><div style="font-size:20px;font-weight:700;color:var(--color-warning);">4.8</div><div style="font-size:10px;color:var(--color-text-muted);">平均评分</div></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--color-border);">
+      <div class="nav-link active" style="padding:10px 16px;border-bottom:2px solid var(--color-primary);border-radius:0;" onclick="switchProfileTab('published',this)">我的发布</div>
+      <div class="nav-link" style="padding:10px 16px;border-bottom:2px solid transparent;border-radius:0;" onclick="switchProfileTab('favorites',this)">我的收藏</div>
+      <div class="nav-link" style="padding:10px 16px;border-bottom:2px solid transparent;border-radius:0;" onclick="switchProfileTab('downloads',this)">下载历史</div>
+    </div>
+
+    <!-- Published Tab -->
+    <div id="tab-published">
+      <div style="display:flex;align-items:center;margin-bottom:12px;">
+        <span style="font-size:14px;font-weight:600;">我的发布 (1)</span>
+        <button class="btn btn-sm btn-primary" style="margin-left:auto;" onclick="location.href='publish.html'">+ 发布新资产</button>
+      </div>
+      <div id="publishedList"></div>
+    </div>
+
+    <!-- Favorites Tab -->
+    <div id="tab-favorites" style="display:none;">
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;">我的收藏 (3)</div>
+      <div class="asset-grid" id="favoritesList"></div>
+    </div>
+
+    <!-- Downloads Tab -->
+    <div id="tab-downloads" style="display:none;">
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;">下载历史</div>
+      <div id="downloadsList"></div>
+    </div>
+
+  </main>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+function switchProfileTab(tab, el) {
+  document.querySelectorAll('[style*="border-bottom:2px"]').forEach(t => {
+    t.style.borderBottomColor = 'transparent';
+    t.classList.remove('active');
+  });
+  el.style.borderBottomColor = 'var(--color-primary)';
+  el.classList.add('active');
+  document.getElementById('tab-published').style.display = tab === 'published' ? 'block' : 'none';
+  document.getElementById('tab-favorites').style.display = tab === 'favorites' ? 'block' : 'none';
+  document.getElementById('tab-downloads').style.display = tab === 'downloads' ? 'block' : 'none';
+}
+
+function renderPublished() {
+  const container = document.getElementById('publishedList');
+  container.innerHTML = MOCK.myPublished.map(p => {
+    const asset = MOCK.assets.find(a => a.id === p.id);
+    if (!asset) return '';
+    return `
+      <div style="background:var(--color-card);border-radius:var(--radius-lg);border:1px solid var(--color-border);padding:16px;display:flex;align-items:center;gap:14px;margin-bottom:10px;">
+        <div style="width:48px;height:48px;border-radius:var(--radius-md);background:linear-gradient(135deg,#e0e7ff,#c7d2fe);display:flex;align-items:center;justify-content:center;font-size:24px;">${asset.icon}</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;">${asset.name}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px;">${typeLabel(asset.type)} · ${asset.version}</div>
+        </div>
+        <div style="text-align:center;margin-right:16px;">
+          <div style="font-size:16px;font-weight:700;">${p.downloads}</div>
+          <div style="font-size:10px;color:var(--color-text-muted);">下载</div>
+        </div>
+        <div style="text-align:center;margin-right:16px;">
+          <div style="font-size:16px;font-weight:700;">⭐ ${p.rating}</div>
+          <div style="font-size:10px;color:var(--color-text-muted);">评分</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm btn-secondary" onclick="location.href='detail.html?id=${p.id}'">查看</button>
+          <button class="btn btn-sm btn-secondary">编辑</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderFavorites() {
+  const container = document.getElementById('favoritesList');
+  const favAssets = MOCK.assets.filter(a => MOCK.myFavorites.includes(a.id));
+  container.innerHTML = favAssets.map(a => `
+    <div class="asset-card" onclick="location.href='detail.html?id=${a.id}'">
+      <div class="card-banner">${a.icon}</div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span class="badge ${typeBadgeClass(a.type)}">${typeLabel(a.type)}</span>
+        </div>
+        <div class="card-title">${a.name}</div>
+        <div class="card-desc">${a.desc}</div>
+        <div class="card-meta">
+          ${renderStars(a.rating)}
+          <span class="downloads">⬇ ${a.downloads}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderDownloads() {
+  const container = document.getElementById('downloadsList');
+  const downloads = [
+    { asset: 'security-rules', date: '2026-04-28', version: 'v2.0' },
+    { asset: 'comment-component', date: '2026-04-26', version: 'v1.3' },
+    { asset: 'ci-workflow', date: '2026-04-25', version: 'v1.1' },
+    { asset: 'tdd-workflow', date: '2026-04-20', version: 'v1.0' },
+  ];
+  container.innerHTML = downloads.map(d => {
+    const asset = MOCK.assets.find(a => a.id === d.asset);
+    if (!asset) return '';
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--color-border);">
+        <span style="font-size:24px;">${asset.icon}</span>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:500;">${asset.name}</div>
+          <div style="font-size:11px;color:var(--color-text-muted);">${typeLabel(asset.type)} · ${d.version}</div>
+        </div>
+        <span style="font-size:11px;color:var(--color-text-muted);">${d.date}</span>
+        <button class="btn btn-sm btn-secondary" onclick="location.href='detail.html?id=${d.asset}'">查看</button>
+      </div>
+    `;
+  }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderPublished();
+  renderFavorites();
+  renderDownloads();
+});
+</script>
+</body>
+</html>

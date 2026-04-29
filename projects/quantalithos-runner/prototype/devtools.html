@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Runner — 开发者工具</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Runner</span>
+    <span class="title" style="font-size:15px;font-weight:600;">开发者工具</span>
+    <div class="actions">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-text-muted);">
+        <span>热重载</span>
+        <div class="perm-toggle on" style="width:36px;height:20px;" onclick="this.classList.toggle('on')">
+          <span style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content" style="padding:12px;gap:12px;display:flex;flex-direction:column;">
+
+    <!-- App Selector -->
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:12px;color:var(--color-text-muted);">目标应用：</span>
+      <select id="appSelect" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:12px;flex:1;" onchange="switchDevApp()">
+        <option value="blog">📝 个人博客 (v0.3)</option>
+        <option value="shop">🛒 电商平台 (v0.1)</option>
+        <option value="chat">💬 即时通讯 (v0.2)</option>
+      </select>
+      <button style="padding:6px 10px;border-radius:var(--radius-sm);background:var(--color-primary);color:#fff;font-size:11px;font-weight:600;border:none;cursor:pointer;">连接</button>
+    </div>
+
+    <!-- DevTools Panel -->
+    <div class="devtools-panel" style="flex:1;display:flex;flex-direction:column;">
+      <div class="devtools-tabs">
+        <div class="devtools-tab active" onclick="switchDevTab('console',this)">Console</div>
+        <div class="devtools-tab" onclick="switchDevTab('network',this)">Network</div>
+        <div class="devtools-tab" onclick="switchDevTab('storage',this)">Storage</div>
+      </div>
+
+      <!-- Console Tab -->
+      <div class="devtools-body" id="tab-console" style="flex:1;"></div>
+
+      <!-- Network Tab -->
+      <div class="devtools-body" id="tab-network" style="flex:1;display:none;padding:0;"></div>
+
+      <!-- Storage Tab -->
+      <div class="devtools-body" id="tab-storage" style="flex:1;display:none;"></div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="display:flex;gap:8px;">
+      <button style="flex:1;padding:10px;border-radius:var(--radius-sm);background:var(--color-bg);border:1px solid var(--color-border);font-size:12px;font-weight:500;cursor:pointer;" onclick="clearConsole()">🗑 清除日志</button>
+      <button style="flex:1;padding:10px;border-radius:var(--radius-sm);background:var(--color-bg);border:1px solid var(--color-border);font-size:12px;font-weight:500;cursor:pointer;" onclick="reloadApp()">🔄 重新加载</button>
+      <button style="flex:1;padding:10px;border-radius:var(--radius-sm);background:var(--color-bg);border:1px solid var(--color-border);font-size:12px;font-weight:500;cursor:pointer;" onclick="inspectElement()">🔍 检查元素</button>
+    </div>
+
+  </main>
+
+  <div id="tabbar"></div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+// --- Console ---
+function renderConsole() {
+  const container = document.getElementById('tab-console');
+  container.innerHTML = MOCK.devLogs.map(l => {
+    const cls = l.level === 'warn' ? 'log-warn' : (l.level === 'error' ? 'log-error' : 'log-info');
+    return `<div class="log-line"><span class="log-time">${l.time}</span> <span class="${cls}">[${l.level.toUpperCase()}]</span> ${l.msg}</div>`;
+  }).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+// --- Network ---
+function renderNetwork() {
+  const container = document.getElementById('tab-network');
+  container.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead>
+        <tr style="border-bottom:1px solid #334155;">
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;">方法</th>
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;">URL</th>
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;">状态</th>
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;">耗时</th>
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;">大小</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${MOCK.networkRequests.map(r => {
+          const statusColor = r.status < 300 ? '#10b981' : (r.status < 400 ? '#f59e0b' : '#ef4444');
+          return `<tr style="border-bottom:1px solid #1e293b;">
+            <td style="padding:5px 8px;"><span style="color:#60a5fa;">${r.method}</span></td>
+            <td style="padding:5px 8px;color:#e2e8f0;">${r.url}</td>
+            <td style="padding:5px 8px;color:${statusColor};">${r.status}</td>
+            <td style="padding:5px 8px;color:#94a3b8;">${r.time}</td>
+            <td style="padding:5px 8px;color:#94a3b8;">${r.size}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// --- Storage ---
+function renderStorage() {
+  const container = document.getElementById('tab-storage');
+  const storageData = [
+    { key: 'blog_draft_1', value: '{"title":"Rust 异步编程","content":"..."}', size: '2.1 KB' },
+    { key: 'blog_user_prefs', value: '{"theme":"light","fontSize":14}', size: '0.1 KB' },
+    { key: 'blog_auth_token', value: '"eyJhbGciOiJIUzI1NiIs..."', size: '0.3 KB' },
+    { key: 'blog_cache_articles', value: '[{"id":1,"title":"..."},...]', size: '1.8 KB' },
+  ];
+  container.innerHTML = `
+    <div style="margin-bottom:8px;color:#94a3b8;font-size:10px;">localStorage · 4 项 · 4.3 KB</div>
+    ${storageData.map(s => `
+      <div style="padding:6px 0;border-bottom:1px solid #334155;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:#60a5fa;font-weight:500;">${s.key}</span>
+          <span style="margin-left:auto;color:#64748b;font-size:10px;">${s.size}</span>
+        </div>
+        <div style="color:#94a3b8;font-size:10px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${s.value}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+// --- Tab Switch ---
+function switchDevTab(tab, el) {
+  document.querySelectorAll('.devtools-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-console').style.display = tab === 'console' ? 'block' : 'none';
+  document.getElementById('tab-network').style.display = tab === 'network' ? 'block' : 'none';
+  document.getElementById('tab-storage').style.display = tab === 'storage' ? 'block' : 'none';
+}
+
+// --- Actions ---
+function clearConsole() {
+  document.getElementById('tab-console').innerHTML = '<div class="log-line" style="color:#64748b;">Console cleared</div>';
+}
+
+function reloadApp() {
+  const console = document.getElementById('tab-console');
+  const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  console.innerHTML += `<div class="log-line"><span class="log-time">${time}</span> <span class="log-info">[INFO]</span> App reloaded</div>`;
+  console.scrollTop = console.scrollHeight;
+}
+
+function inspectElement() {
+  alert('检查元素模式（原型演示 — 实际会高亮 WebView 中的 DOM 元素）');
+}
+
+function switchDevApp() {
+  const appId = document.getElementById('appSelect').value;
+  const console = document.getElementById('tab-console');
+  const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  console.innerHTML += `<div class="log-line"><span class="log-time">${time}</span> <span class="log-info">[INFO]</span> Switched to app: ${appId}</div>`;
+  console.scrollTop = console.scrollHeight;
+}
+
+// --- Simulate live logs ---
+setInterval(() => {
+  const console = document.getElementById('tab-console');
+  if (console.style.display === 'none') return;
+  const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  const msgs = [
+    { level: 'info', msg: '[blog] GET /api/articles → 200 (8ms)' },
+    { level: 'info', msg: '[blog] WebSocket heartbeat sent' },
+    { level: 'info', msg: '[blog] Cache hit: articles_list' },
+  ];
+  const m = msgs[Math.floor(Math.random() * msgs.length)];
+  console.innerHTML += `<div class="log-line" style="animation:fadeIn 0.2s;"><span class="log-time">${time}</span> <span class="log-${m.level}">[${m.level.toUpperCase()}]</span> ${m.msg}</div>`;
+  console.scrollTop = console.scrollHeight;
+}, 4000);
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderConsole();
+  renderNetwork();
+  renderStorage();
+});
+</script>
+</body>
+</html>

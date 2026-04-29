@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Console — 工单管理</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Quantalithos</span>
+    <div class="breadcrumb"><span>博客系统</span><span class="sep">/</span><span class="current">工单管理</span></div>
+    <input class="search" type="text" placeholder="搜索工单...">
+    <div class="notification">🔔<span class="dot"></span></div>
+    <div class="user-avatar">A</div>
+  </header>
+
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">工单管理</div>
+          <div class="page-desc">5 个工单 · 3 个波次</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="viewToggle" onclick="toggleView()">📋 看板视图</button>
+          <button class="btn btn-primary">+ 创建工单</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-bar">
+        <span class="filter-chip active" onclick="filterWI('all',this)">全部 (5)</span>
+        <span class="filter-chip" onclick="filterWI('in_progress',this)">进行中</span>
+        <span class="filter-chip" onclick="filterWI('in_review',this)">审查中</span>
+        <span class="filter-chip" onclick="filterWI('completed',this)">已完成</span>
+        <span class="filter-chip" onclick="filterWI('pending',this)">待开始</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--color-text-muted);">排序：波次 ↑</span>
+      </div>
+
+      <!-- Table View -->
+      <div class="card" id="tableView">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>标题</th>
+              <th>状态</th>
+              <th>负责人</th>
+              <th>优先级</th>
+              <th>波次</th>
+              <th>依赖</th>
+            </tr>
+          </thead>
+          <tbody id="wiTableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Kanban View (hidden by default) -->
+      <div id="kanbanView" style="display:none;flex:1;overflow-x:auto;">
+        <div style="display:flex;gap:12px;min-width:max-content;" id="kanbanColumns"></div>
+      </div>
+
+      <!-- Detail Panel (inline) -->
+      <div class="card" id="detailPanel" style="display:none;">
+        <div class="card-header">
+          <span id="detailTitle">工单详情</span>
+          <button class="btn btn-sm btn-secondary" style="margin-left:auto;" onclick="closeDetail()">✕ 关闭</button>
+        </div>
+        <div class="card-body" id="detailBody"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let currentFilter = 'all';
+let isKanban = false;
+
+function filterWI(status, el) {
+  currentFilter = status;
+  document.querySelectorAll('.filter-bar .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+function getFiltered() {
+  if (currentFilter === 'all') return MOCK.workitems;
+  return MOCK.workitems.filter(w => w.status === currentFilter);
+}
+
+function renderTable() {
+  const items = getFiltered();
+  document.getElementById('wiTableBody').innerHTML = items.map(w => {
+    const a = MOCK.agents.find(x => x.id === w.assignee) || { name: '?', css: 'be' };
+    const prioColor = { high: 'var(--color-error)', medium: 'var(--color-warning)', low: 'var(--color-success)' }[w.priority];
+    return `<tr onclick="showDetail('${w.id}')" style="cursor:pointer;">
+      <td><code style="font-size:11px;color:var(--color-text-muted);">${w.id}</code></td>
+      <td style="font-weight:500;">${w.title}</td>
+      <td>${badge(w.status)}</td>
+      <td><div style="display:flex;align-items:center;gap:6px;"><span class="agent-avatar ${a.css}" style="width:22px;height:22px;font-size:9px;">${a.name}</span><span style="font-size:11px;">${a.name}</span></div></td>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${prioColor};"></span> ${w.priority}</td>
+      <td><span style="font-size:11px;padding:2px 6px;border-radius:3px;background:#f0f0f0;">W${w.wave}</span></td>
+      <td style="font-size:11px;color:var(--color-text-muted);">${w.deps.join(', ') || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderKanban() {
+  const cols = [
+    { id: 'pending', name: '待开始' },
+    { id: 'in_progress', name: '进行中' },
+    { id: 'in_review', name: '审查中' },
+    { id: 'in_testing', name: '测试中' },
+    { id: 'completed', name: '已完成' },
+  ];
+  document.getElementById('kanbanColumns').innerHTML = cols.map(col => {
+    const items = MOCK.workitems.filter(w => w.status === col.id);
+    return `<div style="width:240px;background:#f0f2f5;border-radius:var(--radius-xl);padding:12px;flex-shrink:0;">
+      <div style="font-size:12px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+        ${col.name} <span style="background:#ddd;color:#666;font-size:10px;padding:1px 5px;border-radius:8px;">${items.length}</span>
+      </div>
+      ${items.map(w => {
+        const a = MOCK.agents.find(x => x.id === w.assignee) || { name: '?', css: 'be' };
+        return `<div style="background:#fff;border-radius:var(--radius-lg);padding:10px;margin-bottom:8px;box-shadow:var(--shadow-sm);cursor:pointer;" onclick="showDetail('${w.id}')">
+          <div style="font-size:10px;color:var(--color-text-muted);margin-bottom:4px;">${w.id}</div>
+          <div style="font-size:12px;font-weight:500;margin-bottom:6px;">${w.title}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="agent-avatar ${a.css}" style="width:18px;height:18px;font-size:8px;">${a.name}</span>
+            <span style="font-size:10px;color:var(--color-text-muted);">${a.name}</span>
+          </div>
+        </div>`;
+      }).join('') || '<div style="text-align:center;padding:20px;font-size:11px;color:#999;">暂无</div>'}
+    </div>`;
+  }).join('');
+}
+
+function toggleView() {
+  isKanban = !isKanban;
+  document.getElementById('tableView').style.display = isKanban ? 'none' : 'block';
+  document.getElementById('kanbanView').style.display = isKanban ? 'flex' : 'none';
+  document.getElementById('viewToggle').textContent = isKanban ? '📊 表格视图' : '📋 看板视图';
+  if (isKanban) renderKanban();
+}
+
+function showDetail(id) {
+  const w = MOCK.workitems.find(x => x.id === id);
+  if (!w) return;
+  const a = MOCK.agents.find(x => x.id === w.assignee) || { name: '?', css: 'be', role_name: '未知' };
+  const panel = document.getElementById('detailPanel');
+  panel.style.display = 'block';
+  document.getElementById('detailTitle').textContent = `${w.id} — ${w.title}`;
+
+  const statuses = ['pending', 'in_progress', 'in_review', 'in_testing', 'completed'];
+  const idx = statuses.indexOf(w.status);
+
+  document.getElementById('detailBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <h4 style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px;">基本信息</h4>
+        <div style="display:grid;grid-template-columns:80px 1fr;gap:6px;font-size:12px;">
+          <span style="color:#999;">状态</span><span>${badge(w.status)}</span>
+          <span style="color:#999;">类型</span><span>${w.type}</span>
+          <span style="color:#999;">优先级</span><span>${w.priority}</span>
+          <span style="color:#999;">波次</span><span>Wave ${w.wave}</span>
+          <span style="color:#999;">依赖</span><span>${w.deps.join(', ') || '无'}</span>
+          <span style="color:#999;">负责人</span><span style="display:flex;align-items:center;gap:4px;"><span class="agent-avatar ${a.css}" style="width:18px;height:18px;font-size:8px;">${a.name}</span>${a.role_name}</span>
+        </div>
+      </div>
+      <div>
+        <h4 style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px;">状态流转</h4>
+        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+          ${statuses.map((s, i) => {
+            const bg = i < idx ? 'var(--color-success-light)' : (i === idx ? 'var(--color-primary-light)' : '#f5f5f5');
+            const color = i < idx ? 'var(--color-success)' : (i === idx ? 'var(--color-primary)' : '#999');
+            const labels = { pending:'待开始', in_progress:'开发', in_review:'审查', in_testing:'测试', completed:'完成' };
+            return `<span style="padding:3px 7px;border-radius:3px;font-size:10px;font-weight:500;background:${bg};color:${color};">${i < idx ? '✓ ' : ''}${labels[s]}</span>${i < statuses.length-1 ? '<span style="color:#ccc;font-size:10px;">→</span>' : ''}`;
+          }).join('')}
+        </div>
+        <h4 style="font-size:12px;color:var(--color-text-muted);margin:16px 0 8px;">执行轨迹</h4>
+        <div class="timeline">
+          <div class="timeline-item"><div class="tl-dot" style="background:var(--color-success-light);color:var(--color-success);">✓</div><div class="tl-content"><div class="tl-title">工单创建</div><div class="tl-time">09:06</div></div></div>
+          ${w.status !== 'pending' ? '<div class="timeline-item"><div class="tl-dot" style="background:var(--color-primary-light);color:var(--color-primary);">▶</div><div class="tl-content"><div class="tl-title">开始执行（TDD 工作流）</div><div class="tl-time">09:10</div></div></div>' : ''}
+          ${w.status === 'in_review' || w.status === 'completed' ? '<div class="timeline-item"><div class="tl-dot" style="background:var(--color-info-light);color:var(--color-info);">👀</div><div class="tl-content"><div class="tl-title">提交代码审查</div><div class="tl-time">10:15</div></div></div>' : ''}
+          ${w.status === 'completed' ? '<div class="timeline-item"><div class="tl-dot" style="background:var(--color-success-light);color:var(--color-success);">✅</div><div class="tl-content"><div class="tl-title">审查通过，标记完成</div><div class="tl-time">10:20</div></div></div>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => { renderTable(); });
+</script>
+</body>
+</html>

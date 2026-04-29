@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Chat — 项目进度</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="components.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- Left Navigation -->
+  <nav class="nav-bar">
+    <div class="nav-item" data-page="chat" title="聊天">💬</div>
+    <div class="nav-item active" data-page="progress" title="进度">📊</div>
+    <div class="nav-item" data-page="kanban" title="看板">📋</div>
+    <div class="nav-item" data-page="artifacts" title="产物">📁</div>
+    <div class="nav-spacer"></div>
+    <div class="nav-item" title="设置">⚙️</div>
+    <div class="nav-avatar">A</div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content" style="padding:0;">
+
+    <!-- Header -->
+    <div class="main-header">
+      <span class="title">博客系统 · 项目进度</span>
+      <span class="subtitle">迭代开发阶段 · 3/5 任务完成</span>
+    </div>
+
+    <!-- Pipeline Bar -->
+    <div style="padding:16px 24px;background:#fff;border-bottom:1px solid var(--color-border);">
+      <div id="pipelineBar"></div>
+    </div>
+
+    <!-- BPMN + Detail Split -->
+    <div style="display:flex;flex:1;overflow:hidden;">
+
+      <!-- BPMN Canvas -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:auto;">
+        <div style="padding:16px 24px 8px;font-size:14px;font-weight:600;color:var(--color-text);">
+          当前阶段：迭代开发
+          <span class="status-badge running" style="margin-left:8px;">进行中</span>
+        </div>
+        <div class="bpmn-canvas" id="bpmnCanvas" style="min-height:300px;position:relative;">
+          <!-- SVG edges rendered here -->
+          <svg id="bpmnEdges" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></svg>
+          <!-- Nodes rendered here -->
+        </div>
+
+        <!-- Gate History -->
+        <div style="padding:16px 24px;border-top:1px solid var(--color-border-light);">
+          <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);margin-bottom:10px;">门禁审批历史</div>
+          <div style="display:flex;flex-direction:column;gap:8px;" id="gateHistory"></div>
+        </div>
+      </div>
+
+      <!-- Node Detail Panel -->
+      <aside class="detail-panel" id="nodeDetail">
+        <div class="panel-header">
+          节点详情
+          <span class="close-btn" onclick="document.getElementById('nodeDetail').style.display='none'">✕</span>
+        </div>
+        <div class="panel-body" id="nodeDetailBody">
+          <div class="empty-state">
+            <div class="empty-icon">👆</div>
+            <div class="empty-text">点击流程图中的节点查看详情</div>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+// --- Render BPMN Flow ---
+function renderBpmn() {
+  const canvas = document.getElementById('bpmnCanvas');
+  const svg = document.getElementById('bpmnEdges');
+
+  // Render nodes
+  MOCK.bpmnNodes.forEach(node => {
+    const el = document.createElement('div');
+    el.className = `bpmn-node`;
+    el.style.left = node.x + 'px';
+    el.style.top = node.y + 'px';
+    el.dataset.nodeId = node.id;
+    el.onclick = () => showNodeDetail(node);
+
+    if (node.type === 'event') {
+      el.innerHTML = `<div class="bpmn-node-event" style="border-color:${getStatusColor(node.status)}">
+        ${node.id === 'start' ? '▶' : '■'}
+      </div>`;
+    } else if (node.type === 'gateway') {
+      el.innerHTML = `<div class="bpmn-node-gateway" style="border-color:${getStatusColor(node.status)}">
+        <span>✕</span>
+      </div>`;
+    } else {
+      el.innerHTML = `<div class="bpmn-node-task ${node.status}">
+        <div style="font-weight:500;margin-bottom:2px;">${node.name}</div>
+        <div style="font-size:10px;color:#999;">${node.actor || ''}</div>
+      </div>`;
+    }
+    canvas.appendChild(el);
+  });
+
+  // Render edges (SVG lines)
+  let svgContent = '';
+  MOCK.bpmnEdges.forEach(edge => {
+    const from = MOCK.bpmnNodes.find(n => n.id === edge.from);
+    const to = MOCK.bpmnNodes.find(n => n.id === edge.to);
+    if (!from || !to) return;
+
+    const x1 = from.x + (from.type === 'task' ? 120 : 36);
+    const y1 = from.y + 18;
+    const x2 = to.x;
+    const y2 = to.y + 18;
+
+    const color = from.status === 'completed' ? 'var(--color-success)' : '#ccc';
+    svgContent += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2" marker-end="url(#arrow)"/>`;
+
+    // Edge label
+    if (edge.label) {
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2 - 8;
+      svgContent += `<text x="${mx}" y="${my}" font-size="10" fill="#999" text-anchor="middle">${edge.label}</text>`;
+    }
+  });
+
+  svg.innerHTML = `
+    <defs>
+      <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#999"/>
+      </marker>
+    </defs>
+    ${svgContent}
+  `;
+}
+
+function getStatusColor(status) {
+  const map = { completed: 'var(--color-success)', running: 'var(--color-primary)', pending: '#ccc', failed: 'var(--color-error)' };
+  return map[status] || '#ccc';
+}
+
+// --- Node Detail ---
+function showNodeDetail(node) {
+  // Highlight selected
+  document.querySelectorAll('.bpmn-node').forEach(el => el.querySelector('.bpmn-node-task,.bpmn-node-event,.bpmn-node-gateway')?.classList.remove('selected'));
+
+  const panel = document.getElementById('nodeDetail');
+  panel.style.display = 'flex';
+  const body = document.getElementById('nodeDetailBody');
+
+  if (node.type === 'event') {
+    body.innerHTML = `
+      <div class="panel-section">
+        <div class="panel-section-title">事件节点</div>
+        <p style="font-size:13px;">${node.id === 'start' ? '流程开始' : '流程结束'}</p>
+        <div style="margin-top:8px;">${renderStatusBadge(node.status)}</div>
+      </div>`;
+    return;
+  }
+
+  if (node.type === 'gateway') {
+    body.innerHTML = `
+      <div class="panel-section">
+        <div class="panel-section-title">排他网关</div>
+        <p style="font-size:13px;">条件分支：根据审查结果决定走向</p>
+        <div style="margin-top:8px;">${renderStatusBadge(node.status)}</div>
+        <div style="margin-top:12px;font-size:12px;color:#666;">
+          <div>→ approved: 进入测试</div>
+          <div>→ changes: 回到修复</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Task node
+  const agent = MOCK.agents.find(a => a.role_name.includes(node.actor?.replace('BE/FE','开发'))) || MOCK.agents[1];
+  const relatedTasks = MOCK.workitems.filter(w => w.status === 'in_progress' || w.status === 'in_review');
+
+  body.innerHTML = `
+    <div class="panel-section">
+      <div class="panel-section-title">任务节点</div>
+      <h3 style="font-size:15px;margin-bottom:8px;">${node.name}</h3>
+      <div style="margin-bottom:12px;">${renderStatusBadge(node.status)}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        ${renderAgentAvatar(agent.id, 24)}
+        <span style="font-size:12px;">${agent.role_name} (${agent.name})</span>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">关联工单</div>
+      ${relatedTasks.map(t => `
+        <div class="workitem-card" style="padding:8px 10px;margin-bottom:6px;">
+          <div class="wi-title">${t.id} ${t.title}</div>
+          <div class="wi-meta">
+            ${renderStatusBadge(t.status)}
+            <span class="wi-id" style="margin-left:auto;">${t.assignee}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">执行统计</div>
+      <div style="font-size:12px;color:#666;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div>⏱ 耗时：25 分钟</div>
+        <div>🔧 工具调用：8 次</div>
+        <div>🤖 LLM 调用：12 次</div>
+        <div>📊 Token：4,200</div>
+      </div>
+    </div>
+  `;
+}
+
+// --- Gate History ---
+function renderGateHistory() {
+  const container = document.getElementById('gateHistory');
+  const history = [
+    { stage: '目标校准', type: 'soft', status: 'auto_approved', time: '04-25 09:30' },
+    { stage: '需求理解', type: 'hard', status: 'approved', time: '04-25 12:00', comment: '需求清晰，可以进入设计' },
+    { stage: '方案拆解', type: 'hard', status: 'approved', time: '04-26 10:00', comment: '技术方案合理' },
+  ];
+  container.innerHTML = history.map(g => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f9f9f9;border-radius:6px;">
+      <span style="font-size:14px;">${g.status === 'approved' || g.status === 'auto_approved' ? '✅' : '❌'}</span>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:500;">${g.stage}</div>
+        <div style="font-size:11px;color:#999;">${g.comment || (g.status === 'auto_approved' ? '自动通过' : '')}</div>
+      </div>
+      <span class="status-badge ${g.type === 'hard' ? 'in-review' : 'pending'}" style="font-size:10px;">${g.type}</span>
+      <span style="font-size:10px;color:#999;">${g.time}</span>
+    </div>
+  `).join('');
+}
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', () => {
+  renderPipelineBar(document.getElementById('pipelineBar'));
+  renderBpmn();
+  renderGateHistory();
+});
+</script>
+</body>
+</html>

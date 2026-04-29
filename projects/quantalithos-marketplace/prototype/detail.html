@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Marketplace — 资产详情</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Marketplace</span>
+    <div class="nav-links">
+      <span class="nav-link active" data-page="browse">浏览</span>
+      <span class="nav-link" data-page="publish">发布</span>
+      <span class="nav-link" data-page="profile">我的</span>
+    </div>
+    <input class="search" type="text" placeholder="搜索...">
+    <div class="user-avatar">A</div>
+  </header>
+
+  <main class="main-content" id="detailContent"></main>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const assetId = params.get('id') || 'tdd-workflow';
+  const asset = MOCK.assets.find(a => a.id === assetId) || MOCK.assets[0];
+
+  document.getElementById('detailContent').innerHTML = `
+    <!-- Back -->
+    <div style="margin-bottom:16px;">
+      <a href="index.html" style="font-size:12px;color:var(--color-text-muted);">← 返回市场</a>
+    </div>
+
+    <div class="detail-layout">
+      <!-- Main -->
+      <div class="detail-main">
+
+        <!-- Header -->
+        <div class="detail-header">
+          <div class="detail-icon">${asset.icon}</div>
+          <div class="detail-info">
+            <div class="detail-title">${asset.name}</div>
+            <div class="detail-meta">
+              <span class="badge ${typeBadgeClass(asset.type)}">${typeLabel(asset.type)}</span>
+              · ${asset.version} · 作者: ${asset.author}
+            </div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="detail-section">
+          <div class="section-title">描述</div>
+          <p style="font-size:13px;line-height:1.7;color:var(--color-text-secondary);">
+            ${asset.desc}
+          </p>
+          <p style="font-size:13px;line-height:1.7;color:var(--color-text-secondary);margin-top:10px;">
+            此${typeLabel(asset.type)}可以直接导入到你的项目中使用。导入后会自动注册到 platform 对应的数据表中，
+            无需手动配置。支持版本更新和回滚。
+          </p>
+        </div>
+
+        <!-- Screenshots / Preview -->
+        <div class="detail-section">
+          <div class="section-title">预览</div>
+          <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;">
+            <div style="width:200px;height:130px;border-radius:var(--radius-md);background:linear-gradient(135deg,#e0e7ff,#c7d2fe);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--color-text-muted);">流程图预览</div>
+            <div style="width:200px;height:130px;border-radius:var(--radius-md);background:linear-gradient(135deg,#dbeafe,#bfdbfe);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--color-text-muted);">YAML 配置</div>
+            <div style="width:200px;height:130px;border-radius:var(--radius-md);background:linear-gradient(135deg,#e0f2fe,#bae6fd);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--color-text-muted);">使用示例</div>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="detail-section">
+          <div class="section-title">标签</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${asset.tags.map(t => `<span style="padding:4px 12px;border-radius:12px;background:var(--color-bg);font-size:12px;color:var(--color-text-secondary);border:1px solid var(--color-border);">${t}</span>`).join('')}
+          </div>
+        </div>
+
+        <!-- Reviews -->
+        <div class="detail-section">
+          <div class="section-title">评价 (${asset.reviews})</div>
+          ${MOCK.reviews.map(r => `
+            <div class="review-item">
+              <div class="review-header">
+                <span class="review-author">${r.author}</span>
+                ${renderStars(r.rating)}
+                <span class="review-date">${r.date}</span>
+              </div>
+              <div class="review-text">${r.text}</div>
+            </div>
+          `).join('')}
+        </div>
+
+      </div>
+
+      <!-- Sidebar -->
+      <div class="detail-sidebar">
+
+        <!-- Import Action -->
+        <div class="sidebar-card">
+          <button class="btn btn-primary btn-block" onclick="importAsset('${asset.id}')">⬇ 导入到项目</button>
+          <button class="btn btn-secondary btn-block" style="margin-top:8px;" onclick="addFavorite()">⭐ 收藏</button>
+        </div>
+
+        <!-- Stats -->
+        <div class="sidebar-card">
+          <div class="sc-title">统计</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
+            <div><span style="color:var(--color-text-muted);">下载量</span><div style="font-size:16px;font-weight:700;margin-top:2px;">${asset.downloads}</div></div>
+            <div><span style="color:var(--color-text-muted);">评分</span><div style="font-size:16px;font-weight:700;margin-top:2px;">⭐ ${asset.rating}</div></div>
+            <div><span style="color:var(--color-text-muted);">版本</span><div style="font-size:14px;font-weight:600;margin-top:2px;">${asset.version}</div></div>
+            <div><span style="color:var(--color-text-muted);">评价数</span><div style="font-size:14px;font-weight:600;margin-top:2px;">${asset.reviews}</div></div>
+          </div>
+        </div>
+
+        <!-- Info -->
+        <div class="sidebar-card">
+          <div class="sc-title">信息</div>
+          <div style="font-size:12px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;"><span style="color:var(--color-text-muted);">作者</span><span>${asset.author}</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:var(--color-text-muted);">类型</span><span>${typeLabel(asset.type)}</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:var(--color-text-muted);">许可</span><span>MIT</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:var(--color-text-muted);">兼容版本</span><span>≥ 0.1.0</span></div>
+          </div>
+        </div>
+
+        <!-- Version History -->
+        <div class="sidebar-card">
+          <div class="sc-title">版本历史</div>
+          <div style="font-size:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="padding:2px 6px;background:var(--color-primary-light);color:var(--color-primary);border-radius:4px;font-size:10px;font-weight:600;">${asset.version}</span>
+              <span style="color:var(--color-text-muted);">最新</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="padding:2px 6px;background:var(--color-bg);border-radius:4px;font-size:10px;">v1.0</span>
+              <span style="color:var(--color-text-muted);">初始版本</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+});
+
+function importAsset(id) {
+  if (confirm('确认导入到当前项目？\\n\\n将导入到 platform 对应的数据表中。')) {
+    alert('✅ 导入成功！已添加到项目配置中。');
+  }
+}
+
+function addFavorite() {
+  alert('⭐ 已添加到收藏');
+}
+</script>
+</body>
+</html>

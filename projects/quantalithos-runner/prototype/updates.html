@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantalithos Runner — 更新管理</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <span class="logo">◆ Runner</span>
+    <span class="title" style="font-size:15px;font-weight:600;">更新</span>
+    <div class="actions">
+      <div class="icon-btn" onclick="checkUpdates()">🔄</div>
+    </div>
+  </header>
+
+  <main class="main-content" id="updateContent">
+
+    <!-- Update Available -->
+    <div style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font-size:14px;font-weight:600;">可用更新</span>
+        <button style="padding:6px 14px;border-radius:8px;background:var(--color-primary);color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;" onclick="updateAll()">全部更新</button>
+      </div>
+
+      <div id="updateList"></div>
+    </div>
+
+    <!-- Up to date -->
+    <div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;">已是最新</div>
+      <div id="upToDateList"></div>
+    </div>
+
+  </main>
+
+  <div id="tabbar"></div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+function renderUpdates() {
+  // Updates available
+  const updateList = document.getElementById('updateList');
+  if (MOCK.updates.length === 0) {
+    updateList.innerHTML = `<div style="text-align:center;padding:24px;color:var(--color-text-muted);font-size:13px;">🎉 所有应用已是最新版本</div>`;
+  } else {
+    updateList.innerHTML = MOCK.updates.map(u => `
+      <div class="update-item" id="update-${u.id}">
+        <span class="update-icon">${u.icon}</span>
+        <div class="update-info">
+          <div class="update-name">${u.name}</div>
+          <div class="update-version">${u.current} → ${u.latest} · ${u.size}</div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">${u.note}</div>
+          <div class="progress-bar" id="progress-${u.id}" style="display:none;">
+            <div class="progress-fill" style="width:0%;"></div>
+          </div>
+        </div>
+        <div class="update-btn" id="btn-${u.id}" onclick="updateApp('${u.id}')">更新</div>
+      </div>
+    `).join('');
+  }
+
+  // Up to date
+  const upToDate = MOCK.apps.filter(a => a.status !== 'update');
+  document.getElementById('upToDateList').innerHTML = upToDate.map(app => `
+    <div class="update-item" style="opacity:0.7;">
+      <span class="update-icon">${app.icon}</span>
+      <div class="update-info">
+        <div class="update-name">${app.name}</div>
+        <div class="update-version">${app.version} · 已是最新</div>
+      </div>
+      <span style="font-size:11px;color:var(--color-success);font-weight:500;">✓</span>
+    </div>
+  `).join('');
+}
+
+function updateApp(id) {
+  const btn = document.getElementById(`btn-${id}`);
+  const progress = document.getElementById(`progress-${id}`);
+  btn.textContent = '下载中...';
+  btn.style.background = 'var(--color-text-muted)';
+  btn.style.pointerEvents = 'none';
+  progress.style.display = 'block';
+
+  let pct = 0;
+  const fill = progress.querySelector('.progress-fill');
+  const interval = setInterval(() => {
+    pct += Math.random() * 15 + 5;
+    if (pct >= 100) {
+      pct = 100;
+      clearInterval(interval);
+      fill.style.width = '100%';
+      btn.textContent = '✓ 完成';
+      btn.style.background = 'var(--color-success)';
+      setTimeout(() => {
+        document.getElementById(`update-${id}`).style.opacity = '0.5';
+      }, 500);
+    } else {
+      fill.style.width = pct + '%';
+    }
+  }, 300);
+}
+
+function updateAll() {
+  MOCK.updates.forEach(u => updateApp(u.id));
+}
+
+function checkUpdates() {
+  alert('正在检查更新...\n（原型演示 — 实际会调用 platform API）');
+}
+
+document.addEventListener('DOMContentLoaded', renderUpdates);
+</script>
+</body>
+</html>

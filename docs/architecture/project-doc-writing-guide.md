@@ -675,7 +675,7 @@ main()
 错误：`interfaces parse failed, reason: ip literal is not allowed, value: 10.10.0.2`
 
 修复：改为网卡名 `["eth0"]`。
-```
+
 
 ### 写法要点
 

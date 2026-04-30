@@ -89,6 +89,7 @@ quantalithos-ai/
     ├── quantalithos-console/     # 云端管理后台
     ├── quantalithos-gate/        # API 网关
     ├── quantalithos-sandbox/     # 项目沙箱环境
+    ├── quantalithos-testbed/     # 跨平台真机测试
     ├── quantalithos-runner/      # 跨平台运行器
     ├── quantalithos-sync/        # 工作区同步
     ├── quantalithos-marketplace/ # 资产市场

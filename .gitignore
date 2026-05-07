@@ -1,0 +1,54 @@
+# .gitignore
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editor — VSCode
+.vscode/
+*.code-workspace
+
+# Editor — JetBrains
+.idea/
+*.iml
+
+# Editor — Vim
+*.swp
+*.swo
+
+# Editor — Sublime
+*.sublime-project
+*.sublime-workspace
+
+# Node / npm / misc build artifacts (for future tooling)
+node_modules/
+dist/
+build/
+*.log
+
+# Python virtualenv / caches (for future tooling)
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Local claude / codex artifacts
+.codex
+
+# Secrets (safety net)
+.env
+.env.local
+*.pem
+*.key

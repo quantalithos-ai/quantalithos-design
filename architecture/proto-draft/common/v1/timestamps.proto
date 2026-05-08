@@ -1,0 +1,52 @@
+// Quantalithos core · common/v1/timestamps.proto
+//
+// 时间相关辅助类型。base 使用 google.protobuf.Timestamp。
+//
+// 草案阶段:✅ 字段稳定。
+
+syntax = "proto3";
+
+package quantalithos.common.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "quantalithos/common/v1";
+
+// DateRange 时间段(两端均为可选,表达"开放式区间")。
+message DateRange {
+  optional google.protobuf.Timestamp start_at = 1;
+  optional google.protobuf.Timestamp end_at = 2;
+}
+
+// RetentionPolicy 数据保留策略。governance Policy / Artifact / Memory 等多处使用。
+message RetentionPolicy {
+  google.protobuf.Duration retention_duration = 1;
+  RetentionAction on_expire = 2;
+  string legal_hold_reason = 3;               // 可空;若有则不执行 on_expire
+}
+
+enum RetentionAction {
+  RETENTION_ACTION_UNSPECIFIED = 0;
+  RETENTION_ACTION_ARCHIVE = 1;               // 移入冷存,保留
+  RETENTION_ACTION_ANONYMIZE = 2;             // 匿名化
+  RETENTION_ACTION_DELETE = 3;                // 物理删除(合规触发,极罕见)
+  RETENTION_ACTION_NONE = 4;                  // 永久保留
+}
+
+// CadenceSpec 周期触发(如 Control 复评 / Management Review)。
+message CadenceSpec {
+  enum Kind {
+    CADENCE_UNSPECIFIED = 0;
+    CADENCE_ONE_TIME = 1;
+    CADENCE_DAILY = 2;
+    CADENCE_WEEKLY = 3;
+    CADENCE_MONTHLY = 4;
+    CADENCE_QUARTERLY = 5;
+    CADENCE_ANNUALLY = 6;
+    CADENCE_EVENT_DRIVEN = 7;
+    CADENCE_CRON = 8;                         // 任意 cron 表达式(用 cron_expr)
+  }
+  Kind kind = 1;
+  string cron_expr = 2;                       // 仅 CADENCE_CRON 使用
+}

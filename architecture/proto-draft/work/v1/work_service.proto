@@ -1,0 +1,692 @@
+// Quantalithos core · work/v1/work_service.proto
+//
+// 工作域 RPC:Project + ProjectMember + WorkItem + Iteration + Backlog
+// 上游:domain/work/README.md §三
+// 草案阶段:✅
+
+syntax = "proto3";
+
+package quantalithos.work.v1;
+
+import "common/v1/ids.proto";
+import "common/v1/audit.proto";
+import "common/v1/timestamps.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "quantalithos/work/v1";
+
+// ============================================================
+// Service
+// ============================================================
+
+service WorkService {
+  // === Project 管理 ===
+  rpc CreateProject(CreateProjectRequest) returns (CreateProjectResponse);
+  rpc StartProject(StartProjectRequest) returns (StartProjectResponse);
+  rpc PauseProject(PauseProjectRequest) returns (PauseProjectResponse);
+  rpc ResumeProject(ResumeProjectRequest) returns (ResumeProjectResponse);
+  rpc ArchiveProject(ArchiveProjectRequest) returns (ArchiveProjectResponse);
+  rpc RestoreProject(RestoreProjectRequest) returns (RestoreProjectResponse);
+  rpc DissolveProject(DissolveProjectRequest) returns (DissolveProjectResponse);
+
+  rpc UpdateContextOfUse(UpdateContextOfUseRequest) returns (UpdateContextOfUseResponse);
+  rpc AttachAIIA(AttachAIIARequest) returns (AttachAIIAResponse);
+  rpc GetProject(GetProjectRequest) returns (Project);
+  rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
+
+  // === ProjectMember 管理 ===
+  rpc AssignMember(AssignMemberRequest) returns (AssignMemberResponse);
+  rpc ActivateProjectMember(ActivateProjectMemberRequest) returns (ActivateProjectMemberResponse);
+  rpc PauseProjectMember(PauseProjectMemberRequest) returns (PauseProjectMemberResponse);
+  rpc ResumeProjectMember(ResumeProjectMemberRequest) returns (ResumeProjectMemberResponse);
+  rpc RetireMemberFromProject(RetireMemberFromProjectRequest) returns (RetireMemberFromProjectResponse);
+  rpc UpdateToolScope(UpdateToolScopeRequest) returns (UpdateToolScopeResponse);
+  rpc UpdatePolicyOverrides(UpdatePolicyOverridesRequest) returns (UpdatePolicyOverridesResponse);
+
+  rpc GetProjectMember(GetProjectMemberRequest) returns (ProjectMember);
+  rpc ListProjectMembers(ListProjectMembersRequest) returns (ListProjectMembersResponse);
+
+  // === WorkItem 管理 ===
+  rpc CreateWorkItem(CreateWorkItemRequest) returns (CreateWorkItemResponse);
+  rpc UpdateWorkItem(UpdateWorkItemRequest) returns (UpdateWorkItemResponse);
+  rpc TransitionWorkItemState(TransitionWorkItemStateRequest) returns (TransitionWorkItemStateResponse);
+  rpc AssignWorkItem(AssignWorkItemRequest) returns (AssignWorkItemResponse);
+  rpc AddDependency(AddDependencyRequest) returns (AddDependencyResponse);
+
+  rpc GetWorkItem(GetWorkItemRequest) returns (WorkItem);
+  rpc ListWorkItems(ListWorkItemsRequest) returns (ListWorkItemsResponse);
+
+  // === Iteration 管理 ===
+  rpc PlanIteration(PlanIterationRequest) returns (PlanIterationResponse);
+  rpc StartIteration(StartIterationRequest) returns (StartIterationResponse);
+  rpc CloseIteration(CloseIterationRequest) returns (CloseIterationResponse);
+  rpc CancelIteration(CancelIterationRequest) returns (CancelIterationResponse);
+  rpc GetIteration(GetIterationRequest) returns (Iteration);
+
+  // === Backlog 管理 ===
+  rpc AddToBacklog(AddToBacklogRequest) returns (AddToBacklogResponse);
+  rpc ReorderBacklog(ReorderBacklogRequest) returns (ReorderBacklogResponse);
+  rpc RefineBacklog(RefineBacklogRequest) returns (RefineBacklogResponse);
+  rpc GetBacklog(GetBacklogRequest) returns (Backlog);
+
+  // === 看板 / Board 视图 ===
+  rpc GetProjectBoard(GetProjectBoardRequest) returns (ProjectBoard);
+}
+
+// ============================================================
+// 聚合根
+// ============================================================
+
+message Project {
+  common.v1.ProjectId project_id = 1;
+  common.v1.UserId owner_user_id = 2;
+  string title = 3;
+  string description = 4;
+  ContextOfUse context_of_use = 5;
+  common.v1.TemplateId process_template_id = 6;
+  common.v1.ProfileId process_profile_id = 7;
+  common.v1.InstanceId process_instance_id = 8;
+  repeated common.v1.ProjectMemberId project_members = 9;
+  common.v1.BacklogId backlog_id = 10;
+  common.v1.IterationId current_iteration_id = 11;
+  repeated common.v1.IterationId iteration_history = 12;
+  repeated common.v1.BaselineId baseline_ids = 13;
+  common.v1.ArtifactId aiia_ref = 14;
+  ProjectLifecycle lifecycle = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp started_at = 17;
+  google.protobuf.Timestamp archived_at = 18;
+  google.protobuf.Timestamp dissolved_at = 19;
+  common.v1.TraceId trace_id = 20;
+  common.v1.AuditLogRef audit_log_ref = 21;
+  uint64 version = 22;
+}
+
+enum ProjectLifecycle {
+  PROJECT_LIFECYCLE_UNSPECIFIED = 0;
+  PROJECT_LIFECYCLE_DRAFT = 1;
+  PROJECT_LIFECYCLE_ACTIVE = 2;
+  PROJECT_LIFECYCLE_PAUSED = 3;
+  PROJECT_LIFECYCLE_ARCHIVED = 4;
+  PROJECT_LIFECYCLE_DISSOLVED = 5;
+}
+
+message ContextOfUse {
+  repeated UserProfile target_users = 1;
+  DeploymentEnv deployment_env = 2;
+  repeated string compliance_profile = 3;        // "gdpr" / "hipaa" / "eu_ai_act"
+  repeated string quality_priorities = 4;        // 25010 特性名
+}
+
+message UserProfile {
+  string persona = 1;
+  string description = 2;
+  uint32 estimated_count = 3;
+}
+
+message DeploymentEnv {
+  string kind = 1;                               // "saas" / "self_hosted" / "on_premises"
+  string region = 2;
+  map<string, string> properties = 3;
+}
+
+// === ProjectMember ===
+message ProjectMember {
+  common.v1.ProjectMemberId project_member_id = 1;
+  common.v1.ProjectId project_id = 2;
+  common.v1.MemberId global_member_id = 3;
+  common.v1.RoleId role_in_project = 4;
+  ToolScope tool_scope = 5;
+  PolicyOverrides policy_overrides = 6;
+  common.v1.Ulid memory_slot_ref = 7;            // 指向 identity.EpisodicMemoryRef
+  repeated common.v1.WorkItemId current_workitems = 8;
+  repeated WorkItemHistoryEntry workitem_history = 9;
+  ProjectMemberLifecycle lifecycle = 10;
+  google.protobuf.Timestamp assigned_at = 11;
+  google.protobuf.Timestamp activated_at = 12;
+  google.protobuf.Timestamp paused_at = 13;
+  google.protobuf.Timestamp retired_from_project_at = 14;
+  string career_entry_ref = 15;                  // identity.CareerEntry.entry_id
+  common.v1.TraceId trace_id = 16;
+}
+
+enum ProjectMemberLifecycle {
+  PROJECT_MEMBER_LIFECYCLE_UNSPECIFIED = 0;
+  PROJECT_MEMBER_LIFECYCLE_ASSIGNED = 1;
+  PROJECT_MEMBER_LIFECYCLE_ACTIVE = 2;
+  PROJECT_MEMBER_LIFECYCLE_PAUSED = 3;
+  PROJECT_MEMBER_LIFECYCLE_RETIRED_FROM_PROJECT = 4;
+  PROJECT_MEMBER_LIFECYCLE_ARCHIVED = 5;
+}
+
+message ToolScope {
+  repeated string allowed_tools = 1;
+  repeated string denied_tools = 2;
+  repeated ToolGrantEvidence extra_grants = 3;
+}
+
+message ToolGrantEvidence {
+  string tool_id = 1;
+  common.v1.GateId approval_gate_id = 2;
+  string rationale = 3;
+}
+
+message PolicyOverrides {
+  common.v1.AutonomyLevel autonomy_level = 1;
+  repeated string shared_rules_refs = 2;
+  repeated ApprovalRule approval_requirements = 3;
+}
+
+message ApprovalRule {
+  string rule_id = 1;
+  string condition_expr = 2;
+  string required_approver = 3;
+}
+
+message WorkItemHistoryEntry {
+  common.v1.WorkItemId workitem_id = 1;
+  google.protobuf.Timestamp assigned_at = 2;
+  google.protobuf.Timestamp left_at = 3;
+}
+
+// === WorkItem ===
+message WorkItem {
+  common.v1.WorkItemId workitem_id = 1;
+  common.v1.ProjectId project_id = 2;
+  WorkItemKind kind = 3;
+  string title = 4;
+  string description = 5;
+  repeated AcceptanceCriterion acceptance_criteria = 6;
+  EffortEstimate estimated_effort = 7;
+  EffortEstimate actual_effort = 8;
+  Priority priority = 9;
+  common.v1.ProjectMemberId assignee = 10;
+  repeated common.v1.ProjectMemberId reviewers = 11;
+  repeated common.v1.ActorRef watchers = 12;
+  repeated common.v1.WorkItemId depends_on = 13;
+  repeated common.v1.WorkItemId blocks = 14;
+  string blocker_note = 15;
+  common.v1.IterationId iteration_id = 16;
+  repeated common.v1.ArtifactId related_artifacts = 17;
+  repeated common.v1.TurnId related_turns = 18;
+  common.v1.WorkItemId parent_workitem_id = 19;
+  WorkItemState state = 20;
+  repeated StateTransition state_history = 21;
+  NFRSpec nfr_spec = 22;
+  google.protobuf.Timestamp created_at = 23;
+  google.protobuf.Timestamp updated_at = 24;
+  common.v1.TraceId trace_id = 25;
+  uint64 version = 26;
+}
+
+enum WorkItemKind {
+  WORK_ITEM_KIND_UNSPECIFIED = 0;
+  WORK_ITEM_KIND_STORY = 1;
+  WORK_ITEM_KIND_TASK = 2;
+  WORK_ITEM_KIND_BUG = 3;
+  WORK_ITEM_KIND_PROTOTYPE = 4;
+  WORK_ITEM_KIND_SPIKE = 5;
+  WORK_ITEM_KIND_REVIEW = 6;
+  WORK_ITEM_KIND_NFR = 7;
+}
+
+enum WorkItemState {
+  WORK_ITEM_STATE_UNSPECIFIED = 0;
+  WORK_ITEM_STATE_TODO = 1;
+  WORK_ITEM_STATE_IN_PROGRESS = 2;
+  WORK_ITEM_STATE_BLOCKED = 3;
+  WORK_ITEM_STATE_IN_REVIEW = 4;
+  WORK_ITEM_STATE_DONE = 5;
+  WORK_ITEM_STATE_CANCELLED = 6;
+}
+
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_LOW = 1;
+  PRIORITY_NORMAL = 2;
+  PRIORITY_HIGH = 3;
+  PRIORITY_CRITICAL = 4;
+}
+
+message AcceptanceCriterion {
+  string criterion_id = 1;
+  string description = 2;
+  bool satisfied = 3;
+}
+
+message EffortEstimate {
+  oneof unit {
+    uint32 story_points = 1;
+    uint32 hours = 2;
+    string t_shirt_size = 3;                     // "XS" / "S" / "M" / "L" / "XL"
+  }
+}
+
+message StateTransition {
+  WorkItemState from_state = 1;
+  WorkItemState to_state = 2;
+  google.protobuf.Timestamp at = 3;
+  common.v1.ActorRef actor = 4;
+  string reason = 5;
+}
+
+message NFRSpec {
+  string characteristic = 1;                     // 25010 九特性
+  string sub_characteristic = 2;                 // 25010 子特性
+  string target_attribute = 3;
+  NFRMeasurement measurement = 4;
+  NFRVerification verification = 5;
+  NFRTraceability traceability = 6;
+}
+
+message NFRMeasurement {
+  string method = 1;
+  string window = 2;                             // "30d" / "rolling" / "point"
+  string threshold = 3;                          // ">= 99.9%"
+  string datasource = 4;
+}
+
+message NFRVerification {
+  string verification_type = 1;                  // "continuous_monitoring" / "gate" / "test" / "inspection"
+  string gate_trigger = 2;
+}
+
+message NFRTraceability {
+  string stakeholder = 1;
+  string context_of_use = 2;
+  string rationale = 3;
+}
+
+// === Iteration ===
+message Iteration {
+  common.v1.IterationId iteration_id = 1;
+  common.v1.ProjectId project_id = 2;
+  uint32 sequence_num = 3;
+  string name = 4;
+  string goal = 5;
+  repeated common.v1.WorkItemId planned_workitems = 6;
+  repeated common.v1.WorkItemId actual_workitems = 7;
+  repeated common.v1.WorkItemId spillover_workitems = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp planned_end_at = 10;
+  google.protobuf.Timestamp ended_at = 11;
+  RetrospectiveNotes retrospective_notes = 12;
+  common.v1.ArtifactId retrospective_artifact_ref = 13;
+  Velocity velocity = 14;
+  IterationState state = 15;
+}
+
+enum IterationState {
+  ITERATION_STATE_UNSPECIFIED = 0;
+  ITERATION_STATE_PLANNED = 1;
+  ITERATION_STATE_IN_PROGRESS = 2;
+  ITERATION_STATE_CLOSED = 3;
+  ITERATION_STATE_CANCELLED = 4;
+}
+
+message RetrospectiveNotes {
+  repeated string went_well = 1;
+  repeated string challenges = 2;
+  repeated string actions = 3;
+}
+
+message Velocity {
+  uint32 story_points_completed = 1;
+  uint32 workitems_completed = 2;
+}
+
+// === Backlog ===
+message Backlog {
+  common.v1.BacklogId backlog_id = 1;
+  common.v1.ProjectId project_id = 2;
+  repeated OrderedWorkItemRef workitem_refs = 3;
+  RefinementState refinement_state = 4;
+  google.protobuf.Timestamp last_refined_at = 5;
+  EffortEstimate total_effort_estimate = 6;
+  VelocityMetric velocity_rolling = 7;
+  common.v1.TraceId trace_id = 8;
+}
+
+message OrderedWorkItemRef {
+  common.v1.WorkItemId workitem_id = 1;
+  int64 order_index = 2;
+  google.protobuf.Timestamp added_at = 3;
+  common.v1.ActorRef added_by = 4;
+}
+
+enum RefinementState {
+  REFINEMENT_STATE_UNSPECIFIED = 0;
+  REFINEMENT_STATE_UNREFINED = 1;
+  REFINEMENT_STATE_PARTIALLY_REFINED = 2;
+  REFINEMENT_STATE_REFINED = 3;
+}
+
+message VelocityMetric {
+  uint32 last_3_iterations_avg_points = 1;
+}
+
+// ============================================================
+// Request / Response(核心方法)
+// ============================================================
+
+message CreateProjectRequest {
+  common.v1.UserId owner_user_id = 1;
+  string title = 2;
+  string description = 3;
+  ContextOfUse context_of_use = 4;
+  optional common.v1.TemplateId process_template_id = 5;
+  common.v1.ActorContext actor = 100;
+}
+message CreateProjectResponse {
+  common.v1.ProjectId project_id = 1;
+  common.v1.BacklogId backlog_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message StartProjectRequest {
+  common.v1.ProjectId project_id = 1;
+  common.v1.GateId kickoff_gate_id = 2;
+  common.v1.ProfileId profile_id = 3;
+  common.v1.ActorContext actor = 100;
+}
+message StartProjectResponse {
+  ProjectLifecycle state = 1;
+  common.v1.InstanceId process_instance_id = 2;
+  google.protobuf.Timestamp started_at = 3;
+}
+
+message PauseProjectRequest {
+  common.v1.ProjectId project_id = 1;
+  string reason = 2;
+  common.v1.ActorContext actor = 100;
+}
+message PauseProjectResponse { ProjectLifecycle state = 1; }
+
+message ResumeProjectRequest {
+  common.v1.ProjectId project_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message ResumeProjectResponse { ProjectLifecycle state = 1; }
+
+message ArchiveProjectRequest {
+  common.v1.ProjectId project_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message ArchiveProjectResponse { ProjectLifecycle state = 1; }
+
+message RestoreProjectRequest {
+  common.v1.ProjectId project_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message RestoreProjectResponse { ProjectLifecycle state = 1; }
+
+message DissolveProjectRequest {
+  common.v1.ProjectId project_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message DissolveProjectResponse { ProjectLifecycle state = 1; }
+
+message UpdateContextOfUseRequest {
+  common.v1.ProjectId project_id = 1;
+  ContextOfUse new_context = 2;
+  uint64 expected_version = 3;
+  common.v1.ActorContext actor = 100;
+}
+message UpdateContextOfUseResponse { uint64 new_version = 1; }
+
+message AttachAIIARequest {
+  common.v1.ProjectId project_id = 1;
+  common.v1.ArtifactId aiia_artifact_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message AttachAIIAResponse { uint64 new_version = 1; }
+
+message GetProjectRequest { common.v1.ProjectId project_id = 1; }
+
+message ListProjectsRequest {
+  optional common.v1.UserId owner_filter = 1;
+  optional ProjectLifecycle lifecycle_filter = 2;
+  uint32 page_size = 3;
+  string page_token = 4;
+}
+message ListProjectsResponse {
+  repeated Project projects = 1;
+  string next_page_token = 2;
+}
+
+message AssignMemberRequest {
+  common.v1.ProjectId project_id = 1;
+  common.v1.MemberId global_member_id = 2;
+  common.v1.RoleId role_in_project = 3;
+  optional ToolScope tool_scope = 4;
+  optional PolicyOverrides policy_overrides = 5;
+  common.v1.ActorContext actor = 100;
+}
+message AssignMemberResponse {
+  common.v1.ProjectMemberId project_member_id = 1;
+  google.protobuf.Timestamp assigned_at = 2;
+}
+
+message ActivateProjectMemberRequest {
+  common.v1.ProjectMemberId project_member_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message ActivateProjectMemberResponse {
+  ProjectMemberLifecycle state = 1;
+}
+
+message PauseProjectMemberRequest {
+  common.v1.ProjectMemberId project_member_id = 1;
+  string reason = 2;
+  common.v1.ActorContext actor = 100;
+}
+message PauseProjectMemberResponse { ProjectMemberLifecycle state = 1; }
+
+message ResumeProjectMemberRequest {
+  common.v1.ProjectMemberId project_member_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message ResumeProjectMemberResponse { ProjectMemberLifecycle state = 1; }
+
+message RetireMemberFromProjectRequest {
+  common.v1.ProjectMemberId project_member_id = 1;
+  string reason = 2;
+  common.v1.ActorContext actor = 100;
+}
+message RetireMemberFromProjectResponse { ProjectMemberLifecycle state = 1; }
+
+message UpdateToolScopeRequest {
+  common.v1.ProjectMemberId project_member_id = 1;
+  ToolScope new_scope = 2;
+  repeated common.v1.ArtifactId evidence_refs = 3;
+  common.v1.ActorContext actor = 100;
+}
+message UpdateToolScopeResponse { uint64 new_version = 1; }
+
+message UpdatePolicyOverridesRequest {
+  common.v1.ProjectMemberId project_member_id = 1;
+  PolicyOverrides overrides = 2;
+  common.v1.ActorContext actor = 100;
+}
+message UpdatePolicyOverridesResponse { uint64 new_version = 1; }
+
+message GetProjectMemberRequest { common.v1.ProjectMemberId project_member_id = 1; }
+
+message ListProjectMembersRequest {
+  common.v1.ProjectId project_id = 1;
+  optional ProjectMemberLifecycle lifecycle_filter = 2;
+}
+message ListProjectMembersResponse { repeated ProjectMember members = 1; }
+
+message CreateWorkItemRequest {
+  common.v1.ProjectId project_id = 1;
+  WorkItemKind kind = 2;
+  string title = 3;
+  string description = 4;
+  repeated AcceptanceCriterion acceptance_criteria = 5;
+  Priority priority = 6;
+  optional common.v1.ProjectMemberId assignee = 7;
+  optional NFRSpec nfr_spec = 8;
+  common.v1.ActorContext actor = 100;
+}
+message CreateWorkItemResponse {
+  common.v1.WorkItemId workitem_id = 1;
+  google.protobuf.Timestamp created_at = 2;
+}
+
+message UpdateWorkItemRequest {
+  common.v1.WorkItemId workitem_id = 1;
+  optional string title = 2;
+  optional string description = 3;
+  repeated AcceptanceCriterion acceptance_criteria = 4;
+  optional Priority priority = 5;
+  uint64 expected_version = 6;
+  common.v1.ActorContext actor = 100;
+}
+message UpdateWorkItemResponse { uint64 new_version = 1; }
+
+message TransitionWorkItemStateRequest {
+  common.v1.WorkItemId workitem_id = 1;
+  WorkItemState new_state = 2;
+  string reason = 3;
+  optional string blocker_note = 4;
+  common.v1.ActorContext actor = 100;
+}
+message TransitionWorkItemStateResponse {
+  WorkItemState state = 1;
+  google.protobuf.Timestamp transitioned_at = 2;
+}
+
+message AssignWorkItemRequest {
+  common.v1.WorkItemId workitem_id = 1;
+  common.v1.ProjectMemberId assignee = 2;
+  common.v1.ActorContext actor = 100;
+}
+message AssignWorkItemResponse { common.v1.ProjectMemberId assignee = 1; }
+
+message AddDependencyRequest {
+  common.v1.WorkItemId from_workitem_id = 1;
+  common.v1.WorkItemId depends_on_workitem_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message AddDependencyResponse {}
+
+message GetWorkItemRequest { common.v1.WorkItemId workitem_id = 1; }
+
+message ListWorkItemsRequest {
+  common.v1.ProjectId project_id = 1;
+  optional WorkItemKind kind_filter = 2;
+  optional WorkItemState state_filter = 3;
+  optional common.v1.ProjectMemberId assignee_filter = 4;
+  optional common.v1.IterationId iteration_filter = 5;
+  uint32 page_size = 6;
+  string page_token = 7;
+}
+message ListWorkItemsResponse {
+  repeated WorkItem workitems = 1;
+  string next_page_token = 2;
+}
+
+message PlanIterationRequest {
+  common.v1.ProjectId project_id = 1;
+  string goal = 2;
+  repeated common.v1.WorkItemId planned_workitems = 3;
+  google.protobuf.Timestamp planned_end_at = 4;
+  common.v1.ActorContext actor = 100;
+}
+message PlanIterationResponse {
+  common.v1.IterationId iteration_id = 1;
+  uint32 sequence_num = 2;
+}
+
+message StartIterationRequest { common.v1.IterationId iteration_id = 1; common.v1.ActorContext actor = 100; }
+message StartIterationResponse { IterationState state = 1; google.protobuf.Timestamp started_at = 2; }
+
+message CloseIterationRequest {
+  common.v1.IterationId iteration_id = 1;
+  RetrospectiveNotes retrospective_notes = 2;
+  common.v1.ArtifactId retrospective_artifact_ref = 3;
+  common.v1.ActorContext actor = 100;
+}
+message CloseIterationResponse {
+  IterationState state = 1;
+  Velocity velocity = 2;
+}
+
+message CancelIterationRequest { common.v1.IterationId iteration_id = 1; string reason = 2; common.v1.ActorContext actor = 100; }
+message CancelIterationResponse { IterationState state = 1; }
+
+message GetIterationRequest { common.v1.IterationId iteration_id = 1; }
+
+message AddToBacklogRequest {
+  common.v1.BacklogId backlog_id = 1;
+  common.v1.WorkItemId workitem_id = 2;
+  optional int64 order_index = 3;
+  common.v1.ActorContext actor = 100;
+}
+message AddToBacklogResponse {}
+
+message ReorderBacklogRequest {
+  common.v1.BacklogId backlog_id = 1;
+  repeated common.v1.WorkItemId ordered_ids = 2;
+  common.v1.ActorContext actor = 100;
+}
+message ReorderBacklogResponse {}
+
+message RefineBacklogRequest {
+  common.v1.BacklogId backlog_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message RefineBacklogResponse {
+  RefinementState new_state = 1;
+  google.protobuf.Timestamp refined_at = 2;
+}
+
+message GetBacklogRequest { common.v1.BacklogId backlog_id = 1; }
+
+message GetProjectBoardRequest {
+  common.v1.ProjectId project_id = 1;
+  optional common.v1.IterationId iteration_id = 2;
+  BoardView view = 3;
+}
+
+enum BoardView {
+  BOARD_VIEW_UNSPECIFIED = 0;
+  BOARD_VIEW_KANBAN = 1;
+  BOARD_VIEW_SPRINT = 2;
+  BOARD_VIEW_DEPENDENCY_GRAPH = 3;
+}
+
+message ProjectBoard {
+  common.v1.ProjectId project_id = 1;
+  BoardView view = 2;
+  map<string, WorkItemSummaryList> columns = 3;
+  DependencyGraph dependency_graph = 4;
+}
+
+message WorkItemSummaryList {
+  repeated WorkItemSummary items = 1;
+}
+
+message WorkItemSummary {
+  common.v1.WorkItemId workitem_id = 1;
+  string title = 2;
+  WorkItemKind kind = 3;
+  WorkItemState state = 4;
+  Priority priority = 5;
+  common.v1.ProjectMemberId assignee = 6;
+}
+
+message DependencyGraph {
+  repeated WorkItemSummary nodes = 1;
+  repeated DependencyEdge edges = 2;
+}
+
+message DependencyEdge {
+  common.v1.WorkItemId from = 1;
+  common.v1.WorkItemId to = 2;
+  string kind = 3;                               // "depends_on" / "blocks"
+}

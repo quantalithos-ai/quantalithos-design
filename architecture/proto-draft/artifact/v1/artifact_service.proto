@@ -1,0 +1,497 @@
+// Quantalithos core · artifact/v1/artifact_service.proto
+//
+// 制品域 RPC:Artifact + Baseline + DatasetArtifact + ArtifactRelation + 血缘查询
+// 上游:domain/artifact/README.md §三
+// 草案阶段:✅
+
+syntax = "proto3";
+
+package quantalithos.artifact.v1;
+
+import "common/v1/ids.proto";
+import "common/v1/audit.proto";
+import "common/v1/timestamps.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "quantalithos/artifact/v1";
+
+// ============================================================
+// Service
+// ============================================================
+
+service ArtifactService {
+  // === Artifact 管理 ===
+  rpc CreateArtifact(CreateArtifactRequest) returns (CreateArtifactResponse);
+  rpc UpdateContent(UpdateContentRequest) returns (UpdateContentResponse);
+  rpc SubmitForReview(SubmitForReviewRequest) returns (SubmitForReviewResponse);
+  rpc Approve(ApproveRequest) returns (ApproveResponse);
+  rpc Baseline(BaselineArtifactRequest) returns (BaselineArtifactResponse);
+  rpc Publish(PublishRequest) returns (PublishResponse);
+  rpc Supersede(SupersedeRequest) returns (SupersedeResponse);
+  rpc Archive(ArchiveArtifactRequest) returns (ArchiveArtifactResponse);
+
+  rpc SetQualityTags(SetQualityTagsRequest) returns (SetQualityTagsResponse);
+  rpc AddRelation(AddRelationRequest) returns (AddRelationResponse);
+
+  rpc GetArtifact(GetArtifactRequest) returns (Artifact);
+  rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse);
+  rpc QueryArtifacts(QueryArtifactsRequest) returns (QueryArtifactsResponse);
+
+  // 血缘查询(三红线可追溯性)
+  rpc GetLineage(GetLineageRequest) returns (LineageGraph);
+
+  // === Baseline 管理 ===
+  rpc CreateBaseline(CreateBaselineRequest) returns (CreateBaselineResponse);
+  rpc SupersedeBaseline(SupersedeBaselineRequest) returns (SupersedeBaselineResponse);
+  rpc GetBaseline(GetBaselineRequest) returns (Baseline);
+  rpc ListBaselines(ListBaselinesRequest) returns (ListBaselinesResponse);
+
+  // === Dataset 特化 ===
+  rpc CreateDatasetArtifact(CreateDatasetArtifactRequest) returns (CreateDatasetArtifactResponse);
+  rpc UpdateDataProvenance(UpdateDataProvenanceRequest) returns (UpdateDataProvenanceResponse);
+  rpc AttachBiasEvaluation(AttachBiasEvaluationRequest) returns (AttachBiasEvaluationResponse);
+
+  // === 完整性校验(hash 校验,对应 INV-15)===
+  rpc VerifyContentHash(VerifyContentHashRequest) returns (VerifyContentHashResponse);
+}
+
+// ============================================================
+// 聚合根 / 实体
+// ============================================================
+
+message Artifact {
+  common.v1.ArtifactId artifact_id = 1;
+  common.v1.ProjectId project_id = 2;              // 组织级 Artifact 可空
+  ArtifactKind kind = 3;
+  string title = 4;
+  string description = 5;
+
+  // 内容
+  ContentRef content_ref = 6;
+  ArtifactFormat format = 7;
+
+  // 版本与演进
+  common.v1.Semver version = 8;
+  common.v1.ArtifactId supersedes = 9;
+  common.v1.ArtifactId superseded_by = 10;
+
+  // 责任
+  repeated common.v1.ActorRef authors = 11;
+  repeated common.v1.ActorRef reviewers = 12;
+  common.v1.ActorRef approved_by = 13;
+  google.protobuf.Timestamp approved_at = 14;
+  google.protobuf.Timestamp baselined_at = 15;
+
+  // 关联
+  common.v1.ActivityId produced_in_activity = 16;
+  repeated common.v1.WorkItemId related_workitems = 17;
+  repeated common.v1.TurnId conversation_refs = 18;
+
+  // 25010 质量标签
+  repeated string quality_tags = 19;               // 9 特性(如 "Reliability")
+  repeated string quality_subtags = 20;            // 31 子特性(如 "Availability")
+
+  // 合规角色
+  ComplianceRole compliance_role = 21;
+
+  // 状态
+  ArtifactState state = 22;
+
+  google.protobuf.Timestamp created_at = 23;
+  google.protobuf.Timestamp modified_at = 24;
+  common.v1.TraceId trace_id = 25;
+  common.v1.AuditLogRef audit_log_ref = 26;
+  uint64 version_number = 27;                       // 乐观锁(不同于 semver)
+}
+
+enum ArtifactKind {
+  ARTIFACT_KIND_UNSPECIFIED = 0;
+  ARTIFACT_KIND_REQUIREMENT = 1;
+  ARTIFACT_KIND_DESIGN = 2;
+  ARTIFACT_KIND_ADR = 3;
+  ARTIFACT_KIND_PROTOTYPE = 4;
+  ARTIFACT_KIND_CODE = 5;
+  ARTIFACT_KIND_TEST_PLAN = 6;
+  ARTIFACT_KIND_TEST_REPORT = 7;
+  ARTIFACT_KIND_USER_DOC = 8;
+  ARTIFACT_KIND_RELEASE = 9;
+  ARTIFACT_KIND_LESSONS_LEARNED = 10;
+  ARTIFACT_KIND_DATASET = 11;                       // 扩展为 DatasetArtifact
+  ARTIFACT_KIND_IMPACT_ASSESSMENT = 12;             // AIIA 双身份
+  ARTIFACT_KIND_SOA = 13;                           // SoA 双身份
+  ARTIFACT_KIND_COMPLIANCE_DECLARATION = 14;
+  ARTIFACT_KIND_OPERATIONAL_LOG = 15;
+  ARTIFACT_KIND_CUSTOM = 16;                        // 走 ADR 扩展
+}
+
+message ContentRef {
+  StorageBackend storage_backend = 1;
+  string uri = 2;
+  string hash = 3;                                  // 内容 hash(防篡改)
+  int64 size_bytes = 4;
+  string mime_type = 5;
+}
+
+enum StorageBackend {
+  STORAGE_BACKEND_UNSPECIFIED = 0;
+  STORAGE_BACKEND_GIT = 1;
+  STORAGE_BACKEND_S3 = 2;
+  STORAGE_BACKEND_INLINE = 3;                       // < 64KB 存 PG text
+  STORAGE_BACKEND_EXTERNAL_URL = 4;
+}
+
+enum ArtifactFormat {
+  ARTIFACT_FORMAT_UNSPECIFIED = 0;
+  ARTIFACT_FORMAT_MARKDOWN = 1;
+  ARTIFACT_FORMAT_PDF = 2;
+  ARTIFACT_FORMAT_FIGMA = 3;
+  ARTIFACT_FORMAT_NOTEBOOK = 4;
+  ARTIFACT_FORMAT_GIT_REF = 5;
+  ARTIFACT_FORMAT_BINARY = 6;
+  ARTIFACT_FORMAT_CUSTOM = 7;
+}
+
+enum ComplianceRole {
+  COMPLIANCE_ROLE_UNSPECIFIED = 0;
+  COMPLIANCE_ROLE_NONE = 1;
+  COMPLIANCE_ROLE_EVIDENCE = 2;                     // 作为合规证据
+  COMPLIANCE_ROLE_POLICY = 3;                       // 政策类文档
+  COMPLIANCE_ROLE_REFERENCE = 4;                    // 参考资料
+}
+
+enum ArtifactState {
+  ARTIFACT_STATE_UNSPECIFIED = 0;
+  ARTIFACT_STATE_INITIATED = 1;
+  ARTIFACT_STATE_REVIEWED = 2;
+  ARTIFACT_STATE_APPROVED = 3;
+  ARTIFACT_STATE_BASELINED = 4;
+  ARTIFACT_STATE_PUBLISHED = 5;
+  ARTIFACT_STATE_SUPERSEDED = 6;
+  ARTIFACT_STATE_ARCHIVED = 7;
+}
+
+// ============================================================
+// ArtifactRelation
+// ============================================================
+
+message ArtifactRelation {
+  common.v1.ArtifactRelationId relation_id = 1;
+  common.v1.ArtifactId from_artifact_id = 2;
+  common.v1.ArtifactId to_artifact_id = 3;
+  RelationKind relation_kind = 4;
+  map<string, string> metadata = 5;
+  google.protobuf.Timestamp created_at = 6;
+  common.v1.ActorRef created_by = 7;
+  common.v1.TraceId trace_id = 8;
+}
+
+enum RelationKind {
+  RELATION_KIND_UNSPECIFIED = 0;
+  RELATION_KIND_DERIVES_FROM = 1;                   // 设计源自需求
+  RELATION_KIND_IMPLEMENTS = 2;                     // 代码实现设计
+  RELATION_KIND_VERIFIES = 3;                       // 测试验证代码(V&V verification)
+  RELATION_KIND_VALIDATES = 4;                      // UAT 满足需求(V&V validation)
+  RELATION_KIND_REPLACES = 5;                       // 新版替代旧版
+  RELATION_KIND_REFERENCES = 6;                     // 软引用
+  RELATION_KIND_CONTAINS = 7;                       // Release 包含
+}
+
+// ============================================================
+// Baseline 聚合根
+// ============================================================
+
+message Baseline {
+  common.v1.BaselineId baseline_id = 1;
+  common.v1.ProjectId project_id = 2;
+  BaselineKind baseline_kind = 3;
+  string name = 4;
+  string description = 5;
+  repeated PinnedArtifactRef member_artifact_refs = 6;
+  google.protobuf.Timestamp frozen_at = 7;
+  common.v1.ActorRef frozen_by = 8;
+  common.v1.GateId related_gate_id = 9;
+  BaselineLifecycle lifecycle = 10;
+  common.v1.BaselineId supersedes = 11;
+  common.v1.BaselineId superseded_by = 12;
+  common.v1.TraceId trace_id = 13;
+  common.v1.AuditLogRef audit_log_ref = 14;
+}
+
+enum BaselineKind {
+  BASELINE_KIND_UNSPECIFIED = 0;
+  BASELINE_KIND_REQUIREMENTS = 1;
+  BASELINE_KIND_DESIGN = 2;
+  BASELINE_KIND_PRODUCT = 3;
+  BASELINE_KIND_RELEASE = 4;
+}
+
+message PinnedArtifactRef {
+  common.v1.ArtifactId artifact_id = 1;
+  common.v1.Semver version = 2;
+  string pin_at_hash = 3;                           // 锁死的内容 hash
+  string role_in_baseline = 4;
+}
+
+enum BaselineLifecycle {
+  BASELINE_LIFECYCLE_UNSPECIFIED = 0;
+  BASELINE_LIFECYCLE_ACTIVE = 1;
+  BASELINE_LIFECYCLE_SUPERSEDED = 2;
+  BASELINE_LIFECYCLE_ARCHIVED = 3;
+}
+
+// ============================================================
+// DatasetArtifact(Artifact 特化,kind=DATASET)
+// ============================================================
+
+message DatasetArtifact {
+  // 继承 Artifact 基础字段
+  Artifact base = 1;
+
+  // 特化字段
+  DataProvenance data_provenance = 10;
+  string data_license = 11;
+  optional double data_quality_score = 12;
+  map<string, double> quality_dimensions = 13;
+  common.v1.ArtifactId bias_evaluation_ref = 14;
+  PrivacyCategory privacy_category = 15;
+  common.v1.RetentionPolicy retention_policy = 16;
+}
+
+message DataProvenance {
+  DataSourceType source_type = 1;
+  string source_uri = 2;
+  string collection_method = 3;
+  common.v1.DateRange collection_period = 4;
+  repeated common.v1.ArtifactId consent_evidence_refs = 5;
+}
+
+enum DataSourceType {
+  DATA_SOURCE_TYPE_UNSPECIFIED = 0;
+  DATA_SOURCE_TYPE_MANUAL = 1;
+  DATA_SOURCE_TYPE_SCRAPED = 2;
+  DATA_SOURCE_TYPE_SYNTHESIZED = 3;
+  DATA_SOURCE_TYPE_LICENSED = 4;
+}
+
+enum PrivacyCategory {
+  PRIVACY_CATEGORY_UNSPECIFIED = 0;
+  PRIVACY_CATEGORY_PUBLIC = 1;
+  PRIVACY_CATEGORY_PSEUDONYMIZED = 2;
+  PRIVACY_CATEGORY_SENSITIVE_PII = 3;
+  PRIVACY_CATEGORY_REGULATED = 4;
+}
+
+// ============================================================
+// LineageGraph(血缘查询)
+// ============================================================
+
+message GetLineageRequest {
+  common.v1.ArtifactId root_artifact_id = 1;
+  int32 depth = 2;
+  repeated RelationKind relation_kinds = 3;
+  LineageDirection direction = 4;
+}
+
+enum LineageDirection {
+  LINEAGE_DIRECTION_UNSPECIFIED = 0;
+  LINEAGE_DIRECTION_UPSTREAM = 1;                   // 谁衍生出我
+  LINEAGE_DIRECTION_DOWNSTREAM = 2;                 // 我衍生出谁
+  LINEAGE_DIRECTION_BOTH = 3;
+}
+
+message LineageGraph {
+  repeated Artifact nodes = 1;
+  repeated ArtifactRelation edges = 2;
+  bool truncated = 3;
+}
+
+// ============================================================
+// Request / Response
+// ============================================================
+
+message CreateArtifactRequest {
+  optional common.v1.ProjectId project_id = 1;
+  ArtifactKind kind = 2;
+  string title = 3;
+  string description = 4;
+  ContentRef content_ref = 5;
+  ArtifactFormat format = 6;
+  repeated common.v1.ActorRef authors = 7;
+  optional common.v1.ActivityId produced_in_activity = 8;
+  repeated common.v1.WorkItemId related_workitems = 9;
+  repeated common.v1.TurnId conversation_refs = 10;
+  repeated string quality_tags = 11;
+  ComplianceRole compliance_role = 12;
+  common.v1.ActorContext actor = 100;
+}
+message CreateArtifactResponse {
+  common.v1.ArtifactId artifact_id = 1;
+  ArtifactState state = 2;                          // 预期 INITIATED
+}
+
+message UpdateContentRequest {
+  common.v1.ArtifactId artifact_id = 1;
+  ContentRef new_content_ref = 2;
+  uint64 expected_version_number = 3;
+  common.v1.ActorContext actor = 100;
+}
+message UpdateContentResponse {
+  string new_hash = 1;
+  uint64 new_version_number = 2;
+}
+
+message SubmitForReviewRequest {
+  common.v1.ArtifactId artifact_id = 1;
+  repeated common.v1.ActorRef reviewers = 2;
+  common.v1.ActorContext actor = 100;
+}
+message SubmitForReviewResponse { ArtifactState state = 1; }
+
+message ApproveRequest {
+  common.v1.ArtifactId artifact_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message ApproveResponse { ArtifactState state = 1; google.protobuf.Timestamp approved_at = 2; }
+
+message BaselineArtifactRequest {
+  common.v1.ArtifactId artifact_id = 1;
+  common.v1.GateId gate_id = 2;
+  optional common.v1.BaselineId into_baseline = 3;  // 可选加入既有 Baseline
+  common.v1.ActorContext actor = 100;
+}
+message BaselineArtifactResponse {
+  ArtifactState state = 1;
+  optional common.v1.BaselineId baseline_id = 2;
+}
+
+message PublishRequest {
+  common.v1.ArtifactId artifact_id = 1;
+  string external_uri = 2;
+  common.v1.ActorContext actor = 100;
+}
+message PublishResponse { ArtifactState state = 1; }
+
+message SupersedeRequest {
+  common.v1.ArtifactId old_artifact_id = 1;
+  common.v1.ArtifactId new_artifact_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message SupersedeResponse {}
+
+message ArchiveArtifactRequest {
+  common.v1.ArtifactId artifact_id = 1;
+  common.v1.GateId gate_id = 2;
+  string reason = 3;
+  common.v1.ActorContext actor = 100;
+}
+message ArchiveArtifactResponse { ArtifactState state = 1; }
+
+message SetQualityTagsRequest {
+  common.v1.ArtifactId artifact_id = 1;
+  repeated string tags = 2;
+  repeated string subtags = 3;
+  common.v1.ActorContext actor = 100;
+}
+message SetQualityTagsResponse {}
+
+message AddRelationRequest {
+  common.v1.ArtifactId from_artifact_id = 1;
+  common.v1.ArtifactId to_artifact_id = 2;
+  RelationKind relation_kind = 3;
+  map<string, string> metadata = 4;
+  common.v1.ActorContext actor = 100;
+}
+message AddRelationResponse { common.v1.ArtifactRelationId relation_id = 1; }
+
+message GetArtifactRequest { common.v1.ArtifactId artifact_id = 1; }
+
+message ListArtifactsRequest {
+  optional common.v1.ProjectId project_filter = 1;
+  optional ArtifactKind kind_filter = 2;
+  optional ArtifactState state_filter = 3;
+  uint32 page_size = 4;
+  string page_token = 5;
+}
+message ListArtifactsResponse {
+  repeated Artifact artifacts = 1;
+  string next_page_token = 2;
+}
+
+message QueryArtifactsRequest {
+  string query = 1;
+  optional common.v1.ProjectId in_project = 2;
+  repeated string quality_tags_any = 3;
+  uint32 page_size = 4;
+}
+message QueryArtifactsResponse { repeated Artifact artifacts = 1; }
+
+// === Baseline ===
+message CreateBaselineRequest {
+  common.v1.ProjectId project_id = 1;
+  BaselineKind baseline_kind = 2;
+  string name = 3;
+  string description = 4;
+  repeated PinnedArtifactRef members = 5;
+  common.v1.GateId gate_id = 6;
+  common.v1.ActorContext actor = 100;
+}
+message CreateBaselineResponse {
+  common.v1.BaselineId baseline_id = 1;
+  google.protobuf.Timestamp frozen_at = 2;
+}
+
+message SupersedeBaselineRequest {
+  common.v1.BaselineId old_baseline_id = 1;
+  common.v1.BaselineId new_baseline_id = 2;
+  common.v1.GateId gate_id = 3;
+  common.v1.ActorContext actor = 100;
+}
+message SupersedeBaselineResponse {}
+
+message GetBaselineRequest { common.v1.BaselineId baseline_id = 1; }
+
+message ListBaselinesRequest {
+  common.v1.ProjectId project_id = 1;
+  optional BaselineKind kind_filter = 2;
+}
+message ListBaselinesResponse { repeated Baseline baselines = 1; }
+
+// === Dataset ===
+message CreateDatasetArtifactRequest {
+  CreateArtifactRequest base = 1;                  // 继承基础 Artifact 创建
+  DataProvenance data_provenance = 2;
+  string data_license = 3;
+  PrivacyCategory privacy_category = 4;
+  common.v1.RetentionPolicy retention_policy = 5;
+  common.v1.ActorContext actor = 100;
+}
+message CreateDatasetArtifactResponse {
+  common.v1.ArtifactId artifact_id = 1;
+}
+
+message UpdateDataProvenanceRequest {
+  common.v1.ArtifactId artifact_id = 1;
+  DataProvenance data_provenance = 2;
+  common.v1.ActorContext actor = 100;
+}
+message UpdateDataProvenanceResponse {}
+
+message AttachBiasEvaluationRequest {
+  common.v1.ArtifactId dataset_artifact_id = 1;
+  common.v1.ArtifactId bias_evaluation_ref = 2;     // 必须 kind=test-report
+  common.v1.ActorContext actor = 100;
+}
+message AttachBiasEvaluationResponse {}
+
+// === 内容完整性校验(INV-15)===
+message VerifyContentHashRequest {
+  common.v1.ArtifactId artifact_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message VerifyContentHashResponse {
+  bool matched = 1;
+  string expected_hash = 2;
+  string actual_hash = 3;
+  google.protobuf.Timestamp verified_at = 4;
+}

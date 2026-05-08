@@ -1,0 +1,87 @@
+// Quantalithos core · common/v1/events.proto
+//
+// CloudEvents 1.0 包络 + 事件元数据。所有跨域事件必须用 CloudEvent 包装。
+//
+// 草案阶段:✅ 字段稳定。
+
+syntax = "proto3";
+
+package quantalithos.common.v1;
+
+import "common/v1/ids.proto";
+import "common/v1/audit.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "quantalithos/common/v1";
+
+// ---------- CloudEvents 1.0 包络 ----------
+
+// CloudEvent 符合 CloudEvents 1.0 规范。
+// 所有跨域事件序列化到 bus 时使用此结构。
+//
+// 规范见 https://cloudevents.io/
+message CloudEvent {
+  // CloudEvents 标准必选字段
+  string specversion = 1;                     // "1.0"
+  string type = 2;                            // "<domain>.<aggregate>.<verb>" 过去式
+  string source = 3;                          // "service:quantalithos-<service>"
+  string subject = 4;                         // 聚合根 ID(string form of Ulid)
+  string id = 5;                              // event_id(ULID,全局唯一,幂等去重)
+  google.protobuf.Timestamp time = 6;         // 事件时间
+
+  // CloudEvents 标准可选字段
+  string datacontenttype = 7;                 // "application/vnd.quantalithos.<domain>.<event>.v1+json"
+  string dataschema = 8;                      // 可选:指向 schema URI
+
+  // 扩展属性(Quantalithos 统一追加)
+  string traceparent = 9;                     // W3C Trace Context
+  string tracestate = 10;                     // W3C Trace State
+  ActorRef actor = 11;                         // 触发 actor
+  Severity severity = 12;
+  TenantId tenant = 13;
+
+  // 业务 payload(按 type 不同,序列化为 domain 特定的 EventData message)
+  google.protobuf.Any data = 14;
+}
+
+// ---------- 事件元数据(查询用)----------
+
+// EventMetadata 用于事件查询 API 的响应元数据。
+// 不用于事件本身的包装。
+message EventMetadata {
+  string event_id = 1;
+  string event_type = 2;
+  string subject = 3;
+  google.protobuf.Timestamp time = 4;
+  string trace_id = 5;
+  Severity severity = 6;
+}
+
+// ---------- 事件投递元数据 ----------
+
+// DeliveryMeta 描述订阅方接收事件的元数据。
+message DeliveryMeta {
+  string subscriber_id = 1;                   // 订阅者标识
+  int32 delivery_attempt = 2;                 // 第几次尝试(retry)
+  google.protobuf.Timestamp received_at = 3;
+}
+
+// ---------- 事件过滤器(订阅用)----------
+
+message EventFilter {
+  // 按 type 前缀过滤(如 "identity.member.*")
+  repeated string type_patterns = 1;
+
+  // 按 subject 过滤(聚合根 ID)
+  repeated string subjects = 2;
+
+  // 按 project_id 过滤(从 data 中提取,仅对带 project_id 的事件有效)
+  repeated string project_ids = 3;
+
+  // 按 severity 过滤(最小)
+  Severity min_severity = 4;
+
+  // 自定义 tenant 过滤
+  TenantId tenant = 5;
+}

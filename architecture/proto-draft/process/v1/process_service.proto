@@ -1,0 +1,711 @@
+// Quantalithos core · process/v1/process_service.proto
+//
+// 过程域 RPC:Template + Profile + Instance + Activity + Checkpoint
+// 上游:domain/process/README.md §三
+// 草案阶段:✅
+
+syntax = "proto3";
+
+package quantalithos.process.v1;
+
+import "common/v1/ids.proto";
+import "common/v1/audit.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "quantalithos/process/v1";
+
+// ============================================================
+// Service
+// ============================================================
+
+service ProcessService {
+  // === Template(索引层)===
+  rpc SyncTemplateFromMethodLibrary(SyncTemplateRequest) returns (SyncTemplateResponse);
+  rpc PublishTemplate(PublishTemplateRequest) returns (PublishTemplateResponse);
+  rpc DeprecateTemplate(DeprecateTemplateRequest) returns (DeprecateTemplateResponse);
+  rpc RetireTemplate(RetireTemplateRequest) returns (RetireTemplateResponse);
+
+  rpc GetTemplate(GetTemplateRequest) returns (ProcessTemplate);
+  rpc ListTemplates(ListTemplatesRequest) returns (ListTemplatesResponse);
+
+  // === Profile(Tailoring)===
+  rpc DraftProfile(DraftProfileRequest) returns (DraftProfileResponse);
+  rpc AddTailoringDecision(AddTailoringDecisionRequest) returns (AddTailoringDecisionResponse);
+  rpc ActivateProfile(ActivateProfileRequest) returns (ActivateProfileResponse);
+  rpc SupersedeProfile(SupersedeProfileRequest) returns (SupersedeProfileResponse);
+
+  rpc GetProfile(GetProfileRequest) returns (ProcessProfile);
+  rpc GetEffectiveActivityGraph(GetEffectiveGraphRequest) returns (BPMNActivityGraph);
+
+  // === Instance ===
+  rpc CreateInstance(CreateInstanceRequest) returns (CreateInstanceResponse);
+  rpc StartInstance(StartInstanceRequest) returns (StartInstanceResponse);
+  rpc PauseInstance(PauseInstanceRequest) returns (PauseInstanceResponse);
+  rpc ResumeInstance(ResumeInstanceRequest) returns (ResumeInstanceResponse);
+  rpc CancelInstance(CancelInstanceRequest) returns (CancelInstanceResponse);
+
+  rpc GetInstance(GetInstanceRequest) returns (ProcessInstance);
+  rpc GetInstanceState(GetInstanceStateRequest) returns (InstanceStateSnapshot);
+
+  // === Activity 控制(主要被 L2 runtime 经 member-service 代理调用)===
+  rpc ScheduleActivity(ScheduleActivityRequest) returns (ScheduleActivityResponse);
+  rpc StartActivity(StartActivityRequest) returns (StartActivityResponse);
+  rpc CompleteActivity(CompleteActivityRequest) returns (CompleteActivityResponse);
+  rpc FailActivity(FailActivityRequest) returns (FailActivityResponse);
+  rpc TransitionActivityToWaitGate(TransitionToWaitGateRequest) returns (TransitionToWaitGateResponse);
+  rpc ResumeFromWaitGate(ResumeFromWaitGateRequest) returns (ResumeFromWaitGateResponse);
+
+  rpc GetActivity(GetActivityRequest) returns (Activity);
+  rpc ListActivities(ListActivitiesRequest) returns (ListActivitiesResponse);
+
+  // === Checkpoint & 恢复(ADR-0007)===
+  rpc GetLatestCheckpoint(GetLatestCheckpointRequest) returns (Checkpoint);
+  rpc RecoverInstance(RecoverInstanceRequest) returns (RecoverInstanceResponse);
+
+  // === 查询 ===
+  rpc QueryActiveInstances(QueryActiveInstancesRequest) returns (QueryActiveInstancesResponse);
+  rpc GetInstanceTimeline(GetInstanceTimelineRequest) returns (InstanceTimeline);
+}
+
+// ============================================================
+// 聚合根
+// ============================================================
+
+message ProcessTemplate {
+  common.v1.TemplateId template_id = 1;
+  TemplateFamily family = 2;
+  string display_name = 3;
+  common.v1.Semver version = 4;
+  MethodContentRef spec_source = 5;
+  LifecycleModelSpec lifecycle_model = 6;
+  BPMNActivityGraph activity_graph = 7;
+  repeated common.v1.RoleId roles_required = 8;
+  repeated ArtifactKindSpec artifacts_required = 9;
+  repeated GateRequirementSpec gates_required = 10;
+  TemplateLifecycle lifecycle = 11;
+  google.protobuf.Timestamp published_at = 12;
+  google.protobuf.Timestamp retired_at = 13;
+  string source_fingerprint = 14;
+  google.protobuf.Timestamp source_verified_at = 15;
+  common.v1.AuditLogRef audit_log_ref = 16;
+  common.v1.TraceId trace_id = 17;
+}
+
+enum TemplateFamily {
+  TEMPLATE_FAMILY_UNSPECIFIED = 0;
+  TEMPLATE_FAMILY_WATERFALL = 1;
+  TEMPLATE_FAMILY_V_MODEL = 2;
+  TEMPLATE_FAMILY_INCREMENTAL = 3;
+  TEMPLATE_FAMILY_EVOLUTIONARY = 4;
+  TEMPLATE_FAMILY_ITERATIVE = 5;
+  TEMPLATE_FAMILY_SPIRAL = 6;
+  TEMPLATE_FAMILY_AGILE_SCRUM = 7;
+  TEMPLATE_FAMILY_AGILE_KANBAN = 8;
+  TEMPLATE_FAMILY_AGILE_SAFE = 9;
+  TEMPLATE_FAMILY_DEVOPS = 10;
+}
+
+enum TemplateLifecycle {
+  TEMPLATE_LIFECYCLE_UNSPECIFIED = 0;
+  TEMPLATE_LIFECYCLE_DRAFT = 1;
+  TEMPLATE_LIFECYCLE_PUBLISHED = 2;
+  TEMPLATE_LIFECYCLE_DEPRECATED = 3;
+  TEMPLATE_LIFECYCLE_RETIRED = 4;
+}
+
+message MethodContentRef {
+  common.v1.Ulid method_content_id = 1;
+  common.v1.Semver method_content_version = 2;
+  google.protobuf.Timestamp last_synced_at = 3;
+}
+
+message LifecycleModelSpec {
+  repeated StageSpec stages = 1;
+  StageSequenceMode stage_sequence_mode = 2;
+}
+
+message StageSpec {
+  string stage_id = 1;
+  string display_name = 2;
+  int32 order = 3;
+  repeated string entry_criteria = 4;
+  repeated string exit_criteria = 5;
+}
+
+enum StageSequenceMode {
+  STAGE_SEQUENCE_MODE_UNSPECIFIED = 0;
+  STAGE_SEQUENCE_MODE_LINEAR = 1;
+  STAGE_SEQUENCE_MODE_ITERATIVE = 2;
+  STAGE_SEQUENCE_MODE_PARALLEL = 3;
+  STAGE_SEQUENCE_MODE_EVENT_DRIVEN = 4;
+}
+
+message BPMNActivityGraph {
+  repeated ActivityDef activities = 1;
+  repeated SequenceFlowDef sequence_flows = 2;
+  repeated GatewayDef gateways = 3;
+  repeated EventDef events = 4;
+}
+
+message ActivityDef {
+  string activity_id = 1;
+  string name = 2;
+  BPMNActivityKind kind = 3;
+  repeated common.v1.RoleId assignable_roles = 4;
+  repeated ArtifactInputSpec inputs = 5;
+  repeated ArtifactOutputSpec outputs = 6;
+  google.protobuf.Duration timeout = 7;
+  RetryPolicy retry_policy = 8;
+  string on_gate_trigger = 9;                    // 引用 GateRequirementSpec.gate_id_in_template
+}
+
+enum BPMNActivityKind {
+  BPMN_ACTIVITY_KIND_UNSPECIFIED = 0;
+  BPMN_ACTIVITY_KIND_USER_TASK = 1;
+  BPMN_ACTIVITY_KIND_SERVICE_TASK = 2;
+  BPMN_ACTIVITY_KIND_MANUAL_TASK = 3;
+  BPMN_ACTIVITY_KIND_SUB_PROCESS = 4;
+  BPMN_ACTIVITY_KIND_CALL_ACTIVITY = 5;
+  BPMN_ACTIVITY_KIND_SEND_TASK = 6;
+  BPMN_ACTIVITY_KIND_RECEIVE_TASK = 7;
+  BPMN_ACTIVITY_KIND_GATEWAY = 8;
+  BPMN_ACTIVITY_KIND_START_EVENT = 9;
+  BPMN_ACTIVITY_KIND_END_EVENT = 10;
+  BPMN_ACTIVITY_KIND_INTERMEDIATE_EVENT = 11;
+}
+
+message SequenceFlowDef {
+  string from_node = 1;
+  string to_node = 2;
+  string condition_expr = 3;                     // gateway 用
+}
+
+message GatewayDef {
+  string gateway_id = 1;
+  GatewayKind kind = 2;
+  repeated string incoming = 3;
+  repeated string outgoing = 4;
+  string default_flow = 5;
+}
+
+enum GatewayKind {
+  GATEWAY_KIND_UNSPECIFIED = 0;
+  GATEWAY_KIND_EXCLUSIVE = 1;
+  GATEWAY_KIND_PARALLEL = 2;
+  GATEWAY_KIND_INCLUSIVE = 3;
+  GATEWAY_KIND_EVENT_BASED = 4;
+}
+
+message EventDef {
+  string event_id = 1;
+  EventKind kind = 2;                             // start / intermediate / end
+  string trigger_expr = 3;
+}
+
+enum EventKind {
+  EVENT_KIND_UNSPECIFIED = 0;
+  EVENT_KIND_START = 1;
+  EVENT_KIND_INTERMEDIATE = 2;
+  EVENT_KIND_END = 3;
+}
+
+message RetryPolicy {
+  int32 max_retries = 1;
+  google.protobuf.Duration backoff_initial = 2;
+  double backoff_multiplier = 3;
+}
+
+message ArtifactInputSpec {
+  string artifact_kind = 1;
+  bool required = 2;
+  string description = 3;
+}
+
+message ArtifactOutputSpec {
+  string artifact_kind = 1;
+  bool required = 2;
+  string description = 3;
+}
+
+message ArtifactKindSpec {
+  string kind = 1;
+  string at_stage = 2;
+  bool optional = 3;
+}
+
+message GateRequirementSpec {
+  string gate_id_in_template = 1;
+  string kind = 2;                                // GateKind 字符串
+  optional string at_activity = 3;
+  optional StageTransition at_stage_transition = 4;
+  DecisionMakerSpec decision_maker = 5;
+  common.v1.AutonomyLevel autonomy_level = 6;
+  bool mandatory = 7;
+}
+
+message StageTransition {
+  string from_stage = 1;
+  string to_stage = 2;
+}
+
+message DecisionMakerSpec {
+  string maker_type = 1;
+  optional string specific_maker = 2;
+  optional QuorumConfig quorum_config = 3;
+  optional EscalationConfig escalation_config = 4;
+}
+
+message QuorumConfig {
+  repeated string required_approvers = 1;
+  uint32 min_approvals = 2;
+}
+
+message EscalationConfig {
+  repeated EscalationLevel levels = 1;
+}
+
+message EscalationLevel {
+  int32 priority = 1;
+  google.protobuf.Duration escalate_after = 2;
+  common.v1.ActorRef next_approver = 3;
+}
+
+// === Profile ===
+message ProcessProfile {
+  common.v1.ProfileId profile_id = 1;
+  common.v1.ProjectId project_id = 2;
+  common.v1.TemplateId template_id = 3;
+  common.v1.Semver template_version = 4;
+  ProfileGroup profile_group = 5;
+  TailoringLevel tailoring_level = 6;
+  repeated TailoringDecision tailoring_decisions = 7;
+  BPMNActivityGraph effective_activity_graph = 8;
+  repeated GateRequirementSpec effective_gates_required = 9;
+  ProfileLifecycle lifecycle = 10;
+  google.protobuf.Timestamp effective_from = 11;
+  google.protobuf.Timestamp effective_until = 12;
+  common.v1.ProfileId supersedes = 13;
+  common.v1.ProfileId superseded_by = 14;
+  common.v1.TraceId trace_id = 15;
+  common.v1.AuditLogRef audit_log_ref = 16;
+}
+
+enum ProfileGroup {
+  PROFILE_GROUP_UNSPECIFIED = 0;
+  PROFILE_GROUP_ENTRY = 1;
+  PROFILE_GROUP_BASIC = 2;
+  PROFILE_GROUP_INTERMEDIATE = 3;
+  PROFILE_GROUP_ADVANCED = 4;
+  PROFILE_GROUP_CUSTOM = 5;
+}
+
+enum TailoringLevel {
+  TAILORING_LEVEL_UNSPECIFIED = 0;
+  TAILORING_LEVEL_TIGHT = 1;
+  TAILORING_LEVEL_MODERATE = 2;
+  TAILORING_LEVEL_LOOSE = 3;
+}
+
+enum ProfileLifecycle {
+  PROFILE_LIFECYCLE_UNSPECIFIED = 0;
+  PROFILE_LIFECYCLE_DRAFT = 1;
+  PROFILE_LIFECYCLE_ACTIVE = 2;
+  PROFILE_LIFECYCLE_SUPERSEDED = 3;
+  PROFILE_LIFECYCLE_RETIRED = 4;
+}
+
+// 24748-2 §5.3 Tailoring Record 格式
+message TailoringDecision {
+  string decision_id = 1;
+  TailoringAction action = 2;
+  TailoringTarget target = 3;
+  string change_detail = 4;
+  string rationale = 5;
+  string risk_mitigation = 6;
+  common.v1.ActorRef approved_by = 7;
+  common.v1.GateId approved_via_gate = 8;
+  google.protobuf.Timestamp effective_from = 9;
+}
+
+enum TailoringAction {
+  TAILORING_ACTION_UNSPECIFIED = 0;
+  TAILORING_ACTION_REDUCTION = 1;
+  TAILORING_ACTION_EXTENSION = 2;
+  TAILORING_ACTION_ADAPTATION = 3;
+}
+
+message TailoringTarget {
+  TailoringTargetKind target_type = 1;
+  string target_id = 2;
+}
+
+enum TailoringTargetKind {
+  TAILORING_TARGET_KIND_UNSPECIFIED = 0;
+  TAILORING_TARGET_KIND_ACTIVITY = 1;
+  TAILORING_TARGET_KIND_GATE = 2;
+  TAILORING_TARGET_KIND_ROLE_REQUIREMENT = 3;
+  TAILORING_TARGET_KIND_ARTIFACT_REQUIREMENT = 4;
+  TAILORING_TARGET_KIND_STAGE = 5;
+}
+
+// === Instance ===
+message ProcessInstance {
+  common.v1.InstanceId instance_id = 1;
+  common.v1.ProjectId project_id = 2;
+  common.v1.ProfileId profile_id = 3;
+  InstanceState state = 4;
+  string current_stage = 5;
+  repeated common.v1.ActivityId current_activities = 6;
+  repeated ActivityRef completed_activities = 7;
+  repeated common.v1.GateId pending_gates = 8;
+  repeated Token active_tokens = 9;
+  Checkpoint checkpoint = 10;
+  google.protobuf.Timestamp started_at = 11;
+  google.protobuf.Timestamp ended_at = 12;
+  google.protobuf.Timestamp last_activity_at = 13;
+  common.v1.TraceId trace_id = 14;
+  common.v1.AuditLogRef audit_log_ref = 15;
+  uint64 version = 16;
+}
+
+enum InstanceState {
+  INSTANCE_STATE_UNSPECIFIED = 0;
+  INSTANCE_STATE_DRAFT = 1;
+  INSTANCE_STATE_RUNNING = 2;
+  INSTANCE_STATE_PAUSED = 3;
+  INSTANCE_STATE_COMPLETED = 4;
+  INSTANCE_STATE_FAILED = 5;
+  INSTANCE_STATE_CANCELLED = 6;
+}
+
+message ActivityRef {
+  common.v1.ActivityId activity_id = 1;
+  string activity_def_id = 2;
+  google.protobuf.Timestamp completed_at = 3;
+}
+
+message Token {
+  common.v1.TokenId token_id = 1;
+  string at_node_id = 2;
+  optional string created_from_gateway = 3;
+  google.protobuf.Timestamp created_at = 4;
+  TokenState state = 5;
+}
+
+enum TokenState {
+  TOKEN_STATE_UNSPECIFIED = 0;
+  TOKEN_STATE_ACTIVE = 1;
+  TOKEN_STATE_CONSUMED = 2;
+}
+
+// === Activity 实体 ===
+message Activity {
+  common.v1.ActivityId activity_id = 1;
+  common.v1.InstanceId instance_id = 2;
+  string stage = 3;
+  string definition_ref = 4;                      // Profile.effective_activity_graph 内 activity_id
+  BPMNActivityKind kind = 5;
+  AssigneeRef assignee = 6;
+  repeated common.v1.ArtifactId inputs = 7;
+  repeated common.v1.ArtifactId outputs = 8;
+  repeated common.v1.WorkItemId related_workitems = 9;
+  ActivityState state = 10;
+  common.v1.GateId pending_gate_id = 11;
+  google.protobuf.Timestamp gate_timeout_at = 12;
+  google.protobuf.Timestamp scheduled_at = 13;
+  google.protobuf.Timestamp started_at = 14;
+  google.protobuf.Timestamp ended_at = 15;
+  int32 retry_count = 16;
+  int32 max_retries = 17;
+  string reasoning_trace_ref = 18;                // 指向 observability
+  common.v1.TraceId trace_id = 19;
+  common.v1.AuditLogRef audit_log_ref = 20;
+}
+
+enum ActivityState {
+  ACTIVITY_STATE_UNSPECIFIED = 0;
+  ACTIVITY_STATE_SCHEDULED = 1;
+  ACTIVITY_STATE_IN_PROGRESS = 2;
+  ACTIVITY_STATE_WAITING_GATE = 3;
+  ACTIVITY_STATE_COMPLETED = 4;
+  ACTIVITY_STATE_FAILED = 5;
+  ACTIVITY_STATE_SKIPPED = 6;
+  ACTIVITY_STATE_CANCELLED = 7;
+}
+
+message AssigneeRef {
+  oneof assignee {
+    common.v1.ProjectMemberId project_member = 1;
+    common.v1.UserId user = 2;
+    string system_id = 3;                         // "system:<service_name>"
+  }
+}
+
+// === Checkpoint(ADR-0007)===
+message Checkpoint {
+  common.v1.Ulid checkpoint_id = 1;
+  common.v1.InstanceId instance_id = 2;
+  optional common.v1.Ulid parent_checkpoint_id = 3;
+  google.protobuf.Timestamp snapshot_at = 4;
+  CheckpointState complete_state = 5;
+  int32 activities_completed_count = 6;
+  string reasoning_trace_ref = 7;
+  StorageMode storage_mode = 8;
+  optional string external_blob_ref = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+enum StorageMode {
+  STORAGE_MODE_UNSPECIFIED = 0;
+  STORAGE_MODE_INLINE = 1;
+  STORAGE_MODE_EXTERNAL = 2;
+}
+
+message CheckpointState {
+  InstanceState instance_state = 1;
+  string current_stage = 2;
+  repeated common.v1.ActivityId current_activities = 3;
+  repeated ActivityRef completed_activities = 4;
+  repeated common.v1.GateId pending_gates = 5;
+  repeated Token active_tokens = 6;
+  map<string, WorkItemAssociation> workitem_associations = 7;
+  repeated StageTransitionRecord stage_history = 8;
+}
+
+message WorkItemAssociation {
+  repeated common.v1.WorkItemId workitems = 1;
+}
+
+message StageTransitionRecord {
+  string from_stage = 1;
+  string to_stage = 2;
+  google.protobuf.Timestamp at = 3;
+}
+
+message InstanceStateSnapshot {
+  common.v1.InstanceId instance_id = 1;
+  InstanceState state = 2;
+  string current_stage = 3;
+  repeated common.v1.ActivityId current_activities = 4;
+  repeated common.v1.GateId pending_gates = 5;
+  int32 activities_completed_count = 6;
+  Checkpoint latest_checkpoint = 7;
+}
+
+// ============================================================
+// Request / Response
+// ============================================================
+
+message SyncTemplateRequest {
+  MethodContentRef method_content = 1;
+  common.v1.ActorContext actor = 100;             // 通常是 method-library 服务身份
+}
+message SyncTemplateResponse {
+  common.v1.TemplateId template_id = 1;
+  string source_fingerprint = 2;
+  bool drift_detected = 3;
+}
+
+message PublishTemplateRequest {
+  common.v1.TemplateId template_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message PublishTemplateResponse { TemplateLifecycle state = 1; }
+
+message DeprecateTemplateRequest { common.v1.TemplateId template_id = 1; string reason = 2; common.v1.ActorContext actor = 100; }
+message DeprecateTemplateResponse { TemplateLifecycle state = 1; }
+
+message RetireTemplateRequest { common.v1.TemplateId template_id = 1; common.v1.GateId gate_id = 2; common.v1.ActorContext actor = 100; }
+message RetireTemplateResponse { TemplateLifecycle state = 1; }
+
+message GetTemplateRequest { common.v1.TemplateId template_id = 1; }
+
+message ListTemplatesRequest {
+  optional TemplateFamily family_filter = 1;
+  optional TemplateLifecycle lifecycle_filter = 2;
+}
+message ListTemplatesResponse { repeated ProcessTemplate templates = 1; }
+
+message DraftProfileRequest {
+  common.v1.ProjectId project_id = 1;
+  common.v1.TemplateId template_id = 2;
+  ProfileGroup profile_group = 3;
+  common.v1.ActorContext actor = 100;
+}
+message DraftProfileResponse { common.v1.ProfileId profile_id = 1; }
+
+message AddTailoringDecisionRequest {
+  common.v1.ProfileId profile_id = 1;
+  TailoringDecision decision = 2;
+  common.v1.ActorContext actor = 100;
+}
+message AddTailoringDecisionResponse { string decision_id = 1; }
+
+message ActivateProfileRequest {
+  common.v1.ProfileId profile_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message ActivateProfileResponse {
+  common.v1.ProfileId profile_id = 1;
+  BPMNActivityGraph effective_graph = 2;
+  repeated GateRequirementSpec effective_gates_required = 3;
+  google.protobuf.Timestamp effective_from = 4;
+}
+
+message SupersedeProfileRequest {
+  common.v1.ProfileId old_profile_id = 1;
+  common.v1.ProfileId new_profile_id = 2;
+  common.v1.GateId gate_id = 3;
+  common.v1.ActorContext actor = 100;
+}
+message SupersedeProfileResponse {}
+
+message GetProfileRequest { common.v1.ProfileId profile_id = 1; }
+message GetEffectiveGraphRequest { common.v1.ProfileId profile_id = 1; }
+
+message CreateInstanceRequest {
+  common.v1.ProjectId project_id = 1;
+  common.v1.ProfileId profile_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message CreateInstanceResponse {
+  common.v1.InstanceId instance_id = 1;
+  InstanceState state = 2;                         // 预期 DRAFT
+}
+
+message StartInstanceRequest {
+  common.v1.InstanceId instance_id = 1;
+  common.v1.GateId kickoff_gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message StartInstanceResponse {
+  InstanceState state = 1;
+  repeated common.v1.ActivityId initial_activity_ids = 2;
+  google.protobuf.Timestamp started_at = 3;
+}
+
+message PauseInstanceRequest { common.v1.InstanceId instance_id = 1; string reason = 2; common.v1.ActorContext actor = 100; }
+message PauseInstanceResponse { InstanceState state = 1; }
+
+message ResumeInstanceRequest { common.v1.InstanceId instance_id = 1; common.v1.ActorContext actor = 100; }
+message ResumeInstanceResponse { InstanceState state = 1; }
+
+message CancelInstanceRequest { common.v1.InstanceId instance_id = 1; string reason = 2; common.v1.ActorContext actor = 100; }
+message CancelInstanceResponse { InstanceState state = 1; }
+
+message GetInstanceRequest { common.v1.InstanceId instance_id = 1; }
+message GetInstanceStateRequest { common.v1.InstanceId instance_id = 1; }
+
+message ScheduleActivityRequest {
+  common.v1.InstanceId instance_id = 1;
+  string activity_def_id = 2;
+  AssigneeRef assignee = 3;
+  common.v1.ActorContext actor = 100;
+}
+message ScheduleActivityResponse {
+  common.v1.ActivityId activity_id = 1;
+  ActivityState state = 2;
+}
+
+message StartActivityRequest {
+  common.v1.ActivityId activity_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message StartActivityResponse { ActivityState state = 1; }
+
+message CompleteActivityRequest {
+  common.v1.ActivityId activity_id = 1;
+  repeated common.v1.ArtifactId produced_artifact_ids = 2;
+  optional string reasoning_trace_ref = 3;
+  optional string gateway_decision = 4;
+  common.v1.ActorContext actor = 100;
+}
+message CompleteActivityResponse {
+  ActivityState state = 1;
+  repeated common.v1.ActivityId next_activity_ids = 2;
+  optional InstanceState instance_state_change = 3;
+}
+
+message FailActivityRequest {
+  common.v1.ActivityId activity_id = 1;
+  string error_message = 2;
+  common.v1.ActorContext actor = 100;
+}
+message FailActivityResponse {
+  ActivityState state = 1;
+  bool will_retry = 2;
+  int32 retry_count_after = 3;
+}
+
+message TransitionToWaitGateRequest {
+  common.v1.ActivityId activity_id = 1;
+  string expected_gate_kind = 2;
+  DecisionMakerSpec expected_decision_maker = 3;
+  repeated common.v1.ArtifactId required_artifacts = 4;
+  google.protobuf.Timestamp timeout_at = 5;
+  common.v1.ActorContext actor = 100;
+}
+message TransitionToWaitGateResponse { ActivityState state = 1; }
+
+message ResumeFromWaitGateRequest {
+  common.v1.ActivityId activity_id = 1;
+  common.v1.GateId gate_id = 2;
+  string gate_chosen_option = 3;
+  common.v1.ActorContext actor = 100;
+}
+message ResumeFromWaitGateResponse { ActivityState state = 1; }
+
+message GetActivityRequest { common.v1.ActivityId activity_id = 1; }
+
+message ListActivitiesRequest {
+  common.v1.InstanceId instance_id = 1;
+  optional ActivityState state_filter = 2;
+  uint32 page_size = 3;
+  string page_token = 4;
+}
+message ListActivitiesResponse {
+  repeated Activity activities = 1;
+  string next_page_token = 2;
+}
+
+message GetLatestCheckpointRequest { common.v1.InstanceId instance_id = 1; }
+
+message RecoverInstanceRequest {
+  common.v1.InstanceId instance_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message RecoverInstanceResponse {
+  InstanceState state = 1;
+  common.v1.Ulid recovered_from_checkpoint_id = 2;
+}
+
+message QueryActiveInstancesRequest {
+  optional common.v1.ProjectId project_filter = 1;
+}
+message QueryActiveInstancesResponse { repeated ProcessInstance instances = 1; }
+
+message GetInstanceTimelineRequest { common.v1.InstanceId instance_id = 1; }
+
+message InstanceTimeline {
+  common.v1.InstanceId instance_id = 1;
+  repeated TimelineEntry entries = 2;
+}
+
+message TimelineEntry {
+  oneof entry {
+    ActivityRef activity_completed = 1;
+    StageTransitionRecord stage_transition = 2;
+    GateEntry gate_raised = 3;
+    GateEntry gate_decided = 4;
+  }
+}
+
+message GateEntry {
+  common.v1.GateId gate_id = 1;
+  string kind = 2;
+  google.protobuf.Timestamp at = 3;
+  optional string chosen_option = 4;
+}

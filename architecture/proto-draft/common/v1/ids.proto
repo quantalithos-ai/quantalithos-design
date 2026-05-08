@@ -1,0 +1,86 @@
+// Quantalithos core · common/v1/ids.proto
+//
+// 标识符与追踪上下文。所有域 proto 引用此文件。
+//
+// 草案阶段:✅ 字段稳定,待 core 仓 CI 建立后正式发版。
+// 下一步:段 3 末迁入 quantalithos-core 仓。
+
+syntax = "proto3";
+
+package quantalithos.common.v1;
+
+option go_package = "quantalithos/common/v1";
+
+// ---------- ID 类型 ----------
+
+// Ulid 用于所有聚合根 / 实体 / 事件 ID。128-bit,可排序。
+// 序列化为 Crockford Base32 字符串(26 chars),如 "01HVZX7Y8M0J5K3X4Q2D9N7A8B".
+message Ulid {
+  string value = 1;
+}
+
+// TenantId 用于多租户隔离。SaaS 场景必填;自托管单租户可空。
+message TenantId {
+  string value = 1;
+}
+
+// 各域 ID 的类型别名(有助于 IDE 提示 + buf breaking check)。
+// 实际序列化都是 Ulid,这些 message 只是编译期区分。
+
+message MemberId { string value = 1; }       // GlobalMember
+message ProjectMemberId { string value = 1; }
+message UserId { string value = 1; }
+message RoleId { string value = 1; }         // kebab-case 如 "backend-dev"
+
+message ProjectId { string value = 1; }
+message WorkItemId { string value = 1; }
+message IterationId { string value = 1; }
+message BacklogId { string value = 1; }
+
+message ConversationId { string value = 1; }
+message TurnId { string value = 1; }
+
+message TemplateId { string value = 1; }
+message ProfileId { string value = 1; }
+message InstanceId { string value = 1; }
+message ActivityId { string value = 1; }
+message TokenId { string value = 1; }
+
+message GateId { string value = 1; }
+message PolicyId { string value = 1; }
+message ControlId { string value = 1; }       // 如 "A.4.2",42001 附录 A 编号
+message AIIAId { string value = 1; }
+message SoAId { string value = 1; }
+message NonconformityId { string value = 1; }
+message ApprovalId { string value = 1; }
+
+message ArtifactId { string value = 1; }
+message BaselineId { string value = 1; }
+message ArtifactRelationId { string value = 1; }
+
+// 事件 ID(CloudEvents id)
+message EventId { string value = 1; }
+
+// ---------- Trace Context(W3C) ----------
+
+// W3C Trace Context 字段,随所有 RPC 和事件流动。
+// 格式遵循 https://www.w3.org/TR/trace-context/
+message TraceContext {
+  // traceparent:"00-<trace_id>-<parent_id>-<trace_flags>"
+  string traceparent = 1;
+  // tracestate:vendor 特定 state,可为空
+  string tracestate = 2;
+}
+
+// 提取的 trace_id(16-byte hex),用于入库索引。
+message TraceId { string value = 1; }
+
+// ---------- 版本号 ----------
+
+message Semver {
+  uint32 major = 1;
+  uint32 minor = 2;
+  uint32 patch = 3;
+  string pre_release = 4;  // 如 "alpha.1",可空
+  string build = 5;        // 如 "20260508+abc123",可空
+}

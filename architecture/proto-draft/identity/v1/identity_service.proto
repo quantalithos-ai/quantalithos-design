@@ -1,0 +1,439 @@
+// Quantalithos core · identity/v1/identity_service.proto
+//
+// 身份域 RPC:GlobalMember + Role + Capability 的 CRUD 与生命周期。
+//
+// 上游:domain/identity/README.md §三
+// 草案阶段:✅ 与 domain README 对齐,待 core 仓 CI lint 后定版。
+
+syntax = "proto3";
+
+package quantalithos.identity.v1;
+
+import "common/v1/ids.proto";
+import "common/v1/audit.proto";
+import "common/v1/timestamps.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "quantalithos/identity/v1";
+
+// ============================================================
+// Service
+// ============================================================
+
+service IdentityService {
+  // === GlobalMember 管理 ===
+  rpc HireMember(HireMemberRequest) returns (HireMemberResponse);
+  rpc ActivateMember(ActivateMemberRequest) returns (ActivateMemberResponse);
+  rpc PauseMember(PauseMemberRequest) returns (PauseMemberResponse);
+  rpc RetireMember(RetireMemberRequest) returns (RetireMemberResponse);
+  rpc TombstoneMember(TombstoneMemberRequest) returns (TombstoneMemberResponse);
+
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  rpc ChangeRole(ChangeRoleRequest) returns (ChangeRoleResponse);
+  rpc UpdateCapabilities(UpdateCapabilitiesRequest) returns (UpdateCapabilitiesResponse);
+  rpc AppendCareerEntry(AppendCareerEntryRequest) returns (AppendCareerEntryResponse);
+
+  rpc GetMember(GetMemberRequest) returns (GlobalMember);
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+  rpc QueryMembers(QueryMembersRequest) returns (QueryMembersResponse);
+
+  // === Role 管理 ===
+  rpc DefineRole(DefineRoleRequest) returns (DefineRoleResponse);
+  rpc PublishRole(PublishRoleRequest) returns (PublishRoleResponse);
+  rpc DeprecateRole(DeprecateRoleRequest) returns (DeprecateRoleResponse);
+  rpc RetireRole(RetireRoleRequest) returns (RetireRoleResponse);
+
+  rpc GetRole(GetRoleRequest) returns (Role);
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
+
+  // === Capability 查询 ===
+  rpc GetCapability(GetCapabilityRequest) returns (Capability);
+  rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
+
+  // === 记忆引用管理(ADR-0006)===
+  rpc UpdateSemanticMemoryRef(UpdateSemanticMemoryRefRequest) returns (UpdateSemanticMemoryRefResponse);
+  rpc RegisterEpisodicMemoryRef(RegisterEpisodicMemoryRefRequest) returns (RegisterEpisodicMemoryRefResponse);
+  rpc ListEpisodicMemoryRefs(ListEpisodicMemoryRefsRequest) returns (ListEpisodicMemoryRefsResponse);
+
+  // === 内部接口(只供 L2 member-service)===
+  rpc ResolveMemberForContainer(ResolveMemberRequest) returns (ResolveMemberResponse);
+}
+
+// ============================================================
+// 聚合根消息
+// ============================================================
+
+message GlobalMember {
+  common.v1.MemberId member_id = 1;
+  string name = 2;
+  string avatar = 3;
+  string profile = 4;
+  common.v1.RoleId role_id = 5;
+  repeated common.v1.RoleId secondary_roles = 6;
+  CapabilityProfile capability_profile = 7;
+  MemoryRef semantic_memory_ref = 8;
+  repeated EpisodicMemoryRef episodic_memory_refs = 9;
+  repeated CareerEntry career_history = 10;
+  google.protobuf.Timestamp hired_at = 11;
+  MemberLifecycle current_lifecycle = 12;
+  google.protobuf.Timestamp last_state_transition_at = 13;
+  common.v1.ActorRef created_by = 14;
+  common.v1.AuditLogRef audit_log_ref = 15;
+  uint64 version = 16;
+}
+
+enum MemberLifecycle {
+  MEMBER_LIFECYCLE_UNSPECIFIED = 0;
+  MEMBER_LIFECYCLE_HIRED = 1;
+  MEMBER_LIFECYCLE_ACTIVE = 2;
+  MEMBER_LIFECYCLE_PAUSED = 3;
+  MEMBER_LIFECYCLE_RETIRED = 4;
+  MEMBER_LIFECYCLE_TOMBSTONED = 5;
+}
+
+message Role {
+  common.v1.RoleId role_id = 1;                 // kebab-case
+  string display_name = 2;
+  string short_description = 3;
+  RoleLifecycle lifecycle = 4;
+  repeated CapabilityRef required_capabilities = 5;
+  repeated CapabilityRef default_capabilities = 6;
+  repeated ToolRef default_tool_scope = 7;
+  PolicyDefaults policy_defaults = 8;
+  string image_variant = 9;                      // ADR-0005
+  string supported_image_versions = 10;          // semver range
+  MethodContentRef spec_source = 11;             // → method-library
+  common.v1.Semver version = 12;
+  repeated common.v1.Semver previous_versions = 13;
+  google.protobuf.Timestamp published_at = 14;
+  common.v1.ActorRef published_by = 15;
+  google.protobuf.Timestamp retired_at = 16;
+  common.v1.AuditLogRef audit_log_ref = 17;
+}
+
+enum RoleLifecycle {
+  ROLE_LIFECYCLE_UNSPECIFIED = 0;
+  ROLE_LIFECYCLE_DEFINED = 1;
+  ROLE_LIFECYCLE_PUBLISHED = 2;
+  ROLE_LIFECYCLE_DEPRECATED = 3;
+  ROLE_LIFECYCLE_RETIRED = 4;
+}
+
+message Capability {
+  string capability_id = 1;                      // 如 "python-3.12"
+  CapabilityKind kind = 2;
+  CapabilityLevel level = 3;
+  bool evidence_required = 4;
+  repeated common.v1.ArtifactId evidence_refs = 5;
+}
+
+enum CapabilityKind {
+  CAPABILITY_KIND_UNSPECIFIED = 0;
+  CAPABILITY_KIND_LANGUAGE = 1;
+  CAPABILITY_KIND_SKILL = 2;
+  CAPABILITY_KIND_CERTIFICATION = 3;
+  CAPABILITY_KIND_TOOL_FAMILY = 4;
+}
+
+enum CapabilityLevel {
+  CAPABILITY_LEVEL_UNSPECIFIED = 0;
+  CAPABILITY_LEVEL_NOVICE = 1;
+  CAPABILITY_LEVEL_ADVANCED_BEGINNER = 2;
+  CAPABILITY_LEVEL_COMPETENT = 3;                // 及以上需要 evidence(§2.3.3)
+  CAPABILITY_LEVEL_PROFICIENT = 4;
+  CAPABILITY_LEVEL_EXPERT = 5;
+}
+
+message CapabilityRef {
+  string capability_id = 1;
+  CapabilityLevel min_level = 2;
+}
+
+message CapabilityProfile {
+  repeated Capability capabilities = 1;
+  string profile_summary = 2;                    // LLM 可读的能力摘要
+  google.protobuf.Timestamp last_updated_at = 3;
+  common.v1.ActorRef last_updated_by = 4;
+}
+
+message ToolRef {
+  string tool_id = 1;
+  string tool_category = 2;
+}
+
+message PolicyDefaults {
+  common.v1.AutonomyLevel default_autonomy = 1;
+  repeated string default_shared_rule_refs = 2;
+  map<string, string> extra = 3;
+}
+
+message MethodContentRef {
+  string method_content_id = 1;
+  common.v1.Semver method_content_version = 2;
+  google.protobuf.Timestamp last_synced_at = 3;
+}
+
+message MemoryRef {
+  string slot_id = 1;
+  MemoryBackend backend = 2;
+  string endpoint = 3;
+  google.protobuf.Timestamp created_at = 4;
+  int64 size_estimate_bytes = 5;
+  StorageTier storage_tier = 6;
+}
+
+enum MemoryBackend {
+  MEMORY_BACKEND_UNSPECIFIED = 0;
+  MEMORY_BACKEND_QDRANT = 1;
+  MEMORY_BACKEND_PGVECTOR = 2;
+  MEMORY_BACKEND_MILVUS = 3;
+}
+
+enum StorageTier {
+  STORAGE_TIER_UNSPECIFIED = 0;
+  STORAGE_TIER_HOT = 1;
+  STORAGE_TIER_WARM = 2;
+  STORAGE_TIER_COLD = 3;
+}
+
+message EpisodicMemoryRef {
+  string slot_id = 1;
+  common.v1.ProjectId project_id = 2;
+  common.v1.ProjectMemberId project_member_id = 3;
+  MemoryBackend backend = 4;
+  string endpoint = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_written_at = 7;
+  int64 size_estimate_bytes = 8;
+  StorageTier storage_tier = 9;
+  EpisodicMemoryStatus status = 10;
+}
+
+enum EpisodicMemoryStatus {
+  EPISODIC_MEMORY_STATUS_UNSPECIFIED = 0;
+  EPISODIC_MEMORY_STATUS_ACTIVE = 1;
+  EPISODIC_MEMORY_STATUS_PAUSED = 2;
+  EPISODIC_MEMORY_STATUS_MIGRATING = 3;
+  EPISODIC_MEMORY_STATUS_ARCHIVED = 4;
+}
+
+message CareerEntry {
+  string entry_id = 1;
+  common.v1.ProjectId project_id = 2;
+  common.v1.ProjectMemberId project_member_id = 3;
+  common.v1.RoleId role_in_project = 4;
+  CareerEntryStatus status = 5;
+  google.protobuf.Timestamp joined_at = 6;
+  google.protobuf.Timestamp left_at = 7;
+  repeated common.v1.ArtifactId achievements = 8;
+  repeated common.v1.ArtifactId lessons_learned = 9;
+  repeated common.v1.ArtifactId feedback_refs = 10;
+  common.v1.TraceId trace_id = 11;
+}
+
+enum CareerEntryStatus {
+  CAREER_ENTRY_STATUS_UNSPECIFIED = 0;
+  CAREER_ENTRY_STATUS_IN_PROGRESS = 1;
+  CAREER_ENTRY_STATUS_COMPLETED = 2;
+  CAREER_ENTRY_STATUS_ABANDONED = 3;
+}
+
+// ============================================================
+// Request / Response
+// ============================================================
+
+message HireMemberRequest {
+  string name = 1;
+  common.v1.RoleId role_id = 2;
+  string profile = 3;
+  string avatar = 4;
+  repeated Capability initial_capabilities = 5;
+  common.v1.ActorRef created_by = 6;
+  common.v1.ActorContext actor = 100;
+}
+message HireMemberResponse {
+  common.v1.MemberId member_id = 1;
+  MemberLifecycle state = 2;                     // 预期 HIRED
+  google.protobuf.Timestamp hired_at = 3;
+}
+
+message ActivateMemberRequest {
+  common.v1.MemberId member_id = 1;
+  common.v1.GateId approval_gate_id = 2;         // member-lifecycle Gate
+  common.v1.ActorContext actor = 100;
+}
+message ActivateMemberResponse {
+  MemberLifecycle state = 1;
+  google.protobuf.Timestamp transitioned_at = 2;
+}
+
+message PauseMemberRequest {
+  common.v1.MemberId member_id = 1;
+  string reason = 2;
+  common.v1.ActorContext actor = 100;
+}
+message PauseMemberResponse {
+  MemberLifecycle state = 1;
+  google.protobuf.Timestamp transitioned_at = 2;
+}
+
+message RetireMemberRequest {
+  common.v1.MemberId member_id = 1;
+  string reason = 2;
+  common.v1.GateId approval_gate_id = 3;
+  common.v1.ActorContext actor = 100;
+}
+message RetireMemberResponse {
+  MemberLifecycle state = 1;
+  google.protobuf.Timestamp transitioned_at = 2;
+}
+
+message TombstoneMemberRequest {
+  common.v1.MemberId member_id = 1;
+  common.v1.GateId approval_gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message TombstoneMemberResponse {
+  MemberLifecycle state = 1;
+  google.protobuf.Timestamp transitioned_at = 2;
+}
+
+message UpdateProfileRequest {
+  common.v1.MemberId member_id = 1;
+  optional string name = 2;
+  optional string avatar = 3;
+  optional string profile = 4;
+  uint64 expected_version = 5;                   // 乐观锁
+  common.v1.ActorContext actor = 100;
+}
+message UpdateProfileResponse {
+  uint64 new_version = 1;
+}
+
+message ChangeRoleRequest {
+  common.v1.MemberId member_id = 1;
+  common.v1.RoleId new_role_id = 2;
+  string reason = 3;
+  common.v1.GateId approval_gate_id = 4;
+  common.v1.ActorContext actor = 100;
+}
+message ChangeRoleResponse {
+  uint64 new_version = 1;
+}
+
+message UpdateCapabilitiesRequest {
+  common.v1.MemberId member_id = 1;
+  repeated Capability added = 2;
+  repeated CapabilityRef removed = 3;
+  repeated CapabilityUpdate updated = 4;
+  repeated common.v1.ArtifactId evidence_refs = 5;
+  common.v1.ActorContext actor = 100;
+}
+message CapabilityUpdate {
+  CapabilityRef target = 1;
+  CapabilityLevel previous_level = 2;
+  CapabilityLevel new_level = 3;
+}
+message UpdateCapabilitiesResponse {
+  uint64 new_version = 1;
+}
+
+message AppendCareerEntryRequest {
+  common.v1.MemberId member_id = 1;
+  CareerEntry entry = 2;
+  common.v1.ActorContext actor = 100;
+}
+message AppendCareerEntryResponse {
+  string entry_id = 1;
+}
+
+message GetMemberRequest {
+  common.v1.MemberId member_id = 1;
+}
+
+message ListMembersRequest {
+  optional MemberLifecycle filter_lifecycle = 1;
+  optional common.v1.RoleId filter_role = 2;
+  uint32 page_size = 3;
+  string page_token = 4;
+}
+message ListMembersResponse {
+  repeated GlobalMember members = 1;
+  string next_page_token = 2;
+}
+
+message QueryMembersRequest {
+  string query = 1;                              // 模糊匹配 name / profile
+  uint32 page_size = 2;
+}
+message QueryMembersResponse {
+  repeated GlobalMember members = 1;
+}
+
+// === Role RPC ===
+message DefineRoleRequest {
+  Role role_draft = 1;
+  common.v1.ActorContext actor = 100;
+}
+message DefineRoleResponse {
+  common.v1.RoleId role_id = 1;
+  common.v1.Semver version = 2;
+}
+
+message PublishRoleRequest {
+  common.v1.RoleId role_id = 1;
+  common.v1.GateId approval_gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message PublishRoleResponse { RoleLifecycle state = 1; }
+
+message DeprecateRoleRequest { common.v1.RoleId role_id = 1; common.v1.ActorContext actor = 100; }
+message DeprecateRoleResponse { RoleLifecycle state = 1; }
+
+message RetireRoleRequest { common.v1.RoleId role_id = 1; common.v1.GateId gate_id = 2; common.v1.ActorContext actor = 100; }
+message RetireRoleResponse { RoleLifecycle state = 1; }
+
+message GetRoleRequest { common.v1.RoleId role_id = 1; }
+
+message ListRolesRequest { optional RoleLifecycle filter_lifecycle = 1; }
+message ListRolesResponse { repeated Role roles = 1; }
+
+// === Capability RPC ===
+message GetCapabilityRequest { string capability_id = 1; }
+message ListCapabilitiesRequest { optional CapabilityKind filter_kind = 1; }
+message ListCapabilitiesResponse { repeated Capability capabilities = 1; }
+
+// === Memory ref RPC(ADR-0006)===
+message UpdateSemanticMemoryRefRequest {
+  common.v1.MemberId member_id = 1;
+  MemoryRef ref = 2;
+  common.v1.ActorContext actor = 100;
+}
+message UpdateSemanticMemoryRefResponse { uint64 new_version = 1; }
+
+message RegisterEpisodicMemoryRefRequest {
+  common.v1.MemberId member_id = 1;
+  EpisodicMemoryRef ref = 2;
+  common.v1.ActorContext actor = 100;
+}
+message RegisterEpisodicMemoryRefResponse { string slot_id = 1; }
+
+message ListEpisodicMemoryRefsRequest {
+  common.v1.MemberId member_id = 1;
+  optional common.v1.ProjectId filter_project = 2;
+}
+message ListEpisodicMemoryRefsResponse { repeated EpisodicMemoryRef refs = 1; }
+
+// === 内部接口:供 L2 member-service 启动容器时一次性拉全 ===
+message ResolveMemberRequest {
+  common.v1.MemberId member_id = 1;
+  common.v1.ProjectId project_id = 2;            // 用于查 episodic
+  common.v1.ActorContext actor = 100;            // 必须是 member-service 的服务身份
+}
+message ResolveMemberResponse {
+  Role role = 1;
+  CapabilityProfile capability_profile = 2;
+  MemoryRef semantic_memory_ref = 3;
+  optional EpisodicMemoryRef episodic_memory_ref = 4;
+  MemberLifecycle lifecycle = 5;
+}

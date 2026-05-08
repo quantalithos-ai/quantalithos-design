@@ -1,0 +1,409 @@
+// Quantalithos core · conversation/v1/conversation_service.proto
+//
+// 对话域 RPC:Conversation + Turn + StreamEvents(AG-UI 17 事件映射)
+//
+// 上游:domain/conversation/README.md §三
+// 草案阶段:✅
+
+syntax = "proto3";
+
+package quantalithos.conversation.v1;
+
+import "common/v1/ids.proto";
+import "common/v1/audit.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "quantalithos/conversation/v1";
+
+// ============================================================
+// Service
+// ============================================================
+
+service ConversationService {
+  // === Conversation 管理 ===
+  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
+  rpc ArchiveConversation(ArchiveConversationRequest) returns (ArchiveConversationResponse);
+  rpc LockConversation(LockConversationRequest) returns (LockConversationResponse);
+  rpc UnlockConversation(UnlockConversationRequest) returns (UnlockConversationResponse);
+
+  rpc AddParticipant(AddParticipantRequest) returns (AddParticipantResponse);
+  rpc RemoveParticipant(RemoveParticipantRequest) returns (RemoveParticipantResponse);
+
+  rpc GetConversation(GetConversationRequest) returns (Conversation);
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+
+  // === Turn 管理 ===
+  rpc PostTurn(PostTurnRequest) returns (PostTurnResponse);
+  rpc HideTurn(HideTurnRequest) returns (HideTurnResponse);
+  rpc UnhideTurn(UnhideTurnRequest) returns (UnhideTurnResponse);
+
+  rpc GetTurn(GetTurnRequest) returns (Turn);
+  rpc ListTurns(ListTurnsRequest) returns (ListTurnsResponse);     // cursor 翻页
+  rpc SearchTurns(SearchTurnsRequest) returns (SearchTurnsResponse);
+
+  // === 实时推送(AG-UI 17 事件)===
+  rpc StreamEvents(StreamEventsRequest) returns (stream AGUIEvent);
+}
+
+// ============================================================
+// 聚合根
+// ============================================================
+
+message Conversation {
+  common.v1.ConversationId conversation_id = 1;
+  ConversationKind kind = 2;
+  string title = 3;
+  string description = 4;
+  common.v1.ConversationId parent_conversation_id = 5;
+  common.v1.TurnId parent_turn_id = 6;
+  common.v1.ProjectId project_id = 7;
+  repeated ParticipantRef participants = 8;
+  Visibility visibility = 9;
+  common.v1.ActorRef created_by = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp archived_at = 12;
+  google.protobuf.Timestamp locked_at = 13;
+  google.protobuf.Timestamp last_turn_at = 14;
+  ConversationLifecycle lifecycle = 15;
+  BridgedSource bridged_from = 16;
+  common.v1.AuditLogRef audit_log_ref = 17;
+  uint64 version = 18;
+}
+
+enum ConversationKind {
+  CONVERSATION_KIND_UNSPECIFIED = 0;
+  CONVERSATION_KIND_GROUP = 1;
+  CONVERSATION_KIND_CHANNEL = 2;
+  CONVERSATION_KIND_DM = 3;
+  CONVERSATION_KIND_THREAD = 4;
+}
+
+enum Visibility {
+  VISIBILITY_UNSPECIFIED = 0;
+  VISIBILITY_OPEN = 1;
+  VISIBILITY_CLOSED = 2;
+  VISIBILITY_PRIVATE = 3;
+}
+
+enum ConversationLifecycle {
+  CONVERSATION_LIFECYCLE_UNSPECIFIED = 0;
+  CONVERSATION_LIFECYCLE_ACTIVE = 1;
+  CONVERSATION_LIFECYCLE_ARCHIVED = 2;
+  CONVERSATION_LIFECYCLE_LOCKED = 3;
+}
+
+message ParticipantRef {
+  string actor_id = 1;
+  common.v1.ActorKind actor_kind = 2;
+  google.protobuf.Timestamp joined_at = 3;
+  common.v1.ActorRef joined_by = 4;
+  VisibilityFilter visibility_filter = 5;        // thread 子集过滤
+}
+
+message VisibilityFilter {
+  repeated string included_actors = 1;
+}
+
+message BridgedSource {
+  string platform = 1;                           // "mattermost" / "slack" / "telegram" / "discord"
+  string external_id = 2;
+  string external_workspace = 3;
+}
+
+// ============================================================
+// Turn 实体
+// ============================================================
+
+message Turn {
+  common.v1.TurnId turn_id = 1;
+  common.v1.ConversationId conversation_id = 2;
+  common.v1.ActorRef author = 3;
+  common.v1.ActorKind author_kind = 4;
+  TurnKind kind = 5;
+  TurnContent content = 6;
+  common.v1.TurnId parent_turn_id = 7;
+  repeated common.v1.TurnId referenced_turns = 8;
+  repeated common.v1.ArtifactId artifacts = 9;
+  repeated common.v1.GateId gates = 10;
+  google.protobuf.Timestamp created_at = 11;
+  TurnVisibility visibility = 12;
+  repeated string visibility_members = 13;
+  bool hidden = 14;
+  google.protobuf.Timestamp hidden_at = 15;
+  common.v1.ActorRef hidden_by = 16;
+  string hidden_reason = 17;
+  common.v1.TraceId trace_id = 18;
+  BridgedSource bridged_from = 19;
+  common.v1.AuditLogRef audit_log_ref = 20;
+}
+
+enum TurnKind {
+  TURN_KIND_UNSPECIFIED = 0;
+  TURN_KIND_MESSAGE = 1;
+  TURN_KIND_MENTION = 2;
+  TURN_KIND_DECISION = 3;
+  TURN_KIND_ARTIFACT = 4;
+  TURN_KIND_GATE = 5;
+}
+
+enum TurnVisibility {
+  TURN_VISIBILITY_UNSPECIFIED = 0;
+  TURN_VISIBILITY_ALL = 1;
+  TURN_VISIBILITY_SUBSET = 2;
+}
+
+// oneof 实现五种 content 结构
+message TurnContent {
+  oneof content {
+    MessageContent message = 1;
+    MentionContent mention = 2;
+    DecisionContent decision = 3;
+    ArtifactReferenceContent artifact = 4;
+    GateCardContent gate = 5;
+  }
+}
+
+message MessageContent {
+  string text = 1;                               // markdown
+  repeated Attachment attachments = 2;
+}
+
+message MentionContent {
+  string text = 1;
+  repeated common.v1.MemberId mentioned_members = 2;
+}
+
+message DecisionContent {
+  string decision_type = 1;
+  string subject = 2;
+  common.v1.ActorRef decision_maker = 3;
+  string rationale = 4;
+  common.v1.GateId related_gate_id = 5;
+}
+
+message ArtifactReferenceContent {
+  common.v1.ArtifactId artifact_ref = 1;
+  ArtifactDisplayMode display_mode = 2;
+  string comment = 3;
+}
+
+enum ArtifactDisplayMode {
+  ARTIFACT_DISPLAY_MODE_UNSPECIFIED = 0;
+  ARTIFACT_DISPLAY_MODE_PREVIEW = 1;
+  ARTIFACT_DISPLAY_MODE_LINK = 2;
+  ARTIFACT_DISPLAY_MODE_INLINE = 3;
+}
+
+message GateCardContent {
+  common.v1.GateId gate_ref = 1;
+  GateSnapshot snapshot = 2;                      // Gate 当时的状态快照(不可变)
+}
+
+message GateSnapshot {
+  string kind = 1;
+  string question = 2;
+  repeated GateOptionSnapshot options = 3;
+  google.protobuf.Timestamp snapshot_at = 4;
+}
+
+message GateOptionSnapshot {
+  string option_id = 1;
+  string label = 2;
+  string consequences = 3;
+}
+
+message Attachment {
+  string uri = 1;
+  string mime_type = 2;
+  int64 size_bytes = 3;
+}
+
+// ============================================================
+// RPC Request/Response
+// ============================================================
+
+message CreateConversationRequest {
+  ConversationKind kind = 1;
+  string title = 2;
+  optional string description = 3;
+  optional common.v1.ConversationId parent_conversation_id = 4;
+  optional common.v1.TurnId parent_turn_id = 5;
+  optional common.v1.ProjectId project_id = 6;
+  repeated ParticipantRef initial_participants = 7;
+  Visibility visibility = 8;
+  optional BridgedSource bridged_from = 9;
+  common.v1.ActorContext actor = 100;
+}
+message CreateConversationResponse {
+  common.v1.ConversationId conversation_id = 1;
+  google.protobuf.Timestamp created_at = 2;
+}
+
+message ArchiveConversationRequest {
+  common.v1.ConversationId conversation_id = 1;
+  string reason = 2;
+  common.v1.ActorContext actor = 100;
+}
+message ArchiveConversationResponse { ConversationLifecycle state = 1; }
+
+message LockConversationRequest {
+  common.v1.ConversationId conversation_id = 1;
+  string reason = 2;
+  common.v1.ActorContext actor = 100;
+}
+message LockConversationResponse { ConversationLifecycle state = 1; }
+
+message UnlockConversationRequest {
+  common.v1.ConversationId conversation_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message UnlockConversationResponse { ConversationLifecycle state = 1; }
+
+message AddParticipantRequest {
+  common.v1.ConversationId conversation_id = 1;
+  ParticipantRef participant = 2;
+  common.v1.ActorContext actor = 100;
+}
+message AddParticipantResponse { google.protobuf.Timestamp joined_at = 1; }
+
+message RemoveParticipantRequest {
+  common.v1.ConversationId conversation_id = 1;
+  string actor_id = 2;
+  string reason = 3;
+  common.v1.ActorContext actor = 100;
+}
+message RemoveParticipantResponse { google.protobuf.Timestamp removed_at = 1; }
+
+message GetConversationRequest {
+  common.v1.ConversationId conversation_id = 1;
+}
+
+message ListConversationsRequest {
+  optional common.v1.ProjectId filter_project = 1;
+  optional ConversationKind filter_kind = 2;
+  optional ConversationLifecycle filter_lifecycle = 3;
+  uint32 page_size = 4;
+  string page_token = 5;
+}
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
+  string next_page_token = 2;
+}
+
+message PostTurnRequest {
+  common.v1.ConversationId conversation_id = 1;
+  TurnKind kind = 2;
+  TurnContent content = 3;
+  optional common.v1.TurnId parent_turn_id = 4;
+  repeated common.v1.TurnId referenced_turn_ids = 5;
+  TurnVisibility visibility = 6;
+  repeated string visibility_members = 7;
+  common.v1.ActorContext actor = 100;
+}
+message PostTurnResponse {
+  common.v1.TurnId turn_id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  uint64 conversation_version = 3;
+}
+
+message HideTurnRequest {
+  common.v1.TurnId turn_id = 1;
+  string reason = 2;
+  common.v1.ActorContext actor = 100;
+}
+message HideTurnResponse { google.protobuf.Timestamp hidden_at = 1; }
+
+message UnhideTurnRequest {
+  common.v1.TurnId turn_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message UnhideTurnResponse { google.protobuf.Timestamp unhidden_at = 1; }
+
+message GetTurnRequest { common.v1.TurnId turn_id = 1; }
+
+message ListTurnsRequest {
+  common.v1.ConversationId conversation_id = 1;
+  optional google.protobuf.Timestamp before = 2;
+  uint32 page_size = 3;
+  string page_token = 4;
+}
+message ListTurnsResponse {
+  repeated Turn turns = 1;
+  string next_page_token = 2;
+}
+
+message SearchTurnsRequest {
+  string query = 1;
+  optional common.v1.ConversationId in_conversation = 2;
+  optional common.v1.ProjectId in_project = 3;
+  optional common.v1.ActorRef by_author = 4;
+  optional TurnKind filter_kind = 5;
+  uint32 page_size = 6;
+}
+message SearchTurnsResponse { repeated Turn turns = 1; }
+
+// ============================================================
+// StreamEvents(AG-UI 17 事件映射)
+// ============================================================
+
+message StreamEventsRequest {
+  common.v1.ConversationId conversation_id = 1;
+  optional string last_event_id = 2;             // 断点续传
+  optional google.protobuf.Timestamp since = 3;
+  common.v1.ActorContext actor = 100;
+}
+
+// AGUIEvent 对齐 AG-UI 17 标准事件类型 + Quantalithos 扩展
+message AGUIEvent {
+  string event_id = 1;                           // ULID
+  google.protobuf.Timestamp occurred_at = 2;
+  AGUIEventType event_type = 3;
+  oneof payload {
+    MessageContent message_content = 10;
+    StateUpdate state_update = 11;
+    ToolCallResult tool_call_result = 12;
+    RunEnd run_end = 13;
+    QuantalithosCustom custom = 14;              // GateCard / 自定义
+  }
+}
+
+enum AGUIEventType {
+  AGUI_EVENT_TYPE_UNSPECIFIED = 0;
+
+  // AG-UI 17 标准事件(抽样,完整列表随 AG-UI 实装落地)
+  AGUI_RUN_START = 1;
+  AGUI_RUN_END = 2;
+  AGUI_MESSAGE_CONTENT = 3;
+  AGUI_MESSAGE_CHUNK = 4;
+  AGUI_TOOL_CALL_START = 5;
+  AGUI_TOOL_CALL_RESULT = 6;
+  AGUI_STATE_UPDATE = 7;
+  AGUI_MENTION_TRIGGERED = 8;
+
+  // Quantalithos 扩展
+  QUANTALITHOS_GATE_RAISED = 100;
+  QUANTALITHOS_GATE_DECIDED = 101;
+  QUANTALITHOS_ARTIFACT_SHARED = 102;
+  QUANTALITHOS_DECISION_MADE = 103;
+}
+
+message StateUpdate {
+  string field_path = 1;                         // 如 "conversation.lifecycle"
+  string new_value_json = 2;
+}
+
+message ToolCallResult {
+  string tool_name = 1;
+  string result_summary = 2;
+}
+
+message RunEnd {
+  string reason = 1;
+}
+
+message QuantalithosCustom {
+  string custom_type = 1;                        // "gate_card" / "artifact_preview"
+  bytes payload = 2;                             // 按 custom_type 不同序列化
+}

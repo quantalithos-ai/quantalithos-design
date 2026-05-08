@@ -1,0 +1,84 @@
+// Quantalithos core · common/v1/audit.proto
+//
+// 审计与 Actor 上下文。所有写操作必须携带 ActorContext。
+//
+// 草案阶段:✅ 字段稳定。
+
+syntax = "proto3";
+
+package quantalithos.common.v1;
+
+import "common/v1/ids.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "quantalithos/common/v1";
+
+// ---------- Actor 上下文 ----------
+
+// ActorContext 所有写操作 RPC 必须携带(放在 request 字段)。
+// 用于身份审计 / trace 传播 / 跨域事件归因。
+message ActorContext {
+  // Actor 身份
+  ActorRef actor = 1;
+
+  // Trace 上下文(W3C)
+  TraceContext trace = 2;
+
+  // 请求时间戳(由调用方填写,服务端可重置)
+  google.protobuf.Timestamp requested_at = 3;
+
+  // 租户(可空)
+  TenantId tenant = 4;
+
+  // Idempotency key(可选,用于幂等保证)
+  string idempotency_key = 5;
+
+  // 请求来源(API 客户端标识,如 "chat-web" / "console" / "sdk-python")
+  string client_info = 6;
+}
+
+// ActorRef 描述"谁做了这件事"。
+message ActorRef {
+  string actor_id = 1;                        // 对应 Member/User ID,或 "system"
+  ActorKind actor_kind = 2;
+  string display_name = 3;                    // 冗余字段,加速审计 UI
+}
+
+enum ActorKind {
+  ACTOR_KIND_UNSPECIFIED = 0;
+  ACTOR_KIND_USER = 1;                        // 自然人
+  ACTOR_KIND_MEMBER = 2;                      // AI Member
+  ACTOR_KIND_PROJECT_MEMBER = 3;              // 项目内 Member(带 project 上下文)
+  ACTOR_KIND_SYSTEM = 4;                      // 系统(调度器 / 运维 / 后台进程)
+  ACTOR_KIND_BRIDGED = 5;                     // 桥接来源(Bridges 仓转发)
+}
+
+// ---------- 审计引用 ----------
+
+// AuditLogRef 指向 observability 仓的审计事件链条目。
+message AuditLogRef {
+  string ref_uri = 1;                         // observability 存储路径
+  string hash_anchor = 2;                     // 哈希链锚点
+}
+
+// ---------- 严重性 ----------
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_NORMAL = 1;
+  SEVERITY_LOW = 2;
+  SEVERITY_MAJOR = 3;
+  SEVERITY_HIGH = 4;
+  SEVERITY_CRITICAL = 5;                      // 审计严重,触发告警 + 可能冻结操作
+}
+
+// ---------- 自主性 5 级(Research) ----------
+// governance 域 Gate.autonomy_level 使用此枚举。
+enum AutonomyLevel {
+  AUTONOMY_LEVEL_UNSPECIFIED = 0;
+  AUTONOMY_LEVEL_OPERATOR = 1;                // 用户手动
+  AUTONOMY_LEVEL_COLLABORATOR = 2;            // AI 建议,用户决策
+  AUTONOMY_LEVEL_ADVISOR = 3;                 // AI 推荐,用户确认(典型 Gate)
+  AUTONOMY_LEVEL_APPROVER = 4;                // AI 自主,用户事后审批
+  AUTONOMY_LEVEL_OBSERVER = 5;                // AI 全自主,用户审计(严格约束)
+}

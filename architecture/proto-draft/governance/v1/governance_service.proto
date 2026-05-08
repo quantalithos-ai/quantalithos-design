@@ -1,0 +1,972 @@
+// Quantalithos core · governance/v1/governance_service.proto
+//
+// 治理域 RPC:Gate + Policy + Control + AIIA + SoA + Nonconformity
+// 上游:domain/governance/README.md §三
+// 草案阶段:✅
+
+syntax = "proto3";
+
+package quantalithos.governance.v1;
+
+import "common/v1/ids.proto";
+import "common/v1/audit.proto";
+import "common/v1/timestamps.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "quantalithos/governance/v1";
+
+// ============================================================
+// Service
+// ============================================================
+
+service GovernanceService {
+  // === Gate 管理 ===
+  rpc RaiseGate(RaiseGateRequest) returns (RaiseGateResponse);
+  rpc AttachEvidence(AttachEvidenceRequest) returns (AttachEvidenceResponse);
+  rpc MoveGateToReview(MoveGateToReviewRequest) returns (MoveGateToReviewResponse);
+  rpc CastVote(CastVoteRequest) returns (CastVoteResponse);
+  rpc DecideGate(DecideGateRequest) returns (DecideGateResponse);
+  rpc ExpireGate(ExpireGateRequest) returns (ExpireGateResponse);
+  rpc CancelGate(CancelGateRequest) returns (CancelGateResponse);
+
+  rpc GetGate(GetGateRequest) returns (Gate);
+  rpc ListGates(ListGatesRequest) returns (ListGatesResponse);
+
+  // === Policy 管理 ===
+  rpc DraftPolicy(DraftPolicyRequest) returns (DraftPolicyResponse);
+  rpc ActivatePolicy(ActivatePolicyRequest) returns (ActivatePolicyResponse);
+  rpc SupersedePolicy(SupersedePolicyRequest) returns (SupersedePolicyResponse);
+  rpc RetirePolicy(RetirePolicyRequest) returns (RetirePolicyResponse);
+
+  rpc GetPolicy(GetPolicyRequest) returns (Policy);
+  rpc ListPolicies(ListPoliciesRequest) returns (ListPoliciesResponse);
+
+  // 高频调用,供 Runtime C6 Policy Cache + capability-hub 订阅
+  rpc GetApplicablePolicies(GetApplicablePoliciesRequest) returns (GetApplicablePoliciesResponse);
+
+  // === Control 管理(ISO 42001 附录 A)===
+  rpc DeclareControl(DeclareControlRequest) returns (DeclareControlResponse);
+  rpc UpdateControlImplementation(UpdateControlImplementationRequest) returns (UpdateControlImplementationResponse);
+  rpc ReviewControl(ReviewControlRequest) returns (ReviewControlResponse);
+
+  rpc GetControl(GetControlRequest) returns (Control);
+  rpc ListControls(ListControlsRequest) returns (ListControlsResponse);
+
+  // === AIIA(42001 §8.2 / ISO 42005)===
+  rpc CreateAIIA(CreateAIIARequest) returns (CreateAIIAResponse);
+  rpc UpdateAIIA(UpdateAIIARequest) returns (UpdateAIIAResponse);
+  rpc SubmitAIIAForReview(SubmitAIIAForReviewRequest) returns (SubmitAIIAForReviewResponse);
+  rpc ApproveAIIA(ApproveAIIARequest) returns (ApproveAIIAResponse);
+  rpc SupersedeAIIA(SupersedeAIIARequest) returns (SupersedeAIIAResponse);
+
+  rpc GetAIIA(GetAIIARequest) returns (ImpactAssessment);
+  rpc ListAIIAs(ListAIIAsRequest) returns (ListAIIAsResponse);
+
+  // === SoA(42001 §6.1.3)===
+  rpc DraftSoA(DraftSoARequest) returns (DraftSoAResponse);
+  rpc PublishSoA(PublishSoARequest) returns (PublishSoAResponse);
+  rpc SupersedeSoA(SupersedeSoARequest) returns (SupersedeSoAResponse);
+
+  rpc GetSoA(GetSoARequest) returns (SoADocument);
+  rpc GetActiveSoA(GetActiveSoARequest) returns (SoADocument);
+
+  // === Nonconformity(9001 §10.1 / 42001 §10.1)===
+  rpc RaiseNonconformity(RaiseNonconformityRequest) returns (RaiseNonconformityResponse);
+  rpc UpdateNonconformity(UpdateNonconformityRequest) returns (UpdateNonconformityResponse);
+  rpc AddCorrectiveAction(AddCorrectiveActionRequest) returns (AddCorrectiveActionResponse);
+  rpc VerifyNonconformity(VerifyNonconformityRequest) returns (VerifyNonconformityResponse);
+  rpc CloseNonconformity(CloseNonconformityRequest) returns (CloseNonconformityResponse);
+
+  rpc GetNonconformity(GetNonconformityRequest) returns (Nonconformity);
+  rpc ListNonconformities(ListNonconformitiesRequest) returns (ListNonconformitiesResponse);
+
+  // === 管理评审(42001 §9.3)===
+  rpc ScheduleManagementReview(ScheduleManagementReviewRequest) returns (ScheduleManagementReviewResponse);
+  rpc RecordManagementReview(RecordManagementReviewRequest) returns (RecordManagementReviewResponse);
+}
+
+// ============================================================
+// Gate 聚合根(六段式)
+// ============================================================
+
+message Gate {
+  common.v1.GateId gate_id = 1;
+  GateKind kind = 2;
+  common.v1.ProjectId project_id = 3;
+
+  // 六段
+  Trigger trigger = 10;
+  DecisionRequest decision_request = 11;
+  repeated CandidateOption candidate_options = 12;
+  EvidenceRequirement evidence_requirement = 13;
+  DecisionMaker decision_maker = 14;
+  common.v1.AutonomyLevel autonomy_level = 15;
+  TimeoutPolicy timeout_policy = 16;
+  Resolution resolution = 17;
+  repeated AuditEntry audit_trail = 18;
+
+  // 状态
+  GateState state = 20;
+  google.protobuf.Timestamp created_at = 21;
+  google.protobuf.Timestamp decided_at = 22;
+  google.protobuf.Timestamp expired_at = 23;
+  google.protobuf.Timestamp timeout_at = 24;
+
+  common.v1.TraceId trace_id = 30;
+  common.v1.AuditLogRef audit_log_ref = 31;
+  uint64 version = 32;
+}
+
+enum GateKind {
+  GATE_KIND_UNSPECIFIED = 0;
+  GATE_KIND_KICKOFF = 1;
+  GATE_KIND_REQUIREMENTS_CONFIRM = 2;
+  GATE_KIND_DESIGN_CHOICE = 3;
+  GATE_KIND_PROTOTYPE_APPROVAL = 4;
+  GATE_KIND_CODE_REVIEW = 5;
+  GATE_KIND_RELEASE_CONFIRM = 6;
+  GATE_KIND_IMPACT_ASSESSMENT = 7;
+  GATE_KIND_QUALITY_GATE = 8;
+  GATE_KIND_ARCHIVE_CONFIRM = 9;
+  GATE_KIND_CUSTOM = 10;
+
+  // 内部(非用户可见主菜单但作为治理机制)
+  GATE_KIND_MEMBER_LIFECYCLE = 50;
+  GATE_KIND_BASELINE_FREEZE = 51;
+  GATE_KIND_POLICY_UPDATE = 52;
+  GATE_KIND_SOA_UPDATE = 53;
+  GATE_KIND_NONCONFORMITY_RESOLUTION = 54;
+  GATE_KIND_ROLE_INTRODUCTION = 55;
+  GATE_KIND_MARKETPLACE_REVIEW = 56;
+  GATE_KIND_BREAKING_CHANGE = 57;
+}
+
+enum GateState {
+  GATE_STATE_UNSPECIFIED = 0;
+  GATE_STATE_PENDING = 1;
+  GATE_STATE_IN_REVIEW = 2;
+  GATE_STATE_DECIDED = 3;
+  GATE_STATE_EXPIRED = 4;
+  GATE_STATE_CANCELLED = 5;
+}
+
+message Trigger {
+  common.v1.ActorRef raised_by = 1;
+  google.protobuf.Timestamp raised_at = 2;
+  TriggerSource trigger_source = 3;
+  string trigger_reason = 4;
+  string trigger_event_ref = 5;                  // 引用源事件(event_id)
+}
+
+enum TriggerSource {
+  TRIGGER_SOURCE_UNSPECIFIED = 0;
+  TRIGGER_SOURCE_ACTIVITY_WAITING_GATE = 1;
+  TRIGGER_SOURCE_POLICY_REQUIRE_GATE = 2;
+  TRIGGER_SOURCE_MANUAL_RAISE = 3;
+  TRIGGER_SOURCE_SCHEDULED = 4;
+  TRIGGER_SOURCE_EVENT_DRIVEN = 5;
+}
+
+message DecisionRequest {
+  string question = 1;
+  string context_summary = 2;
+  Urgency urgency = 3;
+  repeated common.v1.ArtifactId related_artifacts = 4;
+  repeated common.v1.ActivityId related_activities = 5;
+  repeated common.v1.WorkItemId related_workitems = 6;
+}
+
+enum Urgency {
+  URGENCY_UNSPECIFIED = 0;
+  URGENCY_LOW = 1;
+  URGENCY_NORMAL = 2;
+  URGENCY_HIGH = 3;
+  URGENCY_CRITICAL = 4;
+}
+
+message CandidateOption {
+  string option_id = 1;
+  string label = 2;
+  string description = 3;
+  string consequences = 4;
+  google.protobuf.Struct metadata = 5;
+}
+
+message EvidenceRequirement {
+  repeated string required_artifact_kinds = 1;
+  repeated ReviewRequirement required_reviews = 2;
+  repeated common.v1.ControlId required_checks = 3;
+  optional uint32 minimum_review_count = 4;
+}
+
+message ReviewRequirement {
+  string review_type = 1;
+  uint32 minimum_reviewers = 2;
+}
+
+message DecisionMaker {
+  MakerType maker_type = 1;
+  common.v1.ActorRef specific_maker = 2;
+  QuorumConfig quorum_config = 3;
+  EscalationConfig escalation_config = 4;
+}
+
+enum MakerType {
+  MAKER_TYPE_UNSPECIFIED = 0;
+  MAKER_TYPE_USER = 1;
+  MAKER_TYPE_SPECIFIC_MEMBER = 2;
+  MAKER_TYPE_APPROVAL_QUORUM = 3;
+  MAKER_TYPE_POLICY_AUTO = 4;                    // autonomy=5 专用
+  MAKER_TYPE_ESCALATION_CHAIN = 5;
+}
+
+message QuorumConfig {
+  repeated common.v1.ActorRef required_approvers = 1;
+  uint32 min_approvals = 2;
+}
+
+message EscalationConfig {
+  repeated EscalationLevel levels = 1;
+}
+
+message EscalationLevel {
+  int32 priority = 1;
+  google.protobuf.Duration escalate_after = 2;
+  common.v1.ActorRef next_approver = 3;
+}
+
+message TimeoutPolicy {
+  google.protobuf.Duration timeout_duration = 1;
+  OnTimeoutAction on_timeout = 2;
+}
+
+enum OnTimeoutAction {
+  ON_TIMEOUT_ACTION_UNSPECIFIED = 0;
+  ON_TIMEOUT_ACTION_AUTO_APPROVE = 1;            // 需 Policy 明示授权
+  ON_TIMEOUT_ACTION_AUTO_REJECT = 2;
+  ON_TIMEOUT_ACTION_ESCALATE = 3;
+  ON_TIMEOUT_ACTION_NOTIFY_ONLY = 4;
+}
+
+message Resolution {
+  string chosen_option_id = 1;
+  common.v1.ActorRef decided_by = 2;
+  google.protobuf.Timestamp decided_at = 3;
+  string decision_rationale = 4;
+  repeated Condition conditions = 5;
+  repeated common.v1.ApprovalId approvals = 6;
+}
+
+message Condition {
+  string condition_id = 1;
+  string description = 2;
+  bool mandatory = 3;
+  google.protobuf.Timestamp fulfilled_at = 4;
+}
+
+message AuditEntry {
+  google.protobuf.Timestamp at = 1;
+  common.v1.ActorRef actor = 2;
+  string action = 3;
+  google.protobuf.Struct metadata = 4;
+}
+
+message Approval {
+  common.v1.ApprovalId approval_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorRef approver = 3;
+  Vote vote = 4;
+  string rationale = 5;
+  repeated common.v1.ArtifactId evidence_reviewed = 6;
+  google.protobuf.Timestamp voted_at = 7;
+  common.v1.TraceId trace_id = 8;
+}
+
+enum Vote {
+  VOTE_UNSPECIFIED = 0;
+  VOTE_APPROVE = 1;
+  VOTE_REJECT = 2;
+  VOTE_ABSTAIN = 3;
+  VOTE_CANCELLED = 4;                            // 撤销后重投
+}
+
+// ============================================================
+// Policy 聚合根
+// ============================================================
+
+message Policy {
+  common.v1.PolicyId policy_id = 1;
+  PolicyKind kind = 2;
+  PolicyScope scope = 3;
+  ScopeTarget scope_target = 4;
+  repeated PolicyRule rules = 5;
+  string rule_schema_version = 6;
+  int32 priority = 7;
+  bool is_shared_rules = 8;
+  google.protobuf.Timestamp effective_from = 9;
+  google.protobuf.Timestamp effective_until = 10;
+  common.v1.ActorRef approved_by = 11;
+  common.v1.GateId related_gate_id = 12;
+  common.v1.Semver version = 13;
+  common.v1.PolicyId supersedes = 14;
+  common.v1.PolicyId superseded_by = 15;
+  PolicyLifecycle lifecycle = 16;
+  google.protobuf.Timestamp subscribers_published = 17;
+  map<string, google.protobuf.Timestamp> subscribers_applied_at = 18;
+  common.v1.TraceId trace_id = 19;
+  common.v1.AuditLogRef audit_log_ref = 20;
+  string fingerprint = 21;                        // 用于订阅方判断刷新
+}
+
+enum PolicyKind {
+  POLICY_KIND_UNSPECIFIED = 0;
+  POLICY_KIND_TOOL_WHITELIST = 1;
+  POLICY_KIND_DATA_ACCESS = 2;
+  POLICY_KIND_RELEASE_POLICY = 3;
+  POLICY_KIND_IMPACT_ASSESSMENT_REQUIRED = 4;
+  POLICY_KIND_ROLE_PERMISSION = 5;
+  POLICY_KIND_AUTONOMY_CONFIG = 6;
+  POLICY_KIND_CUSTOM = 7;
+}
+
+enum PolicyScope {
+  POLICY_SCOPE_UNSPECIFIED = 0;
+  POLICY_SCOPE_ORGANIZATION = 1;
+  POLICY_SCOPE_PROJECT = 2;
+  POLICY_SCOPE_ROLE = 3;
+  POLICY_SCOPE_SPECIFIC_MEMBER = 4;
+}
+
+message ScopeTarget {
+  oneof target {
+    string organization_id = 1;
+    common.v1.ProjectId project_id = 2;
+    common.v1.RoleId role_id = 3;
+    common.v1.MemberId member_id = 4;
+  }
+}
+
+message PolicyRule {
+  string rule_id = 1;
+  string condition_expr = 2;                     // DSL(具体语言待 Q2 决策,暂用字符串)
+  RuleAction action = 3;
+  google.protobuf.Struct action_metadata = 4;
+}
+
+enum RuleAction {
+  RULE_ACTION_UNSPECIFIED = 0;
+  RULE_ACTION_ALLOW = 1;
+  RULE_ACTION_DENY = 2;
+  RULE_ACTION_REQUIRE_GATE = 3;
+  RULE_ACTION_NOTIFY = 4;
+  RULE_ACTION_ESCALATE = 5;
+}
+
+enum PolicyLifecycle {
+  POLICY_LIFECYCLE_UNSPECIFIED = 0;
+  POLICY_LIFECYCLE_DRAFT = 1;
+  POLICY_LIFECYCLE_ACTIVE = 2;
+  POLICY_LIFECYCLE_SUPERSEDED = 3;
+  POLICY_LIFECYCLE_RETIRED = 4;
+}
+
+// ============================================================
+// Control 聚合根(42001 附录 A)
+// ============================================================
+
+message Control {
+  common.v1.ControlId control_id = 1;            // 如 "A.4.2"
+  ControlCategory category = 2;
+  string display_name = 3;
+  string description = 4;
+  ControlScope scope = 5;
+  ScopeTarget scope_target = 6;
+  Applicability applicability = 7;
+  string applicability_rationale = 8;
+  ImplementationStatus implementation_status = 9;
+  string implementation_notes = 10;
+  repeated common.v1.ArtifactId evidence_refs = 11;
+  common.v1.ActorRef owner = 12;
+  repeated common.v1.ActorRef reviewers = 13;
+  common.v1.CadenceSpec review_cycle = 14;
+  google.protobuf.Timestamp last_reviewed_at = 15;
+  google.protobuf.Timestamp next_review_due = 16;
+  repeated common.v1.PolicyId related_policies = 17;
+  repeated string related_risks = 18;
+  repeated common.v1.NonconformityId related_nonconformities = 19;
+  ControlLifecycle lifecycle = 20;
+  common.v1.TraceId trace_id = 21;
+  common.v1.AuditLogRef audit_log_ref = 22;
+}
+
+enum ControlCategory {
+  CONTROL_CATEGORY_UNSPECIFIED = 0;
+  CONTROL_CATEGORY_A2_AI_POLICIES = 2;
+  CONTROL_CATEGORY_A3_INTERNAL_ORGANIZATION = 3;
+  CONTROL_CATEGORY_A4_RESOURCES = 4;
+  CONTROL_CATEGORY_A5_ASSESSING_IMPACTS = 5;
+  CONTROL_CATEGORY_A6_AI_SYSTEM_LIFECYCLE = 6;
+  CONTROL_CATEGORY_A7_DATA_FOR_AI = 7;
+  CONTROL_CATEGORY_A8_INFORMATION_PROVISION = 8;
+  CONTROL_CATEGORY_A9_RESPONSIBLE_USE = 9;
+  CONTROL_CATEGORY_A10_THIRD_PARTY = 10;
+}
+
+enum ControlScope {
+  CONTROL_SCOPE_UNSPECIFIED = 0;
+  CONTROL_SCOPE_ORGANIZATION = 1;
+  CONTROL_SCOPE_PROJECT = 2;
+}
+
+enum Applicability {
+  APPLICABILITY_UNSPECIFIED = 0;
+  APPLICABILITY_APPLICABLE = 1;
+  APPLICABILITY_NOT_APPLICABLE = 2;
+}
+
+enum ImplementationStatus {
+  IMPLEMENTATION_STATUS_UNSPECIFIED = 0;
+  IMPLEMENTATION_STATUS_NOT_IMPLEMENTED = 1;
+  IMPLEMENTATION_STATUS_PARTIALLY = 2;
+  IMPLEMENTATION_STATUS_IMPLEMENTED = 3;
+  IMPLEMENTATION_STATUS_VERIFIED = 4;
+}
+
+enum ControlLifecycle {
+  CONTROL_LIFECYCLE_UNSPECIFIED = 0;
+  CONTROL_LIFECYCLE_DRAFT = 1;
+  CONTROL_LIFECYCLE_ACTIVE = 2;
+  CONTROL_LIFECYCLE_SUPERSEDED = 3;
+  CONTROL_LIFECYCLE_RETIRED = 4;
+}
+
+// ============================================================
+// ImpactAssessment(AIIA)
+// ============================================================
+
+message ImpactAssessment {
+  common.v1.AIIAId aiia_id = 1;
+  common.v1.ProjectId project_id = 2;
+  AIIAScope scope = 3;
+  repeated AffectedParty affected_parties = 4;
+  map<string, ImpactEvaluation> impact_dimensions = 5;  // key: dimension name
+  repeated Mitigation mitigation_plan = 6;
+  ResidualRisk residual_risk = 7;
+  AIIAStatus status = 8;
+  common.v1.ActorRef conducted_by = 9;
+  repeated common.v1.ActorRef reviewed_by = 10;
+  common.v1.GateId approved_via_gate = 11;
+  google.protobuf.Timestamp approved_at = 12;
+  common.v1.Semver version = 13;
+  common.v1.AIIAId supersedes = 14;
+  common.v1.ArtifactId artifact_ref = 15;             // 双身份
+  common.v1.TraceId trace_id = 16;
+  common.v1.AuditLogRef audit_log_ref = 17;
+}
+
+message AIIAScope {
+  string system_description = 1;
+  string intended_use = 2;
+  string foreseeable_misuse = 3;
+  string deployment_context = 4;
+}
+
+message AffectedParty {
+  PartyType party_type = 1;
+  string description = 2;
+  optional uint64 population_estimate = 3;
+}
+
+enum PartyType {
+  PARTY_TYPE_UNSPECIFIED = 0;
+  PARTY_TYPE_INDIVIDUAL = 1;
+  PARTY_TYPE_GROUP = 2;
+  PARTY_TYPE_COMMUNITY = 3;
+  PARTY_TYPE_ENVIRONMENT = 4;
+}
+
+message ImpactEvaluation {
+  RiskRating severity = 1;
+  RiskRating likelihood = 2;
+  string description = 3;
+  repeated common.v1.ArtifactId evidence_refs = 4;
+}
+
+enum RiskRating {
+  RISK_RATING_UNSPECIFIED = 0;
+  RISK_RATING_LOW = 1;
+  RISK_RATING_MEDIUM = 2;
+  RISK_RATING_HIGH = 3;
+  RISK_RATING_CRITICAL = 4;
+}
+
+message Mitigation {
+  string mitigation_id = 1;
+  string description = 2;
+  string target_dimension = 3;
+  common.v1.ActorRef responsible_party = 4;
+  MitigationStatus status = 5;
+  repeated common.v1.ControlId related_controls = 6;
+}
+
+enum MitigationStatus {
+  MITIGATION_STATUS_UNSPECIFIED = 0;
+  MITIGATION_STATUS_PLANNED = 1;
+  MITIGATION_STATUS_IN_PROGRESS = 2;
+  MITIGATION_STATUS_IMPLEMENTED = 3;
+  MITIGATION_STATUS_VERIFIED = 4;
+}
+
+message ResidualRisk {
+  ResidualRiskRating overall_rating = 1;
+  map<string, RiskRating> breakdown_by_dimension = 2;
+  string justification = 3;
+}
+
+enum ResidualRiskRating {
+  RESIDUAL_RISK_RATING_UNSPECIFIED = 0;
+  RESIDUAL_RISK_RATING_ACCEPTABLE = 1;
+  RESIDUAL_RISK_RATING_REQUIRES_ATTENTION = 2;
+  RESIDUAL_RISK_RATING_UNACCEPTABLE = 3;
+}
+
+enum AIIAStatus {
+  AIIA_STATUS_UNSPECIFIED = 0;
+  AIIA_STATUS_DRAFT = 1;
+  AIIA_STATUS_IN_REVIEW = 2;
+  AIIA_STATUS_APPROVED = 3;
+  AIIA_STATUS_SUPERSEDED = 4;
+}
+
+// ============================================================
+// SoADocument
+// ============================================================
+
+message SoADocument {
+  common.v1.SoAId soa_id = 1;
+  SoAScope scope = 2;
+  ScopeTarget scope_target = 3;
+  repeated ApplicableControl applicable_controls = 4;
+  repeated ExcludedControl excluded_controls = 5;
+  string implementation_summary = 6;
+  string scope_description = 7;
+  common.v1.Semver version = 8;
+  common.v1.ActorRef approved_by = 9;
+  common.v1.GateId approved_via_gate = 10;
+  google.protobuf.Timestamp approved_at = 11;
+  google.protobuf.Timestamp effective_from = 12;
+  google.protobuf.Timestamp effective_until = 13;
+  SoALifecycle lifecycle = 14;
+  common.v1.SoAId supersedes = 15;
+  common.v1.ArtifactId artifact_ref = 16;              // 双身份
+  common.v1.TraceId trace_id = 17;
+  common.v1.AuditLogRef audit_log_ref = 18;
+}
+
+enum SoAScope {
+  SOA_SCOPE_UNSPECIFIED = 0;
+  SOA_SCOPE_ORGANIZATION = 1;
+  SOA_SCOPE_PROJECT = 2;
+}
+
+message ApplicableControl {
+  common.v1.ControlId control_id = 1;
+  string applicability_rationale = 2;
+  string implementation_summary = 3;
+  ImplementationStatus implementation_status = 4;
+  repeated common.v1.ArtifactId evidence_refs = 5;
+}
+
+message ExcludedControl {
+  common.v1.ControlId control_id = 1;
+  string exclusion_rationale = 2;
+}
+
+enum SoALifecycle {
+  SOA_LIFECYCLE_UNSPECIFIED = 0;
+  SOA_LIFECYCLE_DRAFT = 1;
+  SOA_LIFECYCLE_ACTIVE = 2;
+  SOA_LIFECYCLE_SUPERSEDED = 3;
+}
+
+// ============================================================
+// Nonconformity
+// ============================================================
+
+message Nonconformity {
+  common.v1.NonconformityId nonconf_id = 1;
+  common.v1.ActorRef raised_by = 2;
+  google.protobuf.Timestamp raised_at = 3;
+  NonconfSource source = 4;
+  string source_ref = 5;
+  string title = 6;
+  string description = 7;
+  common.v1.Severity severity = 8;
+  repeated common.v1.ControlId related_controls = 9;
+  common.v1.ProjectId related_project_id = 10;
+  common.v1.AIIAId related_aiia_id = 11;
+  repeated common.v1.ArtifactId related_artifacts = 12;
+  repeated CorrectiveAction corrective_actions = 13;
+  string root_cause_analysis = 14;
+  NonconfStatus status = 15;
+  common.v1.ActorRef owner = 16;
+  google.protobuf.Timestamp due_date = 17;
+  google.protobuf.Timestamp resolved_at = 18;
+  google.protobuf.Timestamp verified_at = 19;
+  common.v1.TraceId trace_id = 20;
+  common.v1.AuditLogRef audit_log_ref = 21;
+}
+
+enum NonconfSource {
+  NONCONF_SOURCE_UNSPECIFIED = 0;
+  NONCONF_SOURCE_CONTROL_VIOLATION = 1;
+  NONCONF_SOURCE_AUDIT_FINDING = 2;
+  NONCONF_SOURCE_GATE_OVERRIDE = 3;
+  NONCONF_SOURCE_INCIDENT = 4;
+  NONCONF_SOURCE_USER_REPORT = 5;
+}
+
+enum NonconfStatus {
+  NONCONF_STATUS_UNSPECIFIED = 0;
+  NONCONF_STATUS_OPEN = 1;
+  NONCONF_STATUS_INVESTIGATING = 2;
+  NONCONF_STATUS_CORRECTIVE_ACTION_PLANNED = 3;
+  NONCONF_STATUS_CORRECTIVE_ACTION_IN_PROGRESS = 4;
+  NONCONF_STATUS_RESOLVED = 5;
+  NONCONF_STATUS_CLOSED = 6;
+}
+
+message CorrectiveAction {
+  string action_id = 1;
+  string description = 2;
+  common.v1.ActorRef responsible_party = 3;
+  google.protobuf.Timestamp due_date = 4;
+  CorrectiveActionStatus status = 5;
+  repeated common.v1.ArtifactId evidence_refs = 6;
+  repeated common.v1.PolicyId related_policy_updates = 7;
+}
+
+enum CorrectiveActionStatus {
+  CORRECTIVE_ACTION_STATUS_UNSPECIFIED = 0;
+  CORRECTIVE_ACTION_STATUS_PLANNED = 1;
+  CORRECTIVE_ACTION_STATUS_IN_PROGRESS = 2;
+  CORRECTIVE_ACTION_STATUS_COMPLETED = 3;
+  CORRECTIVE_ACTION_STATUS_VERIFIED = 4;
+}
+
+// ============================================================
+// Request / Response
+// ============================================================
+
+message RaiseGateRequest {
+  GateKind kind = 1;
+  common.v1.ProjectId project_id = 2;
+  Trigger trigger = 3;
+  DecisionRequest decision_request = 4;
+  repeated CandidateOption candidate_options = 5;
+  EvidenceRequirement evidence_requirement = 6;
+  DecisionMaker decision_maker = 7;
+  common.v1.AutonomyLevel autonomy_level = 8;
+  TimeoutPolicy timeout_policy = 9;
+  common.v1.ActorContext actor = 100;
+}
+message RaiseGateResponse {
+  common.v1.GateId gate_id = 1;
+  GateState state = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message AttachEvidenceRequest {
+  common.v1.GateId gate_id = 1;
+  common.v1.ArtifactId artifact_ref = 2;
+  common.v1.ActorContext actor = 100;
+}
+message AttachEvidenceResponse {}
+
+message MoveGateToReviewRequest { common.v1.GateId gate_id = 1; common.v1.ActorContext actor = 100; }
+message MoveGateToReviewResponse { GateState state = 1; }
+
+message CastVoteRequest {
+  common.v1.GateId gate_id = 1;
+  Vote vote = 2;
+  string rationale = 3;
+  repeated common.v1.ArtifactId evidence_reviewed = 4;
+  common.v1.ActorContext actor = 100;
+}
+message CastVoteResponse { common.v1.ApprovalId approval_id = 1; }
+
+message DecideGateRequest {
+  common.v1.GateId gate_id = 1;
+  string chosen_option_id = 2;
+  string decision_rationale = 3;
+  repeated Condition conditions = 4;
+  common.v1.ActorContext actor = 100;
+}
+message DecideGateResponse {
+  Resolution resolution = 1;
+  google.protobuf.Timestamp decided_at = 2;
+}
+
+message ExpireGateRequest { common.v1.GateId gate_id = 1; common.v1.ActorContext actor = 100; }
+message ExpireGateResponse { GateState state = 1; }
+
+message CancelGateRequest { common.v1.GateId gate_id = 1; string reason = 2; common.v1.ActorContext actor = 100; }
+message CancelGateResponse { GateState state = 1; }
+
+message GetGateRequest { common.v1.GateId gate_id = 1; }
+
+message ListGatesRequest {
+  optional common.v1.ProjectId project_filter = 1;
+  optional GateKind kind_filter = 2;
+  optional GateState state_filter = 3;
+  uint32 page_size = 4;
+  string page_token = 5;
+}
+message ListGatesResponse {
+  repeated Gate gates = 1;
+  string next_page_token = 2;
+}
+
+// === Policy ===
+message DraftPolicyRequest {
+  Policy policy_draft = 1;
+  common.v1.ActorContext actor = 100;
+}
+message DraftPolicyResponse {
+  common.v1.PolicyId policy_id = 1;
+  string fingerprint = 2;
+}
+
+message ActivatePolicyRequest {
+  common.v1.PolicyId policy_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message ActivatePolicyResponse {
+  PolicyLifecycle state = 1;
+  google.protobuf.Timestamp effective_from = 2;
+}
+
+message SupersedePolicyRequest {
+  common.v1.PolicyId old_policy_id = 1;
+  common.v1.PolicyId new_policy_id = 2;
+  common.v1.GateId gate_id = 3;
+  common.v1.ActorContext actor = 100;
+}
+message SupersedePolicyResponse {}
+
+message RetirePolicyRequest {
+  common.v1.PolicyId policy_id = 1;
+  string reason = 2;
+  common.v1.ActorContext actor = 100;
+}
+message RetirePolicyResponse { PolicyLifecycle state = 1; }
+
+message GetPolicyRequest { common.v1.PolicyId policy_id = 1; }
+
+message ListPoliciesRequest {
+  optional PolicyScope scope_filter = 1;
+  optional PolicyLifecycle lifecycle_filter = 2;
+  optional PolicyKind kind_filter = 3;
+}
+message ListPoliciesResponse { repeated Policy policies = 1; }
+
+message GetApplicablePoliciesRequest {
+  oneof scope_query {
+    string organization_id = 1;
+    common.v1.ProjectId project_id = 2;
+    common.v1.RoleId role_id = 3;
+    common.v1.MemberId member_id = 4;              // 返回全部生效(含继承)
+  }
+  repeated PolicyKind filter_kinds = 5;
+  optional google.protobuf.Timestamp as_of = 6;
+}
+message GetApplicablePoliciesResponse {
+  repeated Policy policies = 1;                    // 按 priority desc
+  google.protobuf.Timestamp resolved_at = 2;
+  string policy_fingerprint = 3;                   // 所有 policy 的聚合 hash
+}
+
+// === Control ===
+message DeclareControlRequest {
+  Control control_draft = 1;
+  common.v1.ActorContext actor = 100;
+}
+message DeclareControlResponse { common.v1.ControlId control_id = 1; }
+
+message UpdateControlImplementationRequest {
+  common.v1.ControlId control_id = 1;
+  ImplementationStatus new_status = 2;
+  string notes = 3;
+  repeated common.v1.ArtifactId evidence_refs = 4;
+  common.v1.ActorContext actor = 100;
+}
+message UpdateControlImplementationResponse {}
+
+message ReviewControlRequest {
+  common.v1.ControlId control_id = 1;
+  string review_outcome = 2;
+  common.v1.ActorContext actor = 100;
+}
+message ReviewControlResponse { google.protobuf.Timestamp reviewed_at = 1; }
+
+message GetControlRequest { common.v1.ControlId control_id = 1; }
+
+message ListControlsRequest {
+  optional ControlCategory category_filter = 1;
+  optional ImplementationStatus status_filter = 2;
+}
+message ListControlsResponse { repeated Control controls = 1; }
+
+// === AIIA ===
+message CreateAIIARequest {
+  common.v1.ProjectId project_id = 1;
+  AIIAScope scope = 2;
+  repeated AffectedParty affected_parties = 3;
+  map<string, ImpactEvaluation> impact_dimensions = 4;
+  repeated Mitigation mitigation_plan = 5;
+  ResidualRisk residual_risk = 6;
+  common.v1.ActorContext actor = 100;
+}
+message CreateAIIAResponse {
+  common.v1.AIIAId aiia_id = 1;
+  common.v1.ArtifactId artifact_ref = 2;
+}
+
+message UpdateAIIARequest {
+  common.v1.AIIAId aiia_id = 1;
+  AIIAScope scope = 2;
+  repeated AffectedParty affected_parties = 3;
+  map<string, ImpactEvaluation> impact_dimensions = 4;
+  repeated Mitigation mitigation_plan = 5;
+  ResidualRisk residual_risk = 6;
+  common.v1.ActorContext actor = 100;
+}
+message UpdateAIIAResponse {}
+
+message SubmitAIIAForReviewRequest {
+  common.v1.AIIAId aiia_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message SubmitAIIAForReviewResponse { AIIAStatus state = 1; }
+
+message ApproveAIIARequest {
+  common.v1.AIIAId aiia_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message ApproveAIIAResponse { AIIAStatus state = 1; google.protobuf.Timestamp approved_at = 2; }
+
+message SupersedeAIIARequest {
+  common.v1.AIIAId old_aiia_id = 1;
+  common.v1.AIIAId new_aiia_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message SupersedeAIIAResponse {}
+
+message GetAIIARequest { common.v1.AIIAId aiia_id = 1; }
+
+message ListAIIAsRequest {
+  optional common.v1.ProjectId project_filter = 1;
+  optional AIIAStatus status_filter = 2;
+}
+message ListAIIAsResponse { repeated ImpactAssessment aiias = 1; }
+
+// === SoA ===
+message DraftSoARequest {
+  SoADocument draft = 1;
+  common.v1.ActorContext actor = 100;
+}
+message DraftSoAResponse { common.v1.SoAId soa_id = 1; }
+
+message PublishSoARequest {
+  common.v1.SoAId soa_id = 1;
+  common.v1.GateId gate_id = 2;
+  common.v1.ActorContext actor = 100;
+}
+message PublishSoAResponse { SoALifecycle state = 1; }
+
+message SupersedeSoARequest {
+  common.v1.SoAId old_soa_id = 1;
+  common.v1.SoAId new_soa_id = 2;
+  common.v1.GateId gate_id = 3;
+  common.v1.ActorContext actor = 100;
+}
+message SupersedeSoAResponse {}
+
+message GetSoARequest { common.v1.SoAId soa_id = 1; }
+
+message GetActiveSoARequest {
+  oneof scope {
+    string organization_id = 1;
+    common.v1.ProjectId project_id = 2;
+  }
+}
+
+// === Nonconformity ===
+message RaiseNonconformityRequest {
+  NonconfSource source = 1;
+  string source_ref = 2;
+  string title = 3;
+  string description = 4;
+  common.v1.Severity severity = 5;
+  repeated common.v1.ControlId related_controls = 6;
+  optional common.v1.ProjectId related_project_id = 7;
+  optional common.v1.AIIAId related_aiia_id = 8;
+  repeated common.v1.ArtifactId related_artifacts = 9;
+  common.v1.ActorContext actor = 100;
+}
+message RaiseNonconformityResponse { common.v1.NonconformityId nonconf_id = 1; }
+
+message UpdateNonconformityRequest {
+  common.v1.NonconformityId nonconf_id = 1;
+  optional NonconfStatus new_status = 2;
+  optional string root_cause_analysis = 3;
+  common.v1.ActorContext actor = 100;
+}
+message UpdateNonconformityResponse {}
+
+message AddCorrectiveActionRequest {
+  common.v1.NonconformityId nonconf_id = 1;
+  CorrectiveAction action = 2;
+  common.v1.ActorContext actor = 100;
+}
+message AddCorrectiveActionResponse { string action_id = 1; }
+
+message VerifyNonconformityRequest {
+  common.v1.NonconformityId nonconf_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message VerifyNonconformityResponse { NonconfStatus state = 1; google.protobuf.Timestamp verified_at = 2; }
+
+message CloseNonconformityRequest {
+  common.v1.NonconformityId nonconf_id = 1;
+  common.v1.ActorContext actor = 100;
+}
+message CloseNonconformityResponse { NonconfStatus state = 1; }
+
+message GetNonconformityRequest { common.v1.NonconformityId nonconf_id = 1; }
+
+message ListNonconformitiesRequest {
+  optional NonconfStatus status_filter = 1;
+  optional common.v1.Severity severity_filter = 2;
+}
+message ListNonconformitiesResponse { repeated Nonconformity items = 1; }
+
+// === Management Review(42001 §9.3)===
+message ScheduleManagementReviewRequest {
+  google.protobuf.Timestamp scheduled_at = 1;
+  repeated common.v1.ActorRef participants = 2;
+  common.v1.ActorContext actor = 100;
+}
+message ScheduleManagementReviewResponse { string review_id = 1; }
+
+message RecordManagementReviewRequest {
+  string review_id = 1;
+  string outcome_summary = 2;
+  repeated common.v1.ArtifactId evidence_refs = 3;
+  common.v1.ActorContext actor = 100;
+}
+message RecordManagementReviewResponse { common.v1.ArtifactId review_artifact = 1; }

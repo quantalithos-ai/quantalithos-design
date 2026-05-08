@@ -9,12 +9,12 @@
 ## 顶层目录速览
 
 ```
-product/            产品定义 — WHY / WHAT(愿景、最终目的、产品矩阵、六域模型)
-methodology/        方法论 — 过程标准的学习与吸收(含 11 份国际标准讨论)
-architecture/       架构 — 系统分解、Member 容器化、ADR
-stages/             六阶段详细设计(阶段 0 ~ 阶段 5)
-standards/          规范 — 必须遵守的(文档规范 / 编码规范 / 流程图规范)
-flow/               流程引擎专题
+product/            产品定义 — WHY / HOW / WHAT(最终目的、六域模型、产品矩阵)
+methodology/        方法论 — 过程标准的学习与吸收(含 14 份国际标准讨论)
+architecture/       架构 — 系统分解、仓库拆分、路线图、标准对齐、ADR
+stages/             Phase 1 六阶段设计(历史参考,A 方案下不作为路线图)
+standards/          规范 — 三横切红线 + 产品/子项目遵循清单 + 文档/编码/图形规范
+flow/               流程引擎专题(Phase 1 遗留,历史参考)
 research/           调研 — Agent 模式、框架、协议、竞品、专题
 references/         外部参考原文 — ISO/IEEE 标准 PDF + BPMN/SPEM 元模型源文件
 implementation/     实施与交付(环境搭建、测试策略、故障排查等)
@@ -28,25 +28,30 @@ discussions/        对话与讨论记录(按日期归档)
 ## 阅读路径
 
 **第一次来 — 想理解这个产品是什么**
-1. `product/vision.md` — 愿景
+1. `product/最终目的.md` — 产品叙事权威版本(六条不可妥协承诺)
 2. `product/基础想法.md` — 最初的产品构想
-3. `product/overview.md` — 整体概览
-4. `architecture/member-容器化架构.md` — 当前权威架构
+3. `product/六域模型.md` — 领域建模(六个域的聚合根 + 事件 + 不变量)
+4. `product/产品矩阵.md` — 10 产品矩阵 + 域消费 + 联动场景
 
 **想理解我们参考的过程标准与方法论**
 1. `methodology/开发流程标准综述.md` — 全景对比(四层模型)
-2. `methodology/standards-discussion/` — 11 份"讨论与对象抽象"
+2. `methodology/standards-discussion/` — 14 份"讨论与对象抽象"
 3. `discussions/2026-05-07-标准与建模.md` — 标准 → 领域模型 → 仓库拆分 → 产品矩阵的完整推演
 
-**想看具体阶段怎么跑**
-1. `stages/` — 阶段 0 到阶段 5 的详细设计
-2. `methodology/流程全景图.md` — 六阶段全景
-3. `methodology/端到端流程说明.md` — 一次项目走完的具体时间线
+**想看当前架构**
+1. `architecture/架构设计.md` — 架构设计方法论基础(任何设计讨论前必读)
+2. `architecture/仓库拆分方案.md` — 26 仓 × 7 层(A 方案)
+3. `architecture/开发路线图与优先级.md` — L0-L5 节点交付顺序
+4. `architecture/adr/` — 架构决策记录
 
 **写设计 / 写代码前必读**
 1. `standards/document/设计文档编写通则.md`
 2. `standards/coding/` — 编程语言规范
 3. `standards/diagram/` — 流程图规范
+
+**历史对照**
+- `architecture/legacy/` — Phase 1 的架构文档(已被 A 方案替代)
+- `product/legacy/` — Phase 1 的产品文档(已被 `product/最终目的.md` 顶替)
 
 ---
 
@@ -73,8 +78,8 @@ dev                 当前主分支 — 仅包含重构后的文档
 ## 与旧仓库结构的映射
 
 ```
-docs/OVERVIEW.md                            → product/overview.md
-docs/vision.md                              → product/vision.md
+docs/OVERVIEW.md                            → product/legacy/overview.md
+docs/vision.md                              → product/legacy/vision.md
 docs/architecture/*                         → architecture/*  (+ 部分 design/* 汇入)
 docs/design/阶段*.md                         → stages/*
 docs/design/*讨论与对象抽象.md                → methodology/standards-discussion/*

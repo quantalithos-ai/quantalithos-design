@@ -1,17 +1,21 @@
 # Member 容器化架构设计
 
-> 状态：**定稿**。这是 Quantalithos AI 在 Phase 2B 及之后的权威架构文档。
+> ⚠️ **状态:2026-05-08 定位调整**
 >
-> 本文**替代**以下文档的相关内容（旧文档应视为过时，保留仅为历史对照）：
-> - [单 runtime 单 agent 落地设计](./单runtime单agent落地设计.md) — 原 Phase 2B "flow 作 supervisor" 方案，已被本方案覆盖
+> 本文成稿于 Phase 2B 阶段,作为当时"Member 容器化"方案的定稿。进入 A 方案后,**本文的核心结论(容器 = 一个 AI 员工、Member/Runtime/Tool 三段)被保留**,但需要按 A 方案重新定位:
 >
-> 关联文档：
-> - [Agent 部署拓扑与群组协作讨论](./agent部署拓扑与群组协作讨论.md)（历史讨论，D1 决策已演进）
-> - [Phase 2 gRPC 升级方案](./phase2-grpc升级方案.md)（已跳过，见 §1.4 Q1 决策）
-> - [开发路线图与优先级](./开发路线图与优先级.md)（需同步更新）
-> - [Phase 2B 实施规划](./phase2b-实施规划.md)（本文的落地执行）
+> - **旧定位**:Phase 2B 及之后的权威架构文档
+> - **新定位**:L2 Member 运行层(5 仓)的**原始推演来源**,核心隐喻("容器 = 一个人")仍然成立
+> - **权威承接**:`architecture/仓库拆分方案.md`(A 方案 L2 五仓)+ `architecture/ai-member设计.md`(待写,系统化沉淀本文 + 本轮 6 轮讨论)
 >
-> 对照清单：本方案已对照 `research_design_principles.md` 和 `software_design_principles.md`，详见 §七。
+> **本文内容与 A 方案的几个关键差异**(读本文时请注意):
+> 1. **单层 Member** → 已升级为**双层 Member**(GlobalMember 在 identity / ProjectMember 在 work),见 ADR-0004
+> 2. **Member 容器 key 是 member_id** → 已修正为 ProjectMember 级容器,key 是 `<global_member_id>:<project_id>`
+> 3. **Phase 2B/2C/3 分期** → 已废弃,见 `architecture/开发路线图与优先级.md` 的 N0-N9 节点
+> 4. **"project-store"、"flow"、"tool-gateway" 术语** → 按 A 方案重新映射为 work/process/capability-hub
+> 5. **历史引用(单runtime单agent落地设计.md 等)** → 已迁入 `architecture/legacy/`
+>
+> 本文保留作为 L2 设计的主要推演来源。等 `architecture/ai-member设计.md` 写成后,本文转为历史参考。
 
 ---
 

@@ -1,10 +1,18 @@
 # Agent 统一模型与三级控制设计
 
-> 讨论如何让 Agent 既能对话又能按流程执行任务，覆盖 AI 员工在真实工作中的所有场景
+> ⚠️ **状态:2026-05-08 被 A 方案吸收**
+>
+> 本文的"三级控制"概念(Free / Guided / Enforced)在 A 方案下演化为**过程域 ProcessProfile 的 tailoring_level + 治理域 Gate 的 autonomy_level 5 级**。核心思路保留,但对象体系和实现方式已重构。权威文档:
+>
+> - 过程域设计:`product/六域模型.md`(待写)§过程域
+> - 治理域 Gate 5 级自主性:`methodology/standards-discussion/ISO-42001.md` + `feedback_research_principles.md`"自主性 5 级"
+> - AI Member 运行层:`architecture/ai-member设计.md`(待写)
+>
+> 本文保留仅作历史讨论来源,不作权威引用。
 
 ---
 
-## 一、问题背景
+## 一、问题背景(Phase 1 遗留,已过时)
 
 ### 1.1 核心矛盾
 

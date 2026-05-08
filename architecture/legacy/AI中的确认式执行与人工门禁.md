@@ -1,6 +1,19 @@
 # AI中的确认式执行与人工门禁
 
-## 一、问题背景
+> ⚠️ **状态:2026-05-08 被 A 方案吸收**
+>
+> 本文讨论的"确认式执行"与"人工门禁"两个概念,在 A 方案下升级为治理域的一等对象:
+>
+> - **门禁 Gate** → 治理域聚合根,含 trigger / decision_request / candidate_options / evidence_requirement / resolution / audit_trail 六段
+> - **确认式执行** → Runtime Tool Invoker 的前置 policy check + Member 的 attention 过滤
+>
+> 权威文档:`product/六域模型.md`(待写)§治理域 + `methodology/standards-discussion/ISO-42001.md`
+>
+> 本文保留仅作历史讨论来源,不作权威引用。
+
+---
+
+## 一、问题背景(Phase 1 遗留,已过时)
 
 像 Cursor 这类 IDE 在执行“写文档、改代码、写文件”这类动作时，通常不会让 AI 直接无条件落盘，而是先把修改内容以 diff、草稿或 proposal 的形式展示给用户，再由用户手动确认是否应用。
 

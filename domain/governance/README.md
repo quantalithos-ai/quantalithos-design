@@ -184,6 +184,16 @@ Gate {
 
 这些**不在 §2.1.2 用户可见的 10 种里**,但作为治理机制存在。统一归为 `custom` kind + 特殊 metadata 标签。
 
+**关于"Activity 与 WorkItem 不一致"场景的 kind 选择(ADR-0008 锁定)**:
+
+- **不新增 `stage-exit` 之类的专用 kind**。即 Activity 想 complete 但 related_workitems 未全部 done 时,不造新 kind
+- 按场景复用已有 kind:
+  - 未达质量 / 验收标准 → `quality-gate`
+  - 多种处理路径让人选 → `design-choice`
+  - 涉及发布边界的最终确认 → `release-confirm`
+- Gate 的差异通过 `decision_request.context_summary` + `candidate_options.metadata` 承载,不依赖 kind 分化
+- 理由:kind 是用户可见语义,增加一种 kind 会触发 UI / 审计列表 / 搜索过滤 / 培训材料的全线适配成本,收益不抵
+
 #### 2.1.3 六段式强约束
 
 **关键约束**:Gate **必须六段完整**才能 decide(INV)。缺任何一段立即拒绝决策。
@@ -806,6 +816,8 @@ message GetApplicablePoliciesResponse {
   - 组织级 Policy / SoA / Control 对组织内所有 Member / User 可读(透明)
   - Nonconformity 限 auditor / owner / 相关责任方可读
 
+**字段级视图裁剪(ADR-0009)**:本域 Get / List / Query 类 RPC **不接受 Role 参数**,返回全量字段;按 Role 的字段可见性、脱敏、派生字段由 UI 仓消费 method-library 的 ViewProfile 实现。actor 仅用于鉴权和审计留痕。
+
 ### 3.4 常见错误码
 
 - `GATE_NOT_FOUND` / `POLICY_NOT_FOUND` / `CONTROL_NOT_FOUND`
@@ -996,6 +1008,7 @@ data: {
 | 来源 | 事件 | 本域动作 |
 |---|---|---|
 | process | `process.activity.waiting_gate` | 若 Gate 尚未创建,按 Activity 配置自动 RaiseGate |
+| process | `process.activity.auto_action_executed`(ADR-0008) | 审计留痕;AutoAction 触发频率达阈值时,触发 Policy 重评 Gate |
 | work | `work.project.started` | 检查是否需要强制 AIIA(INV-10 触发 impact-assessment Gate) |
 | work | `work.project.context_of_use_updated` | 检查 compliance_profile 变化 → 可能触发 AIIA 重评 |
 | artifact | `artifact.reviewed` | 若 Artifact kind 对应某 Gate(如 prototype-approval),检查是否需要发 Gate |
@@ -1645,6 +1658,8 @@ shared_rules > role > project:
 - process.activity.waiting_gate 事件驱动 Gate 自动创建
 - Gate 的 kind 与 process.ProcessTemplate.gates_required 对齐
 - governance 是 process 的"决策手段",不直接执行过程
+- **不为 Activity / WorkItem 不一致新增 kind**(ADR-0008):走已有 `quality-gate` / `design-choice` / `release-confirm`,差别通过 `decision_request.context_summary` + `candidate_options.metadata` 承载
+- **AutoAction 授权复用 autonomy_level**(ADR-0008):ActivityDef.completion_policy=try_auto_then_gate 时,运行时以当前 Project × Activity 的有效 autonomy_level 决定 AutoAction 是否执行;级别不足自动退化为 raise_gate;执行必发 `process.activity.auto_action_executed` 事件,本域订阅记审计
 
 ### 11.3 与 artifact 域
 

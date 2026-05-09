@@ -161,6 +161,30 @@ ActivityDef {
     timeout:                 Option<Duration>,
     retry_policy:            RetryPolicy,
     on_gate_trigger:         Option<GateRequirementRef>,  // Activity 挂起时触发哪个 Gate
+    completion_policy:       CompletionPolicy,     // complete 时如何处理 related_workitems
+                                                   //  (见 ADR-0008,四种策略)
+                                                   //  未指定时默认 auto_complete
+}
+
+// ADR-0008 引入:Activity 想 complete 时,如何处理 related_workitems 的策略
+CompletionPolicy = oneof {
+    auto_complete {},                              // 默认:纯流程节点,不检查 WorkItem
+    enforce_workitems_done {                       // 强制对齐:卡住直到全部 done
+        on_incomplete:       BlockBehavior,        // block / wait
+        wait_timeout:        Option<Duration>,
+        on_timeout:          enum { raise_gate / fail_activity },
+    },
+    raise_gate {                                    // 必起 Gate 人类决策(复用已有 kind)
+        gate_kind:           GateKind,              // quality-gate / design-choice / release-confirm
+        evidence:            EvidenceRequirementSpec,
+        decision_maker:      DecisionMakerSpec,
+        autonomy_level:      AutonomyLevel,
+    },
+    try_auto_then_gate {                           // 先试 AutoAction,处理不了再 Gate
+        auto_actions:        Vec<AutoActionSpec>,  // defer / reduce_priority / split / spillover
+        required_autonomy_level: AutonomyLevel,    // Policy 需授权至此级别,否则退化为 Gate
+        on_unhandled:        GateRequirementSpec,
+    },
 }
 ```
 
@@ -448,7 +472,18 @@ Activity {
   [cancel]   → cancelled(Instance 级 cancel 触发)
 ```
 
-#### 2.4.3 不变量(INV-31 到 INV-40)
+**Activity.state=completed 的含义(ADR-0008)**:
+
+- Activity.completed **表示"流程规定的 Runtime 执行动作已完成"**,即 BPMN 节点语义上的推进
+- **不等于** `related_workitems` 全部 `done` —— Activity 和 WorkItem 是两套独立状态机
+- **项目完成的判据在 WorkItem 侧**(`domain/work/README.md`),不以 Activity completed 为准
+- **complete 时如何处理未完成的 related_workitems** 由 `ActivityDef.completion_policy` 配置:
+  - `auto_complete`(默认):不检查 WorkItem,流程节点直接推进
+  - `enforce_workitems_done`:卡住直到全部 done
+  - `raise_gate`:必起 Gate(复用 quality-gate / design-choice / release-confirm,**不新增 stage-exit**)
+  - `try_auto_then_gate`:先尝试 AutoAction,处理不了再起 Gate(AutoAction 默认禁止,需 Policy 授权)
+
+#### 2.4.3 不变量(INV-31 到 INV-44)
 
 **INV-31** `activity_id` 永不复用(同一 instance 内)
 **INV-32** `state=in_progress` 必须 started_at 非空
@@ -460,6 +495,10 @@ Activity {
 **INV-38** Activity 状态转移必须发事件(可观察性红线)
 **INV-39** Activity 的 inputs / outputs 指向的 Artifact 必须是 approved / baselined(除非 inputs 本就是 initiated / reviewed 的草案)
 **INV-40** ServiceTask 的 assignee 必须是 system 或具备对应 Capability 的 ProjectMember
+**INV-41(ADR-0008)** `completion_policy=try_auto_then_gate` 时,运行时查当前 Project × ActivityDef 的有效 `autonomy_level`;级别 < `required_autonomy_level` → AutoAction 不执行,**静默退化为 raise_gate**(走 `on_unhandled`)
+**INV-42(ADR-0008)** 每次 AutoAction 执行必须发 `process.activity.auto_action_executed` 事件,audit_trail 留痕(不得静默执行)
+**INV-43(ADR-0008)** `completion_policy=raise_gate` / `try_auto_then_gate` 的 Gate 必须用已有 kind(quality-gate / design-choice / release-confirm),不得新造 stage-exit 之类的 kind
+**INV-44(ADR-0008)** Activity.state=completed 仅表示流程节点推进完毕,引擎**不**强制 `related_workitems` 状态与 Activity 状态同步
 
 ### 2.5 Token 值对象(BPMN 并行控制)
 
@@ -699,12 +738,13 @@ message CompleteActivityResponse {
 |---|---|
 | `process.activity.scheduled` | member-service(准备容器)/ work(WorkItem 联动) |
 | `process.activity.started` | conversation(可选发通知)/ observability |
-| `process.activity.completed` | work(WorkItem 状态)/ artifact(outputs 产出联动)/ observability |
+| `process.activity.completed` | work(事件通知;按 ADR-0008,work 不强同步 WorkItem 状态)/ artifact(outputs 产出联动)/ observability |
 | `process.activity.failed` | governance(触发 retry / Nonconformity)/ observability |
 | `process.activity.waiting_gate` | **governance(核心:触发 Gate)**/ observability |
 | `process.activity.resumed_from_gate` | observability |
 | `process.activity.skipped` | observability(通过 Gateway 路由) |
 | `process.activity.artifact_produced` | artifact(创建 Artifact)/ work(WorkItem) |
+| `process.activity.auto_action_executed`(ADR-0008) | governance(审计留痕)/ work(WorkItem 被 AutoAction 处理)/ observability |
 
 #### Stage 级
 
@@ -1321,7 +1361,7 @@ Runtime 继续执行 Activity A
 
 **倾向**:A
 
-**推进**:本文定稿同步产出 **ADR-0007**。
+**推进**:**已由 ADR-0007 决策**(A + 大状态外部 blob 回落),本节保留作为索引。
 
 ### Q2. Sub-Process 和 Call-Activity 的嵌套边界
 
@@ -1427,6 +1467,17 @@ Runtime 继续执行 Activity A
 - governance:Gate 是 Activity 挂起态的决策对象;本域不决策,只发起
 - work:Project / WorkItem / Iteration 驱动 Instance 创建和节奏
 - artifact:Activity outputs 触发 Artifact 创建
+
+**Activity 与 WorkItem 关系(ADR-0008 锁定)**:
+- 两套状态机严格独立:Activity(BPMN 语义)/ WorkItem(Scrum 业务语义),不同步字段
+- 项目完成判据以 **WorkItem 为准**(work 域),Activity completed 仅表示流程节点推进
+- 不一致处理由 `ActivityDef.completion_policy` 配置,AutoAction 默认禁止
+- 不新增 `stage-exit` 类 Gate kind,复用 `quality-gate` / `design-choice` / `release-confirm`
+
+**RPC 不按 Role 过滤字段(ADR-0009 锁定)**:
+- 本域 Get / List / Query 类 RPC 的字段返回 **不接受 Role 参数**,不按 Role 裁剪
+- actor 仅用于鉴权(读不读得到对象)和审计留痕
+- 字段级视图裁剪由 UI 仓消费 method-library 的 ViewProfile 完成
 
 ### 11.4 与 L2 Member 运行层
 

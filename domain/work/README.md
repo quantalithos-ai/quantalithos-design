@@ -174,6 +174,13 @@ Project {
 **INV-14** Project 必须与 conversation 域的一个 kind=group 一对一绑定(conversation 域 INV-2)
 **INV-15** `lifecycle=active` 时必须有 `process_instance_id != null`(除非过程域显式未启动)
 
+**项目完成判据(ADR-0008)**:
+
+- **项目是否完成 = 所有 WorkItem 的 state ∈ {done, cancelled}**
+- **与 ProcessInstance 是否 completed 独立判断**
+- 看板、进度汇总、Retrospective 统计都**以 WorkItem 为准**,不以 Activity 状态为准
+- ProcessInstance.completed 仅表示流程引擎推进完毕,不作为项目验收依据
+
 #### 2.1.4 操作契约(Project)
 
 | 操作 | 前置 | 后置 | 事件 |
@@ -727,6 +734,8 @@ message ProjectBoard {
   - `AssignMember` 必须 owner 或 tech-lead 的 ProjectMember
   - `UpdateToolScope` 扩展出 Role default 的部分必须有 Policy 授权证据
 
+**字段级视图裁剪(ADR-0009)**:本域 Get / List / Query 类 RPC **不接受 Role 参数**,返回全量字段;按 Role 的字段可见性、脱敏、派生字段由 UI 仓消费 method-library 的 ViewProfile 实现。actor 仅用于鉴权(能否读取整个对象)和审计留痕。
+
 ### 3.4 常见错误码
 
 - `PROJECT_NOT_FOUND` / `WORKITEM_NOT_FOUND` / `ITERATION_NOT_FOUND`
@@ -854,7 +863,8 @@ data: {
 | identity | `identity.member.paused` | 所有相关 ProjectMember 转 paused;发 `member_paused` 事件 |
 | identity | `identity.member.retired` | 所有相关 ProjectMember 转 retired_from_project;发对应事件 |
 | identity | `identity.role.updated` | 查受影响 ProjectMember 清单,触发相关容器的 Role 刷新 |
-| process | `process.activity.completed` | 若 Activity 关联 WorkItem,检查是否可转 done |
+| process | `process.activity.completed` | **不**强同步 WorkItem 状态(ADR-0008)。Activity 和 WorkItem 是独立状态机,本域仅记录事件到 WorkItem 时间线 / related_turns 便于展示;WorkItem 状态转移由自身工作流驱动(submit_for_review / approve 等) |
+| process | `process.activity.auto_action_executed`(ADR-0008) | 按 AutoAction 类型更新对应 WorkItem(defer / reduce_priority / split_off_incomplete / spillover),全部动作留审计 |
 | process | `process.activity.artifact_produced` | 更新对应 WorkItem 的 related_artifacts |
 | governance | `governance.gate.decided(kickoff)` | state=draft → active 的确认 |
 | governance | `governance.gate.decided(archive-confirm)` | state=active → archived |
@@ -1445,7 +1455,9 @@ identity.member.retired 触发的链路(对齐 identity §六.3 场景 C):
 ### 11.3 与 `domain/process/README.md`(待写)
 
 - Project.process_template_id / process_profile_id / process_instance_id 都指向 process 域
-- WorkItem ↔ Activity 弱绑定(`六域模型.md` §5.6)
+- WorkItem ↔ Activity 弱绑定(`六域模型.md` §5.6)—— **两套独立状态机**,不同步字段(ADR-0008)
+- 项目完成判据以 **WorkItem 为准**,不以 ProcessInstance.completed 为准(ADR-0008)
+- Activity 完成时如何处理未完成的 related_workitems 由 `ActivityDef.completion_policy` 决定;本域**不被动同步** WorkItem 状态,只记录事件到时间线
 - 过程模板的 Gate 定义来自 process 域,但由 governance 决策
 
 ### 11.4 与 `domain/conversation/README.md`

@@ -3,6 +3,14 @@
 // 治理域 RPC:Gate + Policy + Control + AIIA + SoA + Nonconformity
 // 上游:domain/governance/README.md §三
 // 草案阶段:✅
+//
+// 关键约定:
+// - ADR-0008:不为 Activity / WorkItem 不一致新增 stage-exit kind,
+//   复用 quality-gate / design-choice / release-confirm,差别通过
+//   decision_request.context_summary + candidate_options.metadata 承载。
+//   AutoAction 授权复用已有 autonomy_level 机制(不新增 Policy kind)。
+// - ADR-0009:本服务 Get / List / Query 类 RPC 不接受 Role 参数,不按 Role
+//   过滤字段;字段级视图裁剪在 UI 仓,通过 method-library 的 ViewProfile 完成。
 
 syntax = "proto3";
 

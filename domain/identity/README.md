@@ -230,6 +230,8 @@ Role {
 **INV-13** 有任何 GlobalMember 引用该 Role 时,不允许 retire
 **INV-14** `spec_source` 必须指向 method-library 里已发布的 Method Content(版本对应)
 **INV-15** `required_capabilities` 必须是 `default_capabilities` 的子集
+**INV-16(ADR-0009)** Role 本身不承载"视图策略" —— "某 Role 看某对象时看到什么字段"由 method-library 的 ViewProfile 定义,本域只负责 Role 标识;UI 仓按 (role_id, object_kind) 向 method-library 查 ViewProfile
+**INV-17(ADR-0008 镜像)** `spec_source` 指向的 RoleDefinition 中如含 `performing_tasks → TaskDefinition → ActivityDef`,其 `completion_policy` 语义由 method-library / process 域共同保证,本域不复算
 
 #### 2.2.4 初始 Role 集合(9 个)
 
@@ -385,6 +387,8 @@ message ResolveMemberResponse {
 - **外部(Chat / SDK)**:OAuth2 + Role 级 RBAC
 - **只读查询**(GetMember / ListMembers / QueryMembers)允许 project 内 ProjectMember 自查;其他 Member 的档案根据 Policy 控制
 - **招聘 / Retire 等写操作** 必须经 Gate(governance.Gate.kind=member-lifecycle)
+
+**字段级视图裁剪(ADR-0009)**:本域 Get / List / Query 类 RPC **不接受 Role 参数,不按 Role 过滤字段**,返回已鉴权对象的全量字段。按 Role 的字段可见性、脱敏(如 career_history 的敏感项目)、派生字段(如 tenure_label)由 UI 仓消费 method-library 的 ViewProfile 完成。actor 仅用于鉴权和审计留痕。
 
 ### 3.4 命名约定与错误处理
 
@@ -1047,6 +1051,16 @@ domain/identity/README.md(本文)       ↔    quantalithos-identity 仓(段 3)
 - **ADR-0003** 技术栈 → 本文 §五.1 PG + Rust 落地
 - **ADR-0004** 双层 Member → 本文 §一.2 边界(不持有 ProjectMember)
 - **ADR-0006**(本文定稿同提) Memory 归属 → 本文 §十.Q1
+- **ADR-0009** ViewProfile 归 method-library → 本文 §2.2.3 INV-16:Role 不承载视图策略;§3.3 RPC 不按 Role 过滤字段
+- **ADR-0008** Activity.completion_policy → 本文 §2.2.3 INV-17:Role 引用 TaskDefinition 时,ActivityDef.completion_policy 语义不在本域复算
+
+### 11.4 与 `domain/method-library/README.md`
+
+- Role 的**完整定义**(responsibilities / image_variant / required_capabilities / default_tool_scope 等)在 method-library 的 RoleDefinition
+- 本域的 Role 聚合只持有**索引**(role_id / spec_source / version / 生命周期状态)和运行时需要的冗余字段
+- 同步路径:`method_library.role_definition.published` / `capabilities_changed` → 本域 Role 索引刷新
+- fingerprint 保护:本域 Role 的 spec_source 带 fingerprint 快照,与 method-library 当前值不一致时发 `identity.role.source_drift`
+- ViewProfile 匹配:UI 仓按 `(当前 user 的 Role.role_id, 对象 kind)` 向 method-library 的 ResolveViewProfile RPC 查询,本域不参与
 
 ### 11.4 修订纪律
 

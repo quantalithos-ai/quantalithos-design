@@ -3,6 +3,14 @@
 // 工作域 RPC:Project + ProjectMember + WorkItem + Iteration + Backlog
 // 上游:domain/work/README.md §三
 // 草案阶段:✅
+//
+// 关键约定:
+// - ADR-0009:本服务 Get / List / Query 类 RPC 不接受 Role 参数,不按 Role
+//   过滤字段,返回已鉴权对象的全量字段。按 Role 的字段可见性 / 脱敏 / 派生
+//   由 UI 仓消费 method-library 的 ViewProfile 完成。
+//   actor(common.v1.ActorContext)仅用于鉴权和审计留痕。
+// - ADR-0008:WorkItem 与 Activity 是两套独立状态机,work 不按
+//   process.activity.completed 强同步 WorkItem.state。
 
 syntax = "proto3";
 

@@ -427,6 +427,8 @@ message LineageGraph {
   - `Publish` 必须经 Gate(release 场景)
   - `Archive` 必须经 Gate(合规意义大)
 
+**字段级视图裁剪(ADR-0009)**:本域 Get / List / Query 类 RPC **不接受 Role 参数**,返回已鉴权对象的全量字段(包括 content / metadata / lineage)。按 Role 的字段可见性(例如对 non-author 隐藏 draft 注释)、脱敏(如 dataset 样例脱敏)、派生字段(如 risk_label)由 UI 仓消费 method-library 的 ViewProfile 完成。actor 仅用于鉴权(能否读取整个 Artifact)和审计留痕。
+
 ### 3.4 常见错误码
 
 - `ARTIFACT_NOT_FOUND` / `BASELINE_NOT_FOUND`

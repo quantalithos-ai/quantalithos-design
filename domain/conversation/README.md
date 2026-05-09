@@ -349,6 +349,8 @@ Chat / Bridges 通过 gRPC server-streaming 订阅 conversation 变化。内部�
   - 非参与者不可读(除 visibility=open 的公开 Conversation)
   - Archive / Lock / AddParticipant 操作**必须是 group/channel 的 creator 或项目 owner**,或经 Gate 批准
 
+**字段级视图裁剪(ADR-0009)**:本域 Get / List / Stream 类 RPC **不接受 Role 参数**,返回已鉴权对象的全量字段(包括 Turn.content / reasoning_trace_ref / tool_calls)。按 Role 的字段可见性(例如对非作者隐藏内部 reasoning)、脱敏、派生字段由 UI 仓消费 method-library 的 ViewProfile 完成。actor 仅用于鉴权和审计留痕。
+
 ### 3.5 常见错误码
 
 - `CONVERSATION_NOT_FOUND` / `TURN_NOT_FOUND`

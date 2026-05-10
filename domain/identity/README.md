@@ -506,6 +506,13 @@ data: {
 
 #### RoleDefined / RolePublished / RoleDeprecated / RoleRetired
 
+Role 生命周期事件族。**事件名严格对应 lifecycle 状态**:
+
+- `identity.role.defined` (= RoleDefined)
+- `identity.role.published` (= RolePublished)
+- `identity.role.deprecated` (= RoleDeprecated)
+- `identity.role.retired` (= RoleRetired)
+
 ```
 subject:      role_id
 data: {
@@ -519,6 +526,22 @@ data: {
     triggered_by,
 }
 ```
+
+此外,Role **索引批量刷新**用聚合事件(`method_library.role_definition.published` 触发本域刷 Role 索引后发):
+
+- `identity.role.catalog_updated` —— 本次刷新涉及的 role_id 列表 + fingerprint
+
+```
+subject:      organization_id(或 "global")
+data: {
+    affected_role_ids:   Vec<RoleId>,
+    trigger_event_ref:   EventRef,  // 指向触发的 method_library.role_definition.published
+    new_fingerprints:    Map<RoleId, String>,
+    triggered_by:        ActorRef,
+}
+```
+
+单次 Role 字段变更(非生命周期)用 `identity.role.updated`(已有)。
 
 ### 4.3 审计事件(特殊族)
 
@@ -535,7 +558,7 @@ identity.audit.unauthorized_access_attempt
 
 ### 4.4 订阅事件(来自其他域)
 
-identity 域主要**发布事件**,少量**订阅**用于生涯条目联动:
+identity 域主要**发布事件**,少量**订阅**用于生涯条目联动和 Role 索引同步:
 
 | 订阅事件 | 来源域 | 本域动作 |
 |---|---|---|
@@ -545,6 +568,10 @@ identity 域主要**发布事件**,少量**订阅**用于生涯条目联动:
 | `governance.gate.decided(kind=member-lifecycle)` | governance | 若批准,执行对应 lifecycle 转移(activate / retire / tombstone) |
 | `artifact.approved(kind=feedback)` | artifact | 若 feedback 指向本 Member,append 到 career entry 的 feedback_refs |
 | `archive.memory_migrated_to_cold` | archive | 更新 semantic_memory_ref 到新冷存位置 |
+| `method_library.role_definition.published` | method-library | 刷新 Role 索引表的 spec_source + fingerprint;完成后发 `identity.role.catalog_updated`(ADR-0009) |
+| `method_library.role_definition.capabilities_changed` | method-library | 重评存量 GlobalMember.capability_profile 是否满足新要求;不满足的标注 `needs_requalification`(不立即 retire) |
+| `method_library.content.fingerprint_changed`(涉及 RoleDefinition)| method-library | 对比本域 Role.spec_source.fingerprint;不匹配发 `identity.role.source_drift` |
+| `method_library.configuration.activated` | method-library | 若本组织新 Configuration 改变了可用 Role 集合,冻结被移除 Role 的 Member 新招(不 retire 现有) |
 
 ### 4.5 事件消费的幂等保证
 

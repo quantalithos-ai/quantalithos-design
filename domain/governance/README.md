@@ -1009,11 +1009,16 @@ data: {
 |---|---|---|
 | process | `process.activity.waiting_gate` | 若 Gate 尚未创建,按 Activity 配置自动 RaiseGate |
 | process | `process.activity.auto_action_executed`(ADR-0008) | 审计留痕;AutoAction 触发频率达阈值时,触发 Policy 重评 Gate |
+| process | `process.profile.activated` | 记录 Profile 激活的审计;若涉及强制 Gate 调整,刷新 Policy |
 | work | `work.project.started` | 检查是否需要强制 AIIA(INV-10 触发 impact-assessment Gate) |
 | work | `work.project.context_of_use_updated` | 检查 compliance_profile 变化 → 可能触发 AIIA 重评 |
+| work | `work.project.member_tool_scope_updated` | 若 trigger=policy_reevaluation 则合环记录;其他场景审计留痕 |
 | artifact | `artifact.reviewed` | 若 Artifact kind 对应某 Gate(如 prototype-approval),检查是否需要发 Gate |
 | artifact | `artifact.content_tampered`(严重审计)| 自动 RaiseNonconformity,severity=critical |
 | identity | `identity.member.role_changed` | 可能触发 Policy 重评 |
+| method-library | `method_library.ai_policy.published` | 同步 AIPolicy 条款为本域 Policy 的引用基础(42001 §5.2) |
+| method-library | `method_library.configuration.activated` | 若新 Configuration 涉及本组织的 Policy / Control,重评合规性 |
+| method-library | `method_library.content.fingerprint_changed`(涉及 AIPolicyDef)| 对齐本域 Policy 引用的 AIPolicyDef,fingerprint 不匹配告警 |
 | L2 member | `member.tool_invoked` 的 Policy denied 场景 | 累积统计,达阈值触发 governance.control.violated |
 | observability | 周期触发(每月 1 日) | Control.review_overdue 检查 |
 
@@ -1316,7 +1321,7 @@ L2 member.* 审计事件              → Policy 规则监控
         │
         ├──→ work 订阅:
         │    重评所有 active ProjectMember.tool_scope
-        │    若违反 INV-21 → 发事件 `work.project.member_tool_scope_reevaluated`
+        │    若违反 INV-21 → 发事件 `work.project.member_tool_scope_updated`(附 trigger=policy_reevaluation)
         │
         └──→ observability:分发延迟监控
 

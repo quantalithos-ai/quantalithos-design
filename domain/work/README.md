@@ -1053,14 +1053,19 @@ data: {
 | identity | `identity.member.paused` | 所有相关 ProjectMember 转 paused;发 `member_paused` 事件 |
 | identity | `identity.member.retired` | 所有相关 ProjectMember 转 retired_from_project;发对应事件 |
 | identity | `identity.role.updated` | 查受影响 ProjectMember 清单,触发相关容器的 Role 刷新 |
+| identity | `identity.role.catalog_updated` | 刷新 ProjectMember.role_id 索引缓存 |
 | process | `process.activity.completed` | **不**强同步 WorkItem 状态(ADR-0008)。Activity 和 WorkItem 是独立状态机,本域仅记录事件到 WorkItem 时间线 / related_turns 便于展示;WorkItem 状态转移由自身工作流驱动(submit_for_review / approve 等) |
 | process | `process.activity.auto_action_executed`(ADR-0008) | 按 AutoAction 类型更新对应 WorkItem(defer / reduce_priority / split_off_incomplete / spillover),全部动作留审计 |
 | process | `process.activity.artifact_produced` | 更新对应 WorkItem 的 related_artifacts |
+| process | `process.instance.started / completed` | 对应 Project 的进度概览刷新(不改 WorkItem 状态) |
 | governance | `governance.gate.decided(kickoff)` | state=draft → active 的确认 |
 | governance | `governance.gate.decided(archive-confirm)` | state=active → archived |
 | governance | `governance.policy.updated` | 重评所有 active ProjectMember 的 tool_scope 合法性 |
+| governance | `governance.policy.activated`(涉及 work scope)| 重评本域的 Project / ProjectMember 是否合规 |
 | artifact | `artifact.approved` | 检查对应 WorkItem 是否可 done(INV-30) |
 | artifact | `artifact.baselined` | 写入 Project.baseline_ids |
+| method-library | `method_library.configuration.activated` | 若新 Configuration 影响本组织可用的 WorkItem kind / Role,刷新 Backlog 编辑器约束 |
+| method-library | `method_library.view_profile.published / retired` | UI 仓按 ViewProfile 渲染本域对象,本域不直接处理但记录订阅以便端到端追踪 |
 
 ### 4.4 事件幂等
 

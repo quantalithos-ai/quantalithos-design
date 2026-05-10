@@ -460,6 +460,15 @@ message LineageGraph {
 | `baseline.superseded` | Baseline 换代 |
 | `artifact.content_tampered` | **严重审计**:hash 不匹配 |
 | `artifact.bias_evaluation_attached` | Dataset 特化事件 |
+| `artifact.work_product_kind.added` | WorkProductKind 白名单新增(method-library 订阅,见下) |
+| `artifact.work_product_kind.retired` | WorkProductKind 白名单移除 |
+
+**关于 `artifact.work_product_kind.*` 事件族**(对齐 method-library 域 §4.3):
+
+- artifact 域维护 `ArtifactKind` 的受控词表(16 种 + custom,§2.1.2)
+- 组织级可新增自定义 WorkProductKind,需经 ADR(AR2 清单)
+- 新增 / 移除时发本事件,method-library 订阅以同步允许的 WorkProductDefinition 引用范围
+- subject = kind_name,data 含 rationale / approved_gate_id / scope(global / organization)
 
 ### 4.2 核心事件 schema
 
@@ -546,6 +555,9 @@ data: {
 | `governance.gate.decided(kind=archive)` | governance | 触发 Archive |
 | `work.workitem.state_changed(done)` | work | 检查对应 Artifact 是否应 approved |
 | `identity.member.retired` | identity | 不改 Artifact 历史,但 authors / reviewers 引用标记 "历史成员" |
+| `method_library.work_product_definition.published` | method-library | 同步 WorkProductKind 白名单可接受的 WorkProductDefinition 引用;若含新 kind 触发 `artifact.work_product_kind.added` |
+| `method_library.content.fingerprint_changed`(涉及 WorkProductDefinition)| method-library | 对齐受此 Definition 约束的 Artifact,fingerprint 不匹配告警 |
+| `method_library.ai_policy.published` | method-library | 若 AIPolicy 涉及 Artifact 的保留期 / 脱敏规则,刷新相关 Artifact 的治理标注 |
 
 ---
 

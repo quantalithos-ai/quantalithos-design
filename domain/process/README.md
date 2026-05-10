@@ -934,15 +934,19 @@ source_drift 发生时,**默认停止新 Profile 创建**,直到人工介入同�
 
 | 来源 | 事件 | 本域动作 |
 |---|---|---|
-| method-library | `method_library.content_published` | 触发 SyncTemplateFromMethodLibrary |
-| method-library | `method_library.content_updated` | 同上 + 发 template.source_drift 若现有 Template 不匹配 |
-| governance | `governance.gate.decided` | 匹配 pending_gates,推进 Activity(ResumeFromWaitGate) |
+| method-library | `method_library.process_template.published` | 触发 SyncTemplateFromMethodLibrary;刷新 Template 索引 + fingerprint |
+| method-library | `method_library.content.fingerprint_changed`(涉及 ProcessTemplateDef)| 对比本域 Template.fingerprint;不匹配发 `process.template.source_drift` |
+| method-library | `method_library.content.deprecated / retired`(涉及 ProcessTemplateDef)| 冻结基于该 Template 的新 Profile 创建 |
+| method-library | `method_library.configuration.activated` | 若新 Configuration 改变了可用 Template 集合,重评 active Profile 是否仍合法 |
+| governance | `governance.gate.decided` | 匹配 pending_gates,推进 Activity(ResumeFromWaitGate);kind=profile-activate 的 Gate decided 后本域发 `process.profile.activated` |
 | governance | `governance.gate.expired / cancelled` | 对应 Activity 按 timeout_policy 处理 |
-| governance | `governance.profile.activated` | 更新本域 Profile 状态 |
+| governance | `governance.policy.activated`(涉及 process 的 Policy)| 重评 active Instance 的 Activity 是否需要新增/调整 Gate |
+| governance | `governance.policy.updated`(涉及 autonomy_level)| 重评 completion_policy=try_auto_then_gate 的 Activity,级别变更影响 AutoAction 授权(ADR-0008) |
 | work | `work.project.started` | 触发 StartInstance |
 | work | `work.project.paused / resumed / archived / dissolved` | 对应 Instance 状态转移 |
 | artifact | `artifact.approved / baselined` | 推进 Activity(若在等待该 Artifact approval) |
 | identity | `identity.member.paused / retired` | 检查受影响 Activity,重派或进 failed |
+| identity | `identity.role.catalog_updated` | 刷新 Activity.assignable_roles 的 Role 索引缓存 |
 | observability | 周期:checkpoint 健康检查 | 检查各 Instance 的 checkpoint 新鲜度 |
 
 ### 4.4 事件幂等
@@ -1165,8 +1169,7 @@ process.template.source_drift         → **审计告警**
 其他域 → process 域
 ────────────────────
 method_library.content_published      → SyncTemplateFromMethodLibrary
-governance.gate.decided               → ResumeFromWaitGate(唤醒 Activity)
-governance.profile.activated          → Profile 状态确认
+governance.gate.decided               → ResumeFromWaitGate(唤醒 Activity);kind=profile-activate 后发 process.profile.activated
 work.project.started                  → StartInstance
 work.project.paused/resumed/archived/dissolved → Instance 状态
 artifact.approved / baselined         → 推进等待该 Artifact 的 Activity

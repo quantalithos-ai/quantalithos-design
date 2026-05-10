@@ -447,9 +447,12 @@ data: {
 | `work.project.member_retired_from_project` | work | 从 group.participants 移除 |
 | `governance.gate.raised` | governance | 在 related conversation 发 gate-kind Turn |
 | `governance.gate.decided` | governance | 在 related conversation 发 decision-kind Turn |
+| `process.activity.waiting_gate` | process | 在 related conversation 发提示 Turn(驱动用户关注 Gate 面板) |
 | `artifact.approved` | artifact | 可选:在 related conversation 发 artifact-kind Turn 通知 |
 | `identity.member.retired` | identity | 从所有 Conversation.participants 移除(Turn 历史保留作者引用) |
 | `identity.member.paused` | identity | 更新展示层(不踢出) |
+| `method_library.view_profile.published / retired` | method-library | 清本地 ViewProfile 缓存(ADR-0009);在线用户下次刷新/发消息时按新 Profile 渲染 |
+| `method_library.configuration.activated` | method-library | 刷新 Conversation / Turn 的字段可见性缓存(如派生字段 summary 可能改变) |
 
 ### 4.4 事件幂等
 

@@ -527,11 +527,17 @@ async def outbox_worker(db, bus, config: OutboxConfig):
 
 ## 六、订阅契约(跨域一致)
 
+> **事件清单的单一真相源**:`architecture/bus-draft/event-catalog.md`(2026-05-10 首版,147 事件)。
+>
+> 本节只承载**跨域订阅的机制规则**(幂等 / Ack / Trace / 消费者分组 / 复放 / Tap),具体的"哪个事件被哪些域订阅、severity 是什么、保留期多久"全部查 event-catalog.md。
+>
+> 任何域新增 / 修改事件必须**先更 event-catalog.md,再同步各域 README §4**,详见 event-catalog.md §七 维护纪律。
+
 ### 6.1 通用订阅规则
 
 所有订阅方必须遵守(写入 `standards/子项目遵循规范清单.md` 的 R2-R3 的延伸):
 
-1. **幂等处理**:基于 `event.id` 做 LRU 去重(默认 10000 窗口)
+1. **幂等处理**:基于 `event.id` 做 LRU 去重(默认 10000 窗口);业务级幂等 key 规则见 event-catalog.md §三
 2. **Ack only on success**:业务副作用完成后才 ack
 3. **nack with reason**:失败时带人类可读原因,进 DLQ 时便于诊断
 4. **Trace 传播**:处理事件时以 `event.traceparent` 为父 span 创建子 span

@@ -228,6 +228,7 @@ ProcessTemplateDef.activity_graph {
 
 **Deviation 的语义(GUIDED 模式)**:
 - 如果 Template 刚度=GUIDED(ADR-0010),SubProcess 内部允许 Deviation,记录时标注 "in sub-process X"
+- Deviation 机制本身由 ADR-0012 决策(段 3 起草,讨论笔记见 `architecture/adr/drafts/0012-deviation-discussion-notes.md`)
 
 ### 2.7 新增不变量
 

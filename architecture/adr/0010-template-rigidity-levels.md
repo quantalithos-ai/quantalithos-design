@@ -111,8 +111,8 @@ ExecutionMode = enum {
 - Activity 状态转移严格按 graph,越级禁
 - Profile active 后 effective_graph 不可修改
 - Gate mandatory=true 的不可跳过
-- 任何偏离请求都起 `change-request` Gate(新增 kind,由后续 ADR 锁定)
-- 偏离批准后也要记录 `ActivityDeviation`(后续 ADR-00ZZ)
+- 任何偏离请求都起 `change-request` Gate(新增 kind,由 ADR-0012 锁定)
+- 偏离批准后也要记录 `ActivityDeviation`(段 3 实施阶段起草 ADR-0012,参考 `architecture/adr/drafts/0012-deviation-discussion-notes.md`)
 
 #### GUIDED × CHECKPOINT_BASED(推荐默认)
 
@@ -168,7 +168,7 @@ ProcessTemplateDef : MethodContent {
 
 ### 2.8 偏离(Deviation)留痕占位
 
-GUIDED / STRICT 模式下,"偏离"是一等事实。本 ADR **只占位**,具体机制留给后续 ADR-00ZZ(ActivityDeviation 一等对象):
+GUIDED / STRICT 模式下,"偏离"是一等事实。本 ADR **只占位**,具体机制由 ADR-0012 决策(段 3 实施阶段起草,讨论笔记见 `architecture/adr/drafts/0012-deviation-discussion-notes.md`,含 Q1~Q8 已推演的初步结论):
 
 ```
 ActivityDeviation {
@@ -184,7 +184,7 @@ ActivityDeviation {
 }
 ```
 
-留痕机制的详细字段、事件、持久化、消费方,由 ADR-00ZZ 决策。
+留痕机制的详细字段、事件、持久化、消费方,由 ADR-0012 决策(段 3 起草,笔记已存 `architecture/adr/drafts/0012-deviation-discussion-notes.md`)。
 
 ## 3. 理由
 
@@ -253,7 +253,7 @@ GUIDED 下允许偏离,**但不是允许随意改 Profile**。区别:
 
 - **字段变复杂**:ProcessTemplateDef 多了两个字段 + 一个说明,编辑器和 Marketplace UI 要适配
 - **引擎行为分支**:BPMN 引擎内部要根据刚度走不同路径,测试矩阵变大
-- **Deviation 新概念**:后续 ADR-00ZZ 要配套,否则 GUIDED 模式"偏离留痕"只是空话
+- **Deviation 新概念**:ADR-0012 要在段 3 起草,否则 GUIDED 模式"偏离留痕"只是空话(讨论笔记存 `drafts/0012-deviation-discussion-notes.md`,段 3 时按笔记 + 实际场景验证起草)
 - **默认值可能引起争议**:如有组织认为 agile-scrum 就该 STRICT(合规团队的 Scrum),需 MethodConfiguration 覆盖
 
 ### 4.3 风险缓解
@@ -279,8 +279,8 @@ GUIDED 下允许偏离,**但不是允许随意改 Profile**。区别:
 
 ### 本 ADR 不锁定
 
-- **偏离(Deviation)留痕的具体机制**:留给 ADR-00ZZ
-- **change-request Gate 的具体语义**:留给 ADR-00ZZ 或独立 governance ADR
+- **偏离(Deviation)留痕的具体机制**:留给 ADR-0012(段 3 起草,笔记见 drafts/)
+- **change-request Gate 的具体语义**:留给 ADR-0012(归入)
 - **GUIDED 模式下 Profile 受控修改的具体规则**:留给独立 ADR
 - **Checkpoint 类型(milestone / gate / review / retrospective)的 UI 呈现**:UI 仓决策
 - **Runtime 对 ADVISORY Template 的交互**:由 L2 Member 设计决策
@@ -319,8 +319,7 @@ GUIDED 下允许偏离,**但不是允许随意改 Profile**。区别:
 
 ### 短期(段 3 代码实施前)
 
-1. **ADR-00ZZ · ActivityDeviation 一等对象**(本 ADR 的前置依赖之一)
-2. **ADR-00YY · change-request Gate kind**(或归入 ADR-00ZZ)
+1. **ADR-0012 · ActivityDeviation + change-request Gate**(本 ADR 的前置依赖,段 3 起草 —— 讨论笔记见 `architecture/adr/drafts/0012-deviation-discussion-notes.md`,含 Q1~Q8 已推演的结论 + 前置问题清单)
 3. **process 引擎按刚度分支的实现规划**
 4. **Marketplace Publish Gate 强制 rigidity 显式声明的规则**
 
@@ -349,7 +348,7 @@ GUIDED 下允许偏离,**但不是允许随意改 Profile**。区别:
   - ADR-0008(completion_policy,与刚度正交)
   - ADR-0009(ViewProfile,不冲突)
   - ADR-0011(流程嵌套机制,与刚度正交)
-  - ADR-00ZZ(Deviation 机制,本 ADR 前置)
+  - ADR-0012(Deviation 机制,本 ADR 前置,段 3 起草)
 
 ## 9. 讨论留痕(本 ADR 的推演过程)
 
@@ -373,4 +372,4 @@ GUIDED 下允许偏离,**但不是允许随意改 Profile**。区别:
 
 ---
 
-> 本 ADR 处于 Proposed 状态。建议在两个前置事项完成后转 Accepted:(1)Aris 本人确认方向;(2)ADR-00ZZ Deviation 机制起草至可实施水平。
+> 本 ADR 处于 Proposed 状态。**转 Accepted 的前置条件**:(1)Aris 本人确认方向;(2)ADR-0012(Deviation 机制)起草至可实施水平 —— 段 3 代码实施阶段触发,讨论笔记已存 `architecture/adr/drafts/0012-deviation-discussion-notes.md`。

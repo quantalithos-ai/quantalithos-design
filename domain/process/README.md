@@ -500,6 +500,106 @@ Activity {
 **INV-43(ADR-0008)** `completion_policy=raise_gate` / `try_auto_then_gate` 的 Gate 必须用已有 kind(quality-gate / design-choice / release-confirm),不得新造 stage-exit 之类的 kind
 **INV-44(ADR-0008)** Activity.state=completed 仅表示流程节点推进完毕,引擎**不**强制 `related_workitems` 状态与 Activity 状态同步
 
+#### 2.4.4 Activity 与 WorkItem 的交互语义(澄清)
+
+> 这一节澄清 Activity 和 WorkItem 之间**容易被误解**的关系。ADR-0008 锁定了"两套状态机独立",本节进一步说清**"操作关系"而不是"所有权关系"**的语义。
+
+##### 核心判断
+
+**Activity 不"拥有"WorkItem;Activity 是"对 WorkItem 的加工工位"。**
+
+- WorkItem **住在 work 域**(归属 Project.Backlog + 可能被 Iteration 圈住),不归属 Activity
+- Activity **在自己的执行期内**对 WorkItem 做操作(创建 / 挑选 / 查询 / 标记 / 验收)
+- Activity 结束后,WorkItem **继续存在**,保留在 Backlog / Iteration 里
+
+##### 不是什么(常见误解)
+
+❌ **"Sprint Planning 这个 Activity 包含了 6 个 WorkItem"**
+—— 错。WorkItem 不在 Activity 的生命周期内。Activity completed 后 WorkItem 不会消失,也不属于"这个 Activity 的数据"。
+
+❌ **"Daily Standup 也包含那 6 个 WorkItem"**
+—— 错。如果 Activity 包含 WorkItem,同一个 WorkItem 就会"同时属于多个 Activity",所有权无法解释。
+
+❌ **"Activity completed 意味着它关联的 WorkItem 都 done"**
+—— 错。ADR-0008 明确:两套状态机独立,WorkItem 状态由 work 域的业务流程驱动(assign / submit / approve),不受 Activity 状态影响。
+
+##### 是什么(正确语义)
+
+✅ **Activity 是"工位",WorkItem 是"从工位上流过的货物"**
+
+- 工位有职责(Planning 负责挑选 / Daily 负责同步 / Review 负责验收)
+- 货物不住在工位上,货物在流水线(Backlog / Iteration)里流动
+- 工位在自己的执行期内对流经的货物做加工,加工完继续流
+
+✅ **`Activity.related_workitems` 是"弱引用"**
+
+这个字段的语义是:"这个 Activity **执行时**关心了哪些 WorkItem"。它不代表:
+- 所有权(WorkItem 不归属 Activity)
+- 生命周期绑定(Activity completed 不销毁 WorkItem)
+- 数量一致(一个 WorkItem 可能被多个 Activity 提及,N:N 关系)
+
+##### 典型操作类型(按 Activity kind 分类)
+
+不同 Activity 对 WorkItem 做不同类型的操作:
+
+| Activity 典型 | 对 WorkItem 的操作 | 副作用 |
+|---|---|---|
+| Sprint Planning | 创建 / 从 Backlog 挑选 / 估算 / 建依赖 | Backlog 可能新增 / Iteration.planned 填充 |
+| Daily Standup | 查询状态 / 标记 blocked / 调整优先级 | WorkItem.state / priority / blocker_note 可能变 |
+| 需求澄清 Activity | 创建 story kind WorkItem / 加验收标准 | Backlog 新增 |
+| 编码 Activity | 消费(由 assignee 执行)/ 提交 | WorkItem.state: in_progress → in_review |
+| Sprint Review | 查询 done 清单 / 分流 spillover | Iteration.actual_workitems / spillover_workitems 填充 |
+| Retrospective | 创建 lessons-learned Artifact | 不直接操作 WorkItem |
+
+**注意**:上表的 Activity 名是**示例**,实际 Activity 的职责取决于 Template 作者在 method-library 里怎么写的,引擎只认 BPMN kind(user-task / service-task 等)+ `completion_policy`。
+
+##### 数据模型层的反映
+
+```
+process 域:
+  Activity.related_workitems: Vec<WorkItemRef>  // 弱引用,审计便利
+
+work 域:
+  WorkItem.project_id:     ProjectId         // 强聚合,真正归属
+  WorkItem.iteration_id:   Option<IterationId>  // 被 Iteration 圈住
+  WorkItem.related_activities: Vec<ActivityRef>  // 反向弱引用(也是弱)
+```
+
+**单向"强聚合"只有一条**:`WorkItem.project_id → Project`。其他都是弱引用,跨域事件传播,对方看到引用不存在时不崩溃(容错)。
+
+##### 与"两轨并行"模型的关系
+
+把本节的澄清画一下,就是 ADR-0008 的两轨模型:
+
+```
+Template 轨道(process 域,节拍 + 关卡)
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Planning ─▶ Daily ─▶ Daily ─▶ Review
+    │           │         │        │
+    │ 操作      │ 操作    │ 操作   │ 操作
+    ▼           ▼         ▼        ▼
+ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WorkItem 轨道(work 域,业务 + 依赖)
+     (WorkItem 在 Backlog / Iteration 里流动)
+```
+
+两轨各有自己的 DAG:
+- **Template 轨道**:Activity DAG,由模板作者在 method-library 定义
+- **WorkItem 轨道**:依赖 DAG(depends_on / blocks),由用户在运行时动态建立
+
+两轨只在**节拍点交汇**(Activity 执行时对 WorkItem 做操作),平时各走各的。
+
+##### 对 completion_policy 的再解释
+
+ADR-0008 的 `completion_policy` 字段,本质是**定义"Activity 完成时如何处理交汇产生的不一致"**:
+
+- `auto_complete` = "Activity 做完自己的工作就走,不管 WorkItem 进度"
+- `enforce_workitems_done` = "Activity 必须等 WorkItem 都 done 才能走"
+- `raise_gate` = "Activity 完成时必起 Gate 让人拍板"
+- `try_auto_then_gate` = "先尝试自动处理未 done 的 WorkItem,处理不了再起 Gate"
+
+四种策略都**不改变"两轨独立"的事实**,只是配置交汇点上的合流行为。
+
 ### 2.5 Token 值对象(BPMN 并行控制)
 
 #### 2.5.1 作用

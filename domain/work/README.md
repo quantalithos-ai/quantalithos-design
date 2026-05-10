@@ -540,6 +540,196 @@ Iteration {
 
 Kanban 项目的 `process_template_id` 指向 kanban 家族 Template,Project 不强制创建 Iteration(但可以用 Iteration 做"review cadence")。
 
+#### 2.5.5 Backlog / Iteration / WorkItem 三者职责分工(澄清)
+
+> 这一节澄清三个概念**容易混淆的边界**。它们在本 README 各处分散提及,这里集中说清。
+
+##### 核心判断
+
+- **Backlog** = Project 的 **"所有待办的总池子"**,终身流动,按优先级排序
+- **Iteration** = **"本阶段承诺完成的那批"**,有固定时长 + Sprint Goal
+- **WorkItem** = **具体的业务任务**,住在 Backlog 里,可能被 Iteration 圈住
+
+**一句话**:Backlog 管"要做哪些事",Iteration 管"这段时间做哪几件",WorkItem 是"事"本身。
+
+##### 三个问题分清三个概念
+
+| 问题 | 回答者 |
+|---|---|
+| 这个项目有哪些事要做? | **Backlog** |
+| 接下来 2 周要做哪几件? | **Iteration** |
+| 具体是什么事、由谁做、做到哪步了? | **WorkItem** |
+
+##### 字段关系
+
+```
+Project
+  ├─ backlog_id: BacklogId             (1 : 1 包含)
+  └─ iteration_id: Option<IterationId> (0 : 1,指向当前 Iteration)
+
+Backlog
+  ├─ project_id: ProjectId             (归属)
+  └─ ordered_workitems: Vec<WorkItemId>(按优先级排序,引用不包含)
+
+Iteration
+  ├─ project_id: ProjectId             (归属)
+  ├─ planned_workitems:  Vec<WorkItemId>  (计划做,引用)
+  ├─ actual_workitems:   Vec<WorkItemId>  (实际完成)
+  └─ spillover_workitems: Vec<WorkItemId> (没完成,滑到下迭代)
+
+WorkItem
+  ├─ project_id:    ProjectId           (真正归属的根,强聚合)
+  ├─ iteration_id:  Option<IterationId> (被 Iteration 圈住,可空)
+  └─ state:         WorkItemState       (自己的状态机,独立)
+```
+
+**关键**:Backlog 和 Iteration 对 WorkItem 都是 **引用**,不是 **包含**。WorkItem 的强聚合根是 Project,不是 Backlog / Iteration 中任何一个。
+
+##### 同时存在于 Backlog + Iteration?
+
+是的,这是正常状态。
+
+```
+一个 WorkItem 的"多重身份":
+  · Backlog.ordered_workitems 里有它       (它是项目的"事")
+  · Iteration.planned_workitems 里也有它    (它被圈进"这个 Sprint")
+  · WorkItem.iteration_id = Sprint-1       (它自己知道被圈了)
+
+这三个视图是"同一事实的三个角度",一致性由 work 域保证。
+```
+
+##### 流转场景(四个典型时刻)
+
+```
+时刻 1:项目启动
+━━━━━━━━━━━━━━━━━━━━━━━━
+Backlog 空的,Iteration 没有
+
+时刻 2:需求源源不断加入
+━━━━━━━━━━━━━━━━━━━━━━━━
+PO / 用户陆续 CreateWorkItem → 加进 Backlog
+Backlog: [WI-1, WI-2, WI-3, ..., WI-20]   ← 20 个
+Iterations: [ ]                             ← 还没开始 Sprint
+
+时刻 3:Sprint Planning(过程域的 Activity 触发)
+━━━━━━━━━━━━━━━━━━━━━━━━
+Activity 职责:从 Backlog 挑出本 Sprint 要做的
+  · 创建 Iteration (Sprint-1)
+  · WI-1 / WI-3 / WI-5 / WI-7 的 iteration_id = Sprint-1
+  · Iteration.planned_workitems = [WI-1, WI-3, WI-5, WI-7]
+
+Backlog: [WI-1, WI-2, WI-3, WI-4, WI-5, ..., WI-20]   ← 全集没变
+                   ↑ 圈了 ↑            ↑
+Iteration Sprint-1:
+  planned:    [WI-1, WI-3, WI-5, WI-7]    ← 圈出的子集
+
+时刻 4:Sprint 执行中
+━━━━━━━━━━━━━━━━━━━━━━━━
+WorkItem 按自己的状态机推进(assign / in_progress / review / done)
+Backlog 和 Iteration 的"列表"不动,只是 WorkItem 自己的 state 在变
+其他 WorkItem(WI-2, WI-4, ...)在 Backlog 里继续等
+
+时刻 5:Sprint Review(过程域的 Activity 触发)
+━━━━━━━━━━━━━━━━━━━━━━━━
+Activity 职责:查 planned 的 state,分流
+  · WI-1, WI-3 已 done → actual_workitems = [WI-1, WI-3]
+  · WI-5, WI-7 未 done → spillover_workitems = [WI-5, WI-7]
+  · 关闭 Sprint-1
+
+时刻 6:Sprint-2 Planning(下一轮)
+━━━━━━━━━━━━━━━━━━━━━━━━
+  · WI-5, WI-7 重回 Backlog(iteration_id 清空)
+    ↑ 可以选择再做,也可以调优先级或 cancel
+  · 新建 Sprint-2,从 Backlog 再挑
+```
+
+##### Kanban 模式下的简化
+
+Kanban 没有 Sprint,WorkItem 直接走 Backlog → in_progress → done,按 WIP limit 拉动:
+
+```
+Backlog: [WI-1, WI-2, WI-3, ...]   ← 仍然存在,按优先级排
+Iterations: [ ]                     ← 不创建,或只作为 review cadence
+
+WorkItem.iteration_id = None        ← 不被圈
+WorkItem 的状态机独立流转
+WIP limit 由看板列控制(同时 in_progress 的数量上限)
+```
+
+即:Kanban 下只有 **Backlog + WorkItem 两层**,没有 Iteration 中间层。
+
+##### 与 Template / Activity 的关系
+
+Backlog / Iteration 都是 **work 域的实体**,**不属于 process 域**。它们与 Template 的关系:
+
+- Template 定义 Activity 节奏(Sprint Planning / Daily / Review 等)
+- Activity 在执行时 **操作** Backlog 和 Iteration(挑选 / 填充 / 分流)
+- **Activity 不拥有 Backlog / Iteration**,只是调用 work 域 RPC 修改它们
+
+即:Template 决定**什么时候挑选 / 什么时候验收**,Backlog / Iteration 承载**挑了哪些 / 验收了哪些**。两者在 Activity 这个"工位"上交汇。
+
+##### ASCII 模型图
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Project(work 域聚合根)                      │
+│                                                                 │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │  Backlog                                                 │  │
+│   │  ───────                                                 │  │
+│   │  ordered_workitems:                                      │  │
+│   │   [WI-1, WI-2, WI-3, WI-4, WI-5, ..., WI-20]  (全集)    │  │
+│   └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │  Iterations  (时间切片序列)                              │  │
+│   │                                                          │  │
+│   │   Sprint-1 (closed)                                      │  │
+│   │     planned:   [WI-1, WI-3, WI-5, WI-7]                 │  │
+│   │     actual:    [WI-1, WI-3]                              │  │
+│   │     spillover: [WI-5, WI-7]                              │  │
+│   │                                                          │  │
+│   │   Sprint-2 (in_progress)                                 │  │
+│   │     planned:   [WI-5, WI-7, WI-2, WI-4]                 │  │
+│   │     actual:    [WI-5]                                    │  │
+│   └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │  WorkItems  (每个是独立聚合根)                           │  │
+│   │                                                          │  │
+│   │   WI-1  state=done        iteration_id=Sprint-1          │  │
+│   │   WI-2  state=in_progress iteration_id=Sprint-2          │  │
+│   │   WI-3  state=done        iteration_id=Sprint-1          │  │
+│   │   WI-5  state=in_progress iteration_id=Sprint-2          │  │
+│   │   ...                                                    │  │
+│   │                                                          │  │
+│   │   依赖图(独立的 DAG):                                 │  │
+│   │     WI-2 ─depends_on──▶ WI-1                            │  │
+│   │     WI-4 ─depends_on──▶ WI-3                            │  │
+│   │                                                          │  │
+│   └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+               ▲
+               │  process 域的 Activity(Planning / Review)
+               │  在节拍点操作以上三类对象
+               │
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          Template 轨道(process 域,节拍)
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+##### 三者的生命周期
+
+| 概念 | 何时创建 | 何时结束 |
+|---|---|---|
+| Backlog | Project 创建时(1:1 附带) | Project 归档时(与 Project 同命) |
+| Iteration | Sprint Planning Activity 触发 | Sprint Review Activity 关闭(state=closed) |
+| WorkItem | 任何人 CreateWorkItem 时 | state=done / cancelled(不物理删除,保留审计) |
+
+Backlog 和 Project 同命;Iteration 是短命的(几周),会序列化出多个;WorkItem 的寿命取决于自身状态机。
+
 ### 2.6 双层 Member 模型全景
 
 对齐 ADR-0004 和 `ai-member设计.md` §六,把双层模型在本域的落地集中表达:

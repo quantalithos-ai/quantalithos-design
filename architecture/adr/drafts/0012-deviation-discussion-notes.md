@@ -528,7 +528,7 @@ ADR-0012 一旦 Accepted,要连带订正 300-500 行跨多个文件。如果未�
 ### 6.4 ADR-0010 / 0011 保 Proposed 不影响其他工作
 
 - 段 2 其他设计文档可以继续推进
-- 下游仓 README(repo-readmes-draft)可以继续对齐
+- 下游仓 README(`projects/L{n}-{repo}/`)可以继续对齐
 - 段 3 实施时自然会触发 ADR-0012 起草
 
 ---

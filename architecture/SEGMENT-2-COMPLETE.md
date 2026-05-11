@@ -30,7 +30,7 @@
 - `architecture/bus-draft/README.md`(919 行)+ `event-catalog.md`(466 行,147 事件)
 - `architecture/proto-draft/`(7 个 proto 文件,共 ~3,200 行)
 - `architecture/sdk-draft/README.md`(983 行)
-- `architecture/repo-readmes-draft/`(26 个仓 README)
+- `projects/L{n}-{repo}/README.md`(26 个仓总览,段 3 Day 1 从 repo-readmes-draft 迁入后原目录已删)
 - `architecture/部署架构.md`(973 行)
 
 **判断**:段 2 目标**全部达成**。部分 Proposed 状态的 ADR 留到段 3 实施阶段转正,这是合理的"延迟决策"而非缺口。
@@ -78,7 +78,7 @@
 - `architecture/bus-draft/event-catalog.md`(**本轮新增 466 行**)—— **147 个事件的单一真相源**
 - `architecture/sdk-draft/README.md`(983 行)—— 三语言 SDK 规范
 - `architecture/proto-draft/`(7 个 proto,共 ~3,200 行)—— RPC + message 契约
-- `architecture/repo-readmes-draft/`(26 个仓 README)—— 段 3 每仓初始化模板
+- `projects/L{n}-{repo}/README.md`(26 个仓总览,段 3 Day 1 从 repo-readmes-draft 迁入后原目录已删)
 
 ---
 
@@ -223,7 +223,7 @@
 7. architecture/adr/0001 ~ 0011   —— 11 份 ADR(按顺序)
 8. domain/identity/README.md       —— 第一个要实施的域(详细)
 9. architecture/bus-draft/event-catalog.md —— 事件契约主表
-10. architecture/repo-readmes-draft/L1-identity/README.md —— 仓库初始化模板
+10. projects/L1-identity/README.md —— 项目总览(段 3 Day 1 迁入)
 ```
 
 预计阅读时间:**8-12 小时**,熟练后 3-4 小时。
@@ -349,7 +349,7 @@ LangGraph / Temporal / Anthropic Workflow / MCP / A2A / AG-UI / 14 种失败模�
 1. 读本文件(`SEGMENT-2-COMPLETE.md`)—— 2 小时
 2. 按 §5.3 的顺序读入口文档 —— 8-12 小时
 3. 按 §5.1 挑 **identity 仓**起步
-4. 按 `architecture/repo-readmes-draft/L1-identity/README.md` 初始化仓库
+4. 按 `projects/L1-identity/README.md` 初始化仓库
 5. 不要立刻起 ADR-0012 / 0013 / 0014,让实施驱动
 
 ### 记忆引用

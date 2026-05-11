@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" version="29.6.1">
+  <diagram name="L0-core Context">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Standards band -->
+        <mxCell id="10" value="External standards &amp; ecosystem" style="swimlane;horizontal=0;startSize=28;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="70" y="40" width="1460" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" value="CloudEvents 1.0 Spec" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#333333;" vertex="1" parent="10">
+          <mxGeometry x="70" y="45" width="220" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" value="W3C Trace Context Spec" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#333333;" vertex="1" parent="10">
+          <mxGeometry x="420" y="45" width="240" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="13" value="buf.build ecosystem" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#333333;" vertex="1" parent="10">
+          <mxGeometry x="810" y="45" width="220" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- Core center -->
+        <mxCell id="20" value="★ quantalithos-core ★&#xa;L0 shared contract layer&#xa;• proto schema for 6 L1 services&#xa;• CloudEvents 1.0 envelope&#xa;• W3C Trace Context&#xa;• ErrorCode / shared common types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#1f4e79;strokeWidth=3;fontColor=#0b1f33;fontStyle=1;align=center;verticalAlign=middle;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="475" y="250" width="650" height="150" as="geometry"/>
+        </mxCell>
+
+        <!-- Band 1: bus + sdk -->
+        <mxCell id="30" value="Primary direct consumers" style="swimlane;horizontal=0;startSize=26;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="160" y="460" width="1280" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" value="quantalithos-bus&#xa;Consumes CloudEvent envelope" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#333333;" vertex="1" parent="30">
+          <mxGeometry x="190" y="40" width="260" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" value="quantalithos-sdk&#xa;Generates Rust / Python / TypeScript bindings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#333333;" vertex="1" parent="30">
+          <mxGeometry x="760" y="40" width="330" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- Band 2: L1 -->
+        <mxCell id="40" value="L1 six domains" style="swimlane;horizontal=0;startSize=26;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="70" y="620" width="1460" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="41" value="identity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40"><mxGeometry x="45" y="48" width="170" height="50" as="geometry"/></mxCell>
+        <mxCell id="42" value="conversation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40"><mxGeometry x="270" y="48" width="170" height="50" as="geometry"/></mxCell>
+        <mxCell id="43" value="work" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40"><mxGeometry x="495" y="48" width="170" height="50" as="geometry"/></mxCell>
+        <mxCell id="44" value="process" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40"><mxGeometry x="720" y="48" width="170" height="50" as="geometry"/></mxCell>
+        <mxCell id="45" value="governance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40"><mxGeometry x="945" y="48" width="170" height="50" as="geometry"/></mxCell>
+        <mxCell id="46" value="artifact" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="40"><mxGeometry x="1170" y="48" width="170" height="50" as="geometry"/></mxCell>
+
+        <!-- Band 3: L2/L3 -->
+        <mxCell id="50" value="L2 / L3 consumers" style="swimlane;horizontal=0;startSize=26;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="180" y="810" width="1240" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="51" value="member runtime / member-service / tools" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="50"><mxGeometry x="80" y="40" width="380" height="50" as="geometry"/></mxCell>
+        <mxCell id="52" value="capability-hub" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="50"><mxGeometry x="520" y="40" width="220" height="50" as="geometry"/></mxCell>
+        <mxCell id="53" value="method-library" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="50"><mxGeometry x="820" y="40" width="220" height="50" as="geometry"/></mxCell>
+
+        <!-- Band 4: L4 -->
+        <mxCell id="60" value="L4 infrastructure consumers" style="swimlane;horizontal=0;startSize=26;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="260" y="960" width="1080" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="61" value="observability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="60"><mxGeometry x="110" y="35" width="220" height="45" as="geometry"/></mxCell>
+        <mxCell id="62" value="archive" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="60"><mxGeometry x="430" y="35" width="220" height="45" as="geometry"/></mxCell>
+        <mxCell id="63" value="sandbox" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="60"><mxGeometry x="750" y="35" width="220" height="45" as="geometry"/></mxCell>
+
+        <!-- Band 5: L5/L6 -->
+        <mxCell id="70" value="L5 / L6 consumers" style="swimlane;horizontal=0;startSize=26;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1100" width="1360" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="71" value="chat / console / runner / sync / website" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="70"><mxGeometry x="120" y="40" width="470" height="50" as="geometry"/></mxCell>
+        <mxCell id="72" value="bridges / marketplace" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="70"><mxGeometry x="760" y="40" width="320" height="50" as="geometry"/></mxCell>
+
+        <!-- Edges from standards to core -->
+        <mxCell id="100" value="aligns with" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="11" target="20"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="101" value="aligns with" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="12" target="20"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="102" value="tooling" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="13" target="20"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Edges from core to band 1 -->
+        <mxCell id="110" value="CloudEvent envelope" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.35;exitY=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="20" target="31"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="111" value="binding generation source" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.65;exitY=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="20" target="32"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Edge from core to L1 band -->
+        <mxCell id="120" value="service proto contracts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="20" target="40"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Edge from core to L2/L3 band -->
+        <mxCell id="121" value="shared RPC + event schema" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="20" target="50"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="800" y="690"/></Array></mxGeometry></mxCell>
+
+        <!-- Edge from core to L4 band -->
+        <mxCell id="122" value="shared RPC + event schema" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="20" target="60"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="800" y="860"/></Array></mxGeometry></mxCell>
+
+        <!-- Edge from core to L5/L6 band -->
+        <mxCell id="123" value="shared RPC + event schema" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="20" target="70"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="800" y="1030"/></Array></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

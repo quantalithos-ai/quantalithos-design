@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" version="29.6.1">
+  <diagram name="L0-core Context v3">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Standards band -->
+        <mxCell id="10" value="External standards &amp; ecosystem" style="swimlane;horizontal=0;startSize=26;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="90" y="30" width="1420" height="115" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" value="CloudEvents 1.0&#xa;event envelope spec" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#333333;align=center;verticalAlign=middle;" vertex="1" parent="10">
+          <mxGeometry x="70" y="35" width="240" height="48" as="geometry"/></mxCell>
+        <mxCell id="12" value="W3C Trace Context&#xa;trace propagation spec" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#333333;align=center;verticalAlign=middle;" vertex="1" parent="10">
+          <mxGeometry x="420" y="35" width="260" height="48" as="geometry"/></mxCell>
+        <mxCell id="13" value="buf.build&#xa;build tooling" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#333333;align=center;verticalAlign=middle;" vertex="1" parent="10">
+          <mxGeometry x="850" y="35" width="220" height="48" as="geometry"/></mxCell>
+
+        <!-- Core -->
+        <mxCell id="20" value="★ quantalithos-core ★&#xa;L0 shared contract layer&#xa;proto schema for 6 L1 services&#xa;CloudEvents 1.0 envelope&#xa;W3C Trace Context&#xa;ErrorCode / shared common types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#1f4e79;strokeWidth=3;fontColor=#0b1f33;fontStyle=1;align=center;verticalAlign=middle;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="500" y="190" width="600" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- Primary direct consumers -->
+        <mxCell id="30" value="Primary direct consumers" style="swimlane;horizontal=0;startSize=24;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="230" y="400" width="1140" height="105" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" value="quantalithos-bus&#xa;consumes CloudEvent envelope" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#333333;align=center;verticalAlign=middle;" vertex="1" parent="30"><mxGeometry x="120" y="32" width="300" height="48" as="geometry"/></mxCell>
+        <mxCell id="32" value="quantalithos-sdk&#xa;generates Rust / Python / TS bindings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#333333;align=center;verticalAlign=middle;" vertex="1" parent="30"><mxGeometry x="690" y="32" width="330" height="48" as="geometry"/></mxCell>
+
+        <!-- L1 domains -->
+        <mxCell id="40" value="L1 six domains" style="swimlane;horizontal=0;startSize=24;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="100" y="545" width="1400" height="125" as="geometry"/>
+        </mxCell>
+        <mxCell id="41" value="identity&#xa;members" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" vertex="1" parent="40"><mxGeometry x="30" y="38" width="180" height="45" as="geometry"/></mxCell>
+        <mxCell id="42" value="conversation&#xa;chats" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" vertex="1" parent="40"><mxGeometry x="250" y="38" width="180" height="45" as="geometry"/></mxCell>
+        <mxCell id="43" value="work&#xa;projects" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" vertex="1" parent="40"><mxGeometry x="470" y="38" width="180" height="45" as="geometry"/></mxCell>
+        <mxCell id="44" value="process&#xa;workflows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" vertex="1" parent="40"><mxGeometry x="690" y="38" width="180" height="45" as="geometry"/></mxCell>
+        <mxCell id="45" value="governance&#xa;gates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" vertex="1" parent="40"><mxGeometry x="910" y="38" width="180" height="45" as="geometry"/></mxCell>
+        <mxCell id="46" value="artifact&#xa;assets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" vertex="1" parent="40"><mxGeometry x="1130" y="38" width="180" height="45" as="geometry"/></mxCell>
+
+        <!-- L2/L3 consumers -->
+        <mxCell id="50" value="L2 / L3 consumers" style="swimlane;horizontal=0;startSize=24;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="180" y="710" width="1240" height="115" as="geometry"/>
+        </mxCell>
+        <mxCell id="51" value="member runtime / member-service / tools" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=center;verticalAlign=middle;" vertex="1" parent="50"><mxGeometry x="70" y="35" width="380" height="48" as="geometry"/></mxCell>
+        <mxCell id="52" value="capability-hub" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=center;verticalAlign=middle;" vertex="1" parent="50"><mxGeometry x="500" y="35" width="250" height="48" as="geometry"/></mxCell>
+        <mxCell id="53" value="method-library" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=center;verticalAlign=middle;" vertex="1" parent="50"><mxGeometry x="840" y="35" width="250" height="48" as="geometry"/></mxCell>
+
+        <!-- L4/L5/L6 consumers -->
+        <mxCell id="60" value="L4 / L5 / L6 consumers" style="swimlane;horizontal=0;startSize=24;rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="110" y="865" width="1380" height="145" as="geometry"/>
+        </mxCell>
+        <mxCell id="61" value="observability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=center;verticalAlign=middle;" vertex="1" parent="60"><mxGeometry x="80" y="34" width="220" height="42" as="geometry"/></mxCell>
+        <mxCell id="62" value="archive" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=center;verticalAlign=middle;" vertex="1" parent="60"><mxGeometry x="390" y="34" width="220" height="42" as="geometry"/></mxCell>
+        <mxCell id="63" value="sandbox" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=center;verticalAlign=middle;" vertex="1" parent="60"><mxGeometry x="700" y="34" width="220" height="42" as="geometry"/></mxCell>
+        <mxCell id="71" value="chat / console / runner / sync / website" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;verticalAlign=middle;" vertex="1" parent="60"><mxGeometry x="140" y="88" width="450" height="42" as="geometry"/></mxCell>
+        <mxCell id="72" value="bridges / marketplace" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;verticalAlign=middle;" vertex="1" parent="60"><mxGeometry x="800" y="88" width="300" height="42" as="geometry"/></mxCell>
+
+        <!-- Minimal edges -->
+        <mxCell id="100" value="aligns with" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.2;entryY=0;" edge="1" parent="1" source="11" target="20"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="101" value="aligns with" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="12" target="20"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="102" value="build tooling" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.8;entryY=0;" edge="1" parent="1" source="13" target="20"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="110" value="CloudEvent envelope + bindings" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="20" target="30"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="111" value="service proto contracts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="20" target="40"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="112" value="shared contracts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="20" target="50"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="113" value="event + RPC schemas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="20" target="60"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

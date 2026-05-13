@@ -1,6 +1,6 @@
 # 项目文档写作指南
 
-> 基于 teleop-quic-transformer 项目的设计流程总结，适用于新项目的文档编写。
+> 基于 teleop-quic-transformer 项目的设计流程总结，适用于新项目的文档编写。  
 
 ---
 

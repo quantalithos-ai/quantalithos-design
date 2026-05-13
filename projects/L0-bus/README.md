@@ -1,6 +1,6 @@
 # quantalithos-bus
 
-> **仓使命**:Event Bus 抽象 + 多后端适配(NATS JetStream / Redis Streams / Kafka / In-memory)。Quantalithos **跨域通信的唯一主干**。
+> **仓使命**:Event Bus 抽象 + 多后端适配(NATS JetStream / Redis Streams / Kafka / In-memory)。Quantalithos **跨域通信的唯一主干**。  
 
 ---
 

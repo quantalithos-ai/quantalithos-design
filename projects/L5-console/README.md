@@ -1,6 +1,6 @@
 # quantalithos-console
 
-> **仓使命**:组织治理中心 —— 企业管理者 / 合规官 / 方法论制定者的 Web 操作台。与 Chat 互补:Chat 是协作视角,Console 是治理视角。
+> **仓使命**:组织治理中心 —— 企业管理者 / 合规官 / 方法论制定者的 Web 操作台。与 Chat 互补:Chat 是协作视角,Console 是治理视角。  
 
 ---
 

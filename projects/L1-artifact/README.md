@@ -1,6 +1,6 @@
 # quantalithos-artifact
 
-> **仓使命**:制品域服务 —— Artifact(16 kind)+ ArtifactRelation(7 kind)+ Baseline + DatasetArtifact。一切可审计产出的承载者。
+> **仓使命**:制品域服务 —— Artifact(16 kind)+ ArtifactRelation(7 kind)+ Baseline + DatasetArtifact。一切可审计产出的承载者。  
 
 ---
 

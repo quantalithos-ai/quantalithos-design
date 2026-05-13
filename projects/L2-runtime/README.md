@@ -1,6 +1,6 @@
 # quantalithos-runtime
 
-> **仓使命**:Runtime Process(Python 大脑进程),AI 员工容器内的**决策中枢**。9 子模块承载 LLM 推理 + 记忆 + 工具调用 + 反思。
+> **仓使命**:Runtime Process(Python 大脑进程),AI 员工容器内的**决策中枢**。9 子模块承载 LLM 推理 + 记忆 + 工具调用 + 反思。  
 
 ---
 

@@ -1,6 +1,6 @@
 # quantalithos-conversation
 
-> **仓使命**:对话域服务 —— Conversation(四形态)+ Turn(五 kind)的持久化、实时推送、AG-UI 17 事件映射。
+> **仓使命**:对话域服务 —— Conversation(四形态)+ Turn(五 kind)的持久化、实时推送、AG-UI 17 事件映射。  
 
 ---
 

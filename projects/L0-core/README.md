@@ -1,6 +1,6 @@
 # quantalithos-core
 
-> **仓使命**:Quantalithos 的**共享契约基石** —— Proto schema + CloudEvents 1.0 包络 + W3C Trace Context + 全平台 ErrorCode 枚举。所有仓编译期依赖本仓。
+> **仓使命**:Quantalithos 的**共享契约基石** —— Proto schema + CloudEvents 1.0 包络 + W3C Trace Context + 全平台 ErrorCode 枚举。所有仓编译期依赖本仓。  
 
 ---
 

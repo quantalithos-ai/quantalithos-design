@@ -1,6 +1,6 @@
 # quantalithos-member
 
-> **仓使命**:Member Process(Rust 门面进程),AI 员工容器内的**"嘴耳"**。6 子模块负责入站筛选 + 出站代笔,不做决策。
+> **仓使命**:Member Process(Rust 门面进程),AI 员工容器内的**"嘴耳"**。6 子模块负责入站筛选 + 出站代笔,不做决策。  
 
 ---
 

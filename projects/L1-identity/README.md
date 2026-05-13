@@ -1,6 +1,6 @@
 # quantalithos-identity
 
-> **仓使命**:身份域服务 —— GlobalMember / Role / Capability 的持久化与生命周期管理。员工档案的单一真相源。
+> **仓使命**:身份域服务 —— GlobalMember / Role / Capability 的持久化与生命周期管理。员工档案的单一真相源。  
 
 ---
 

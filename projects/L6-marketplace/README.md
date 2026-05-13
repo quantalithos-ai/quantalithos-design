@@ -1,6 +1,6 @@
 # quantalithos-marketplace
 
-> **仓使命**:资产市场 —— 社区 + 组织 + 第三方共享 / 购买 / 发布的 ProcessTemplate / Role 定义 / MCP Tool / Deployment Package。
+> **仓使命**:资产市场 —— 社区 + 组织 + 第三方共享 / 购买 / 发布的 ProcessTemplate / Role 定义 / MCP Tool / Deployment Package。  
 
 ---
 

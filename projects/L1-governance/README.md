@@ -1,6 +1,6 @@
 # quantalithos-governance
 
-> **仓使命**:治理域服务 —— Gate / Policy / Control / AIIA / SoA / Nonconformity。Quantalithos 对齐 ISO 42001 AIMS 的**核心技术载体**。
+> **仓使命**:治理域服务 —— Gate / Policy / Control / AIIA / SoA / Nonconformity。Quantalithos 对齐 ISO 42001 AIMS 的**核心技术载体**。  
 
 ---
 

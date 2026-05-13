@@ -1,6 +1,6 @@
 # quantalithos-sync
 
-> **仓使命**:工作区同步 CLI —— 让开发者把 AI 产出代码同步到本地 IDE,修改后推回走 review Gate。
+> **仓使命**:工作区同步 CLI —— 让开发者把 AI 产出代码同步到本地 IDE,修改后推回走 review Gate。  
 
 ---
 

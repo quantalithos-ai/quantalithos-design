@@ -1,6 +1,6 @@
 # quantalithos-member-images
 
-> **仓使命**:按 Role 预构建的 Docker 镜像集合(CI 产出仓)。每 Role 一镜像,供 member-service 拉取运行。
+> **仓使命**:按 Role 预构建的 Docker 镜像集合(CI 产出仓)。每 Role 一镜像,供 member-service 拉取运行。  
 
 ---
 

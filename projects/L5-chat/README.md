@@ -1,6 +1,6 @@
 # quantalithos-chat
 
-> **仓使命**:协作入口 —— 桌面 / Web / Mobile 多端客户端。用户看到的 Quantalithos 的**脸**。
+> **仓使命**:协作入口 —— 桌面 / Web / Mobile 多端客户端。用户看到的 Quantalithos 的**脸**。  
 
 ---
 

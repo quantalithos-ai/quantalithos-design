@@ -1,6 +1,6 @@
 # quantalithos-sdk
 
-> **仓使命**:三语言(Python / Rust / TypeScript)client 库 + 统一接入层。所有端侧 + 内部 runtime 走同一套 sdk。
+> **仓使命**:三语言(Python / Rust / TypeScript)client 库 + 统一接入层。所有端侧 + 内部 runtime 走同一套 sdk。  
 
 ---
 

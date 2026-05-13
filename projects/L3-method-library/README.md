@@ -1,6 +1,6 @@
 # quantalithos-method-library
 
-> **仓使命**:**Method Content 存储与分发** —— SPEM 2.0 方法资产(TaskDefinition / RoleDefinition / WorkProductDefinition / ProcessTemplate)+ AIPolicy + 生命周期模型目录。
+> **仓使命**:**Method Content 存储与分发** —— SPEM 2.0 方法资产(TaskDefinition / RoleDefinition / WorkProductDefinition / ProcessTemplate)+ AIPolicy + 生命周期模型目录。  
 
 ---
 

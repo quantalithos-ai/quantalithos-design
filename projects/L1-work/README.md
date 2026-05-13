@@ -1,6 +1,6 @@
 # quantalithos-work
 
-> **仓使命**:工作域服务 —— Project / ProjectMember / Backlog / WorkItem / Iteration 聚合。承载软件项目的完整生命周期与双层 Member 模型的"项目分配层"。
+> **仓使命**:工作域服务 —— Project / ProjectMember / Backlog / WorkItem / Iteration 聚合。承载软件项目的完整生命周期与双层 Member 模型的"项目分配层"。  
 
 ---
 

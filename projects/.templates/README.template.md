@@ -1,8 +1,8 @@
 # README · [项目名]
 
-> **文档定位**:项目总览(OVERVIEW),给初次接触者 30 秒看懂。
-> **书写规范**:遵循 `standards/document/project-doc-writing-guide.md` §一
-> **本文不承载**:结构体字段 / API 签名 / 设计决策理由(属于下层文档)
+> **文档定位**:项目总览(OVERVIEW),给初次接触者 30 秒看懂。  
+> **书写规范**:遵循 `standards/document/project-doc-writing-guide.md` §一  
+> **本文不承载**:结构体字段 / API 签名 / 设计决策理由(属于下层文档)  
 
 ---
 

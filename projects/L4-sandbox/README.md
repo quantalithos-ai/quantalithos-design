@@ -1,6 +1,6 @@
 # quantalithos-sandbox
 
-> **仓使命**:代码执行隔离 —— 为 Runtime Tool 调用 / Runner App 提供安全沙箱。至少 Docker + gVisor 两种隔离后端。
+> **仓使命**:代码执行隔离 —— 为 Runtime Tool 调用 / Runner App 提供安全沙箱。至少 Docker + gVisor 两种隔离后端。  
 
 ---
 

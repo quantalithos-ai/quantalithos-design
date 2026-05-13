@@ -1,6 +1,6 @@
 # quantalithos-capability-hub
 
-> **仓使命**:能力池 —— MCP Server 注册表 + A2A Node Directory + Provider Contract(LLM 模型提供商)+ 白名单 / 成本记账。
+> **仓使命**:能力池 —— MCP Server 注册表 + A2A Node Directory + Provider Contract(LLM 模型提供商)+ 白名单 / 成本记账。  
 
 ---
 

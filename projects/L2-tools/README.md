@@ -1,6 +1,6 @@
 # quantalithos-tools
 
-> **仓使命**:Runtime 可调用的**工具集 monorepo**。含内置 Tool(file / code / git / sandbox / lsp / test)+ MCP Client(外部工具代理)。不自治,只被 Runtime 调用。
+> **仓使命**:Runtime 可调用的**工具集 monorepo**。含内置 Tool(file / code / git / sandbox / lsp / test)+ MCP Client(外部工具代理)。不自治,只被 Runtime 调用。  
 
 ---
 

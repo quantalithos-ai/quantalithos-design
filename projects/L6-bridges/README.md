@@ -1,6 +1,6 @@
 # quantalithos-bridges
 
-> **仓使命**:外部平台桥接 —— 让用户**不离开既有团队协作平台**(Mattermost / Telegram / Slack / Discord)就能使用 AI 员工。
+> **仓使命**:外部平台桥接 —— 让用户**不离开既有团队协作平台**(Mattermost / Telegram / Slack / Discord)就能使用 AI 员工。  
 
 ---
 

@@ -1,6 +1,6 @@
 # quantalithos-observability
 
-> **仓使命**:OTel Collector + 不可变审计日志(append-only + 哈希链)+ 指标聚合 + DORA/EBM/42001 指标仪表板。三红线"可审计性"的技术载体。
+> **仓使命**:OTel Collector + 不可变审计日志(append-only + 哈希链)+ 指标聚合 + DORA/EBM/42001 指标仪表板。三红线"可审计性"的技术载体。  
 
 ---
 

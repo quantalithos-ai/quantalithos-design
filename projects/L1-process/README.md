@@ -1,6 +1,6 @@
 # quantalithos-process
 
-> **仓使命**:过程域服务 —— ProcessTemplate / ProcessProfile / ProcessInstance 三段式。BPMN 2.0 引擎 + 29110 Tailoring + Temporal 持久执行的综合落地。
+> **仓使命**:过程域服务 —— ProcessTemplate / ProcessProfile / ProcessInstance 三段式。BPMN 2.0 引擎 + 29110 Tailoring + Temporal 持久执行的综合落地。  
 
 ---
 

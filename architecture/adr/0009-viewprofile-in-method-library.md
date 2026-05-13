@@ -1,10 +1,10 @@
 # ADR-0009:ViewProfile 归 method-library —— L1 域全量返数据、视图策略外置
 
-> Status: **Accepted**
-> Date: 2026-05-09
-> Deciders: Aris
-> Consulted: `product/六域模型.md` §9.3 方法库横切 / `domain/work/README.md` §3 / `domain/process/README.md` §3 / `domain/governance/README.md` §3 / `product/产品矩阵.md`
-> Informed: method-library 仓 / console 仓 / chat 仓 / 各 L1 域
+> Status: **Accepted**  
+> Date: 2026-05-09  
+> Deciders: Aris  
+> Consulted: `product/六域模型.md` §9.3 方法库横切 / `domain/work/README.md` §3 / `domain/process/README.md` §3 / `domain/governance/README.md` §3 / `product/产品矩阵.md`  
+> Informed: method-library 仓 / console 仓 / chat 仓 / 各 L1 域  
 
 ---
 

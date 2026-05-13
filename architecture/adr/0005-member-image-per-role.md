@@ -1,10 +1,10 @@
 # ADR-0005:AI Member 容器镜像按 Role 预构建
 
-> Status: **Accepted**
-> Date: 2026-05-08
-> Deciders: Aris
-> Consulted: 本轮 AI Member 架构讨论第 6 轮(两个仓存在意义)
-> Informed: L2 `member` / `runtime` / `tools` / `member-images` / `member-service` 所有仓
+> Status: **Accepted**  
+> Date: 2026-05-08  
+> Deciders: Aris  
+> Consulted: 本轮 AI Member 架构讨论第 6 轮(两个仓存在意义)  
+> Informed: L2 `member` / `runtime` / `tools` / `member-images` / `member-service` 所有仓  
 
 ---
 

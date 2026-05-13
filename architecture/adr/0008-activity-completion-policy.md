@@ -1,10 +1,10 @@
 # ADR-0008:Activity.completion_policy 配置化 + WorkItem 状态独立
 
-> Status: **Accepted**
-> Date: 2026-05-09
-> Deciders: Aris
-> Consulted: `domain/process/README.md` §2.4 + §十一.3 / `domain/work/README.md` §2.4 + §4.3 / `domain/governance/README.md` §2.1.2 / `product/六域模型.md` §5.6
-> Informed: process 仓 / work 仓 / governance 仓 / method-library 仓
+> Status: **Accepted**  
+> Date: 2026-05-09  
+> Deciders: Aris  
+> Consulted: `domain/process/README.md` §2.4 + §十一.3 / `domain/work/README.md` §2.4 + §4.3 / `domain/governance/README.md` §2.1.2 / `product/六域模型.md` §5.6  
+> Informed: process 仓 / work 仓 / governance 仓 / method-library 仓  
 
 ---
 

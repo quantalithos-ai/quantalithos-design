@@ -1,10 +1,10 @@
 # ADR-0004:GlobalMember 与 ProjectMember 双层分离
 
-> Status: **Accepted**
-> Date: 2026-05-08
-> Deciders: Aris
-> Consulted: 讨论回溯(AI Member 架构的 6 轮对话)+ `product/最终目的.md` §3.2
-> Informed: L1 `identity` 和 `work` 仓 / L2 `member` 运行层 / 所有涉及"员工"字段的文档
+> Status: **Accepted**  
+> Date: 2026-05-08  
+> Deciders: Aris  
+> Consulted: 讨论回溯(AI Member 架构的 6 轮对话)+ `product/最终目的.md` §3.2  
+> Informed: L1 `identity` 和 `work` 仓 / L2 `member` 运行层 / 所有涉及"员工"字段的文档  
 
 ---
 

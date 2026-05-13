@@ -1,10 +1,10 @@
 # ADR-0003:身份域采用 Rust + PostgreSQL 技术栈
 
-> Status: **Accepted**
-> Date: 2026-05-08
-> Deciders: Aris
-> Consulted: `feedback_research_principles.md` / `architecture/架构设计.md` / `feedback_red_lines.md`
-> Informed: L1 六域其他仓的选型决策
+> Status: **Accepted**  
+> Date: 2026-05-08  
+> Deciders: Aris  
+> Consulted: `feedback_research_principles.md` / `architecture/架构设计.md` / `feedback_red_lines.md`  
+> Informed: L1 六域其他仓的选型决策  
 
 ---
 

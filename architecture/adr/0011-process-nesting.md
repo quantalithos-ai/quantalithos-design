@@ -1,10 +1,10 @@
 # ADR-0011:流程嵌套机制 —— SubProcess vs CallActivity 边界 + 父子 Instance 生命周期
 
-> Status: **Proposed**
-> Date: 2026-05-10
-> Deciders: Aris(待确认)
-> Consulted: `domain/process/README.md` §2.1 / §2.4 / §2.5 / §十 Q2 / ADR-0007 / ADR-0008 / ADR-0010 / `methodology/standards-discussion/BPMN-2.0.md`
-> Informed: process 仓 / method-library 仓 / governance 仓 / observability 仓
+> Status: **Proposed**  
+> Date: 2026-05-10  
+> Deciders: Aris(待确认)  
+> Consulted: `domain/process/README.md` §2.1 / §2.4 / §2.5 / §十 Q2 / ADR-0007 / ADR-0008 / ADR-0010 / `methodology/standards-discussion/BPMN-2.0.md`  
+> Informed: process 仓 / method-library 仓 / governance 仓 / observability 仓  
 
 ---
 

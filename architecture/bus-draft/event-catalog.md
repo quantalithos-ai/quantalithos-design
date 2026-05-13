@@ -1,6 +1,6 @@
 # Event Catalog — Quantalithos 事件契约主表
 
-> **文档定位**:Quantalithos 所有跨域事件的**单一真相源**(Single Source of Truth)。任何域新增、修改、弃用事件**必须先更新本表**,再在各域 README 里同步。
+> **文档定位**:Quantalithos 所有跨域事件的**单一真相源**(Single Source of Truth)。任何域新增、修改、弃用事件**必须先更新本表**,再在各域 README 里同步。  
 >
 > **适用范围**:六个 L1 域(identity / conversation / work / process / governance / artifact)+ L3 方法能力域(method-library / capability-hub)+ L2 Member 运行层(future)+ L4 横切(archive / observability tap)。
 >

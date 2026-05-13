@@ -1,10 +1,10 @@
 # ADR-0010:Template 刚度分层 —— 从"剧本引擎"到"范式向导"
 
-> Status: **Proposed**
-> Date: 2026-05-10
-> Deciders: Aris(待确认)
-> Consulted: `domain/process/README.md` §2.1 / §2.4 / `domain/method-library/README.md` §2.5 / `product/六域模型.md` §六 过程域 / ADR-0008 / ADR-0009 / 本仓记忆 `feedback_red_lines.md`(可裁剪性红线)
-> Informed: process 仓 / method-library 仓 / governance 仓 / console 仓 / 所有 L1 域
+> Status: **Proposed**  
+> Date: 2026-05-10  
+> Deciders: Aris(待确认)  
+> Consulted: `domain/process/README.md` §2.1 / §2.4 / `domain/method-library/README.md` §2.5 / `product/六域模型.md` §六 过程域 / ADR-0008 / ADR-0009 / 本仓记忆 `feedback_red_lines.md`(可裁剪性红线)  
+> Informed: process 仓 / method-library 仓 / governance 仓 / console 仓 / 所有 L1 域  
 
 ---
 

@@ -1,6 +1,6 @@
 # Agent 统一模型与三级控制设计
 
-> ⚠️ **状态:2026-05-08 被 A 方案吸收**
+> ⚠️ **状态:2026-05-08 被 A 方案吸收**  
 >
 > 本文的"三级控制"概念(Free / Guided / Enforced)在 A 方案下演化为**过程域 ProcessProfile 的 tailoring_level + 治理域 Gate 的 autonomy_level 5 级**。核心思路保留,但对象体系和实现方式已重构。权威文档:
 >

@@ -1,6 +1,6 @@
 # Phase 2 gRPC 升级方案
 
-> ⚠️ **状态：Phase 2 runtime 相关部分已跳过（2026-05-07）**
+> ⚠️ **状态：Phase 2 runtime 相关部分已跳过（2026-05-07）**  
 >
 > 经讨论（决策 Q1），Phase 2 的 runtime ↔ flow gRPC 改造**直接跳过**，进入 **Phase 2B Member 容器化**。
 > 理由：Phase 2B 后旧 runtime 归档重写，Phase 2 的 runtime gRPC 代码将成短命代码。

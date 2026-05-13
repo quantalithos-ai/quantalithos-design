@@ -1,10 +1,10 @@
 # ADR-0006:Memory 持久化归属 —— identity 扩展 + 外部向量库
 
-> Status: **Accepted**
-> Date: 2026-05-08
-> Deciders: Aris
-> Consulted: `architecture/ai-member设计.md` §4.4 + §十一 Q1 / `domain/identity/README.md` §十 Q1
-> Informed: identity 仓 / runtime 仓 / observability 仓 / archive 仓 / 未来 memory 相关工作
+> Status: **Accepted**  
+> Date: 2026-05-08  
+> Deciders: Aris  
+> Consulted: `architecture/ai-member设计.md` §4.4 + §十一 Q1 / `domain/identity/README.md` §十 Q1  
+> Informed: identity 仓 / runtime 仓 / observability 仓 / archive 仓 / 未来 memory 相关工作  
 
 ---
 

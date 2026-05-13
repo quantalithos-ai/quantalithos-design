@@ -1,6 +1,6 @@
 # bus-draft — Event Bus 接口草案
 
-> **文档定位**:Quantalithos A 方案段 3 第二件产出 —— `quantalithos-bus` 仓的接口抽象 + 多后端适配 + 订阅过滤 + 可靠投递 + Outbox 协议的**设计态草案**。
+> **文档定位**:Quantalithos A 方案段 3 第二件产出 —— `quantalithos-bus` 仓的接口抽象 + 多后端适配 + 订阅过滤 + 可靠投递 + Outbox 协议的**设计态草案**。  
 >
 > **最终归属**:本草案在段 3 末迁入 `quantalithos-bus` 独立仓。
 >

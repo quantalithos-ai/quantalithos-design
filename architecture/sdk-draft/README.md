@@ -1,6 +1,6 @@
 # sdk-draft — SDK 仓草案
 
-> **文档定位**:Quantalithos A 方案段 3 第三件产出 —— `quantalithos-sdk` 仓的**三语言(Python / Rust / TypeScript)客户端库**设计态草案。
+> **文档定位**:Quantalithos A 方案段 3 第三件产出 —— `quantalithos-sdk` 仓的**三语言(Python / Rust / TypeScript)客户端库**设计态草案。  
 >
 > **最终归属**:本草案在段 3 末迁入 `quantalithos-sdk` 独立仓。
 >

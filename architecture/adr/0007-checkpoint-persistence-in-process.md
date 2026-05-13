@@ -1,10 +1,10 @@
 # ADR-0007:Checkpoint 持久化位置 —— 过程域扩展 + 外部 blob 回落
 
-> Status: **Accepted**
-> Date: 2026-05-08
-> Deciders: Aris
-> Consulted: `architecture/ai-member设计.md` §4.8 + §十一 Q2 / `domain/process/README.md` §5.4 + §十 Q1
-> Informed: process 仓 / runtime 仓 / observability 仓 / member-service 仓
+> Status: **Accepted**  
+> Date: 2026-05-08  
+> Deciders: Aris  
+> Consulted: `architecture/ai-member设计.md` §4.8 + §十一 Q2 / `domain/process/README.md` §5.4 + §十 Q1  
+> Informed: process 仓 / runtime 仓 / observability 仓 / member-service 仓  
 
 ---
 

@@ -1,6 +1,6 @@
 # proto-draft — core 仓 proto + CloudEvents schema 草案
 
-> **文档定位**:Quantalithos A 方案段 3 第一件产出 —— `quantalithos-core` 仓的 proto 与 CloudEvents schema **设计态草案**。
+> **文档定位**:Quantalithos A 方案段 3 第一件产出 —— `quantalithos-core` 仓的 proto 与 CloudEvents schema **设计态草案**。  
 >
 > **最终归属**:本目录内容在段 3 末将迁移到 `quantalithos-core` 独立仓(26 仓之一)。当前放在 `design` 仓的 `architecture/proto-draft/` 下是设计期工件,便于跨 domain 统一审视。
 >

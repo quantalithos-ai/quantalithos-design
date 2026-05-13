@@ -1,6 +1,6 @@
 # 单 runtime 单 agent 落地设计（Phase 2B）
 
-> ⚠️ **状态：已废弃（2026-05-07）**
+> ⚠️ **状态：已废弃（2026-05-07）**  
 >
 > 本文档描述的 "flow 作 supervisor + 1 runtime 进程绑 1 agent（subprocess 模式）" 方案已被 **[Member 容器化架构设计](./member-container-architecture.md)** 替代。
 >

@@ -161,7 +161,26 @@ README.md                  是什么 / 怎么快速理解
 | `08-问题与处置记录` | 有明显非显然问题的仓完整写 | 其他仓轻写 | 可写“暂无可复用问题” |
 | `09-部署与运维手册` | 运行时/基础设施/端侧入口/生态仓完整写 | 纯静态/纯资产型仓轻写 | 不建议空缺 |
 
-### 2.7 样板优先级
+### 2.7 工作事实 / 流程节奏 / 执行计划分层规则
+
+当项目涉及 Backlog / WorkItem / child WorkItem / Iteration / ImplementationPlan / TaskDefinition.steps / Activity 时,必须按以下层次理解,不得混写:
+
+| 对象 | 层次 | 作用 |
+|---|---|---|
+| Backlog / WorkItem / child WorkItem | **团队协作事实层** | 团队需要跟踪、排期、依赖、验收、审计的工作单元 |
+| Iteration | **承诺子集层** | 从 Backlog 中选出的时间窗口承诺集合 |
+| ImplementationPlan / checklist | **个人/局部执行计划层** | 某个 WorkItem 的执行路线图、PlanItem、风险和证据,默认不进入 Backlog 真相 |
+| TaskDefinition.steps | **标准方法层** | 某类任务的一般标准做法,属于方法资产 |
+| Process Activity | **流程节奏层** | refinement / planning / review / retro / gate 等节奏节点,不拥有 WorkItem 真相 |
+
+**规则**:
+- Backlog 先存在,可以为空池; Sprint Planning 不创建 Backlog,只从 Backlog 中选择 WorkItem 形成 Iteration.planned_workitems
+- child WorkItem 是协作级拆分,仍属于 work 域正式工作事实
+- ImplementationPlan 不是 child WorkItem,而是挂在 WorkItem 上的执行型对象/产物
+- 默认不把个人执行步骤升级为 WorkItem; 只有进入协作、依赖、排期、验收、风险视野时才升级成 child WorkItem
+- 父子关系(`parent_workitem_id`)表达分解关系,`depends_on / blocks` 表达执行依赖,两者不得混用
+
+### 2.8 样板优先级
 
 当前样板优先级:
 

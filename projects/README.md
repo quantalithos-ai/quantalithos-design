@@ -203,6 +203,71 @@ README.md                  是什么 / 怎么快速理解
 - 如果同类型样板不够,回到 `projects/README.md` 补规则,不要在单仓里偷偷形成新流派
 - 一旦发现某条规则被 3 个以上仓重复以同样方式“例外化”,应回到本文件把例外升格为正式规则
 
+### 2.9 项目文档校准工作流
+
+当一个项目需要按最新 SOP 重新校准 `00~07` 文档时,不得直接跳写正式文档。
+
+统一执行链路:
+
+```text
+选择项目与文档
+  -> 创建子项目 design-calibration 工作台
+  -> 按对应 SOP Step 逐项讨论
+  -> 形成 Step 中间产物
+  -> 用户确认 / 门禁通过
+  -> 回填正式文档
+  -> 自审与提交
+```
+
+每个 Step 的中间产物必须遵循:
+
+```text
+standards/document/设计文档讨论中间产物规范.md
+```
+
+中间产物必须至少包含:
+
+- SOP 问题回答
+- 当前文档问题诊断
+- 改动前后对比
+- 设计取舍
+- 结构化中间产物
+- 回填草稿
+- 待确认事项
+- 进入下一步条件
+
+推荐工作台命名:
+
+```text
+projects/<project>/design-calibration/<doc>_calibration_flow.md
+projects/<project>/design-calibration/<doc>_step_<NN>_<topic>.md
+```
+
+示例:
+
+```text
+projects/L3-method-library/design-calibration/02_hld_calibration_flow.md
+projects/L3-method-library/design-calibration/02_hld_step_01_upstream_boundary.md
+projects/L3-method-library/design-calibration/03_ddd_calibration_flow.md
+```
+
+状态标记:
+
+```text
+[ ] 未开始
+[~] 讨论中
+[x] 已确认
+```
+
+批量校准纪律:
+
+- 每个项目先校准上游文档,再校准下游文档
+- `02-概要设计.md` 未通过承接清单门禁时,不得进入 `03-详细设计.md`
+- `03-详细设计.md` 未形成模块实现契约时,不得进入 `07-实施计划.md`
+- 中间产物不得直接替代正式文档
+- 正式文档不得保留 SOP 问题原文
+- 用户明确要求直接写入时,仍应在最终说明中列出使用了哪些中间产物判断
+
 ---
 
 ## 三、规范对应表
@@ -228,8 +293,8 @@ README.md                  是什么 / 怎么快速理解
 | README.md | `project-doc-writing-guide.md` §一 | 通则 | 初次接触者 |
 | 00-需求文档 | `需求文档书写规范.md` | 通则 | 产品 / 架构 / 测试 |
 | 01-架构设计 | `架构设计书写规范.md` | 通则 + 架构设计.md | 架构师 / 评审者 |
-| 02-概要设计 | `概要设计书写规范.md` | 通则 | 模块设计者 |
-| 03-详细设计 | `详细设计书写规范.md` | 通则 + 代码设计规范 | 开发者 |
+| 02-概要设计 | `概要设计书写规范.md` | `概要设计讨论流程_SOP.md` + `设计文档讨论中间产物规范.md` + 通则 | 模块设计者 |
+| 03-详细设计 | `详细设计书写规范.md` | `详细设计讨论流程_SOP.md` + `设计文档讨论中间产物规范.md` + 通则 + 代码设计规范 | 开发者 |
 | 04-配置设计 | `配置设计书写规范.md` | 通则 + 详细设计规范 | 开发 / SRE / 安全 |
 | 05-测试方案 | `测试方案书写规范.md` | 通则 + 详细设计规范 | QA / 开发 / SRE |
 | 06-验收标准 | `验收标准书写规范.md` | 通则 + 测试方案规范 | Owner / TL / 产品 |

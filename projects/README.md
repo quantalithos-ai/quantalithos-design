@@ -1,8 +1,8 @@
 # projects/ · Quantalithos 子项目文档体系
 
-> **目录定位**:Quantalithos 26 个子项目的**README + 00~09 文档体系集中地**。  
+> **目录定位**:Quantalithos 27 个子项目的**README + 00~09 文档体系集中地**。
 >
-> **段 3 起用**(2026-05-10):先按"分层做 + 按节点并行"策略完成 26 仓 `00-需求文档` + `01-架构设计` 全覆盖；后续 `02~09` 按节点和仓类型逐批展开。
+> **段 3 起用**(2026-05-10):先按"分层做 + 按节点并行"策略完成 26 仓 `00-需求文档` + `01-架构设计` 全覆盖；后续新增 `L1-workspace` 作为第 27 仓进入设计校准队列；后续 `02~09` 按节点和仓类型逐批展开。
 >
 > **规范源头**:`standards/document/`。本目录的每份文档必须严格遵循对应规范,**不得自造结构**。
 
@@ -26,7 +26,7 @@ projects/
 │   ├── 08-问题与处置记录.template.md     工程问题沉淀模板
 │   └── 09-部署与运维手册.template.md     部署/回滚/运维模板
 │
-└── L{n}-{repo}/                       26 个子项目,按 L 层级 + 仓名
+└── L{n}-{repo}/                       27 个子项目,按 L 层级 + 仓名
     ├── README.md                         总览(OVERVIEW,30 秒看懂)
     ├── 00-需求文档.md                   需求入口
     ├── 01-架构设计.md                   架构边界与决策
@@ -40,14 +40,14 @@ projects/
     └── 09-部署与运维手册.md             部署与运行手册(按仓类型可轻写)
 ```
 
-### 26 个子项目清单
+### 27 个子项目清单
 
 | L 层 | 子项目 | N 节点 | 语言建议 |
 |---|---|---|---|
 | L0 | core / bus / sdk | N0 | core(proto 定义) / bus(Rust) / sdk(多语言) |
 | L1 | identity | N1 | Rust |
 | L1 | conversation | N1 | Rust |
-| L1 | work / process / governance / artifact | N2 | Rust |
+| L1 | work / process / governance / artifact / workspace | N2 | Rust |
 | L3 | capability-hub / method-library | N3 | Rust |
 | L2 | member / member-images / member-service / runtime / tools | N4 | 混合(member-Go,member-images-Shell,runtime-Python,tools-混合) |
 | L4 | sandbox / observability / archive | N5 | Go / Rust |
@@ -115,13 +115,14 @@ README.md                  是什么 / 怎么快速理解
 
 ### 2.3 需求文档的三种来源分类
 
-虽然 26 仓都要求撰写 `00-需求文档.md`,但**需求来源并不相同**。写法必须按来源调整,不要机械套模板。
+虽然 27 仓都要求撰写 `00-需求文档.md`,但**需求来源并不相同**。写法必须按来源调整,不要机械套模板。
 
 | 类型 | 说明 | 典型仓 | 写法重点 |
 |---|---|---|---|
 | **产品叙事直推型** | `product/` 层已经有明确产品叙事,仓级需求是在此基础上细化 | L5-chat / L5-console / L5-runner / L5-sync / L5-website / L6-bridges / L6-marketplace | 强调用户故事、交互、验收标准、非功能指标 |
 | **架构反推型** | `product/` 层无直接业务叙事,需求主要来自架构边界和下游 25 仓的共同需要 | L0-core / L0-bus / L4-observability / L4-archive / L4-sandbox | 强调"为什么这个基础设施仓必须存在"、契约职责、下游消费者 |
 | **运行时能力型** | 需求来自平台能力与技术流程,既非纯产品也非纯契约 | L2-member / L2-runtime / L2-tools / L2-member-service / L2-member-images / L3-capability-hub / L3-method-library | 强调操作语义、运行时行为、接口/事件能力边界 |
+| **跨域视图型** | 需求来自多个真相源的统一消费体验,自身只拥有视图局部状态 | L1-workspace | 强调 PersonalWorkspace / ProjectWorkspace 如何统一消费 identity / work / conversation / process / artifact / governance,以及 read cursor / unread / pin / mute 等局部状态 |
 
 **写作原则**:
 - 产品叙事直推型 → 问题定义主要引用 `product/` 文档,仓级需求做细化
@@ -134,7 +135,8 @@ README.md                  是什么 / 怎么快速理解
 | 仓类型 | 典型仓 | 需求文档写法重心 | 架构设计写法重心 |
 |---|---|---|---|
 | **基础设施契约型** | L0-core / L0-bus / L0-sdk / 部分 L4 | 为什么这个基础设施不得不存在;下游共同需要;契约 / 稳定性 / 兼容性 | 依赖方向、契约边界、构建期/运行期容器、演进与版本策略 |
-| **业务域型** | L1 六域 | 直接细化 `product/` 叙事;用户故事、功能清单、验收标准最重要 | 边界、上下文、数据所有权、聚合关系、事件编织 |
+| **业务域型** | L1 identity / conversation / work / process / governance / artifact | 直接细化 `product/` 叙事;用户故事、功能清单、验收标准最重要 | 边界、上下文、数据所有权、聚合关系、事件编织 |
+| **跨域视图型** | L1-workspace | 成员个人首页、项目工作台、inbox、read cursor、unread、pin/mute 的统一体验 | 视图局部状态归属、跨域投影、只读聚合、消费者一致性 |
 | **运行时能力型** | L2 / 部分 L3 | 能力如何被上下游使用;角色可能是开发者 / 运维 / AI 成员 | 运行时流程、并发、资源管理、恢复路径、容器协作 |
 | **端侧产品型** | L5-chat / L5-console / L5-runner / L5-sync / L5-website | 终端用户体验、交互、验收、非功能(尤其 Learnability / Responsiveness) | 上下文图、容器图、外部依赖、网关/UI 边界 |
 | **生态扩展型** | L6-bridges / L6-marketplace | 外部平台/第三方资产/授权/审核/分发生命周期 | 外部系统边界、桥接投影、上游真相引用、供应链与审计 |
@@ -189,6 +191,7 @@ README.md                  是什么 / 怎么快速理解
 - L1-identity / L1-conversation / L1-work / L1-process / L1-governance / L1-artifact
 
 #### 第二层(已稳定,按第一层比照)
+- L1-workspace(新增跨域视图型,需先完成 00/01 校准后再升级为第一层样板)
 - L2-member / L2-runtime / L2-tools / L2-member-service / L2-member-images
 - L3-method-library / L3-capability-hub
 - L4-observability / L4-archive / L4-sandbox
@@ -259,7 +262,7 @@ README.md                  是什么 / 怎么快速理解
 
 ### 4.2 需求文档自审(来自 `需求文档书写规范.md`)
 
-所有 26 仓需求文档交付前必过:
+所有 27 仓需求文档交付前必过:
 
 - [ ] 与 `product/` 的关系声明清晰(引用 / 细化 / 新增)
 - [ ] 问题定义有量化(当前值 / 目标值 / 痛点可感知)

@@ -47,7 +47,7 @@ Runtime Process
 ## 关键依赖
 
 ### 上游
-- `quantalithos-sdk`(Python SDK,访问 L1 六域)
+- `quantalithos-sdk`(Python SDK,访问 L1 业务真相域与 workspace 视图)
 - `quantalithos-member`(容器内 IPC)
 - `quantalithos-tools`(Tool 集)
 - 外部:Anthropic / OpenAI / 自托管 LLM(通过 capability-hub 代理)+ 外部向量库(Memory)

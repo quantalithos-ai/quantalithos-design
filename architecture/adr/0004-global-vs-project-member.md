@@ -59,6 +59,47 @@ AI Member 的 6 轮设计讨论里暴露出一个根本矛盾:
 
 **一个运行时容器对应一个 ProjectMember 实例,不是对应一个 GlobalMember。**
 
+### 2.1 补充说明:Workspace View 不改变双层 Member 模型
+
+2026-05-25 的后续讨论补充了 AI Member 的“个人视野 / 项目视野”模型:
+
+```text
+PersonalWorkspace
+  GlobalMember-scoped 的个人工作台视图。
+
+ProjectWorkspace
+  ProjectMember / Project-scoped 的项目工作台视图。
+```
+
+该补充不推翻本 ADR 的双层 Member 决策。它只说明 AI Member 在交互时可以有不同上下文视角:
+
+```text
+私聊 / DM
+  -> PersonalWorkspace-first
+  -> 先看个人 inbox、项目列表、跨项目待办和私聊上下文
+
+项目群聊
+  -> ProjectWorkspace-first
+  -> 先看当前项目目标、项目成员、群聊、任务、流程、产物和 gate
+```
+
+关键边界如下:
+
+```text
+GlobalMember 仍是身份真相,不变成运行时容器。
+ProjectMember 仍是项目承担关系,也是项目执行容器粒度。
+PersonalWorkspace / ProjectWorkspace 是 view / context / projection,不是新的业务真相。
+DM 可以读取 PersonalWorkspace;一旦要执行项目动作,必须切换到对应 ProjectWorkspace / ProjectMember 上下文。
+```
+
+因此:
+
+```text
+PersonalWorkspace 解决“成员如何看见自己的跨项目世界”。
+ProjectWorkspace 解决“成员进入某个项目后如何看见项目上下文”。
+ProjectMember 仍解决“成员在某个项目中以什么身份执行”。
+```
+
 ## 3. 理由
 
 ### 3.1 边界清晰

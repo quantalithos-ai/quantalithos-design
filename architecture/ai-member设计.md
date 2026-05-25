@@ -10,6 +10,7 @@
 > - `architecture/adr/0003-identity-rust-stack.md`
 > - `architecture/adr/0004-global-vs-project-member.md`
 > - `architecture/adr/0005-member-image-per-role.md`
+> - `architecture/adr/drafts/0015-member-workspace-view.md`
 >
 > **下游承接**:
 > - L2 五仓各自的 `README.md`(段 3 产物)← 本文是它们的上位设计
@@ -17,7 +18,7 @@
 > - `domain/work/README.md`(段 2 并行产物)← ProjectMember 详细设计
 > - 后续与 Member 相关的 ADR(Memory 归属 / Checkpoint 位置 / SubAgent 形态 / LLM 路由 等)
 >
-> **本文不承载**:L1 六域的详细设计(留给 `domain/<域>/`);具体 proto / DB schema(留给段 3);UI 设计(留给 UX 文档)。
+> **本文不承载**:L1 业务真相域与 Workspace View 的详细设计(留给对应 L1 仓);具体 proto / DB schema(留给段 3);UI 设计(留给 UX 文档)。
 
 ---
 
@@ -35,6 +36,48 @@
 4. **隔离执行风险** —— 沙箱内执行,不污染主机,不越权调用
 5. **保证可恢复** —— 崩溃后从 checkpoint 恢复,对齐持久执行理念
 6. **保证可审计 / 可追溯** —— 任何决策 / 工具调用 / 状态变更都发事件
+
+### 1.1.1 AI Member 的两层视野
+
+AI Member 在运行时不仅需要项目执行上下文,也需要成员个人上下文:
+
+```text
+PersonalWorkspace
+  个人视野。
+  回答“我是谁、我在哪些项目里、哪些项目/私聊/待办需要我关注”。
+
+ProjectWorkspace
+  项目视野。
+  回答“我进入某个项目后,项目目标、成员、群聊、任务、流程、产物和 gate 是什么”。
+```
+
+二者不是新的身份真相或工作真相,而是 Workspace View / Context / Projection:
+
+```text
+identity / work / conversation / process / artifact / governance
+  仍然拥有正式业务真相。
+
+PersonalWorkspace / ProjectWorkspace
+  只负责聚合读取这些真相,并承载 read cursor、unread、pin、mute、last opened 等视图局部状态。
+```
+
+群聊和私聊的默认视野不同:
+
+```text
+项目群聊中的 AI Member
+  ProjectWorkspace-first
+
+私聊中的 AI Member
+  PersonalWorkspace-first
+```
+
+边界规则:
+
+```text
+群聊不默认读取完整 PersonalWorkspace,避免泄露其他项目、私聊和跨项目待办。
+私聊可以读取 PersonalWorkspace;如果用户谈到具体项目,再显式打开对应 ProjectWorkspace。
+执行项目动作时必须绑定到 ProjectWorkspace / ProjectMember 上下文。
+```
 
 ### 1.2 与产品叙事的对齐
 
@@ -84,6 +127,7 @@
 - **不实现 MCP Server 治理** —— 那在 L3 capability-hub,本层只调用
 - **不定义沙箱实现** —— 那在 L4 sandbox,本层只使用
 - **不做业务过程编排** —— 那在 L1 process 域,本层只接受 Activity 指令并执行
+- **不拥有 Workspace View 真相** —— PersonalWorkspace / ProjectWorkspace 是上游聚合视图,本层只消费其上下文
 
 ---
 
@@ -220,12 +264,13 @@ MemberIdentity {
 
 1. **身份过滤**:只收与本 member_id / project_member_id / project_id 相关
 2. **角色过滤**:基于 role_id 订阅 role-level 事件(例如 tech-lead 订阅 `governance.gate.raised` 全量;backend-dev 只订与自己有 assignee 关系的)
-3. **项目上下文过滤**:只收本 project 内事件;跨项目事件不入本容器(因为一个 GlobalMember 在不同 Project 里是不同的 ProjectMember,容器只对应其中一个)
+3. **上下文过滤**:项目群聊事件只收本 project 内事件;私聊 / DM 事件可进入 PersonalWorkspace-first 路径,但不得直接携带其他项目正文进入当前 ProjectMember 容器
 
 **订阅的关键事件族**(对齐六域模型):
 
 ```
 conversation.turn_posted       若 author 或 mention 含本 Member
+conversation.dm_turn_posted    若 DM participant 含本 GlobalMember
 conversation.gate_raised       若本 Member 是 decision_maker 之一
 work.workitem.assigned         若 assignee 是本 ProjectMember
 work.workitem.state_changed    若本 Member 是 assignee / reviewer
@@ -431,7 +476,7 @@ Runtime Process(Python)
  ├─ C2. Prompt Composer      分层 prompt 组装(shared_rules → role → policy → context)
  ├─ C3. Memory Store         三层记忆(working / episodic / semantic)
  ├─ C4. Goal / Plan          当前 Activity 目标栈 + 计划步骤
- ├─ C5. Context Manager      对话 / 项目 / 时间上下文聚合与截断
+ ├─ C5. Context Manager      解析 Personal / Project scope,聚合上下文并截断
  ├─ C6. Policy Cache         治理域下发的规则本地缓存
  ├─ C7. Checkpoint Store     每步外部持久化 + 崩溃恢复
  ├─ C8. Sub-Agent Spawner    独立上下文子 agent
@@ -596,14 +641,39 @@ Goal {
 
 ### 4.6 C5 · Context Manager
 
-**职责**:聚合多源上下文 + 按 token 预算截断。
+**职责**:解析交互视角,加载 Workspace 上下文,聚合多源上下文并按 token 预算截断。
+
+**ContextScope 判定**:
+
+```text
+Project Group Conversation
+  -> ContextScope = Project
+  -> load ProjectWorkspace(project_id)
+
+DM Conversation
+  -> ContextScope = Personal
+  -> load PersonalWorkspace(global_member_id)
+
+DM Conversation + explicit project mention
+  -> ContextScope = Personal + Project
+  -> load PersonalWorkspace(global_member_id)
+  -> resolve Project
+  -> load ProjectWorkspace(project_id)
+```
+
+**视野约束**:
+
+- `ProjectScope` 默认只读取当前 `ProjectWorkspace`,不得展开完整 `PersonalWorkspace`
+- `PersonalScope` 可以读取项目列表、跨项目 inbox、私聊、待办摘要,但不能直接执行项目动作
+- `Personal + ProjectScope` 允许在私聊中查看某个项目上下文;执行动作时必须绑定到对应 `ProjectMember`
 
 **上下文来源**:
 
 ```
 Context 组成
+ ├─ 视野上下文          PersonalWorkspace / ProjectWorkspace 摘要
  ├─ 对话上下文          最近 N 条 Turn(来自 B2 转发)
- ├─ 项目上下文          Project meta / Iteration goal / Baseline
+ ├─ 项目上下文          Project meta / Iteration goal / Baseline(仅 ProjectScope)
  ├─ 时间上下文          current_activity / 时间节点
  ├─ Goal 上下文         C4 的当前 Goal / Plan
  ├─ Memory 摘要         C3 episodic 检索的相关记忆
@@ -618,6 +688,25 @@ Context 组成
 4. Memory 摘要(压缩到摘要,不放全文)
 5. 历史 Turn(滑动窗口 + LLM 摘要老的部分)
 6. 工具调用结果(按时间倒序,旧的只保留结论)
+
+**Workspace 读取边界**:
+
+```text
+Workspace 负责“看见什么”。
+Truth Source 负责“事实是什么”。
+Runtime 负责“决定怎么做”。
+Conversation 负责“正式留下什么话”。
+```
+
+C5 只消费 Workspace View,不通过 Workspace 改写业务真相。需要执行动作时,由 C9 / Action Router 调用对应域:
+
+```text
+发消息      -> conversation
+更新任务    -> work
+推进活动    -> process
+提交产物    -> artifact
+请求决策    -> governance
+```
 
 **预算内超时**:
 
@@ -1009,6 +1098,18 @@ service MemberService {
 
 这一节把 **ADR-0004**(GlobalMember 在 identity,ProjectMember 在 work)在运行层的具体落地讲清。
 
+Workspace View 是对双层 Member 模型的补充,不是替代:
+
+```text
+PersonalWorkspace
+  GlobalMember-scoped 个人视图,用于私聊、inbox、跨项目待办和项目列表。
+
+ProjectWorkspace
+  ProjectMember / Project-scoped 项目视图,用于项目群聊、项目任务、流程、产物和 gate。
+```
+
+项目执行容器仍然只对应 `ProjectMember`。`PersonalWorkspace` 不等于容器粒度,也不持有项目执行权限。
+
 ### 6.1 三层概念再对齐
 
 ```
@@ -1021,6 +1122,12 @@ service MemberService {
 [层 3]  Member Container      在 L2 Member 运行层
                               一个 ProjectMember 的运行态实例
                               唯一绑定 (global_member_id, project_id) 对
+
+[视图]  PersonalWorkspace     GlobalMember-scoped 个人视野
+                              不拥有身份 / 项目 / 对话 / 工作真相
+
+[视图]  ProjectWorkspace      ProjectMember / Project-scoped 项目视野
+                              不拥有项目 / 任务 / 流程 / 产物 / gate 真相
 ```
 
 **关键约束**:
@@ -1028,6 +1135,7 @@ service MemberService {
 - **容器只对应 ProjectMember,不对应 GlobalMember** —— 一个 GlobalMember 在多个 Project 活跃时,会有多个容器
 - **同一 (global, project) 对在同一时刻只能有一个 active 容器** —— 不允许并发运行
 - **容器生命周期绑定 ProjectMember 生命周期** —— ProjectMember.lifecycle 变化驱动容器启停
+- **私聊不自动产生 GlobalMember 容器** —— DM 先进入 PersonalWorkspace;只有执行项目动作时才路由到对应 ProjectMember 容器或启动对应容器
 
 ### 6.2 从事件到容器的完整链路
 
@@ -1266,6 +1374,116 @@ bus → Member.B2 → Attention(B5)→ IPC(B6) → Runtime
   ▼
 产出 Artifact(如果有):
   Runtime 通过 B6 → B3 发 artifact.created + artifact.produced_in_activity
+```
+
+### 7.5 群聊视角:AI Member 与 Conversation 数据流
+
+项目群聊默认绑定 `ProjectWorkspace`:
+
+```text
+用户 / 其他成员
+  |
+  | PostTurn
+  v
+[conversation]
+  Project Group Conversation
+  |
+  | event: conversation.turn_posted
+  v
+[Member Process]
+  B2 Event Subscriber
+  B5 Attention Filter
+  |
+  | accepted event
+  v
+[Runtime Process]
+  C5 Context Manager
+  ContextScope = Project
+  load ProjectWorkspace(project_id)
+  |
+  | query project context
+  v
+[ProjectWorkspace]
+  project / members / group chat / work / process / artifact / gate
+  |
+  | decide response / action
+  v
+[Runtime Process]
+  |
+  | PostTurn / domain command
+  v
+[conversation / work / process / artifact / governance]
+```
+
+群聊语义:
+
+```text
+我在这个项目里,基于当前项目群聊和项目上下文协作。
+```
+
+群聊中不默认读取:
+
+```text
+其他项目 inbox
+其他项目私聊
+其他项目待办
+完整 PersonalWorkspace
+```
+
+### 7.6 私聊视角:AI Member 与 Conversation 数据流
+
+私聊默认绑定 `PersonalWorkspace`:
+
+```text
+用户
+  |
+  | PostTurn
+  v
+[conversation]
+  DM Conversation
+  |
+  | event: conversation.dm_turn_posted
+  v
+[Member Process]
+  B2 Event Subscriber
+  B5 Attention Filter
+  |
+  | accepted DM event
+  v
+[Runtime Process]
+  C5 Context Manager
+  ContextScope = Personal
+  load PersonalWorkspace(global_member_id)
+  |
+  | optional project resolve
+  v
+[PersonalWorkspace]
+  inbox / projects / private conversations / assigned work / pending gates
+  |
+  | open ProjectWorkspace only if needed
+  v
+[Runtime Process]
+  |
+  | reply in DM or redirect to project group
+  v
+[conversation]
+```
+
+私聊语义:
+
+```text
+我从个人工作台看当前用户的问题。
+如果问题涉及某个项目,我再显式打开对应 ProjectWorkspace。
+```
+
+执行项目动作时:
+
+```text
+DM Conversation
+  -> PersonalWorkspace
+  -> resolve Project
+  -> ProjectWorkspace
+  -> route to ProjectMember-scoped execution
 ```
 
 ---

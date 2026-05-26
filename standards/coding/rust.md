@@ -84,28 +84,41 @@ Rust 编码规范的作用主要是如下方面：
 
 规则主要是侧重于通用场景下，代码可读性、维护性、安全性、性能这四方面的考量，它仅仅覆盖一小部分（不到 1/5）clippy lint 。另外还有一些规则是clippy lint没有的，需要自定义lint。
 
+### 源码语言约束
+
+本规范文档使用中文说明规则,但实际实现仓的 Rust 源码必须默认使用英文。
+
+要求:
+
+- 标识符、模块名、类型名、函数名、变量名、测试名必须使用英文。
+- 普通注释、rustdoc 文档注释、错误说明注释必须使用英文。
+- 中文只能出现在明确的业务数据、协议样例、国际化资源或测试夹具中,且应能说明原因。
+- 本规范中的中文解释不是可复制到源码中的注释模板。
+
 ### Rust 文档注释与 rustdoc
 
-Rust 除普通注释外，还提供可以直接生成 API 文档的文档注释能力，通常配合 `rustdoc` 和 `cargo doc` 使用。对于公开函数、结构体、枚举、trait、模块等对外接口，应优先使用文档注释，而不是只写普通行注释。
+Rust 除普通注释外，还提供可以直接生成 API 文档的文档注释能力，通常配合 `rustdoc` 和 `cargo doc` 使用。对于公开函数、结构体、枚举、枚举变体、trait、模块等对外接口，应优先使用文档注释，而不是只写普通行注释。
 
-- `///`：用于为其后的语言项编写文档注释，例如函数、结构体、枚举、trait、type alias 以及公开模块成员。
+- `///`：用于为其后的语言项编写文档注释，例如函数、结构体、枚举、枚举变体、trait、type alias 以及公开模块成员。
 - `//!`：用于为当前模块或当前 crate 编写文档注释，通常放在模块文件或 crate 根文件顶部。
 - `cargo doc`：用于为当前 crate 生成 HTML 文档；`cargo doc --open` 可在生成后直接打开。
 - 公共 API 的文档注释宜先写单句摘要，再补充行为说明、边界条件、错误语义、panic 条件和必要示例。
+- 公开枚举的每个枚举变体都必须写 `///` 文档注释;带载荷变体必须说明载荷承载的错误、数据或上下文语义。
 - 文档中的示例应尽量保持可编译、可运行，避免文档与实现脱节。
 
 **示例**:
 
 ```rust
-//! 用户认证模块。
+//! User authentication module.
 
-/// 校验 token 是否有效。
+/// Validates whether a token is acceptable.
 ///
-/// 返回 `Ok(true)` 表示通过校验，返回 `Ok(false)` 表示校验失败。
+/// Returns `Ok(true)` when the token is accepted and `Ok(false)` when it is
+/// rejected by policy.
 ///
 /// # Errors
 ///
-/// 当 token 格式非法时返回错误。
+/// Returns an error when the token format is invalid.
 pub fn validate_token(token: &str) -> Result<bool, AuthError> {
     todo!()
 }

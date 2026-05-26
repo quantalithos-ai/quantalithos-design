@@ -313,8 +313,8 @@ projects/L3-method-library/design-calibration/03_ddd_calibration_flow.md
 - [ ] 完整阅读本项目 03-详细设计,能回答“实现层到底怎么做”
 - [ ] 若已进入交付阶段,完整阅读 04-配置设计 / 05-测试方案 / 06-验收标准
 - [ ] 完整阅读对应语言编码规范(`standards/coding/{rust,python,typescript}.md`)
-- [ ] 代码全英文、不允许中文字符
-- [ ] Commit 遵循项目格式:type 英文,主题正文中文,固定 Co-Authored-By
+- [ ] 实现代码全英文,源码标识符、普通注释、rustdoc 和测试名不使用中文
+- [ ] 本 design 文档仓 Commit 遵循项目格式:type 英文,主题正文中文,固定 Co-Authored-By;其他实现仓 Commit message 使用英文
 
 ---
 ## 四、质量门禁(必过)
@@ -485,9 +485,9 @@ N{x} 开发中:
 
 ### 8.2 提交规范
 
-- 文档变更与代码变更尽量同一批次提交
-- Commit 信息格式:type 英文,主题正文中文
-- Co-Authored-By 固定
+- 本 design 文档仓 Commit 信息格式:type 英文,主题正文中文
+- 其他实现仓的代码 Commit message 使用英文;若目标仓有更严格规范,取更严格者
+- Co-Authored-By 固定为 `Co-Authored-By: Codex <noreply@openai.com>`
 
 ### 8.3 评审频率
 

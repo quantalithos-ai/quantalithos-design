@@ -782,15 +782,16 @@ git config user.email
 7. 当前项目是否要求固定 footer，固定文本是什么。
 8. 是否允许多模型 `Co-Authored-By`，还是只能保留项目固定 footer。
 9. 当前仓是设计文档仓还是实际实现代码仓。
-10. 如果是设计文档仓，是否允许中文提交正文、中文伪代码注释和中文说明。
-11. 如果是实现代码仓，源码标识符、rustdoc、普通注释和测试名是否必须英文。
-12. 每笔提交应对应什么实施边界。
-13. 哪些 commit 时机被允许，哪些时机被禁止。
-14. 代码规范、格式化、lint 和测试如何检查。
-15. 设计偏离时如何同步文档。
-16. 证据如何附到提交、PR 或交付说明中。
-17. 哪些情况下必须拆分提交，哪些情况下允许合并提交。
-18. 当前实施计划中应给出的合格 commit 示例是什么。
+10. 如果提交发生在当前 design 文档仓，如何保证 `type` 英文、subject / body 中文、footer 固定。
+11. 如果提交发生在其他实现仓，如何保证 commit message 使用英文或符合更严格目标仓规范。
+12. 如果提交发生在其他实现仓，源码标识符、rustdoc、普通注释和测试名是否必须英文。
+13. 每笔提交应对应什么实施边界。
+14. 哪些 commit 时机被允许，哪些时机被禁止。
+15. 代码规范、格式化、lint 和测试如何检查。
+16. 设计偏离时如何同步文档。
+17. 证据如何附到提交、PR 或交付说明中。
+18. 哪些情况下必须拆分提交，哪些情况下允许合并提交。
+19. 当前实施计划中应给出的合格 commit 示例是什么。
 
 #### 期望产出
 
@@ -808,9 +809,9 @@ git config user.email
 
 | 部分 | 项目约束 | 示例 / 说明 |
 |---|---|---|
-| subject | <type 英文 + 项目主题格式> | `docs: 段 4 预备 · <中文主题>` |
-| body | <正文语言和分组方式> | 说明范围、关键变更、验证结果 |
-| footer | <固定 footer 或不需要 footer> | `Co-Authored-By: codex <noreply@openai.com>` |
+| subject | <type 英文 + 中文主题> | `docs: 收稳实施计划` |
+| body | <中文正文和分组方式> | 说明范围、关键变更、验证结果 |
+| footer | <固定 footer 或不需要 footer> | `Co-Authored-By: Codex <noreply@openai.com>` |
 
 #### Type / Scope
 
@@ -831,8 +832,8 @@ git config user.email
 
 | 仓类型 | commit message | 注释 / rustdoc / 测试名 | 说明 |
 |---|---|---|---|
-| 设计文档仓 | <是否允许中文 subject/body> | <设计说明和伪代码注释是否允许中文> | <例如 quantalithos-design> |
-| 实际实现代码仓 | <按实现仓提交规范> | <源码标识符、rustdoc、普通注释和测试名默认英文> | <中文只允许作为业务数据、协议样例、i18n 资源或测试夹具> |
+| 当前 design 文档仓 | <type 英文,subject / body 中文,footer 固定> | <设计说明和伪代码注释可中文> | <仅 quantalithos-design> |
+| 其他实现仓 | <commit message 英文或更严格目标仓规范> | <源码标识符、rustdoc、普通注释和测试名默认英文> | <不得继承 design 仓中文 commit 口径> |
 
 #### Commit 示例
 
@@ -868,11 +869,12 @@ git config user.email
 - 必须包含编码规范阅读要求。
 - 必须包含 commit 时机约束。
 - 必须包含提交 message 的 subject、body、footer 约束。
+- 必须声明当前 design 文档仓使用中文 subject / body、英文 type、固定 footer。
 - 必须包含 type / scope 允许值或省略 scope 的理由。
 - 必须包含 body 分组格式、文件名写法和增删改行数标记规则。
 - 如果项目要求固定 footer，必须写出完整 footer 文本。
 - 如果项目允许多模型 footer，必须说明每个模型各占一行；如果项目只允许固定 footer，必须禁止展开多行模型注脚。
-- 必须区分设计文档仓与实际实现代码仓的语言规则。
+- 必须区分当前 design 文档仓提交语言与其他实现仓提交 / 源码语言规则。
 - 实现代码仓必须声明源码标识符、rustdoc、普通注释和测试名默认英文。
 - 必须给出至少一条符合当前项目的 commit 示例。
 - 必须包含提交前检查清单。

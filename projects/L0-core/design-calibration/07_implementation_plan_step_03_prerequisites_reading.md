@@ -109,7 +109,25 @@
 | 目标实现仓历史提交 | `<l0-core-code-root>` 的 `git log` | 对齐目标仓 commit 风格和提交粒度 | commit message 格式和粒度不合格 | 选取近期合格提交作为参考 |
 | L0-core README | `projects/L0-core/README.md` | 仅识别旧口径风险 | 误把旧 README 当作实现基线 | 明确不得替代新版 `00~06` |
 
-#### 7.2 git 配置检查清单
+#### 7.2 阶段实施前阅读矩阵
+
+正式 `00`~`07` 文档是实现基线；`design-calibration` 是决策背景和细节追溯。实施者不需要在开工前一次性阅读全部中间产物，但每个阶段开工前必须阅读会影响该阶段实现判断的校准文件。
+
+| 阶段 / commit boundary | 必读正式章节 | 必读 `design-calibration` | 读取目的 | 开工门禁 |
+|---|---|---|---|---|
+| PH-01 / commit-01-a~b | `02` §4~§8；`03` §4 / §7 / §8 / §14；`04` §5~§9；`05` §6 / §9；`06` §5~§7 | `02_hld_step_04_code_subject_framework.md`；`03_ddd_step_04_units_file_layout.md`；`03_ddd_step_08_protocol_contracts.md`；`03_ddd_step_14_config_dependencies.md`；`04_config_step_06_profiles_matrix.md`；`04_config_step_07_config_items.md`；`04_config_step_09_load_validate_apply.md`；`07_implementation_plan_step_04_deliverables.md`；`07_implementation_plan_step_06_tasks_commits.md` | 确认 workspace / crate 骨架、DTO、配置 profile、fake port 与提交边界 | 能说明目录命名、package / crate 命名、配置加载门禁和 PH-01 两个提交边界 |
+| PH-02 / commit-02-a~b | `03` §5~§13；`05` command / integration 测试切口；`06` AC-FUNC-001 / AC-DATA / AC-STATE | `03_ddd_step_06_object_contracts.md`；`03_ddd_step_07_trait_port_adapter_contracts.md`；`03_ddd_step_09_function_flows.md`；`03_ddd_step_11_persistence_transaction_consistency.md`；`03_ddd_step_12_error_recovery.md`；`03_ddd_step_13_concurrency_idempotency.md`；`07_implementation_plan_step_06_tasks_commits.md`；`07_implementation_plan_step_07_test_acceptance_gates.md` | 确认 draft 写路径、幂等、审计、outbox、事务和错误恢复 | 能说明 create / update draft 纵切如何从 command 到 domain / repository / audit / outbox 完成 |
+| PH-03 / commit-03-a~b | `03` §5 / §7~§12 / §15；`05` publish / lifecycle / event 测试切口；`06` AC-FUNC / AC-IF / AC-STATE / VETO | `03_ddd_step_06_object_contracts.md`；`03_ddd_step_08_protocol_contracts.md`；`03_ddd_step_09_function_flows.md`；`03_ddd_step_10_state_matrix.md`；`03_ddd_step_11_persistence_transaction_consistency.md`；`03_ddd_step_12_error_recovery.md`；`03_ddd_step_15_observability_audit.md`；`06_acceptance_step_07_interface_event_sync.md`；`06_acceptance_step_08_state_tx_consistency.md`；`06_acceptance_step_11_one_vote_veto.md` | 确认 review / publish / lifecycle / event 的状态、事件和审计一致性 | 能说明发布成功、发布失败、terminal guard、事件发布和 VETO 触发处理 |
+| PH-04 / commit-04-a~b | `03` §7~§11 / §15；`05` query / trace / view 测试切口；`06` AC-IF / AC-DATA / AC-OBS | `03_ddd_step_07_trait_port_adapter_contracts.md`；`03_ddd_step_08_protocol_contracts.md`；`03_ddd_step_09_function_flows.md`；`03_ddd_step_11_persistence_transaction_consistency.md`；`03_ddd_step_15_observability_audit.md`；`06_acceptance_step_07_interface_event_sync.md`；`06_acceptance_step_10_observability_audit_evidence.md` | 确认 query、projection、stale marker、trace 和消费视图 | 能说明 read model 如何标记 stale、如何返回 trace 和 package / sample view |
+| PH-05 / commit-05-a~b | `03` §7~§11 / §13~§15；`04` §6~§11；`05` worker / relay 测试切口；`06` AC-DATA / AC-OBS / release gate | `03_ddd_step_07_trait_port_adapter_contracts.md`；`03_ddd_step_08_protocol_contracts.md`；`03_ddd_step_09_function_flows.md`；`03_ddd_step_11_persistence_transaction_consistency.md`；`03_ddd_step_14_config_dependencies.md`；`03_ddd_step_15_observability_audit.md`；`04_config_step_06_profiles_matrix.md`；`04_config_step_07_config_items.md`；`04_config_step_09_load_validate_apply.md`；`07_implementation_plan_step_08_config_environment.md` | 确认后台作业、snapshot、fact、relay boundary、配置依赖和 fake 边界 | 能说明 worker job、snapshot derivation、fact publish 和 outbox relay 的 P0 fake / boundary 策略 |
+| PH-06 / commit-06-a | `05` §13~§15；`06` §10~§14；`07` §7 / §11 / §12 | `05_test_plan_step_13_evidence_report.md`；`05_test_plan_step_15_formal_document_assembly.md`；`06_acceptance_step_10_observability_audit_evidence.md`；`06_acceptance_step_11_one_vote_veto.md`；`06_acceptance_step_12_defect_release_rules.md`；`06_acceptance_step_13_risk_acceptance.md`；`06_acceptance_step_14_final_decision_signoff.md`；`07_implementation_plan_step_07_test_acceptance_gates.md`；`07_implementation_plan_step_11_commit_review_delivery.md`；`07_implementation_plan_step_12_completion.md` | 确认 E2E、evidence、redline、release gate 和交付说明 | 能说明所有 P0 EV、AC-BLOCKER、VETO、风险接受和最终交付证据是否满足 |
+
+冲突处理规则：
+- 正式 `00`~`07` 与 `design-calibration` 冲突时，以正式文档为准。
+- 正式文档不清楚时，读取对应 `design-calibration` 文件理解决策背景。
+- 读取后仍不能确定实现口径时，暂停当前阶段并回报设计缺口。
+
+#### 7.3 git 配置检查清单
 
 ```bash
 git config user.name "quantalithos-labs"
@@ -125,7 +143,7 @@ git config user.email
 | `user.email` | `quantalithos.ai@gmail.com` | `git config user.email` | 提交前复核 |
 | 历史提交参考 | 查看目标实现仓近期合格提交 | `git log` | 只参考实现仓，不搬用 design 仓中文提交规则 |
 
-#### 7.3 编码与提交规范确认清单
+#### 7.4 编码与提交规范确认清单
 
 | 类型 | 前置要求 | 检查方式 |
 |---|---|---|
@@ -140,7 +158,7 @@ git config user.email
 | Commit body | 按子功能分组，只写文件名，标注改动量，不写字面量 `\n` | 使用 message 文件和 `git commit -F` |
 | Footer | 默认 `Co-Authored-By: Codex <noreply@openai.com>` | footer 前保留空行 |
 
-#### 7.4 工具与环境前置检查表
+#### 7.5 工具与环境前置检查表
 
 | 前置项 | P0 要求 | 检查方式 | 不满足时处理 |
 |---|---|---|---|
@@ -155,7 +173,7 @@ git config user.email
 | Gate / toolchain adapter | 可 fake gate pass / fail / fingerprint mismatch | fixture / adapter fake | 不要求真实审批系统 |
 | 证据输出 | 可记录 run_id、commit、suite、case_id、profile、artifact path | 对照 05 / 06 EV | 物理路径未定进入 Step 8 / Step 11 |
 
-#### 7.5 前置检查流程图
+#### 7.6 前置检查流程图
 
 ```text
 Implementer
@@ -195,7 +213,7 @@ Enter Step 4 deliverable extraction
 > - `design-calibration/07_implementation_plan_step_03_prerequisites_reading.md`
 >
 > 延伸阅读：
-> - 建议继续阅读上述中间产物的“阅读清单”“git 配置检查清单”“编码与提交规范确认清单”和“工具与环境前置检查表”小节，了解实施者在编码前必须完成哪些前置动作。
+> - 建议继续阅读上述中间产物的“阅读清单”“阶段实施前阅读矩阵”“git 配置检查清单”“编码与提交规范确认清单”和“工具与环境前置检查表”小节，了解实施者在编码前必须完成哪些前置动作。
 
 实施者开始编码前，必须完成阅读、git 配置、编码规范、提交规范、工具链和环境前置检查。不得在未确认目标实现仓、未阅读上游 `00~06`、未确认 Rust 规范和未配置项目级 git identity 的情况下开始实现。
 
@@ -212,6 +230,8 @@ Enter Step 4 deliverable extraction
 | 实施计划规范 | `standards/document/实施计划书写规范.md` | 理解代码批次、提交边界和 commit 规范 | commit 粒度和 message 不合格 | 对照 §6 与 §11 |
 
 `projects/L0-core/README.md` 只允许作为旧上下文风险提示阅读，不得作为本轮实现基线。
+
+阶段开工前还必须按阶段实施前阅读矩阵补读对应的 `design-calibration` 文件。正式 `00`~`07` 文档是实现基线；`design-calibration` 只用于理解决策背景、取舍和细节来源。若二者冲突，以正式文档为准；若正式文档不清楚，先读对应校准来源；仍不清楚时暂停并回报设计缺口。
 
 目标实现仓必须使用项目级 git 配置：
 
@@ -238,6 +258,7 @@ git config user.email
 ### 10. 进入下一步条件
 
 - 阅读清单已覆盖 `00~06`、Rust 编码规范、实施计划规范、提交规范和目标实现仓历史提交。
+- 阶段实施前阅读矩阵已把正式章节的校准来源转译为 PH-01~PH-06 的开工前阅读门禁。
 - 项目级 git 配置命令已明确，且禁止使用 `--global`。
 - 实现仓英文源码、英文 rustdoc、英文测试名和英文 commit message 已前置声明。
 - 工具、环境、fake adapter、状态根和证据输出前置项已列出。

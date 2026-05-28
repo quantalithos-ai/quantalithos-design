@@ -11,6 +11,9 @@
 
 | 版本 | 日期 | 讨论主题 | 修订内容 |
 |---|---|---|---|
+| v0.5 | 2026-05-28 | 收紧实现仓 commit message 讨论规则 | 按实践结论补充英文 commit、固定 `type(scope): subject`、一笔提交对应一个 §6 commit boundary、body 按子功能分组、文件名与改动量标记、footer 空行和 `git commit -F` 规则 |
+| v0.4 | 2026-05-28 | 补充代码实现批次讨论规则 | 在 Step 6 增加代码批次问题、输出表和批次规模门禁，约束大段代码按可验证切片分批实现 |
+| v0.3 | 2026-05-28 | 补充通用执行纪律 | 对齐中间产物规范，补充逐 Step、删除旧文件重建、校准来源追溯和长文档分批写作纪律及正反例 |
 | v0.2 | 2026-05-26 | 提交规范讨论约束补强 | 按旧版 commit 规范完整补齐提交粒度、message 结构、Type / Scope、body 格式、footer、示例、自检清单和设计仓 / 实现仓语言边界的讨论输入输出 |
 | v0.1 | 2026-05-26 | 实施计划流程骨架定稿 | 建立以“实施前置条件、阶段顺序、提交边界、测试验收门禁”为主轴的实施计划讨论流程 |
 
@@ -130,6 +133,41 @@ ASCII 图正文
 ````
 
 如果某一步按需可画图但本轮不画，必须说明“不画图的原因”，不能留下空图占位。
+
+### 2.8 通用执行纪律
+
+实施计划讨论必须遵守 `设计文档讨论中间产物规范.md` 的“通用执行纪律”：
+
+- 严格按 Step 独立执行，不得合并 Step。
+- 明确要求重写 / 重建 / 替换旧文件时，先删除旧文件，再按新文件标准创建。
+- 正式 `07-实施计划.md` 的章节必须能追溯到具体 `design-calibration/...` 中间产物。
+- 长文档先建骨架，再按 Step 或章节分批写入。
+- 单次写入以 100~300 行为宜；预计超过 300 行应拆分；预计超过 500 行必须拆分。
+- 实施输入、前置条件、实施对象、阶段顺序、提交边界、测试验收门禁和提交纪律等 Step 必须分别收敛。
+
+正确示例：
+
+```text
+Step 3 单独收稳阅读清单、编码规范、提交规范和 git 配置。
+Step 5 单独设计实施阶段与依赖顺序。
+Step 6 单独拆分阶段任务和提交边界。
+正式 07-实施计划.md 每章标注对应校准来源。
+```
+
+错误示例：
+
+```text
+把 Step 3~Step 7 合并成“实施步骤列表”。
+在实施计划中补写详细设计缺失的对象和函数。
+在旧 07-实施计划.md 上直接追加新版提交规范。
+一次性写入 700 行实施任务。
+```
+
+错误原因：
+
+- 实施计划只能承接上游，不能替代详细设计。
+- 阶段任务、提交边界和测试验收门禁混写会影响 review、回退和验收证据。
+- 旧提交纪律和新版实现仓纪律容易冲突。
 
 ---
 
@@ -483,6 +521,7 @@ git config user.email
 
 - 每阶段任务表
 - 每阶段编写顺序表
+- 每阶段代码实现批次表
 - 每阶段提交边界表
 - 提交粒度判断表
 - 提交前检查清单
@@ -500,6 +539,11 @@ git config user.email
 9. 是否存在把无关修改混入同一提交的风险。
 10. 每个提交边界能否用一句话描述。
 11. 每个提交边界是否可以独立 review、独立验证、必要时独立回退。
+12. 本阶段是否存在单批代码预计超过 300 行或 500 行的实现动作。
+13. 哪些实现动作必须拆成多个代码批次。
+14. 哪些状态机、事务、并发、幂等、安全、审计、错误恢复或跨仓同步逻辑必须单独批次实现。
+15. 每个代码批次完成后应该执行哪些编译、格式化、lint、单测、集成测试或验收门禁。
+16. 每个代码批次与提交边界是什么关系。
 
 #### 期望产出
 
@@ -511,6 +555,12 @@ git config user.email
 | 任务编号 | 编写顺序 | 实施动作 | 输入 | 输出 | 完成判定 |
 |---|---:|---|---|---|---|
 | IMPL-02-01 | 1 | <实施动作> | <输入> | <输出> | <判定> |
+
+#### 代码实现批次
+
+| 批次编号 | 目标 | 输入 | 输出 | 预计规模 | 验证门禁 | 提交关系 |
+|---|---|---|---|---|---|---|
+| BATCH-02-01 | <本批次形成的可验证代码增量> | <详细设计 / 测试切口 / 依赖批次> | <代码 / 测试 / 证据输出> | 100~300 行 / 需拆分 / 不适用 | GATE-xx | 单独提交 / 归入 commit-02-a |
 
 #### 提交边界
 
@@ -534,6 +584,10 @@ git config user.email
 - 任务必须以实施动作命名。
 - 任务必须归属阶段。
 - 任务必须写明阶段内编写顺序。
+- 每个阶段必须输出代码实现批次表。
+- 代码批次必须按可验证功能切片拆分，不能按“所有 domain / 所有 repository / 所有测试”横向堆叠。
+- 单批预计超过 300 行应拆分；超过 500 行必须拆分。
+- 状态机、事务、并发、幂等、安全、审计、错误恢复和跨仓同步等高风险逻辑必须单独批次实现、单独验证。
 - 提交边界必须服务于 review 和回退。
 - 提交边界必须说明 commit 时机。
 - 不允许以单个函数作为默认提交边界。
@@ -544,6 +598,7 @@ git config user.email
 #### 进入下一步的条件
 
 - 每个阶段都有任务表、编写顺序和提交边界。
+- 每个阶段都有代码实现批次表，且批次规模、验证门禁和提交关系清楚。
 - 每个提交边界都有提交前门禁。
 
 ### Step 7. 嵌入测试与验收门禁
@@ -775,23 +830,30 @@ git config user.email
 
 1. 提交前必须检查哪些 git 配置。
 2. 提交 message 应参考哪些规范和历史提交。
-3. 提交 subject 的 `type`、主题语言和阶段前缀如何约束。
-4. 提交 body 应说明哪些内容，是否需要按功能或阶段分组。
-5. body 是否需要列出文件名、增删改行数和文件级改动描述。
-6. 当前项目允许哪些 `type` 和 `scope`。
-7. 当前项目是否要求固定 footer，固定文本是什么。
-8. 是否允许多模型 `Co-Authored-By`，还是只能保留项目固定 footer。
-9. 当前仓是设计文档仓还是实际实现代码仓。
-10. 如果提交发生在当前 design 文档仓，如何保证 `type` 英文、subject / body 中文、footer 固定。
-11. 如果提交发生在其他实现仓，如何保证 commit message 使用英文或符合更严格目标仓规范。
-12. 如果提交发生在其他实现仓，源码标识符、rustdoc、普通注释和测试名是否必须英文。
-13. 每笔提交应对应什么实施边界。
-14. 哪些 commit 时机被允许，哪些时机被禁止。
-15. 代码规范、格式化、lint 和测试如何检查。
-16. 设计偏离时如何同步文档。
-17. 证据如何附到提交、PR 或交付说明中。
-18. 哪些情况下必须拆分提交，哪些情况下允许合并提交。
-19. 当前实施计划中应给出的合格 commit 示例是什么。
+3. 当前仓是 `quantalithos-design` 设计文档仓，还是其他实现代码仓。
+4. 如果提交发生在当前 design 文档仓，如何保证 `type` 英文、subject / body 中文、footer 固定。
+5. 如果提交发生在其他实现仓，如何保证 commit message 必须使用英文。
+6. 如果提交发生在其他实现仓，如何保证标题格式固定为 `type(scope): subject`。
+7. 当前项目允许哪些 `type` 和 `scope`，以及 `scope` 如何与 §6 commit boundary 对齐。
+8. 每笔提交应对应哪个 §6 commit boundary，是否存在把多个 boundary 混成一笔的风险。
+9. 如果一个 commit boundary 内部包含多个协作子功能，如何保证仍然是一笔提交，而不是按文件、repository、service、route 或子模块拆成多笔。
+10. commit body 的第一句如何概括本 commit boundary。
+11. commit body 应按哪些子功能分组，分组名称如何体现“为什么这些文件属于同一笔提交”。
+12. body 文件条目是否只写文件名，禁止写完整路径。
+13. body 文件条目是否带大致改动量，例如 `(+3)`、`(-35)`、`(~38)`、`(~+330/-60)`。
+14. body 是否禁止字面量 `\n`，并使用真实换行。
+15. bullet 之间是否禁止插空行。
+16. 当前项目是否要求固定 footer，固定文本是什么。
+17. `Co-Authored-By` 前是否必须有真实空行。
+18. 是否允许多模型 `Co-Authored-By`，还是只能保留项目固定 footer。
+19. 当需要精确控制格式时，是否必须把完整 message 写入文件，再使用 `git commit -F` 或 `git commit --amend -F`。
+20. 如果提交发生在其他实现仓，源码标识符、rustdoc、普通注释和测试名是否必须英文。
+21. 哪些 commit 时机被允许，哪些时机被禁止。
+22. 代码规范、格式化、lint 和测试如何检查。
+23. 设计偏离时如何同步文档。
+24. 证据如何附到提交、PR 或交付说明中。
+25. 哪些情况下必须拆分提交，哪些情况下允许合并提交。
+26. 当前实施计划中应给出的合格 commit 示例和反例是什么。
 
 #### 期望产出
 
@@ -802,61 +864,120 @@ git config user.email
 | git user.name | `quantalithos-labs` | `git config user.name` |
 | git user.email | `quantalithos.ai@gmail.com` | `git config user.email` |
 | 提交规范 | <规范路径> | 提交前阅读并对照历史提交 |
-| 提交粒度 | <一个可验证提交边界> | 对照 §6 提交边界 |
-| 提交信息 | <subject/body/footer 约束> | 对照近期合格提交 |
+| 提交粒度 | 一笔提交对应一个 §6 commit boundary | 对照 §6 提交边界 |
+| 提交信息 | 标题、body、footer、空行和语言边界符合本章规则 | 对照近期合格提交 |
 
 #### 提交 message 结构
 
 | 部分 | 项目约束 | 示例 / 说明 |
 |---|---|---|
-| subject | <type 英文 + 中文主题> | `docs: 收稳实施计划` |
-| body | <中文正文和分组方式> | 说明范围、关键变更、验证结果 |
-| footer | <固定 footer 或不需要 footer> | `Co-Authored-By: Codex <noreply@openai.com>` |
+| title | 实现仓固定为 `<type>(<scope>): <subject>`；design 仓按项目历史允许 `<type>: <中文 subject>` | `feat(query): add basic read APIs and projection access` |
+| summary | body 第一段用一句话说明本 commit boundary | `Basic read-only query services and projection access for PH-06-a:` |
+| body groups | 按子功能分组，每组列文件名、改动量和文件级说明 | `Projection and repository reads:` |
+| footer | 默认保留固定 footer，且 footer 前必须空一行 | `Co-Authored-By: Codex <noreply@openai.com>` |
 
 #### Type / Scope
 
 | 项 | 允许值 | 说明 |
 |---|---|---|
 | type | feat / fix / refactor / docs / test / chore / perf / ci / style | <按项目裁剪> |
-| scope | project / workitem / artifact / agent-config / snapshot / event / api / common / design / integration / knowledge | <按项目裁剪；可说明省略 scope> |
+| scope | project / workitem / artifact / agent-config / snapshot / event / api / common / design / integration / knowledge | <按项目裁剪；实现仓标题必须填写 scope> |
 
 #### Commit body 格式
 
 ```text
-<功能总结，一句话描述这组改动做了什么>:
-- <文件名> (+/-/~<行数>): <一句话描述这个文件的改动>
-- <文件名> (+/-/~<行数>): <一句话描述这个文件的改动>
+One-sentence summary for this commit boundary:
+
+Sub-feature group A:
+- file_a.rs (+12): concise functional summary.
+- file_b.rs (~+80/-10): concise functional summary.
+
+Sub-feature group B:
+- file_c.rs (+34): concise functional summary.
+- file_d.rs (+9): concise functional summary.
 ```
+
+#### Commit body 文件条目规则
+
+| 项 | 规则 | 正例 | 反例 |
+|---|---|---|---|
+| 文件名 | 只写文件名，不写完整路径 | `query_services.rs` | `crates/method/src/query_services.rs` |
+| 改动量 | 使用大致变化标记 | `(+3)` / `(-35)` / `(~38)` / `(~+330/-60)` | `(120 lines)` |
+| 分组 | 按子功能分组，不按文件类型平铺 | `Projection and repository reads:` | `Files:` |
+| 换行 | 使用真实换行，不写字面量 `\n` | 标题、body、footer 分段 | `subject\n\nbody` |
+| 空行 | 标题后空一行；footer 前空一行；bullet 之间不插空行 | 分组间可空行 | bullet 之间逐条空行 |
 
 #### 语言边界
 
 | 仓类型 | commit message | 注释 / rustdoc / 测试名 | 说明 |
 |---|---|---|---|
 | 当前 design 文档仓 | <type 英文,subject / body 中文,footer 固定> | <设计说明和伪代码注释可中文> | <仅 quantalithos-design> |
-| 其他实现仓 | <commit message 英文或更严格目标仓规范> | <源码标识符、rustdoc、普通注释和测试名默认英文> | <不得继承 design 仓中文 commit 口径> |
+| 其他实现仓 | <commit message 必须英文；标题固定为 `type(scope): subject`；目标仓更严格规则只能叠加，不能放宽英文 commit 和固定标题要求> | <源码标识符、rustdoc、普通注释和测试名默认英文> | <不得继承 design 仓中文 commit 口径> |
 
 #### Commit 示例
 
 ```text
-<type>(<scope>): <subject>
+feat(query): add basic read APIs and projection access
 
-<body>
+Basic read-only query services and projection access for PH-06-a:
 
-<footer>
+Projection and repository reads:
+- postgres.rs (~+215/-5): add read-only content, version, and published-reference reads plus adapter tests.
+- mod.rs (+17): extend read-only ports for query flows.
+
+Basic query handlers and HTTP routes:
+- query_services.rs (+848): add Get/List/GetVersion handlers, consistency markers, and tests.
+- routes.rs (~+840/-20): wire query endpoints and HTTP tests.
+
+Co-Authored-By: Codex <noreply@openai.com>
 ```
+
+#### Commit 反例
+
+```text
+feat(query): add basic read APIs and projection access
+Basic read-only query services and projection access for PH-06-a:\n\n- crates/core/src/query_services.rs (+848): add query handlers.
+- routes.rs (+840): wire routes.
+
+- postgres.rs (+215): add reads.
+Co-Authored-By: Codex <noreply@openai.com>
+```
+
+错误原因：
+
+- 标题后没有真实空行。
+- body 中出现了字面量 `\n`。
+- 文件条目写了完整路径。
+- bullet 之间插入了空行。
+- 没有按子功能分组。
+- `Co-Authored-By` 前没有空行。
+
+#### 不合格拆分示例
+
+```text
+commit 1: feat(query): add repository reads
+commit 2: feat(query): add query services
+commit 3: feat(query): add routes
+```
+
+如果这三部分共同构成同一个 §6 commit boundary，应合并为一笔提交，并在 body 中按子功能分组说明。
 
 #### 提交前检查清单
 
 | 检查项 | 通过条件 |
 |---|---|
 | git 配置 | <user.name/user.email 正确> |
-| diff 范围 | <只覆盖一个提交边界> |
+| diff 范围 | <只覆盖一个 §6 commit boundary> |
 | 门禁结果 | <fmt/lint/test/acceptance 已通过或说明原因> |
 | 文档同步 | <设计偏离已回写> |
 | 源码语言 | <实现仓源码标识符、rustdoc、普通注释和测试名未混入中文> |
-| body 格式 | <按功能分组，文件名不带路径，标注增删改行数> |
+| title 格式 | <实现仓固定为 `type(scope): subject`> |
+| body 格式 | <先写 boundary summary，再按子功能分组，文件名不带路径，标注改动量> |
+| 空行格式 | <标题后空一行，footer 前空一行，bullet 之间不插空行> |
+| 换行格式 | <body 中没有字面量 `\n`> |
 | 证据记录 | <测试或验收证据已有落点> |
 | 提交信息 | <subject/body/footer 符合规范> |
+| 格式控制 | <需要精确控制时使用 `git commit -F` 或 `git commit --amend -F`> |
 
 #### 回填位置
 
@@ -870,13 +991,20 @@ git config user.email
 - 必须包含 commit 时机约束。
 - 必须包含提交 message 的 subject、body、footer 约束。
 - 必须声明当前 design 文档仓使用中文 subject / body、英文 type、固定 footer。
-- 必须包含 type / scope 允许值或省略 scope 的理由。
-- 必须包含 body 分组格式、文件名写法和增删改行数标记规则。
+- 必须声明其他实现仓 commit message 必须英文，且标题固定为 `type(scope): subject`。
+- 必须包含 type / scope 允许值；实现仓不得默认省略 scope。
+- 必须包含一笔提交对应一个 §6 commit boundary 的规则。
+- 必须说明同一 boundary 内多个协作子功能应保留为一笔提交，并在 body 中按子功能分组。
+- 必须包含 body boundary summary、子功能分组、文件名写法和改动量标记规则。
+- 必须禁止 body 字面量 `\n`。
+- 必须禁止 bullet 之间插空行。
 - 如果项目要求固定 footer，必须写出完整 footer 文本。
+- 必须要求 `Co-Authored-By` 前有真实空行。
 - 如果项目允许多模型 footer，必须说明每个模型各占一行；如果项目只允许固定 footer，必须禁止展开多行模型注脚。
 - 必须区分当前 design 文档仓提交语言与其他实现仓提交 / 源码语言规则。
 - 实现代码仓必须声明源码标识符、rustdoc、普通注释和测试名默认英文。
-- 必须给出至少一条符合当前项目的 commit 示例。
+- 必须给出至少一条符合当前项目的 commit 正例和一条反例。
+- 必须说明需要精确控制格式时，应把完整 message 写入文件，再使用 `git commit -F` 或 `git commit --amend -F`。
 - 必须包含提交前检查清单。
 - 不允许把不相关改动混入同一提交。
 

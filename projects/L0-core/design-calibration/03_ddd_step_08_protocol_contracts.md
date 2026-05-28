@@ -18,7 +18,7 @@
 | 输入 | 内容 | 本步使用方式 |
 |---|---|---|
 | `02-概要设计.md` §7 | 已确认 Command API、Query API、Outbound Event、Operations Job 骨架 | 作为协议覆盖清单 |
-| Step 4 实现单元与文件布局 | 已确认 `l0_core_contracts/src/commands.rs`、`queries.rs`、`events.rs`、`jobs.rs`、CLI 和 jobs 文件布局 | 作为 DTO 和入口落文件依据 |
+| Step 4 实现单元与文件布局 | 已确认 `crates/contracts/src/commands.rs`、`queries.rs`、`events.rs`、`jobs.rs`、CLI 和 jobs 文件布局 | 作为 DTO 和入口落文件依据 |
 | Step 5 模块实现契约主轴 | 已确认 `contracts`、`cli_entry`、`jobs`、`application_services` 的职责边界 | 作为调用方 / 处理方归属依据 |
 | Step 6 对象实现契约 | 已确认 application service 函数签名、receipt、metadata、error 支撑对象 | 作为协议函数签名和 schema 字段来源 |
 | Step 7 Port / Adapter 契约 | 已确认 outbox、event publisher、toolchain、source / snapshot / projection port | 作为 event / job 处理边界依据 |
@@ -64,7 +64,7 @@ L0-core 本轮不实现在线 HTTP / RPC 服务。
 | 8.2 | [x] | Command API 协议 | `commands.rs` / `ContractCommandApi` | 5 个写路径 command |
 | 8.3 | [x] | Query API 协议 | `queries.rs` / `ContractQueryApi` | 8 个只读 query |
 | 8.4 | [x] | Outbound Event 协议 | `events.rs` / `OutboxPort` / `EventPublisherPort` | 7 个事实事件 |
-| 8.5 | [x] | Operations Job 协议 | `jobs.rs` / `l0_core_jobs` | 6 个 job / worker |
+| 8.5 | [x] | Operations Job 协议 | `jobs.rs` / `core_jobs` | 6 个 job / worker |
 | 8.6 | [x] | Step 8 统一复核 | 全部协议 | schema、错误、幂等、审计、Step 9 交接 |
 
 ---
@@ -91,7 +91,7 @@ L0-core 本轮不实现在线 HTTP / RPC 服务。
 | Command API | CLI / library caller | `ContractCommandApi` -> application service | CLI command + Rust DTO |
 | Query API | CLI / library caller | `ContractQueryApi` -> application service | CLI command + Rust DTO |
 | Outbound Event | `ContractFactService` / outbox / relay | L0-bus boundary | CloudEvents payload + outbox |
-| Operations Job | scheduler / CLI trigger / worker | `l0_core_jobs` -> application service / worker | job binary + Rust DTO |
+| Operations Job | scheduler / CLI trigger / worker | `core_jobs` -> application service / worker | job binary + Rust DTO |
 
 ### 5.3 外部接口使用 HTTP、RPC、event bus 还是其他方式？
 
@@ -113,10 +113,10 @@ L0-core 本轮不实现在线 HTTP / RPC 服务。
 
 | 类别 | 文件 |
 |---|---|
-| Command DTO | `crates/l0_core_contracts/src/commands.rs` |
-| Query DTO / View DTO | `crates/l0_core_contracts/src/queries.rs` |
-| Event payload DTO | `crates/l0_core_contracts/src/events.rs` |
-| Job input / output DTO | `crates/l0_core_contracts/src/jobs.rs` |
+| Command DTO | `crates/contracts/src/commands.rs` |
+| Query DTO / View DTO | `crates/contracts/src/queries.rs` |
+| Event payload DTO | `crates/contracts/src/events.rs` |
+| Job input / output DTO | `crates/contracts/src/jobs.rs` |
 
 ### 5.5 每个协议失败时映射成什么错误？
 
@@ -175,10 +175,10 @@ L0-core 本轮不实现在线 HTTP / RPC 服务。
 
 | 分类 | 传输方式 | 所属文件 | 入口 / 发布方 | 处理方 / 订阅方 | 说明 |
 |---|---|---|---|---|---|
-| Command API | CLI command + Rust library call | `l0_core_contracts/src/commands.rs` | `ContractCommandApi` | application service | 改写真相,必须携带 actor、metadata、idempotency key |
-| Query API | CLI command + Rust library call | `l0_core_contracts/src/queries.rs` | `ContractQueryApi` | trace / snapshot / release service | 只读查询,不得改写真相 |
-| Outbound Event | CloudEvents payload + outbox | `l0_core_contracts/src/events.rs` | `ContractFactService` / outbox relay | L0-bus 边界和下游消费者 | 只表达已提交事实,不实现投递运行时 |
-| Operations Job | job binary + Rust job input DTO | `l0_core_contracts/src/jobs.rs` | `l0_core_jobs` | application service / worker | 后台校验、派生、重建、复算、事实发布和 outbox relay |
+| Command API | CLI command + Rust library call | `crates/contracts/src/commands.rs` | `ContractCommandApi` | application service | 改写真相,必须携带 actor、metadata、idempotency key |
+| Query API | CLI command + Rust library call | `crates/contracts/src/queries.rs` | `ContractQueryApi` | trace / snapshot / release service | 只读查询,不得改写真相 |
+| Outbound Event | CloudEvents payload + outbox | `crates/contracts/src/events.rs` | `ContractFactService` / outbox relay | L0-bus 边界和下游消费者 | 只表达已提交事实,不实现投递运行时 |
+| Operations Job | job binary + Rust job input DTO | `crates/contracts/src/jobs.rs` | `core_jobs` | application service / worker | 后台校验、派生、重建、复算、事实发布和 outbox relay |
 
 #### 9.1.2 协议总表
 
@@ -255,7 +255,7 @@ pub struct ProtocolName {
 
 #### 9.1.6 本步新增协议支撑类型
 
-以下类型属于 Step 8 协议层新增支撑类型,应落在 `l0_core_contracts` 中。它们不属于 domain aggregate,不表达领域状态机。
+以下类型属于 Step 8 协议层新增支撑类型,应落在 `core_contracts` 中。它们不属于 domain aggregate,不表达领域状态机。
 
 ```rust
 /// Job 运行 ID。
@@ -376,7 +376,7 @@ pub struct ExternalReferenceSummary {
 
 ### 9.2 Command API 协议
 
-Command API 是同步写入口。它们通过 `l0_core_cli` 暴露为 CLI command,同时通过 `ContractCommandApi` 暴露为 Rust library 同步入口。Command API 不实现 HTTP server,也不直接调用 infra adapter。
+Command API 是同步写入口。它们通过 `core_cli` 暴露为 CLI command,同时通过 `ContractCommandApi` 暴露为 Rust library 同步入口。Command API 不实现 HTTP server,也不直接调用 infra adapter。
 
 #### 9.2.1 `CreateContractDraft`
 
@@ -712,7 +712,7 @@ pub struct ContractLifecycleReceipt {
 
 ### 9.3 Query API 协议
 
-Query API 是同步只读入口。它们通过 `l0_core_cli` 暴露为 CLI command,同时通过 `ContractQueryApi` 暴露为 Rust library 查询入口。Query API 不写审计、不写 outbox、不触发状态迁移。
+Query API 是同步只读入口。它们通过 `core_cli` 暴露为 CLI command,同时通过 `ContractQueryApi` 暴露为 Rust library 查询入口。Query API 不写审计、不写 outbox、不触发状态迁移。
 
 #### 9.3.1 `GetContractDefinition`
 
@@ -1537,7 +1537,7 @@ Operations Job 是后台延后承接入口。Job 可以由 CLI trigger、调度�
 
 | 项 | 内容 |
 |---|---|
-| Job binary | `l0-core-validate-contract-change` |
+| Job binary | `core-validate-contract-change` |
 | 触发方式 | CLI trigger / scheduler |
 | 函数签名 | `pub async fn run(&self, input: ValidateContractChangeJobInput, actor: ActorContext, meta: CommandMetadata) -> Result<ValidateContractChangeJobOutput, ApplicationError>` |
 | 处理方 | `ValidateContractChangeJob` -> `ContractCompatibilityService.validate_contract_change(ValidateContractChange command, ActorContext actor, CommandMetadata meta)` |
@@ -1604,7 +1604,7 @@ pub struct ValidateContractChangeJobOutput {
 
 | 项 | 内容 |
 |---|---|
-| Job binary | `l0-core-derive-release-snapshot` |
+| Job binary | `core-derive-release-snapshot` |
 | 触发方式 | baseline 发布后调度 / CLI trigger |
 | 函数签名 | `pub async fn run(&self, input: DeriveReleaseSnapshotJobInput, actor: ActorContext, meta: CommandMetadata) -> Result<DeriveReleaseSnapshotJobOutput, ApplicationError>` |
 | 处理方 | `DeriveReleaseSnapshotJob` -> `ContractSnapshotService.derive_release_snapshot(DeriveReleaseSnapshot command, ActorContext actor, CommandMetadata meta)` |
@@ -1668,7 +1668,7 @@ pub struct DeriveReleaseSnapshotJobOutput {
 
 | 项 | 内容 |
 |---|---|
-| Job binary | `l0-core-rebuild-contract-index` |
+| Job binary | `core-rebuild-contract-index` |
 | 触发方式 | CLI trigger / scheduler / projection stale 恢复 |
 | 函数签名 | `pub async fn run(&self, input: RebuildContractIndexJobInput, actor: ActorContext, meta: CommandMetadata) -> Result<RebuildContractIndexJobOutput, ApplicationError>` |
 | 处理方 | `RebuildContractIndexJob` -> `ContractOperationsService.rebuild_contract_index(RebuildContractIndex command, ActorContext actor, CommandMetadata meta)` |
@@ -1732,7 +1732,7 @@ pub struct RebuildContractIndexJobOutput {
 
 | 项 | 内容 |
 |---|---|
-| Job binary | `l0-core-recalculate-fingerprint` |
+| Job binary | `core-recalculate-fingerprint` |
 | 触发方式 | CLI trigger / scheduler / 发布前检查 |
 | 函数签名 | `pub async fn run(&self, input: RecalculateFingerprintJobInput, actor: ActorContext, meta: CommandMetadata) -> Result<RecalculateFingerprintJobOutput, ApplicationError>` |
 | 处理方 | `RecalculateFingerprintJob` -> `ContractOperationsService.recalculate_fingerprint(RecalculateFingerprint command, ActorContext actor, CommandMetadata meta)` |
@@ -1796,7 +1796,7 @@ pub struct RecalculateFingerprintJobOutput {
 
 | 项 | 内容 |
 |---|---|
-| Job binary | `l0-core-publish-contract-fact` |
+| Job binary | `core-publish-contract-fact` |
 | 触发方式 | CLI trigger / scheduler |
 | 函数签名 | `pub async fn run(&self, input: PublishContractFactJobInput, actor: ActorContext, meta: CommandMetadata) -> Result<PublishContractFactJobOutput, ApplicationError>` |
 | 处理方 | `PublishContractFactJob` -> `ContractFactService.publish_contract_fact(PublishContractFact command, ActorContext actor, CommandMetadata meta)` |
@@ -1860,7 +1860,7 @@ pub struct PublishContractFactJobOutput {
 
 | 项 | 内容 |
 |---|---|
-| Job binary | `l0-core-outbox-relay` |
+| Job binary | `core-outbox-relay` |
 | 触发方式 | long running worker / 手工单批 replay |
 | 函数签名 | `pub async fn run_once(&self, input: OutboxRelayWorkerInput) -> Result<OutboxRelayWorkerOutput, ApplicationError>` |
 | 处理方 | `OutboxRelayWorker` -> `OutboxPort.fetch_pending(BatchSize batch_size)` -> `EventPublisherPort.publish(FactOutboxEvent event)` |

@@ -18,7 +18,7 @@
 | 输入 | 内容 | 本步使用方式 |
 |---|---|---|
 | `01-架构设计.md` §9 | 数据所有权与一致性策略 | 作为 truth / snapshot / projection / reference 的归属边界 |
-| Step 4 文件布局 | `contract-source/`、`release-snapshots/`、`l0_core_infra` 下 source / snapshot / projection / audit / outbox / unit_of_work adapter | 作为存储对象和 adapter 落点 |
+| Step 4 文件布局 | `contract-source/`、`release-snapshots/`、`core_infra` 下 source / snapshot / projection / audit / outbox / unit_of_work adapter | 作为存储对象和 adapter 落点 |
 | Step 6 对象实现契约 | 聚合、快照、引用、事实、projection、状态对象 | 作为持久化对象全集 |
 | Step 7 Trait / Port 契约 | `UnitOfWork`、repository、audit、outbox、projection 等 port | 作为 repository 函数和事务边界来源 |
 | Step 9 函数级处理流 | Command / Query / Event / Job 的事务边界 | 作为事务场景来源 |

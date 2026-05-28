@@ -71,9 +71,9 @@ Gate / reference / blob / toolchain / event publisher 的细节不在 domain 内
 
 | 模块 | 读取内容 | 说明 |
 |---|---|---|
-| `l0_core_cli/src/main.rs` | `CoreRuntimeConfig` | CLI 入口负责从本地配置源装配 runtime |
-| `l0_core_jobs/src/bin/*.rs` | `CoreRuntimeConfig` | 所有后台 job 入口统一走 runtime 装配 |
-| `l0_core_infra` 各 adapter 构造器 | 路径 root / resolver config / adapter-local defaults | 具体 adapter 从 runtime config 取得根目录和局部配置 |
+| `crates/cli/src/main.rs` | `CoreRuntimeConfig` | CLI 入口负责从本地配置源装配 runtime |
+| `crates/jobs/src/bin/*.rs` | `CoreRuntimeConfig` | 所有后台 job 入口统一走 runtime 装配 |
+| `core_infra` 各 adapter 构造器 | 路径 root / resolver config / adapter-local defaults | 具体 adapter 从 runtime config 取得根目录和局部配置 |
 | `build_cli_runtime(...)` / `build_job_runtime(...)` | 全量 runtime config | 是配置进入 application / infra 的唯一正门 |
 | `application_services` | 不直接读取配置 | 只接收已装配好的 port 和策略对象 |
 
@@ -222,7 +222,7 @@ Gate / reference / blob / toolchain / event publisher 的细节不在 domain 内
 | 回补位置 | 回补内容 |
 |---|---|
 | Step 7 Trait / Port / Adapter 契约 | `CoreRuntimeConfig` 增加 `audit_root`、`idempotency_root`;`CoreInfraPorts` 增加 `FileIdempotencyStore`;adapter 实现表增加 `FileIdempotencyStore` |
-| Step 4 文件布局 | `l0_core_application/src/ports/idempotency.rs`、`l0_core_infra/src/idempotency_store/` |
+| Step 4 文件布局 | `crates/application/src/ports/idempotency.rs`、`crates/infra/src/idempotency_store/` |
 | Step 11 持久化与一致性 | `idempotency_records` / `IdempotencyRepository` |
 
 ---

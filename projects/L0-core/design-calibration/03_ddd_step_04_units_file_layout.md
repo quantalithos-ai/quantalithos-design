@@ -52,19 +52,19 @@ Step 3 已确认编码、runtime、仓库、提交和安全边界约束。
 
 | 实现单元 | 类型 | 是否 P0 必建 | 说明 |
 |---|---|---|---|
-| `l0_core_contracts` | library crate | 是 | 对外共享的 Command / Query / Event / Job / View / Receipt / Error DTO 与公共上下文类型 |
-| `l0_core_domain` | library crate | 是 | 共享契约核心、领域契约包、发布基线、快照、引用、事实和领域策略 |
-| `l0_core_application` | library crate | 是 | 用例编排服务和 port trait,保护事务、审计、outbox、gate、reference 等接缝 |
-| `l0_core_infra` | library crate | 是 | 文件源、快照源、投影、outbox、toolchain 和外部 adapter 的 port 实现 |
-| `l0_core_cli` | binary crate | 是 | 契约变更入口、查询入口和运维触发入口;不是在线 API 服务 |
-| `l0_core_jobs` | binary crate | 是 | 校验、快照派生、索引重建、fingerprint 复算、事实发布和 outbox relay 执行入口 |
+| `core_contracts` | library crate | 是 | 对外共享的 Command / Query / Event / Job / View / Receipt / Error DTO 与公共上下文类型 |
+| `core_domain` | library crate | 是 | 共享契约核心、领域契约包、发布基线、快照、引用、事实和领域策略 |
+| `core_application` | library crate | 是 | 用例编排服务和 port trait,保护事务、审计、outbox、gate、reference 等接缝 |
+| `core_infra` | library crate | 是 | 文件源、快照源、投影、outbox、toolchain 和外部 adapter 的 port 实现 |
+| `core_cli` | binary crate | 是 | 契约变更入口、查询入口和运维触发入口;不是在线 API 服务 |
+| `core_jobs` | binary crate | 是 | 校验、快照派生、索引重建、fingerprint 复算、事实发布和 outbox relay 执行入口 |
 
 不在本步必建的实现单元:
 
 | 实现单元 | 不纳入原因 | 后续处理 |
 |---|---|---|
-| `l0_core_http_api` | 架构设计已明确 L0-core 没有常驻在线运行时容器 | 若未来要暴露在线 API,先回退架构 / 概要设计确认 |
-| `l0_core_sdk_exporter` | SDK 高层封装和分发属于 `L0-sdk` | 本仓只输出契约快照和事件事实 |
+| `core_http_api` | 架构设计已明确 L0-core 没有常驻在线运行时容器 | 若未来要暴露在线 API,先回退架构 / 概要设计确认 |
+| `core_sdk_exporter` | SDK 高层封装和分发属于 `L0-sdk` | 本仓只输出契约快照和事件事实 |
 | `proto/` 作为唯一主布局 | 当前 v0.2.0 主线不再把 L0-core 简化为 proto / buf 仓 | 可作为具体契约源码格式候选,但不能替代本轮 workspace 主布局 |
 | marketplace / plugin / registry 发布单元 | 属于 P1 或相邻仓能力 | 不进入 P0 文件树 |
 
@@ -74,12 +74,12 @@ Step 3 已确认编码、runtime、仓库、提交和安全边界约束。
 
 | 实现单元 | 对应概要设计代码主体 | 对应业务组成部分 |
 |---|---|---|
-| `l0_core_contracts` | Command / Query / Outbound Event / Operations Job 骨架,外部接缝 DTO | 契约变更承接、引用追溯查询、后台校验与事实输出 |
-| `l0_core_domain` | `ContractDefinition`、`ContractScope`、`ContractVersion`、`ContractLifecycle`、`ContractReleaseBaseline`、`ContractReleaseSnapshot`、`ContractFactRecord`、六个 `ContractPackage`、domain policy | 契约真相与领域契约组织、兼容性门禁与发布基线、快照派生与下游消费、引用索引与追溯查询、后台事实输出 |
-| `l0_core_application` | `ContractChangeService`、`ContractReleaseService`、`ContractCompatibilityService`、`ContractSnapshotService`、`ContractTraceService`、`ContractFactService`、`ContractOperationsService`、port trait | 契约承接与发布编排、后台校验与事实输出、技术承载与外部适配 |
-| `l0_core_infra` | repository / gate / audit / outbox / reference resolver / blob ref / event publisher / clock / id generator adapter | 技术承载与外部适配支撑主体集合 |
-| `l0_core_cli` | `ContractCommandApi`、`ContractQueryApi`、`ContractOperationsTrigger`、`ExternalInputBoundaryGuard` 的入口适配 | 契约变更承接与输入收口、引用索引与追溯查询、后台触发 |
-| `l0_core_jobs` | `OutboxRelayWorker`、`ValidateContractChangeJob`、`DeriveReleaseSnapshotJob`、`RebuildContractIndexJob`、`RecalculateFingerprintJob`、`PublishContractFactJob` | 后台校验与事实输出 |
+| `core_contracts` | Command / Query / Outbound Event / Operations Job 骨架,外部接缝 DTO | 契约变更承接、引用追溯查询、后台校验与事实输出 |
+| `core_domain` | `ContractDefinition`、`ContractScope`、`ContractVersion`、`ContractLifecycle`、`ContractReleaseBaseline`、`ContractReleaseSnapshot`、`ContractFactRecord`、六个 `ContractPackage`、domain policy | 契约真相与领域契约组织、兼容性门禁与发布基线、快照派生与下游消费、引用索引与追溯查询、后台事实输出 |
+| `core_application` | `ContractChangeService`、`ContractReleaseService`、`ContractCompatibilityService`、`ContractSnapshotService`、`ContractTraceService`、`ContractFactService`、`ContractOperationsService`、port trait | 契约承接与发布编排、后台校验与事实输出、技术承载与外部适配 |
+| `core_infra` | repository / gate / audit / outbox / reference resolver / blob ref / event publisher / clock / id generator adapter | 技术承载与外部适配支撑主体集合 |
+| `core_cli` | `ContractCommandApi`、`ContractQueryApi`、`ContractOperationsTrigger`、`ExternalInputBoundaryGuard` 的入口适配 | 契约变更承接与输入收口、引用索引与追溯查询、后台触发 |
+| `core_jobs` | `OutboxRelayWorker`、`ValidateContractChangeJob`、`DeriveReleaseSnapshotJob`、`RebuildContractIndexJob`、`RecalculateFingerprintJob`、`PublishContractFactJob` | 后台校验与事实输出 |
 
 ### 3.3 文件路径应该如何组织,才能体现模块边界?
 
@@ -88,36 +88,36 @@ Step 3 已确认编码、runtime、仓库、提交和安全边界约束。
 按 “workspace 先强制依赖方向,crate 内再按实现职责分包” 组织。
 
 ```text
-l0_core_cli
+core_cli
   | call
   v
-l0_core_application
+core_application
   | uses
   v
-l0_core_domain
+core_domain
 
-l0_core_application
+core_application
   | defines ports
   v
-l0_core_infra
+core_infra
   | implements ports
   ^
   | called by
-l0_core_cli / l0_core_jobs
+core_cli / core_jobs
 
-l0_core_contracts
+core_contracts
   | shared DTO dependency
   v
-l0_core_cli / l0_core_jobs / l0_core_application / l0_core_infra
+core_cli / core_jobs / core_application / core_infra
 ```
 
 关键说明:
 
-- `l0_core_domain` 不依赖 `l0_core_infra`、`l0_core_cli`、`l0_core_jobs`、HTTP、DB、bus 或外部工具。
-- `l0_core_application` 定义 port trait,但不依赖具体 adapter。
-- `l0_core_infra` 实现 port,承接 source store、snapshot store、outbox、reference resolver、toolchain 和 event publisher。
-- `l0_core_cli` 是同步入口适配,不是常驻在线 API 服务。
-- `l0_core_jobs` 是构建期 / 运维期后台处理入口,不是 `L0-bus` runtime。
+- `core_domain` 不依赖 `core_infra`、`core_cli`、`core_jobs`、HTTP、DB、bus 或外部工具。
+- `core_application` 定义 port trait,但不依赖具体 adapter。
+- `core_infra` 实现 port,承接 source store、snapshot store、outbox、reference resolver、toolchain 和 event publisher。
+- `core_cli` 是同步入口适配,不是常驻在线 API 服务。
+- `core_jobs` 是构建期 / 运维期后台处理入口,不是 `L0-bus` runtime。
 
 ### 3.4 哪些文件必须创建,哪些文件只是后续可能扩展?
 
@@ -128,7 +128,7 @@ l0_core_cli / l0_core_jobs / l0_core_application / l0_core_infra
 | workspace 根 | `Cargo.toml`、`README.md` | 固定 workspace 和实现仓说明入口 |
 | 契约源码承载 | `contract-source/README.md`、`contract-source/core/README.md`、`contract-source/packages/identity/README.md`、`contract-source/packages/conversation/README.md`、`contract-source/packages/work/README.md`、`contract-source/packages/process/README.md`、`contract-source/packages/governance/README.md`、`contract-source/packages/artifact/README.md` | 先固定来源目录,不在 Step 4 锁死具体源文件格式 |
 | 发布快照承载 | `release-snapshots/README.md` | 先固定快照输出目录,快照格式在协议 / 持久化章节细化 |
-| P0 crate | `l0_core_contracts`、`l0_core_domain`、`l0_core_application`、`l0_core_infra`、`l0_core_cli`、`l0_core_jobs` | 支撑 P0 主链完整实现 |
+| P0 crate | `crates/contracts` / `core_contracts`、`crates/domain` / `core_domain`、`crates/application` / `core_application`、`crates/infra` / `core_infra`、`crates/cli` / `core-cli`、`crates/jobs` / `core-jobs` | 支撑 P0 主链完整实现 |
 | 最小集成测试入口 | `tests/contract_change_flow.rs`、`tests/release_snapshot_flow.rs`、`tests/trace_query_flow.rs`、`tests/operations_jobs.rs` | 只列详细设计可承接的最小测试切口 |
 
 后续可能扩展但本轮不创建为 P0 必建文件:
@@ -136,9 +136,9 @@ l0_core_cli / l0_core_jobs / l0_core_application / l0_core_infra
 | 扩展文件 / 目录 | 触发条件 |
 |---|---|
 | `proto/` | 若后续确认 proto 是某类契约源码或快照的正式承载格式 |
-| `crates/l0_core_http_api/` | 若后续确认 L0-core 需要常驻在线 API 服务 |
-| `crates/l0_core_sdk_exporter/` | 若后续确认某些导出逻辑不属于 L0-sdk |
-| `crates/l0_core_marketplace_adapter/` | 若后续 P1 引入 marketplace / package listing |
+| `crates/http_api/` | 若后续确认 L0-core 需要常驻在线 API 服务 |
+| `crates/sdk_exporter/` | 若后续确认某些导出逻辑不属于 L0-sdk |
+| `crates/marketplace_adapter/` | 若后续 P1 引入 marketplace / package listing |
 
 ### 3.5 每个文件负责定义哪些对象、trait、handler、repository 或测试?
 
@@ -166,8 +166,8 @@ l0_core_cli / l0_core_jobs / l0_core_application / l0_core_infra
 |---|---|---|---|
 | 布局形态 | 旧文和 README 倾向 proto / primitive 文件集合 | 采用 Rust workspace 多 crate 架构,并保留契约源码 / 快照承载目录 | 同时支撑代码契约、公共 DTO、后台处理和契约来源资产 |
 | crate 划分 | 未明确 | `contracts` / `domain` / `application` / `infra` / `cli` / `jobs` | 用编译依赖关系保护 domain 纯净和 public contract 复用 |
-| API 入口 | 容易理解为常驻 HTTP API 服务 | `l0_core_cli` 承载同步入口适配,不预设在线服务 | 对齐架构设计“无常驻在线运行时容器” |
-| 后台处理 | 旧文没有稳定 job 承载位置 | `l0_core_jobs` 承载校验、快照、索引、fingerprint、事实发布和 outbox relay | 对齐概要设计后台校验与事实输出 |
+| API 入口 | 容易理解为常驻 HTTP API 服务 | `core_cli` 承载同步入口适配,不预设在线服务 | 对齐架构设计“无常驻在线运行时容器” |
+| 后台处理 | 旧文没有稳定 job 承载位置 | `core_jobs` 承载校验、快照、索引、fingerprint、事实发布和 outbox relay | 对齐概要设计后台校验与事实输出 |
 | 契约源码 | 旧 README 只给 proto 目录 | 先给 `contract-source/` 作为契约真相来源目录,不锁死格式 | 保持结构化契约源码主线,避免提前绑定单一工具 |
 | P1 扩展 | 容易把 plugin、marketplace、SDK exporter 一起建出来 | 只列后续扩展,不进入 P0 必建树 | 对齐 Step 2 非范围 |
 
@@ -197,12 +197,12 @@ l0_core_cli / l0_core_jobs / l0_core_application / l0_core_infra
 
 | 实现单元 | 类型 | 职责 | 对应概要设计章节 |
 |---|---|---|---|
-| `l0_core_contracts` | library crate | 定义 Command / Query / Event / Job / View / Receipt / Error DTO、`ActorContext`、`CommandMetadata`、`QueryMetadata` 等公共协议对象 | §4 外部接缝;§7 API / 接口骨架;§11 详细设计承接 |
-| `l0_core_domain` | library crate | 定义共享契约核心、领域契约包、发布基线、快照、引用、追溯、事实记录和领域策略 | §4 共享契约核心;§5.4~§5.8;§6 关键对象;§9 状态 |
-| `l0_core_application` | library crate | 定义 application service、use case 编排、port trait 和应用错误边界 | §4 Application Services;§5.3~§5.9;§8 关键处理流 |
-| `l0_core_infra` | library crate | 实现 source store、snapshot store、projection、outbox、reference resolver、blob ref、gate decision、event publisher、clock、id generator 等 adapter | §4 Ports / Persistence / Projection / External Adapters;§5.9 |
-| `l0_core_cli` | binary crate | 承载 `ContractCommandApi`、`ContractQueryApi`、`ContractOperationsTrigger` 的同步入口适配和输出映射 | §4 Inbound / Operations;§5.3;§5.7;§5.8 |
-| `l0_core_jobs` | binary crate | 承载校验、快照派生、索引重建、fingerprint 复算、事实发布和 outbox relay 执行入口 | §5.8 后台校验与事实输出 |
+| `core_contracts` | library crate | 定义 Command / Query / Event / Job / View / Receipt / Error DTO、`ActorContext`、`CommandMetadata`、`QueryMetadata` 等公共协议对象 | §4 外部接缝;§7 API / 接口骨架;§11 详细设计承接 |
+| `core_domain` | library crate | 定义共享契约核心、领域契约包、发布基线、快照、引用、追溯、事实记录和领域策略 | §4 共享契约核心;§5.4~§5.8;§6 关键对象;§9 状态 |
+| `core_application` | library crate | 定义 application service、use case 编排、port trait 和应用错误边界 | §4 Application Services;§5.3~§5.9;§8 关键处理流 |
+| `core_infra` | library crate | 实现 source store、snapshot store、projection、outbox、reference resolver、blob ref、gate decision、event publisher、clock、id generator 等 adapter | §4 Ports / Persistence / Projection / External Adapters;§5.9 |
+| `core_cli` | binary crate | 承载 `ContractCommandApi`、`ContractQueryApi`、`ContractOperationsTrigger` 的同步入口适配和输出映射 | §4 Inbound / Operations;§5.3;§5.7;§5.8 |
+| `core_jobs` | binary crate | 承载校验、快照派生、索引重建、fingerprint 复算、事实发布和 outbox relay 执行入口 | §5.8 后台校验与事实输出 |
 
 ### 7.3 文件布局树
 
@@ -232,7 +232,7 @@ quantalithos-core/
   release-snapshots/                             # 只读发布快照承载根目录
     README.md                                    # 发布快照目录说明
   crates/
-    l0_core_contracts/                           # 公共协议对象 crate
+    core_contracts/                           # 公共协议对象 crate
       Cargo.toml
       src/
         lib.rs                                   # 导出 contracts public API
@@ -245,7 +245,7 @@ quantalithos-core/
         views.rs                                 # Query view / snapshot view DTO
         receipts.rs                              # command / job receipt DTO
         errors.rs                                # API / protocol error DTO
-    l0_core_domain/                              # 领域模型与领域策略 crate
+    core_domain/                              # 领域模型与领域策略 crate
       Cargo.toml
       src/
         lib.rs                                   # 导出 domain public API
@@ -293,7 +293,7 @@ quantalithos-core/
           boundary_guard.rs                      # BoundaryGuard / DefinitionUseBoundaryGuard
           reference_validation.rs                # ReferenceValidationPolicy
           fingerprint.rs                         # FingerprintPolicy
-    l0_core_application/                         # 应用服务与 port crate
+    core_application/                         # 应用服务与 port crate
       Cargo.toml
       src/
         lib.rs                                   # 导出 application public API
@@ -329,7 +329,7 @@ quantalithos-core/
           validation_runner.rs                   # ContractValidationRunnerPort
           fingerprint_runner.rs                  # FingerprintRunnerPort
           snapshot_exporter.rs                   # SnapshotExporterPort
-    l0_core_infra/                               # 基础设施适配 crate
+    core_infra/                               # 基础设施适配 crate
       Cargo.toml
       src/
         lib.rs                                   # 导出 infra adapter
@@ -366,7 +366,7 @@ quantalithos-core/
           validator.rs                           # contract validation runner
           fingerprint.rs                         # canonical fingerprint runner
           snapshot_exporter.rs                   # snapshot export runner
-    l0_core_cli/                                 # 同步入口适配 crate
+    core_cli/                                 # 同步入口适配 crate
       Cargo.toml
       src/
         main.rs                                  # CLI process bootstrap
@@ -379,7 +379,7 @@ quantalithos-core/
         context.rs                               # gateway / actor / metadata context loading
         output.rs                                # command / query / job output rendering
         error_mapping.rs                         # application error to CLI status mapping
-    l0_core_jobs/                                # 后台处理入口 crate
+    core_jobs/                                # 后台处理入口 crate
       Cargo.toml
       src/
         lib.rs                                   # job shared wiring
@@ -412,9 +412,9 @@ quantalithos-core/
 
 - 该目录树是目标实现仓布局,不表示当前 design 仓已有这些文件。
 - `contract-source/` 和 `release-snapshots/` 固定承载目录,但不在 Step 4 决定具体源文件格式。
-- `l0_core_cli` 表达同步入口适配,不是在线 HTTP / RPC 服务。
-- `l0_core_jobs` 表达构建期 / 运维期后台处理,不是业务 runtime worker。
-- `l0_core_infra` 中的 event publisher 只负责把事实交给 `L0-bus` 边界,不实现 bus 投递运行时。
+- `core_cli` 表达同步入口适配,不是在线 HTTP / RPC 服务。
+- `core_jobs` 表达构建期 / 运维期后台处理,不是业务 runtime worker。
+- `core_infra` 中的 event publisher 只负责把事实交给 `L0-bus` 边界,不实现 bus 投递运行时。
 
 ### 7.4 文件职责表
 
@@ -433,92 +433,92 @@ quantalithos-core/
 | `contract-source/packages/artifact/README.md` | contract source | artifact 契约包源码说明 | 说明 artifact 契约包源码边界 |
 | `contract-source/references/README.md` | contract source | 外部引用说明 | 说明标准、ADR、评审、下游反馈只保存引用 |
 | `release-snapshots/README.md` | release snapshot | 快照目录说明 | 说明只读发布快照承载规则 |
-| `crates/l0_core_contracts/src/actor.rs` | contracts | Actor DTO | 定义 `ActorContext` / `ActorRef` 等操作者上下文 |
-| `crates/l0_core_contracts/src/metadata.rs` | contracts | Metadata DTO | 定义 `CommandMetadata` / `QueryMetadata` / `RequestMetadata` |
-| `crates/l0_core_contracts/src/commands.rs` | contracts | Command DTO | 定义创建、更新、提交、发布、生命周期变更等命令载荷 |
-| `crates/l0_core_contracts/src/queries.rs` | contracts | Query DTO | 定义获取、列表、追溯、快照、兼容追溯等查询载荷 |
-| `crates/l0_core_contracts/src/events.rs` | contracts | Outbound Event DTO | 定义契约草稿变化、发布、生命周期、快照、事实输出等事件载荷 |
-| `crates/l0_core_contracts/src/jobs.rs` | contracts | Operations Job DTO | 定义校验、派生、重建、复算、事实发布等 job 输入 / 输出 |
-| `crates/l0_core_contracts/src/views.rs` | contracts | View DTO | 定义契约详情、列表、快照、追溯和兼容视图 |
-| `crates/l0_core_contracts/src/receipts.rs` | contracts | Receipt DTO | 定义 command / job 处理回执 |
-| `crates/l0_core_contracts/src/errors.rs` | contracts | Protocol error DTO | 定义对外错误响应结构 |
-| `crates/l0_core_domain/src/definition/aggregate.rs` | domain | `ContractDefinition` | 维护共享契约定义真相与不变量 |
-| `crates/l0_core_domain/src/definition/scope.rs` | domain | `ContractScope` | 表达契约范围和跨仓共享边界 |
-| `crates/l0_core_domain/src/definition/version.rs` | domain | `ContractVersion` | 表达契约版本位置和演进序列 |
-| `crates/l0_core_domain/src/definition/lifecycle.rs` | domain | `ContractLifecycle` | 表达 draft / in_review / published / deprecated / retired / superseded 状态 |
-| `crates/l0_core_domain/src/definition/evolution.rs` | domain | `ContractEvolutionRecord` | 记录契约演进追溯锚点 |
-| `crates/l0_core_domain/src/packages/identity.rs` | domain | `IdentityContractPackage` | 承载 identity 对外共享契约包 |
-| `crates/l0_core_domain/src/packages/conversation.rs` | domain | `ConversationContractPackage` | 承载 conversation 对外共享契约包 |
-| `crates/l0_core_domain/src/packages/work.rs` | domain | `WorkContractPackage` | 承载 work 对外共享契约包 |
-| `crates/l0_core_domain/src/packages/process.rs` | domain | `ProcessContractPackage` | 承载 process 对外共享契约包 |
-| `crates/l0_core_domain/src/packages/governance.rs` | domain | `GovernanceContractPackage` | 承载 governance 对外共享契约包 |
-| `crates/l0_core_domain/src/packages/artifact.rs` | domain | `ArtifactContractPackage` | 承载 artifact 对外共享契约包 |
-| `crates/l0_core_domain/src/release/baseline.rs` | domain | `ContractReleaseBaseline` | 表达正式发布基线 |
-| `crates/l0_core_domain/src/release/compatibility.rs` | domain | `CompatibilityStatus` | 表达兼容性判断状态 |
-| `crates/l0_core_domain/src/release/policy.rs` | domain | `ReleasePolicy` | 约束发布、废弃、退役和 supersede 规则 |
-| `crates/l0_core_domain/src/snapshot/release_snapshot.rs` | domain | `ContractReleaseSnapshot` | 表达只读发布快照 |
-| `crates/l0_core_domain/src/snapshot/downstream_ref.rs` | domain | `DownstreamConsumptionRef` | 表达下游消费引用关系 |
-| `crates/l0_core_domain/src/reference/external_reference.rs` | domain | `ExternalReference` | 表达标准、ADR、评审、下游反馈等外部引用 |
-| `crates/l0_core_domain/src/projection/read_model.rs` | domain | `ContractReadModel` | 表达契约只读查询模型 |
-| `crates/l0_core_domain/src/projection/trace_projection.rs` | domain | `ContractTraceProjection` | 表达版本、引用、审计和事实追溯投影 |
-| `crates/l0_core_domain/src/fact/record.rs` | domain | `ContractFactRecord` | 表达契约变化可感知事实 |
-| `crates/l0_core_domain/src/policies/scope_policy.rs` | domain | `ScopePolicy` | 判断候选契约是否具有跨仓共享价值 |
-| `crates/l0_core_domain/src/policies/boundary_guard.rs` | domain | `BoundaryGuard` / `DefinitionUseBoundaryGuard` | 防止外部正文、运行实例和业务真相混入本仓 |
-| `crates/l0_core_domain/src/policies/reference_validation.rs` | domain | `ReferenceValidationPolicy` | 校验定义引用和外部引用是否允许 |
-| `crates/l0_core_domain/src/policies/fingerprint.rs` | domain | `FingerprintPolicy` | 约束 canonical 内容与 fingerprint 生成 / 对比规则 |
-| `crates/l0_core_application/src/services/change_service.rs` | application | `ContractChangeService` | 编排草稿、更新、提交前准备和输入收口 |
-| `crates/l0_core_application/src/services/release_service.rs` | application | `ContractReleaseService` | 编排发布、废弃、退役和 supersede |
-| `crates/l0_core_application/src/services/compatibility_service.rs` | application | `ContractCompatibilityService` | 编排 gate、fingerprint 和兼容判断 |
-| `crates/l0_core_application/src/services/snapshot_service.rs` | application | `ContractSnapshotService` | 编排发布快照生成、导出和恢复入口 |
-| `crates/l0_core_application/src/services/trace_service.rs` | application | `ContractTraceService` | 编排版本、引用、审计和事实追溯视图 |
-| `crates/l0_core_application/src/services/fact_service.rs` | application | `ContractFactService` | 编排事实输出、审计和 outbox 写入 |
-| `crates/l0_core_application/src/services/operations_service.rs` | application | `ContractOperationsService` | 编排 seed、replay、rebuild、recalculate 等操作 |
-| `crates/l0_core_application/src/ports/unit_of_work.rs` | application ports | `UnitOfWork` | 定义事务边界端口 |
-| `crates/l0_core_application/src/ports/definition_repository.rs` | application ports | `ContractDefinitionRepository` | 定义契约真相读写端口 |
-| `crates/l0_core_application/src/ports/baseline_repository.rs` | application ports | `ContractBaselineRepository` | 定义发布基线读写端口 |
-| `crates/l0_core_application/src/ports/snapshot_repository.rs` | application ports | `SnapshotRepository` | 定义发布快照读写端口 |
-| `crates/l0_core_application/src/ports/reference_repository.rs` | application ports | `ReferenceRepository` | 定义引用、标准映射和消费引用读写端口 |
-| `crates/l0_core_application/src/ports/audit_log.rs` | application ports | `AuditLogPort` | 定义审计记录写入端口 |
-| `crates/l0_core_application/src/ports/idempotency.rs` | application ports | `IdempotencyRepository` | 定义幂等预占、replay 和 complete 端口 |
-| `crates/l0_core_application/src/ports/outbox.rs` | application ports | `OutboxPort` | 定义 outbox 事实写入端口 |
-| `crates/l0_core_application/src/ports/gate_decision.rs` | application ports | `GateDecisionPort` | 定义 approved gate 查询端口 |
-| `crates/l0_core_application/src/ports/reference_resolver.rs` | application ports | `ReferenceResolverPort` | 定义外部引用解析端口 |
-| `crates/l0_core_application/src/ports/blob_ref.rs` | application ports | `BlobRefPort` | 定义 blob 引用校验端口 |
-| `crates/l0_core_application/src/ports/event_publisher.rs` | application ports | `EventPublisherPort` | 定义事实交给 `L0-bus` 边界的发布端口 |
-| `crates/l0_core_application/src/ports/clock.rs` | application ports | `ClockPort` | 定义时间来源端口 |
-| `crates/l0_core_application/src/ports/id_generator.rs` | application ports | `IdGeneratorPort` | 定义稳定编号生成端口 |
-| `crates/l0_core_application/src/ports/source_store.rs` | application ports | `ContractSourceStorePort` | 定义契约源码资产读写端口 |
-| `crates/l0_core_application/src/ports/snapshot_store.rs` | application ports | `ReleaseSnapshotStorePort` | 定义发布快照资产读写端口 |
-| `crates/l0_core_application/src/ports/projection_store.rs` | application ports | `ProjectionStorePort` | 定义查询投影、索引水位和批量重建端口 |
-| `crates/l0_core_application/src/ports/validation_runner.rs` | application ports | `ContractValidationRunnerPort` | 定义契约校验工具链端口 |
-| `crates/l0_core_application/src/ports/fingerprint_runner.rs` | application ports | `FingerprintRunnerPort` | 定义 canonical fingerprint 工具链端口 |
-| `crates/l0_core_application/src/ports/snapshot_exporter.rs` | application ports | `SnapshotExporterPort` | 定义发布快照导出工具链端口 |
-| `crates/l0_core_infra/src/source_store/filesystem.rs` | infra | filesystem source adapter | 从结构化契约源码目录读取和写入契约源 |
-| `crates/l0_core_infra/src/snapshot_store/filesystem.rs` | infra | filesystem snapshot adapter | 读写只读发布快照 |
-| `crates/l0_core_infra/src/projection_store/file_index.rs` | infra | file projection adapter | 读写查询索引和追溯投影 |
-| `crates/l0_core_infra/src/audit_store/file_audit.rs` | infra | file audit adapter | 追加和查询审计记录 |
-| `crates/l0_core_infra/src/idempotency_store/file_idempotency.rs` | infra | file idempotency adapter | 持久化幂等预占和 replay 结果 |
-| `crates/l0_core_infra/src/outbox_store/file_outbox.rs` | infra | file outbox adapter | 持久化待发布事实 |
-| `crates/l0_core_infra/src/adapters/unit_of_work.rs` | infra | unit of work adapter | 提供事务 / 文件锁 / 一致性提交边界 |
-| `crates/l0_core_infra/src/adapters/gate_decision.rs` | infra | gate adapter | 读取或校验 approved gate 引用 |
-| `crates/l0_core_infra/src/adapters/reference_resolver.rs` | infra | reference resolver adapter | 解析外部引用是否存在或可用 |
-| `crates/l0_core_infra/src/adapters/blob_ref.rs` | infra | blob ref adapter | 校验 blob 引用而不吸收正文 |
-| `crates/l0_core_infra/src/adapters/event_publisher.rs` | infra | `EventPublisherPort` adapter | 将事实交给 `L0-bus` 边界 |
-| `crates/l0_core_infra/src/adapters/clock.rs` | infra | clock adapter | 提供系统时间来源 |
-| `crates/l0_core_infra/src/adapters/id_generator.rs` | infra | id generator adapter | 提供稳定编号来源 |
-| `crates/l0_core_infra/src/toolchain/validator.rs` | infra | validation runner | 承接契约校验工具链 |
-| `crates/l0_core_infra/src/toolchain/fingerprint.rs` | infra | fingerprint runner | 承接 canonical fingerprint 生成 / 对比 |
-| `crates/l0_core_infra/src/toolchain/snapshot_exporter.rs` | infra | snapshot exporter runner | 承接快照派生和导出 |
-| `crates/l0_core_cli/src/commands/command_api.rs` | cli | `ContractCommandApi` adapter | 接收写请求并调用 application service |
-| `crates/l0_core_cli/src/commands/query_api.rs` | cli | `ContractQueryApi` adapter | 接收查询请求并调用 query / trace service |
-| `crates/l0_core_cli/src/commands/operations_trigger.rs` | cli | `ContractOperationsTrigger` adapter | 接收运维触发并调用 operations service |
-| `crates/l0_core_cli/src/context.rs` | cli | actor / metadata context loading | 加载外层可信入口传入的上下文,不做认证授权 |
-| `crates/l0_core_jobs/src/jobs/validate_contract_change.rs` | jobs | `ValidateContractChangeJob` | 校验候选契约变化是否满足规则 |
-| `crates/l0_core_jobs/src/jobs/derive_release_snapshot.rs` | jobs | `DeriveReleaseSnapshotJob` | 基于发布基线派生或刷新快照 |
-| `crates/l0_core_jobs/src/jobs/rebuild_contract_index.rs` | jobs | `RebuildContractIndexJob` | 重建查询索引和追溯投影 |
-| `crates/l0_core_jobs/src/jobs/recalculate_fingerprint.rs` | jobs | `RecalculateFingerprintJob` | 复算 canonical fingerprint 并用于漂移判断 |
-| `crates/l0_core_jobs/src/jobs/publish_contract_fact.rs` | jobs | `PublishContractFactJob` | 将已提交事实整理为可传播记录 |
-| `crates/l0_core_jobs/src/outbox_relay/worker.rs` | jobs | `OutboxRelayWorker` | 从 outbox 读取事实并调用 event publisher port |
+| `crates/contracts/src/actor.rs` | contracts | Actor DTO | 定义 `ActorContext` / `ActorRef` 等操作者上下文 |
+| `crates/contracts/src/metadata.rs` | contracts | Metadata DTO | 定义 `CommandMetadata` / `QueryMetadata` / `RequestMetadata` |
+| `crates/contracts/src/commands.rs` | contracts | Command DTO | 定义创建、更新、提交、发布、生命周期变更等命令载荷 |
+| `crates/contracts/src/queries.rs` | contracts | Query DTO | 定义获取、列表、追溯、快照、兼容追溯等查询载荷 |
+| `crates/contracts/src/events.rs` | contracts | Outbound Event DTO | 定义契约草稿变化、发布、生命周期、快照、事实输出等事件载荷 |
+| `crates/contracts/src/jobs.rs` | contracts | Operations Job DTO | 定义校验、派生、重建、复算、事实发布等 job 输入 / 输出 |
+| `crates/contracts/src/views.rs` | contracts | View DTO | 定义契约详情、列表、快照、追溯和兼容视图 |
+| `crates/contracts/src/receipts.rs` | contracts | Receipt DTO | 定义 command / job 处理回执 |
+| `crates/contracts/src/errors.rs` | contracts | Protocol error DTO | 定义对外错误响应结构 |
+| `crates/domain/src/definition/aggregate.rs` | domain | `ContractDefinition` | 维护共享契约定义真相与不变量 |
+| `crates/domain/src/definition/scope.rs` | domain | `ContractScope` | 表达契约范围和跨仓共享边界 |
+| `crates/domain/src/definition/version.rs` | domain | `ContractVersion` | 表达契约版本位置和演进序列 |
+| `crates/domain/src/definition/lifecycle.rs` | domain | `ContractLifecycle` | 表达 draft / in_review / published / deprecated / retired / superseded 状态 |
+| `crates/domain/src/definition/evolution.rs` | domain | `ContractEvolutionRecord` | 记录契约演进追溯锚点 |
+| `crates/domain/src/packages/identity.rs` | domain | `IdentityContractPackage` | 承载 identity 对外共享契约包 |
+| `crates/domain/src/packages/conversation.rs` | domain | `ConversationContractPackage` | 承载 conversation 对外共享契约包 |
+| `crates/domain/src/packages/work.rs` | domain | `WorkContractPackage` | 承载 work 对外共享契约包 |
+| `crates/domain/src/packages/process.rs` | domain | `ProcessContractPackage` | 承载 process 对外共享契约包 |
+| `crates/domain/src/packages/governance.rs` | domain | `GovernanceContractPackage` | 承载 governance 对外共享契约包 |
+| `crates/domain/src/packages/artifact.rs` | domain | `ArtifactContractPackage` | 承载 artifact 对外共享契约包 |
+| `crates/domain/src/release/baseline.rs` | domain | `ContractReleaseBaseline` | 表达正式发布基线 |
+| `crates/domain/src/release/compatibility.rs` | domain | `CompatibilityStatus` | 表达兼容性判断状态 |
+| `crates/domain/src/release/policy.rs` | domain | `ReleasePolicy` | 约束发布、废弃、退役和 supersede 规则 |
+| `crates/domain/src/snapshot/release_snapshot.rs` | domain | `ContractReleaseSnapshot` | 表达只读发布快照 |
+| `crates/domain/src/snapshot/downstream_ref.rs` | domain | `DownstreamConsumptionRef` | 表达下游消费引用关系 |
+| `crates/domain/src/reference/external_reference.rs` | domain | `ExternalReference` | 表达标准、ADR、评审、下游反馈等外部引用 |
+| `crates/domain/src/projection/read_model.rs` | domain | `ContractReadModel` | 表达契约只读查询模型 |
+| `crates/domain/src/projection/trace_projection.rs` | domain | `ContractTraceProjection` | 表达版本、引用、审计和事实追溯投影 |
+| `crates/domain/src/fact/record.rs` | domain | `ContractFactRecord` | 表达契约变化可感知事实 |
+| `crates/domain/src/policies/scope_policy.rs` | domain | `ScopePolicy` | 判断候选契约是否具有跨仓共享价值 |
+| `crates/domain/src/policies/boundary_guard.rs` | domain | `BoundaryGuard` / `DefinitionUseBoundaryGuard` | 防止外部正文、运行实例和业务真相混入本仓 |
+| `crates/domain/src/policies/reference_validation.rs` | domain | `ReferenceValidationPolicy` | 校验定义引用和外部引用是否允许 |
+| `crates/domain/src/policies/fingerprint.rs` | domain | `FingerprintPolicy` | 约束 canonical 内容与 fingerprint 生成 / 对比规则 |
+| `crates/application/src/services/change_service.rs` | application | `ContractChangeService` | 编排草稿、更新、提交前准备和输入收口 |
+| `crates/application/src/services/release_service.rs` | application | `ContractReleaseService` | 编排发布、废弃、退役和 supersede |
+| `crates/application/src/services/compatibility_service.rs` | application | `ContractCompatibilityService` | 编排 gate、fingerprint 和兼容判断 |
+| `crates/application/src/services/snapshot_service.rs` | application | `ContractSnapshotService` | 编排发布快照生成、导出和恢复入口 |
+| `crates/application/src/services/trace_service.rs` | application | `ContractTraceService` | 编排版本、引用、审计和事实追溯视图 |
+| `crates/application/src/services/fact_service.rs` | application | `ContractFactService` | 编排事实输出、审计和 outbox 写入 |
+| `crates/application/src/services/operations_service.rs` | application | `ContractOperationsService` | 编排 seed、replay、rebuild、recalculate 等操作 |
+| `crates/application/src/ports/unit_of_work.rs` | application ports | `UnitOfWork` | 定义事务边界端口 |
+| `crates/application/src/ports/definition_repository.rs` | application ports | `ContractDefinitionRepository` | 定义契约真相读写端口 |
+| `crates/application/src/ports/baseline_repository.rs` | application ports | `ContractBaselineRepository` | 定义发布基线读写端口 |
+| `crates/application/src/ports/snapshot_repository.rs` | application ports | `SnapshotRepository` | 定义发布快照读写端口 |
+| `crates/application/src/ports/reference_repository.rs` | application ports | `ReferenceRepository` | 定义引用、标准映射和消费引用读写端口 |
+| `crates/application/src/ports/audit_log.rs` | application ports | `AuditLogPort` | 定义审计记录写入端口 |
+| `crates/application/src/ports/idempotency.rs` | application ports | `IdempotencyRepository` | 定义幂等预占、replay 和 complete 端口 |
+| `crates/application/src/ports/outbox.rs` | application ports | `OutboxPort` | 定义 outbox 事实写入端口 |
+| `crates/application/src/ports/gate_decision.rs` | application ports | `GateDecisionPort` | 定义 approved gate 查询端口 |
+| `crates/application/src/ports/reference_resolver.rs` | application ports | `ReferenceResolverPort` | 定义外部引用解析端口 |
+| `crates/application/src/ports/blob_ref.rs` | application ports | `BlobRefPort` | 定义 blob 引用校验端口 |
+| `crates/application/src/ports/event_publisher.rs` | application ports | `EventPublisherPort` | 定义事实交给 `L0-bus` 边界的发布端口 |
+| `crates/application/src/ports/clock.rs` | application ports | `ClockPort` | 定义时间来源端口 |
+| `crates/application/src/ports/id_generator.rs` | application ports | `IdGeneratorPort` | 定义稳定编号生成端口 |
+| `crates/application/src/ports/source_store.rs` | application ports | `ContractSourceStorePort` | 定义契约源码资产读写端口 |
+| `crates/application/src/ports/snapshot_store.rs` | application ports | `ReleaseSnapshotStorePort` | 定义发布快照资产读写端口 |
+| `crates/application/src/ports/projection_store.rs` | application ports | `ProjectionStorePort` | 定义查询投影、索引水位和批量重建端口 |
+| `crates/application/src/ports/validation_runner.rs` | application ports | `ContractValidationRunnerPort` | 定义契约校验工具链端口 |
+| `crates/application/src/ports/fingerprint_runner.rs` | application ports | `FingerprintRunnerPort` | 定义 canonical fingerprint 工具链端口 |
+| `crates/application/src/ports/snapshot_exporter.rs` | application ports | `SnapshotExporterPort` | 定义发布快照导出工具链端口 |
+| `crates/infra/src/source_store/filesystem.rs` | infra | filesystem source adapter | 从结构化契约源码目录读取和写入契约源 |
+| `crates/infra/src/snapshot_store/filesystem.rs` | infra | filesystem snapshot adapter | 读写只读发布快照 |
+| `crates/infra/src/projection_store/file_index.rs` | infra | file projection adapter | 读写查询索引和追溯投影 |
+| `crates/infra/src/audit_store/file_audit.rs` | infra | file audit adapter | 追加和查询审计记录 |
+| `crates/infra/src/idempotency_store/file_idempotency.rs` | infra | file idempotency adapter | 持久化幂等预占和 replay 结果 |
+| `crates/infra/src/outbox_store/file_outbox.rs` | infra | file outbox adapter | 持久化待发布事实 |
+| `crates/infra/src/adapters/unit_of_work.rs` | infra | unit of work adapter | 提供事务 / 文件锁 / 一致性提交边界 |
+| `crates/infra/src/adapters/gate_decision.rs` | infra | gate adapter | 读取或校验 approved gate 引用 |
+| `crates/infra/src/adapters/reference_resolver.rs` | infra | reference resolver adapter | 解析外部引用是否存在或可用 |
+| `crates/infra/src/adapters/blob_ref.rs` | infra | blob ref adapter | 校验 blob 引用而不吸收正文 |
+| `crates/infra/src/adapters/event_publisher.rs` | infra | `EventPublisherPort` adapter | 将事实交给 `L0-bus` 边界 |
+| `crates/infra/src/adapters/clock.rs` | infra | clock adapter | 提供系统时间来源 |
+| `crates/infra/src/adapters/id_generator.rs` | infra | id generator adapter | 提供稳定编号来源 |
+| `crates/infra/src/toolchain/validator.rs` | infra | validation runner | 承接契约校验工具链 |
+| `crates/infra/src/toolchain/fingerprint.rs` | infra | fingerprint runner | 承接 canonical fingerprint 生成 / 对比 |
+| `crates/infra/src/toolchain/snapshot_exporter.rs` | infra | snapshot exporter runner | 承接快照派生和导出 |
+| `crates/cli/src/commands/command_api.rs` | cli | `ContractCommandApi` adapter | 接收写请求并调用 application service |
+| `crates/cli/src/commands/query_api.rs` | cli | `ContractQueryApi` adapter | 接收查询请求并调用 query / trace service |
+| `crates/cli/src/commands/operations_trigger.rs` | cli | `ContractOperationsTrigger` adapter | 接收运维触发并调用 operations service |
+| `crates/cli/src/context.rs` | cli | actor / metadata context loading | 加载外层可信入口传入的上下文,不做认证授权 |
+| `crates/jobs/src/jobs/validate_contract_change.rs` | jobs | `ValidateContractChangeJob` | 校验候选契约变化是否满足规则 |
+| `crates/jobs/src/jobs/derive_release_snapshot.rs` | jobs | `DeriveReleaseSnapshotJob` | 基于发布基线派生或刷新快照 |
+| `crates/jobs/src/jobs/rebuild_contract_index.rs` | jobs | `RebuildContractIndexJob` | 重建查询索引和追溯投影 |
+| `crates/jobs/src/jobs/recalculate_fingerprint.rs` | jobs | `RecalculateFingerprintJob` | 复算 canonical fingerprint 并用于漂移判断 |
+| `crates/jobs/src/jobs/publish_contract_fact.rs` | jobs | `PublishContractFactJob` | 将已提交事实整理为可传播记录 |
+| `crates/jobs/src/outbox_relay/worker.rs` | jobs | `OutboxRelayWorker` | 从 outbox 读取事实并调用 event publisher port |
 | `tests/contract_change_flow.rs` | integration tests | contract change flow test | 覆盖变更入口和输入收口主链 |
 | `tests/release_snapshot_flow.rs` | integration tests | release snapshot flow test | 覆盖发布基线和快照派生主链 |
 | `tests/trace_query_flow.rs` | integration tests | trace query flow test | 覆盖追溯查询主链 |
@@ -548,14 +548,23 @@ quantalithos-core/
 
 ### 4.2 实现单元总表
 
-| 实现单元 | 类型 | 职责 | 对应概要设计章节 |
-|---|---|---|---|
-| `l0_core_contracts` | library crate | 定义 Command / Query / Event / Job / View / Receipt / Error DTO、`ActorContext`、`CommandMetadata`、`QueryMetadata` 等公共协议对象 | §4 外部接缝;§7 API / 接口骨架;§11 详细设计承接 |
-| `l0_core_domain` | library crate | 定义共享契约核心、领域契约包、发布基线、快照、引用、追溯、事实记录和领域策略 | §4 共享契约核心;§5.4~§5.8;§6 关键对象;§9 状态 |
-| `l0_core_application` | library crate | 定义 application service、use case 编排、port trait 和应用错误边界 | §4 Application Services;§5.3~§5.9;§8 关键处理流 |
-| `l0_core_infra` | library crate | 实现 source store、snapshot store、projection、outbox、reference resolver、blob ref、gate decision、event publisher、clock、id generator 等 adapter | §4 Ports / Persistence / Projection / External Adapters;§5.9 |
-| `l0_core_cli` | binary crate | 承载 `ContractCommandApi`、`ContractQueryApi`、`ContractOperationsTrigger` 的同步入口适配和输出映射 | §4 Inbound / Operations;§5.3;§5.7;§5.8 |
-| `l0_core_jobs` | binary crate | 承载校验、快照派生、索引重建、fingerprint 复算、事实发布和 outbox relay 执行入口 | §5.8 后台校验与事实输出 |
+命名规则：
+
+- 文件目录使用短语义名，例如 `crates/application`。
+- Cargo package 使用 `core-*` 前缀，例如 `core-application`。
+- Rust library crate 使用 `core_*` 前缀，例如 `core_application`。
+- 目录名不重复写入 `l0`，因为目标实现仓本身已经表达 L0-core 项目边界。
+
+| 目录 / 资产根 | 类型 | Cargo package / Rust crate | 职责 | 对应概要设计章节 |
+|---|---|---|---|---|
+| `contract-source/` | asset root | - | 结构化契约源码真相 | §4 / §5 |
+| `release-snapshots/` | asset root | - | 只读发布快照 | §5 / §8 |
+| `crates/contracts` | library crate | `core-contracts` / `core_contracts` | 定义 Command / Query / Event / Job / View / Receipt / Error DTO、`ActorContext`、`CommandMetadata`、`QueryMetadata` 等公共协议对象 | §4 外部接缝;§7 API / 接口骨架;§11 详细设计承接 |
+| `crates/domain` | library crate | `core-domain` / `core_domain` | 定义共享契约核心、领域契约包、发布基线、快照、引用、追溯、事实记录和领域策略 | §4 共享契约核心;§5.4~§5.8;§6 关键对象;§9 状态 |
+| `crates/application` | library crate | `core-application` / `core_application` | 定义 application service、use case 编排、port trait 和应用错误边界 | §4 Application Services;§5.3~§5.9;§8 关键处理流 |
+| `crates/infra` | library crate | `core-infra` / `core_infra` | 实现 source store、snapshot store、projection、outbox、reference resolver、blob ref、gate decision、event publisher、clock、id generator 等 adapter | §4 Ports / Persistence / Projection / External Adapters;§5.9 |
+| `crates/cli` | binary crate | `core-cli` / `core` | 承载 `ContractCommandApi`、`ContractQueryApi`、`ContractOperationsTrigger` 的同步入口适配和输出映射 | §4 Inbound / Operations;§5.3;§5.7;§5.8 |
+| `crates/jobs` | binary crate | `core-jobs` / `core-*` job binaries | 承载校验、快照派生、索引重建、fingerprint 复算、事实发布和 outbox relay 执行入口 | §5.8 后台校验与事实输出 |
 
 ### 4.3 文件布局树
 
@@ -585,6 +594,6 @@ quantalithos-core/
 - 已明确采用 workspace 多 crate 架构。
 - 已明确 `contracts` / `domain` / `application` / `infra` / `cli` / `jobs` 六个 P0 实现单元。
 - 已明确 `contract-source/` 和 `release-snapshots/` 的承载目录。
-- 已明确 `l0_core_cli` 不是在线 API 服务,`l0_core_jobs` 不是 `L0-bus` runtime。
+- 已明确 `crates/cli` / `core-cli` 不是在线 API 服务,`crates/jobs` / `core-jobs` 不是 `L0-bus` runtime。
 - 已明确文件路径、所属模块、定义内容和主要责任。
 - 可以进入 Step 5 “定义模块实现契约主轴”。

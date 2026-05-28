@@ -98,18 +98,18 @@ trace_id 由 RequestMetadata / CommandMetadata / QueryMetadata 贯穿到日志�
 
 | 指标 | 类型 | 打点位置 | 标签 |
 |---|---|---|---|
-| `l0_core_command_total` | counter | 每个 Command 入口 | `operation`, `result` |
-| `l0_core_command_latency_ms` | histogram | 每个 Command 入口完成时 | `operation`, `result` |
-| `l0_core_query_total` | counter | 每个 Query 入口 | `query`, `result` |
-| `l0_core_job_total` | counter | 每个 Job 入口 | `job`, `result` |
-| `l0_core_job_latency_ms` | histogram | 每个 Job 完成时 | `job`, `result` |
-| `l0_core_idempotency_replay_total` | counter | `IdempotencyRepository.reserve(...)` 命中 replay 时 | `operation` |
-| `l0_core_conflict_total` | counter | expected version 冲突或幂等冲突时 | `operation`, `reason` |
-| `l0_core_outbox_pending_total` | gauge | outbox relay poll 时 | `store` |
-| `l0_core_outbox_publish_total` | counter | outbox relay publish 成功时 | `event_type`, `result` |
-| `l0_core_projection_stale_total` | gauge | projection 标记 stale / rebuilding 时 | `projection_name` |
-| `l0_core_snapshot_export_total` | counter | snapshot exporter 完成时 | `result` |
-| `l0_core_audit_append_total` | counter | audit append 成功时 | `audit_type` |
+| `core_command_total` | counter | 每个 Command 入口 | `operation`, `result` |
+| `core_command_latency_ms` | histogram | 每个 Command 入口完成时 | `operation`, `result` |
+| `core_query_total` | counter | 每个 Query 入口 | `query`, `result` |
+| `core_job_total` | counter | 每个 Job 入口 | `job`, `result` |
+| `core_job_latency_ms` | histogram | 每个 Job 完成时 | `job`, `result` |
+| `core_idempotency_replay_total` | counter | `IdempotencyRepository.reserve(...)` 命中 replay 时 | `operation` |
+| `core_conflict_total` | counter | expected version 冲突或幂等冲突时 | `operation`, `reason` |
+| `core_outbox_pending_total` | gauge | outbox relay poll 时 | `store` |
+| `core_outbox_publish_total` | counter | outbox relay publish 成功时 | `event_type`, `result` |
+| `core_projection_stale_total` | gauge | projection 标记 stale / rebuilding 时 | `projection_name` |
+| `core_snapshot_export_total` | counter | snapshot exporter 完成时 | `result` |
+| `core_audit_append_total` | counter | audit append 成功时 | `audit_type` |
 
 ### 5.4 日志、指标、审计字段分别记录什么？
 
@@ -210,18 +210,18 @@ trace_id 由 RequestMetadata / CommandMetadata / QueryMetadata 贯穿到日志�
 
 | 指标 | 类型 | 打点位置 | 标签 |
 |---|---|---|---|
-| `l0_core_command_total` | counter | Command 完成时 | `operation`, `result` |
-| `l0_core_command_latency_ms` | histogram | Command 完成时 | `operation`, `result` |
-| `l0_core_query_total` | counter | Query 完成时 | `query`, `result` |
-| `l0_core_job_total` | counter | Job 完成时 | `job`, `result` |
-| `l0_core_job_latency_ms` | histogram | Job 完成时 | `job`, `result` |
-| `l0_core_idempotency_replay_total` | counter | reserve 命中 replay 时 | `operation` |
-| `l0_core_conflict_total` | counter | 幂等冲突或 expected version 冲突时 | `operation`, `reason` |
-| `l0_core_outbox_pending_total` | gauge | relay poll 时 | `store` |
-| `l0_core_outbox_publish_total` | counter | relay publish 成功时 | `event_type`, `result` |
-| `l0_core_projection_stale_total` | gauge | projection 标记 stale / rebuilding 时 | `projection_name` |
-| `l0_core_snapshot_export_total` | counter | snapshot exporter 完成时 | `result` |
-| `l0_core_audit_append_total` | counter | audit append 成功时 | `audit_type` |
+| `core_command_total` | counter | Command 完成时 | `operation`, `result` |
+| `core_command_latency_ms` | histogram | Command 完成时 | `operation`, `result` |
+| `core_query_total` | counter | Query 完成时 | `query`, `result` |
+| `core_job_total` | counter | Job 完成时 | `job`, `result` |
+| `core_job_latency_ms` | histogram | Job 完成时 | `job`, `result` |
+| `core_idempotency_replay_total` | counter | reserve 命中 replay 时 | `operation` |
+| `core_conflict_total` | counter | 幂等冲突或 expected version 冲突时 | `operation`, `reason` |
+| `core_outbox_pending_total` | gauge | relay poll 时 | `store` |
+| `core_outbox_publish_total` | counter | relay publish 成功时 | `event_type`, `result` |
+| `core_projection_stale_total` | gauge | projection 标记 stale / rebuilding 时 | `projection_name` |
+| `core_snapshot_export_total` | counter | snapshot exporter 完成时 | `result` |
+| `core_audit_append_total` | counter | audit append 成功时 | `audit_type` |
 
 ### 10.3 审计事件表
 

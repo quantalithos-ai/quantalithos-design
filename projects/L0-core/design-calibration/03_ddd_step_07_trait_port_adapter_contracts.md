@@ -17,7 +17,7 @@
 
 | 输入 | 内容 | 本步使用方式 |
 |---|---|---|
-| Step 4 实现单元与文件布局 | 已确认 `l0_core_application/src/ports/` 和 `l0_core_infra/src/...` 文件布局 | 作为 port trait 和 adapter 落文件依据 |
+| Step 4 实现单元与文件布局 | 已确认 `crates/application/src/ports/` 和 `crates/infra/src/...` 文件布局 | 作为 port trait 和 adapter 落文件依据 |
 | Step 5 模块实现契约主轴 | 已确认 `application_ports` 和 `infra_adapters` 模块边界 | 作为 trait 定义方和实现方归属依据 |
 | Step 6 对象实现契约 | 已确认 domain object、application service 和 service 依赖字段 | 作为 trait 方法参数、返回对象和错误类型来源 |
 | 架构设计依赖方向 | application 只依赖 port trait;infra 实现 port;domain 不依赖 infra | 作为允许依赖 / 禁止依赖判断依据 |
@@ -70,7 +70,7 @@ trait 函数必须写完整参数类型、返回类型和错误类型。
 
 ### 5.1 哪些模块需要定义 trait / port？
 
-需要在 `l0_core_application/src/ports/` 定义 trait / port 的模块如下:
+需要在 `crates/application/src/ports/` 定义 trait / port 的模块如下:
 
 | 模块 | 需要定义的 port | 原因 |
 |---|---|---|
@@ -82,7 +82,7 @@ trait 函数必须写完整参数类型、返回类型和错误类型。
 
 ### 5.2 哪些模块负责实现这些 trait / port？
 
-全部由 `l0_core_infra` 实现。`l0_core_cli` 和 `l0_core_jobs` 只负责装配和调用 application service。
+全部由 `core_infra` 实现。`core_cli` 和 `core_jobs` 只负责装配和调用 application service。
 
 | 实现模块 | 实现范围 |
 |---|---|
@@ -338,8 +338,8 @@ pub trait UnitOfWork {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractChangeService`、`ContractReleaseService`、`ContractFactService`、`ContractOperationsService` | 写路径和恢复路径必须通过事务边界 |
-| 定义方 | `l0_core_application/src/ports/unit_of_work.rs` | 定义 trait 和 `TransactionContext` |
-| 实现方 | `l0_core_infra` transaction adapter | 可基于文件锁、数据库事务或后续具体存储实现 |
+| 定义方 | `crates/application/src/ports/unit_of_work.rs` | 定义 trait 和 `TransactionContext` |
+| 实现方 | `core_infra` transaction adapter | 可基于文件锁、数据库事务或后续具体存储实现 |
 
 ###### 不变量与禁止事项
 
@@ -371,8 +371,8 @@ pub trait ClockPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | 所有写路径 service、operations service、job runner | 创建对象、迁移状态、记录审计、生成 receipt 时使用 |
-| 定义方 | `l0_core_application/src/ports/clock.rs` | 定义时间端口 |
-| 实现方 | `l0_core_infra/src/adapters/clock.rs` | 提供系统时间或测试时间 |
+| 定义方 | `crates/application/src/ports/clock.rs` | 定义时间端口 |
+| 实现方 | `crates/infra/src/adapters/clock.rs` | 提供系统时间或测试时间 |
 
 ###### 不变量与禁止事项
 
@@ -419,8 +419,8 @@ pub trait IdGeneratorPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractChangeService`、`ContractReleaseService`、`ContractSnapshotService`、`ContractFactService`、`ContractOperationsService` | 创建新对象或 receipt 前生成 ID |
-| 定义方 | `l0_core_application/src/ports/id_generator.rs` | 定义 ID 生成端口 |
-| 实现方 | `l0_core_infra/src/adapters/id_generator.rs` | 可使用 UUID、ULID 或后续统一 ID 方案 |
+| 定义方 | `crates/application/src/ports/id_generator.rs` | 定义 ID 生成端口 |
+| 实现方 | `crates/infra/src/adapters/id_generator.rs` | 可使用 UUID、ULID 或后续统一 ID 方案 |
 
 ###### 不变量与禁止事项
 
@@ -498,8 +498,8 @@ pub trait ContractDefinitionRepository {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractChangeService`、`ContractReleaseService`、`ContractCompatibilityService`、`ContractTraceService`、`ContractOperationsService` | 创建、更新、发布、校验、查询和重建时读取定义 |
-| 定义方 | `l0_core_application/src/ports/definition_repository.rs` | 定义 repository trait |
-| 实现方 | `l0_core_infra/src/source_store/*` 或后续 persistence adapter | 负责从契约源码 / 持久化层读写真相 |
+| 定义方 | `crates/application/src/ports/definition_repository.rs` | 定义 repository trait |
+| 实现方 | `crates/infra/src/source_store/*` 或后续 persistence adapter | 负责从契约源码 / 持久化层读写真相 |
 
 ###### 不变量与禁止事项
 
@@ -565,8 +565,8 @@ pub trait ContractBaselineRepository {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractReleaseService`、`ContractSnapshotService`、`ContractTraceService`、`ContractOperationsService` | 发布、快照派生、追溯和重建时读取基线 |
-| 定义方 | `l0_core_application/src/ports/baseline_repository.rs` | 定义 repository trait |
-| 实现方 | `l0_core_infra` baseline persistence adapter | 负责发布基线持久化 |
+| 定义方 | `crates/application/src/ports/baseline_repository.rs` | 定义 repository trait |
+| 实现方 | `core_infra` baseline persistence adapter | 负责发布基线持久化 |
 
 ###### 不变量与禁止事项
 
@@ -647,8 +647,8 @@ pub trait SnapshotRepository {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractSnapshotService`、`ContractTraceService`、`ContractOperationsService` | 快照派生、查询、追溯和重建时使用 |
-| 定义方 | `l0_core_application/src/ports/snapshot_repository.rs` | 定义 snapshot repository trait |
-| 实现方 | `l0_core_infra/src/snapshot_store/*` | 负责快照元数据和引用持久化 |
+| 定义方 | `crates/application/src/ports/snapshot_repository.rs` | 定义 snapshot repository trait |
+| 实现方 | `crates/infra/src/snapshot_store/*` | 负责快照元数据和引用持久化 |
 
 ###### 不变量与禁止事项
 
@@ -701,8 +701,8 @@ pub trait ContractFactRepository {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractFactService`、`ContractOperationsService`、`OutboxRelayWorker` | 事实创建、事实状态更新、事实发布整理和恢复时使用 |
-| 定义方 | `l0_core_application/src/ports/fact_repository.rs` | 定义 fact repository trait |
-| 实现方 | `l0_core_infra/src/outbox_store/*` 或独立 fact store adapter | 负责事实记录持久化 |
+| 定义方 | `crates/application/src/ports/fact_repository.rs` | 定义 fact repository trait |
+| 实现方 | `crates/infra/src/outbox_store/*` 或独立 fact store adapter | 负责事实记录持久化 |
 
 ###### 不变量与禁止事项
 
@@ -774,8 +774,8 @@ pub trait ReferenceRepository {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractTraceService`、`ContractCompatibilityService`、`ContractOperationsService` | 查询、兼容追溯、投影重建时使用 |
-| 定义方 | `l0_core_application/src/ports/reference_repository.rs` | 定义 reference / projection repository trait |
-| 实现方 | `l0_core_infra/src/projection_store/*` | 负责引用和投影持久化 |
+| 定义方 | `crates/application/src/ports/reference_repository.rs` | 定义 reference / projection repository trait |
+| 实现方 | `crates/infra/src/projection_store/*` | 负责引用和投影持久化 |
 
 ###### 不变量与禁止事项
 
@@ -822,8 +822,8 @@ pub trait AuditLogPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | 所有写路径 application service、operations service | 写入关键动作审计 |
-| 定义方 | `l0_core_application/src/ports/audit_log.rs` | 定义审计端口 |
-| 实现方 | `l0_core_infra` audit adapter | 可基于文件、数据库或后续审计系统实现 |
+| 定义方 | `crates/application/src/ports/audit_log.rs` | 定义审计端口 |
+| 实现方 | `core_infra` audit adapter | 可基于文件、数据库或后续审计系统实现 |
 
 ###### 不变量与禁止事项
 
@@ -883,8 +883,8 @@ pub trait OutboxPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractFactService`、`ContractOperationsService`、`OutboxRelayWorker` | 写入事实事件、拉取待发布事件、更新发布状态 |
-| 定义方 | `l0_core_application/src/ports/outbox.rs` | 定义 outbox 端口 |
-| 实现方 | `l0_core_infra/src/outbox_store/*` | 负责 outbox 持久化 |
+| 定义方 | `crates/application/src/ports/outbox.rs` | 定义 outbox 端口 |
+| 实现方 | `crates/infra/src/outbox_store/*` | 负责 outbox 持久化 |
 
 ###### 不变量与禁止事项
 
@@ -920,8 +920,8 @@ pub trait EventPublisherPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `OutboxRelayWorker`、`ContractOperationsService` | 从 outbox 取出事实后调用发布边界 |
-| 定义方 | `l0_core_application/src/ports/event_publisher.rs` | 定义发布端口 |
-| 实现方 | `l0_core_infra/src/adapters/event_publisher.rs` | 适配 L0-bus 边界 |
+| 定义方 | `crates/application/src/ports/event_publisher.rs` | 定义发布端口 |
+| 实现方 | `crates/infra/src/adapters/event_publisher.rs` | 适配 L0-bus 边界 |
 
 ###### 不变量与禁止事项
 
@@ -969,8 +969,8 @@ pub trait GateDecisionPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractReleaseService`、`ContractCompatibilityService` | 发布基线和兼容检查前校验 gate |
-| 定义方 | `l0_core_application/src/ports/gate_decision.rs` | 定义门禁端口 |
-| 实现方 | `l0_core_infra/src/adapters/gate_decision.rs` | 适配治理或门禁引用来源 |
+| 定义方 | `crates/application/src/ports/gate_decision.rs` | 定义门禁端口 |
+| 实现方 | `crates/infra/src/adapters/gate_decision.rs` | 适配治理或门禁引用来源 |
 
 ###### 不变量与禁止事项
 
@@ -1020,8 +1020,8 @@ pub trait ReferenceResolverPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractCompatibilityService`、`ContractTraceService`、`ContractOperationsService` | 兼容检查、追溯刷新、引用重建时使用 |
-| 定义方 | `l0_core_application/src/ports/reference_resolver.rs` | 定义引用解析端口 |
-| 实现方 | `l0_core_infra/src/adapters/reference_resolver.rs` | 适配本地文件、标准索引、事件目录或后续外部系统 |
+| 定义方 | `crates/application/src/ports/reference_resolver.rs` | 定义引用解析端口 |
+| 实现方 | `crates/infra/src/adapters/reference_resolver.rs` | 适配本地文件、标准索引、事件目录或后续外部系统 |
 
 ###### 不变量与禁止事项
 
@@ -1071,8 +1071,8 @@ pub trait BlobRefPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractChangeService`、`ContractSnapshotService`、`ContractFactService` | 保存正文引用、派生快照、生成事实前校验引用 |
-| 定义方 | `l0_core_application/src/ports/blob_ref.rs` | 定义 blob 引用校验端口 |
-| 实现方 | `l0_core_infra/src/adapters/blob_ref.rs` | 适配对象存储、本地文件或后续 blob provider |
+| 定义方 | `crates/application/src/ports/blob_ref.rs` | 定义 blob 引用校验端口 |
+| 实现方 | `crates/infra/src/adapters/blob_ref.rs` | 适配对象存储、本地文件或后续 blob provider |
 
 ###### 不变量与禁止事项
 
@@ -1142,8 +1142,8 @@ pub trait ContractSourceStorePort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractOperationsService`、`ValidateContractChangeJob`、`RebuildContractIndexJob` | seed、校验和索引重建时读取源码资产 |
-| 定义方 | `l0_core_application/src/ports/source_store.rs` | 定义源码资产端口 |
-| 实现方 | `l0_core_infra/src/source_store/filesystem.rs` | 基于 `contract-source/` 目录实现源码读写 |
+| 定义方 | `crates/application/src/ports/source_store.rs` | 定义源码资产端口 |
+| 实现方 | `crates/infra/src/source_store/filesystem.rs` | 基于 `contract-source/` 目录实现源码读写 |
 
 ###### 不变量与禁止事项
 
@@ -1193,8 +1193,8 @@ pub trait ReleaseSnapshotStorePort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractSnapshotService`、`DeriveReleaseSnapshotJob`、`ContractOperationsService` | 快照导出、快照校验和恢复时使用 |
-| 定义方 | `l0_core_application/src/ports/snapshot_store.rs` | 定义快照资产端口 |
-| 实现方 | `l0_core_infra/src/snapshot_store/filesystem.rs` | 基于 `release-snapshots/` 目录实现只读快照资产存取 |
+| 定义方 | `crates/application/src/ports/snapshot_store.rs` | 定义快照资产端口 |
+| 实现方 | `crates/infra/src/snapshot_store/filesystem.rs` | 基于 `release-snapshots/` 目录实现只读快照资产存取 |
 
 ###### 不变量与禁止事项
 
@@ -1255,8 +1255,8 @@ pub trait ProjectionStorePort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractTraceService`、`ContractOperationsService`、`RebuildContractIndexJob` | 查询、追溯和索引重建时使用 |
-| 定义方 | `l0_core_application/src/ports/projection_store.rs` | 定义投影端口 |
-| 实现方 | `l0_core_infra/src/projection_store/file_index.rs` | 基于文件索引实现 projection 存取 |
+| 定义方 | `crates/application/src/ports/projection_store.rs` | 定义投影端口 |
+| 实现方 | `crates/infra/src/projection_store/file_index.rs` | 基于文件索引实现 projection 存取 |
 
 ###### 不变量与禁止事项
 
@@ -1299,8 +1299,8 @@ pub trait ContractValidationRunnerPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractCompatibilityService`、`ContractOperationsService`、`ValidateContractChangeJob` | 变更校验和后台校验时使用 |
-| 定义方 | `l0_core_application/src/ports/validation_runner.rs` | 定义校验工具链端口 |
-| 实现方 | `l0_core_infra/src/toolchain/validator.rs` | 适配本地校验工具或后续可替换工具链 |
+| 定义方 | `crates/application/src/ports/validation_runner.rs` | 定义校验工具链端口 |
+| 实现方 | `crates/infra/src/toolchain/validator.rs` | 适配本地校验工具或后续可替换工具链 |
 
 ###### 不变量与禁止事项
 
@@ -1348,8 +1348,8 @@ pub trait FingerprintRunnerPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractCompatibilityService`、`ContractSnapshotService`、`ContractOperationsService`、`RecalculateFingerprintJob` | 发布前校验、快照对账和漂移检测时使用 |
-| 定义方 | `l0_core_application/src/ports/fingerprint_runner.rs` | 定义 fingerprint 工具链端口 |
-| 实现方 | `l0_core_infra/src/toolchain/fingerprint.rs` | 实现 canonical fingerprint 计算和对比 |
+| 定义方 | `crates/application/src/ports/fingerprint_runner.rs` | 定义 fingerprint 工具链端口 |
+| 实现方 | `crates/infra/src/toolchain/fingerprint.rs` | 实现 canonical fingerprint 计算和对比 |
 
 ###### 不变量与禁止事项
 
@@ -1391,8 +1391,8 @@ pub trait SnapshotExporterPort {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | `ContractSnapshotService`、`DeriveReleaseSnapshotJob`、`ContractOperationsService` | 从发布基线派生快照和校验快照时使用 |
-| 定义方 | `l0_core_application/src/ports/snapshot_exporter.rs` | 定义快照导出端口 |
-| 实现方 | `l0_core_infra/src/toolchain/snapshot_exporter.rs` | 实现 canonical snapshot 导出 |
+| 定义方 | `crates/application/src/ports/snapshot_exporter.rs` | 定义快照导出端口 |
+| 实现方 | `crates/infra/src/toolchain/snapshot_exporter.rs` | 实现 canonical snapshot 导出 |
 
 ###### 不变量与禁止事项
 
@@ -1408,22 +1408,22 @@ pub trait SnapshotExporterPort {
 
 | Adapter | 实现 port | 所属文件 | 主要责任 | 禁止事项 |
 |---|---|---|---|---|
-| `FilesystemContractSourceStore` | `ContractSourceStorePort`、可选实现 `ContractDefinitionRepository` 的文件源读写部分 | `crates/l0_core_infra/src/source_store/filesystem.rs` | 读取、写入和枚举 `contract-source/` 结构化源码资产 | 不迁移领域状态;不写 outbox;不替代发布门禁 |
-| `FilesystemReleaseSnapshotStore` | `ReleaseSnapshotStorePort`、可选实现 `SnapshotRepository` 的文件快照部分 | `crates/l0_core_infra/src/snapshot_store/filesystem.rs` | 写入和校验 `release-snapshots/` 只读快照资产 | 不创建发布基线;不推送 SDK;不反写源码 |
-| `FileProjectionIndexStore` | `ProjectionStorePort`、可选实现 `ReferenceRepository` 的 projection 部分 | `crates/l0_core_infra/src/projection_store/file_index.rs` | 维护只读模型、追溯投影和 projection 水位 | 不改写真相聚合;不自行决定投影业务语义 |
-| `FileOutboxStore` | `OutboxPort` | `crates/l0_core_infra/src/outbox_store/file_outbox.rs` | 持久化待发布事实事件和投递状态 | 不直接调用 L0-bus;不删除失败事实 |
-| `FileAuditLogStore` | `AuditLogPort` | `crates/l0_core_infra/src/audit_store/file_audit.rs` | 追加和查询审计记录 | 不保存敏感凭据;不改写真相 |
-| `FileIdempotencyStore` | `IdempotencyRepository` | `crates/l0_core_infra/src/idempotency_store/file_idempotency.rs` | 预占幂等键、保存 replay decision 和完成 receipt | 不保存完整 payload;不发布事件 |
-| `GateDecisionAdapter` | `GateDecisionPort` | `crates/l0_core_infra/src/adapters/gate_decision.rs` | 读取和校验 approved gate 引用 | 不实现治理审批流程;不伪造通过结果 |
-| `ReferenceResolverAdapter` | `ReferenceResolverPort` | `crates/l0_core_infra/src/adapters/reference_resolver.rs` | 解析标准、ADR、事件目录等外部引用是否存在可用 | 不复制外部正文;不决定是否发布 |
-| `BlobRefAdapter` | `BlobRefPort` | `crates/l0_core_infra/src/adapters/blob_ref.rs` | 校验 blob 引用是否存在且可读 | 不返回 blob 正文;不吸收外部大对象 |
-| `L0BusEventPublisherAdapter` | `EventPublisherPort` | `crates/l0_core_infra/src/adapters/event_publisher.rs` | 将已提交 outbox 事实交给 L0-bus 边界 | 不实现 bus runtime;不处理业务状态迁移 |
-| `SystemClockAdapter` | `ClockPort` | `crates/l0_core_infra/src/adapters/clock.rs` | 提供系统时间 | 不在 domain 内直接读取系统时间 |
-| `StableIdGeneratorAdapter` | `IdGeneratorPort` | `crates/l0_core_infra/src/adapters/id_generator.rs` | 生成稳定 ID | 不在 domain 内生成随机 ID |
-| `FileUnitOfWorkAdapter` | `UnitOfWork` | `crates/l0_core_infra/src/adapters/unit_of_work.rs` | 提供事务 / 文件锁 / 一致性提交边界 | 不承载业务规则;不吞掉 application error |
-| `ContractValidationRunner` | `ContractValidationRunnerPort` | `crates/l0_core_infra/src/toolchain/validator.rs` | 执行契约结构、引用和兼容前置校验 | 不保存领域对象;不发布事件 |
-| `CanonicalFingerprintRunner` | `FingerprintRunnerPort` | `crates/l0_core_infra/src/toolchain/fingerprint.rs` | 计算和对比 canonical fingerprint | 不决定发布是否通过;不改写定义 |
-| `CanonicalSnapshotExporter` | `SnapshotExporterPort` | `crates/l0_core_infra/src/toolchain/snapshot_exporter.rs` | 从发布基线导出 canonical release snapshot | 不保存快照元数据;不发布 SDK 包 |
+| `FilesystemContractSourceStore` | `ContractSourceStorePort`、可选实现 `ContractDefinitionRepository` 的文件源读写部分 | `crates/infra/src/source_store/filesystem.rs` | 读取、写入和枚举 `contract-source/` 结构化源码资产 | 不迁移领域状态;不写 outbox;不替代发布门禁 |
+| `FilesystemReleaseSnapshotStore` | `ReleaseSnapshotStorePort`、可选实现 `SnapshotRepository` 的文件快照部分 | `crates/infra/src/snapshot_store/filesystem.rs` | 写入和校验 `release-snapshots/` 只读快照资产 | 不创建发布基线;不推送 SDK;不反写源码 |
+| `FileProjectionIndexStore` | `ProjectionStorePort`、可选实现 `ReferenceRepository` 的 projection 部分 | `crates/infra/src/projection_store/file_index.rs` | 维护只读模型、追溯投影和 projection 水位 | 不改写真相聚合;不自行决定投影业务语义 |
+| `FileOutboxStore` | `OutboxPort` | `crates/infra/src/outbox_store/file_outbox.rs` | 持久化待发布事实事件和投递状态 | 不直接调用 L0-bus;不删除失败事实 |
+| `FileAuditLogStore` | `AuditLogPort` | `crates/infra/src/audit_store/file_audit.rs` | 追加和查询审计记录 | 不保存敏感凭据;不改写真相 |
+| `FileIdempotencyStore` | `IdempotencyRepository` | `crates/infra/src/idempotency_store/file_idempotency.rs` | 预占幂等键、保存 replay decision 和完成 receipt | 不保存完整 payload;不发布事件 |
+| `GateDecisionAdapter` | `GateDecisionPort` | `crates/infra/src/adapters/gate_decision.rs` | 读取和校验 approved gate 引用 | 不实现治理审批流程;不伪造通过结果 |
+| `ReferenceResolverAdapter` | `ReferenceResolverPort` | `crates/infra/src/adapters/reference_resolver.rs` | 解析标准、ADR、事件目录等外部引用是否存在可用 | 不复制外部正文;不决定是否发布 |
+| `BlobRefAdapter` | `BlobRefPort` | `crates/infra/src/adapters/blob_ref.rs` | 校验 blob 引用是否存在且可读 | 不返回 blob 正文;不吸收外部大对象 |
+| `L0BusEventPublisherAdapter` | `EventPublisherPort` | `crates/infra/src/adapters/event_publisher.rs` | 将已提交 outbox 事实交给 L0-bus 边界 | 不实现 bus runtime;不处理业务状态迁移 |
+| `SystemClockAdapter` | `ClockPort` | `crates/infra/src/adapters/clock.rs` | 提供系统时间 | 不在 domain 内直接读取系统时间 |
+| `StableIdGeneratorAdapter` | `IdGeneratorPort` | `crates/infra/src/adapters/id_generator.rs` | 生成稳定 ID | 不在 domain 内生成随机 ID |
+| `FileUnitOfWorkAdapter` | `UnitOfWork` | `crates/infra/src/adapters/unit_of_work.rs` | 提供事务 / 文件锁 / 一致性提交边界 | 不承载业务规则;不吞掉 application error |
+| `ContractValidationRunner` | `ContractValidationRunnerPort` | `crates/infra/src/toolchain/validator.rs` | 执行契约结构、引用和兼容前置校验 | 不保存领域对象;不发布事件 |
+| `CanonicalFingerprintRunner` | `FingerprintRunnerPort` | `crates/infra/src/toolchain/fingerprint.rs` | 计算和对比 canonical fingerprint | 不决定发布是否通过;不改写定义 |
+| `CanonicalSnapshotExporter` | `SnapshotExporterPort` | `crates/infra/src/toolchain/snapshot_exporter.rs` | 从发布基线导出 canonical release snapshot | 不保存快照元数据;不发布 SDK 包 |
 
 说明:
 
@@ -1695,10 +1695,10 @@ pub struct CoreInfraPorts {
 
 | 需要补入位置 | 文件 / 目录 | 原因 |
 |---|---|---|
-| `l0_core_application/src/ports/` | `source_store.rs`、`snapshot_store.rs`、`projection_store.rs`、`validation_runner.rs`、`fingerprint_runner.rs`、`snapshot_exporter.rs`、`idempotency.rs` | Step 7 已确认这些是正式 application port |
-| `l0_core_infra/src/audit_store/` | `mod.rs`、`file_audit.rs` | `AuditLogPort` 需要明确实现落点 |
-| `l0_core_infra/src/idempotency_store/` | `mod.rs`、`file_idempotency.rs` | `IdempotencyRepository` 需要明确实现落点 |
-| `l0_core_infra/src/adapters/` | `unit_of_work.rs` | `UnitOfWork` 需要明确实现落点 |
+| `crates/application/src/ports/` | `source_store.rs`、`snapshot_store.rs`、`projection_store.rs`、`validation_runner.rs`、`fingerprint_runner.rs`、`snapshot_exporter.rs`、`idempotency.rs` | Step 7 已确认这些是正式 application port |
+| `crates/infra/src/audit_store/` | `mod.rs`、`file_audit.rs` | `AuditLogPort` 需要明确实现落点 |
+| `crates/infra/src/idempotency_store/` | `mod.rs`、`file_idempotency.rs` | `IdempotencyRepository` 需要明确实现落点 |
+| `crates/infra/src/adapters/` | `unit_of_work.rs` | `UnitOfWork` 需要明确实现落点 |
 
 #### 9.8.6 Step 13 回补:幂等仓储端口
 
@@ -1743,8 +1743,8 @@ pub trait IdempotencyRepository {
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
 | 调用方 | 所有 Command 写路径 service、Operations Job service | 在业务写入前 reserve,成功提交后 complete |
-| 定义方 | `l0_core_application/src/ports/idempotency.rs` | 定义幂等仓储端口 |
-| 实现方 | `l0_core_infra/src/idempotency_store/` 或对应 repository adapter | 通过文件型 index、数据库表或 KV 实现唯一键预占 |
+| 定义方 | `crates/application/src/ports/idempotency.rs` | 定义幂等仓储端口 |
+| 实现方 | `crates/infra/src/idempotency_store/` 或对应 repository adapter | 通过文件型 index、数据库表或 KV 实现唯一键预占 |
 
 ###### 不变量与禁止事项
 

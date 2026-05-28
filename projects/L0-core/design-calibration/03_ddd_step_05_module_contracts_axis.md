@@ -53,19 +53,19 @@ Step 4 已确认 workspace 多 crate 架构和文件布局。
 |---|---|---|---|
 | `contract_source_assets` | `contract-source/` | asset module | 承载结构化契约源码真相,不能混入 Rust domain 对象或快照输出 |
 | `release_snapshot_assets` | `release-snapshots/` | asset module | 承载只读发布快照,必须与源码真相分离 |
-| `contracts` | `l0_core_contracts` | protocol module | 对外共享 DTO / event / job / receipt / error,下游和入口都要复用 |
-| `domain_definition` | `l0_core_domain` | domain module | 维护 `ContractDefinition`、scope、version、lifecycle、evolution 真相 |
-| `domain_packages` | `l0_core_domain` | domain module | 维护六个领域契约包,避免领域包散落到业务仓 |
-| `domain_release` | `l0_core_domain` | domain module | 维护发布基线、兼容状态和发布策略 |
-| `domain_snapshot` | `l0_core_domain` | domain module | 维护发布快照和下游消费引用的领域语义 |
-| `domain_reference_projection` | `l0_core_domain` | domain module | 维护外部引用、标准映射、事件目录引用、只读模型和追溯投影语义 |
-| `domain_fact` | `l0_core_domain` | domain module | 维护契约变化可感知事实记录 |
-| `domain_policies` | `l0_core_domain` | domain policy module | 维护范围、边界、引用校验和 fingerprint 策略 |
-| `application_services` | `l0_core_application` | application module | 编排命令、发布、兼容、快照、追溯、事实和运维用例 |
-| `application_ports` | `l0_core_application` | port module | 定义 repository、audit、outbox、gate、resolver、publisher、clock、id、unit of work 端口 |
-| `infra_adapters` | `l0_core_infra` | adapter module | 实现 source / snapshot / projection / outbox / toolchain / external adapter |
-| `cli_entry` | `l0_core_cli` | entry module | 承载同步入口适配,不等于在线 API 服务 |
-| `jobs` | `l0_core_jobs` | job module | 承载后台校验、快照、索引、fingerprint、事实发布和 outbox relay |
+| `contracts` | `core_contracts` | protocol module | 对外共享 DTO / event / job / receipt / error,下游和入口都要复用 |
+| `domain_definition` | `core_domain` | domain module | 维护 `ContractDefinition`、scope、version、lifecycle、evolution 真相 |
+| `domain_packages` | `core_domain` | domain module | 维护六个领域契约包,避免领域包散落到业务仓 |
+| `domain_release` | `core_domain` | domain module | 维护发布基线、兼容状态和发布策略 |
+| `domain_snapshot` | `core_domain` | domain module | 维护发布快照和下游消费引用的领域语义 |
+| `domain_reference_projection` | `core_domain` | domain module | 维护外部引用、标准映射、事件目录引用、只读模型和追溯投影语义 |
+| `domain_fact` | `core_domain` | domain module | 维护契约变化可感知事实记录 |
+| `domain_policies` | `core_domain` | domain policy module | 维护范围、边界、引用校验和 fingerprint 策略 |
+| `application_services` | `core_application` | application module | 编排命令、发布、兼容、快照、追溯、事实和运维用例 |
+| `application_ports` | `core_application` | port module | 定义 repository、audit、outbox、gate、resolver、publisher、clock、id、unit of work 端口 |
+| `infra_adapters` | `core_infra` | adapter module | 实现 source / snapshot / projection / outbox / toolchain / external adapter |
+| `cli_entry` | `core_cli` | entry module | 承载同步入口适配,不等于在线 API 服务 |
+| `jobs` | `core_jobs` | job module | 承载后台校验、快照、索引、fingerprint、事实发布和 outbox relay |
 
 ### 3.2 每个模块对应概要设计中的哪个主要组成部分或代码主体?
 
@@ -198,19 +198,19 @@ Step 4 已确认 workspace 多 crate 架构和文件布局。
 |---|---|---|---|---|
 | `contract_source_assets` | `contract-source/` | 承载结构化契约源码真相 | source ref / package source ref | 无代码依赖 |
 | `release_snapshot_assets` | `release-snapshots/` | 承载只读发布快照 | snapshot ref | `contract_source_assets` 的派生结果 |
-| `contracts` | `l0_core_contracts` | 定义对外协议 DTO | Command / Query / Event / Job / View / Receipt / Error DTO | 基础 id / time / metadata value |
-| `domain_definition` | `l0_core_domain` | 维护契约定义真相 | definition / scope / version / lifecycle / evolution types | `contracts` 中必要 value |
-| `domain_packages` | `l0_core_domain` | 维护六个领域契约包 | six package types | `domain_definition`、`domain_policies` |
-| `domain_release` | `l0_core_domain` | 维护发布基线与兼容状态 | release baseline / compatibility / release policy | `domain_definition`、`domain_reference_projection`、`domain_policies` |
-| `domain_snapshot` | `l0_core_domain` | 维护发布快照与消费引用 | release snapshot / downstream ref | `domain_release`、`domain_definition` |
-| `domain_reference_projection` | `l0_core_domain` | 维护引用、索引、只读模型和追溯投影 | external reference / read model / trace projection | `domain_definition`、`domain_release` |
-| `domain_fact` | `l0_core_domain` | 维护可感知事实记录 | fact record | `domain_definition`、`domain_release`、`domain_snapshot` |
-| `domain_policies` | `l0_core_domain` | 维护纯领域规则 | scope / boundary / reference / fingerprint policy | domain value object |
-| `application_services` | `l0_core_application` | 编排 P0 用例和事务边界 | change / release / compatibility / snapshot / trace / fact / operations service | `contracts`、domain modules、`application_ports` |
-| `application_ports` | `l0_core_application` | 定义外部依赖端口 | repository / audit / outbox / gate / resolver / publisher / clock / id / unit of work trait | `contracts`、domain modules |
-| `infra_adapters` | `l0_core_infra` | 实现 port 和工具链适配 | source / snapshot / projection / outbox / external adapter | `application_ports`、domain modules、asset dirs |
-| `cli_entry` | `l0_core_cli` | 同步入口适配 | command / query / operations trigger entry | `contracts`、`application_services`、`infra_adapters` |
-| `jobs` | `l0_core_jobs` | 后台 job 和 outbox relay | job binaries / job runner / relay worker | `contracts`、`application_services`、`infra_adapters` |
+| `contracts` | `core_contracts` | 定义对外协议 DTO | Command / Query / Event / Job / View / Receipt / Error DTO | 基础 id / time / metadata value |
+| `domain_definition` | `core_domain` | 维护契约定义真相 | definition / scope / version / lifecycle / evolution types | `contracts` 中必要 value |
+| `domain_packages` | `core_domain` | 维护六个领域契约包 | six package types | `domain_definition`、`domain_policies` |
+| `domain_release` | `core_domain` | 维护发布基线与兼容状态 | release baseline / compatibility / release policy | `domain_definition`、`domain_reference_projection`、`domain_policies` |
+| `domain_snapshot` | `core_domain` | 维护发布快照与消费引用 | release snapshot / downstream ref | `domain_release`、`domain_definition` |
+| `domain_reference_projection` | `core_domain` | 维护引用、索引、只读模型和追溯投影 | external reference / read model / trace projection | `domain_definition`、`domain_release` |
+| `domain_fact` | `core_domain` | 维护可感知事实记录 | fact record | `domain_definition`、`domain_release`、`domain_snapshot` |
+| `domain_policies` | `core_domain` | 维护纯领域规则 | scope / boundary / reference / fingerprint policy | domain value object |
+| `application_services` | `core_application` | 编排 P0 用例和事务边界 | change / release / compatibility / snapshot / trace / fact / operations service | `contracts`、domain modules、`application_ports` |
+| `application_ports` | `core_application` | 定义外部依赖端口 | repository / audit / outbox / gate / resolver / publisher / clock / id / unit of work trait | `contracts`、domain modules |
+| `infra_adapters` | `core_infra` | 实现 port 和工具链适配 | source / snapshot / projection / outbox / external adapter | `application_ports`、domain modules、asset dirs |
+| `cli_entry` | `core_cli` | 同步入口适配 | command / query / operations trigger entry | `contracts`、`application_services`、`infra_adapters` |
+| `jobs` | `core_jobs` | 后台 job 和 outbox relay | job binaries / job runner / relay worker | `contracts`、`application_services`、`infra_adapters` |
 
 ### 7.2 模块职责表
 
@@ -218,19 +218,19 @@ Step 4 已确认 workspace 多 crate 架构和文件布局。
 |---|---|---|---|---|---|---|
 | `contract_source_assets` | `contract-source/` | 契约真相与领域契约组织 | 保存结构化契约源码真相 | source ref | 无代码依赖 | Rust crate、快照输出、下游仓 |
 | `release_snapshot_assets` | `release-snapshots/` | 快照派生与下游消费 | 保存只读发布快照 | snapshot ref | 可由 infra 写入 | 反向改写源码真相 |
-| `contracts` | `l0_core_contracts` | 外部接缝 / 查询 / 事实输出 | 定义跨模块共享协议对象 | DTO / error / receipt | 基础 value 类型 | application / domain / infra |
-| `domain_definition` | `l0_core_domain` | 契约真相与领域契约组织 | 维护 definition 真相和生命周期 | definition types | `contracts`、同 crate domain 模块 | application / infra / cli / jobs |
-| `domain_packages` | `l0_core_domain` | 契约真相与领域契约组织 | 维护领域契约包语义 | package types | `domain_definition`、`domain_policies` | 下游业务仓、业务实例正文 |
-| `domain_release` | `l0_core_domain` | 兼容性门禁与发布基线 | 维护发布基线、兼容状态和发布规则 | release types | `domain_definition`、`domain_reference_projection`、`domain_policies` | infra / toolchain 执行结果本体 |
-| `domain_snapshot` | `l0_core_domain` | 快照派生与下游消费 | 维护发布快照和消费引用语义 | snapshot types | `domain_release`、`domain_definition` | 让 snapshot 拥有 truth |
-| `domain_reference_projection` | `l0_core_domain` | 引用索引与追溯查询 | 维护引用、标准映射、事件目录、只读模型和追溯投影语义 | reference / projection types | `domain_definition`、`domain_release` | 查询路径改写真相 |
-| `domain_fact` | `l0_core_domain` | 后台校验与事实输出 | 维护可感知事实记录 | fact record | `domain_definition`、`domain_release`、`domain_snapshot` | 直接发布 bus event |
-| `domain_policies` | `l0_core_domain` | 输入收口 / 门禁 / 引用边界 | 维护纯领域规则 | policy functions | domain value object | repository / filesystem / bus / gateway |
-| `application_services` | `l0_core_application` | 6 个业务组成部分编排 | 编排 use case、事务、审计、outbox 和恢复口径 | service functions | `contracts`、domain modules、`application_ports` | concrete infra adapter |
-| `application_ports` | `l0_core_application` | 技术承载与外部适配 | 定义外部依赖端口 | port trait | `contracts`、domain modules | infra / cli / jobs |
-| `infra_adapters` | `l0_core_infra` | 技术承载与外部适配 | 实现 port 和工具链适配 | adapter types / wiring helpers | `application_ports`、domain modules、asset dirs | 被 domain / application 反向依赖 |
-| `cli_entry` | `l0_core_cli` | 输入收口 / 查询 / 运维触发 | 将同步入口请求转给 application | command / query / operations CLI entry | `contracts`、`application_services`、`infra_adapters` | auth、domain rule、bus runtime |
-| `jobs` | `l0_core_jobs` | 后台校验与事实输出 | 运行后台 job 和 outbox relay | job runner / binary | `contracts`、`application_services`、`infra_adapters` | 绕过 application 直接改写真相 |
+| `contracts` | `core_contracts` | 外部接缝 / 查询 / 事实输出 | 定义跨模块共享协议对象 | DTO / error / receipt | 基础 value 类型 | application / domain / infra |
+| `domain_definition` | `core_domain` | 契约真相与领域契约组织 | 维护 definition 真相和生命周期 | definition types | `contracts`、同 crate domain 模块 | application / infra / cli / jobs |
+| `domain_packages` | `core_domain` | 契约真相与领域契约组织 | 维护领域契约包语义 | package types | `domain_definition`、`domain_policies` | 下游业务仓、业务实例正文 |
+| `domain_release` | `core_domain` | 兼容性门禁与发布基线 | 维护发布基线、兼容状态和发布规则 | release types | `domain_definition`、`domain_reference_projection`、`domain_policies` | infra / toolchain 执行结果本体 |
+| `domain_snapshot` | `core_domain` | 快照派生与下游消费 | 维护发布快照和消费引用语义 | snapshot types | `domain_release`、`domain_definition` | 让 snapshot 拥有 truth |
+| `domain_reference_projection` | `core_domain` | 引用索引与追溯查询 | 维护引用、标准映射、事件目录、只读模型和追溯投影语义 | reference / projection types | `domain_definition`、`domain_release` | 查询路径改写真相 |
+| `domain_fact` | `core_domain` | 后台校验与事实输出 | 维护可感知事实记录 | fact record | `domain_definition`、`domain_release`、`domain_snapshot` | 直接发布 bus event |
+| `domain_policies` | `core_domain` | 输入收口 / 门禁 / 引用边界 | 维护纯领域规则 | policy functions | domain value object | repository / filesystem / bus / gateway |
+| `application_services` | `core_application` | 6 个业务组成部分编排 | 编排 use case、事务、审计、outbox 和恢复口径 | service functions | `contracts`、domain modules、`application_ports` | concrete infra adapter |
+| `application_ports` | `core_application` | 技术承载与外部适配 | 定义外部依赖端口 | port trait | `contracts`、domain modules | infra / cli / jobs |
+| `infra_adapters` | `core_infra` | 技术承载与外部适配 | 实现 port 和工具链适配 | adapter types / wiring helpers | `application_ports`、domain modules、asset dirs | 被 domain / application 反向依赖 |
+| `cli_entry` | `core_cli` | 输入收口 / 查询 / 运维触发 | 将同步入口请求转给 application | command / query / operations CLI entry | `contracts`、`application_services`、`infra_adapters` | auth、domain rule、bus runtime |
+| `jobs` | `core_jobs` | 后台校验与事实输出 | 运行后台 job 和 outbox relay | job runner / binary | `contracts`、`application_services`、`infra_adapters` | 绕过 application 直接改写真相 |
 
 ### 7.3 模块依赖图
 

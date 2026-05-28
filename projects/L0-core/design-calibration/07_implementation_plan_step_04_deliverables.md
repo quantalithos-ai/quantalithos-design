@@ -27,7 +27,7 @@
 
 1. 本轮会新增或修改哪些代码模块。
 
-   回答：本轮会交付 L0-core Rust workspace 多 crate 骨架，以及 `contract-source/`、`release-snapshots/`、`crates/l0_core_contracts`、`crates/l0_core_domain`、`crates/l0_core_application`、`crates/l0_core_infra`、`crates/l0_core_cli`、`crates/l0_core_jobs` 和 `state/*` 本地状态根。实施对象来自 `03-详细设计.md` §4 / §5，但交付物按可验证闭环组织，不按对象逐个拆成任务。
+   回答：本轮会交付 L0-core Rust workspace 多 crate 骨架，以及 `contract-source/`、`release-snapshots/`、`crates/contracts`、`crates/domain`、`crates/application`、`crates/infra`、`crates/cli`、`crates/jobs` 和 `state/*` 本地状态根。实施对象来自 `03-详细设计.md` §4 / §5，但交付物按可验证闭环组织，不按对象逐个拆成任务。
 
 2. 本轮会新增或修改哪些接口、事件、job 或 adapter。
 
@@ -92,12 +92,12 @@
 | Rust workspace 多 crate 骨架 | code | `03` §4 | 建立 contracts / domain / application / infra / cli / jobs 依赖边界 | workspace 可构建，依赖方向不反转 |
 | `contract-source/` | asset root | `03` §4 / §10 | 契约源码 truth 输入根 | fixture 可读，source ref 可解析 |
 | `release-snapshots/` | asset root | `03` §4 / §10 | 发布快照输出根 | snapshot metadata 与 asset fingerprint 可验证 |
-| `l0_core_contracts` | code | `03` §7 | Command / Query / Event / Job / View / Receipt / Error DTO | DTO roundtrip 和 schema contract suite 通过 |
-| `l0_core_domain` | code | `03` §5 / §9 | 契约定义、发布、快照、事实、投影、策略不变量 | unit domain suite 通过 |
-| `l0_core_application` | code | `03` §5 / §8 / §10~§12 | application service、port trait、事务、幂等和错误映射 | service command/query suite 通过 |
-| `l0_core_infra` | code | `03` §5 / §10 / §13 | 文件型 stores、fake adapter、runtime wiring | integration persistence 和 config smoke 通过 |
-| `l0_core_cli` | binary | `03` §7 / §8 | CLI command / query / operations trigger | CLI smoke 和错误码验证通过 |
-| `l0_core_jobs` | binary | `03` §7 / §8 | 5 个 job binary + outbox relay worker | worker job suite 和 relay boundary suite 通过 |
+| `core_contracts` | code | `03` §7 | Command / Query / Event / Job / View / Receipt / Error DTO | DTO roundtrip 和 schema contract suite 通过 |
+| `core_domain` | code | `03` §5 / §9 | 契约定义、发布、快照、事实、投影、策略不变量 | unit domain suite 通过 |
+| `core_application` | code | `03` §5 / §8 / §10~§12 | application service、port trait、事务、幂等和错误映射 | service command/query suite 通过 |
+| `core_infra` | code | `03` §5 / §10 / §13 | 文件型 stores、fake adapter、runtime wiring | integration persistence 和 config smoke 通过 |
+| `core_cli` | binary | `03` §7 / §8 | CLI command / query / operations trigger | CLI smoke 和错误码验证通过 |
+| `core_jobs` | binary | `03` §7 / §8 | 5 个 job binary + outbox relay worker | worker job suite 和 relay boundary suite 通过 |
 | P0 JSON 配置与 profile fixture | config | `04` §7 / §9 | 7 个 P0 配置项、严格 JSON、profile fixture | `TC-CONFIG-001~003` 通过 |
 | P0 测试与证据结构 | test / evidence | `05` §6 / §9 / §13 | 自动化 suite、fixture、EV 逻辑路径 | P0 EV 可定位 |
 
@@ -106,14 +106,14 @@
 | 交付物 | 类型 | 来源章节 | 预计落点 | 完成判定 |
 |---|---|---|---|---|
 | Workspace 与 crate 骨架 | code | `03` §4 | `<l0-core-code-root>/Cargo.toml`、`crates/*` | `cargo check` 或等价门禁通过 |
-| Contract DTO 契约 | code | `03` §7.2~§7.6 | `crates/l0_core_contracts/src/*.rs` | `TC-DTO-001`、EV-CONTRACT-001 通过 |
-| Domain 不变量与状态机 | code | `03` §5 / §9 | `crates/l0_core_domain/src/*` | lifecycle、release、snapshot、fact、projection unit tests 通过 |
-| Application command/query/job service | code | `03` §8 / §10~§12 | `crates/l0_core_application/src/services/*` | `TC-CMD-*`、`TC-QUERY-*`、`TC-IDEM-*` 通过 |
-| Port trait 契约 | code | `03` §5.5 / §13.3 | `crates/l0_core_application/src/ports/*` | application 不依赖 concrete adapter |
-| File store 与状态根 adapter | code | `03` §10 / §13 | `crates/l0_core_infra/src/stores/*`、`state/*` | integration persistence suite 通过 |
-| Runtime wiring | code | `03` §13 / `04` §9 | `crates/l0_core_infra/src/runtime_wiring.rs` | CLI / job runtime 可由 `CoreRuntimeConfig` 构建 |
-| CLI 入口 | binary | `03` §7 / §8 | `crates/l0_core_cli/src/main.rs` | command / query smoke 与错误码验证通过 |
-| Operations jobs 与 relay worker | binary | `03` §7.5 / §8.4 | `crates/l0_core_jobs/src/bin/*.rs` | `TC-JOB-*`、`TC-OUTBOX-002` 通过 |
+| Contract DTO 契约 | code | `03` §7.2~§7.6 | `crates/contracts/src/*.rs` | `TC-DTO-001`、EV-CONTRACT-001 通过 |
+| Domain 不变量与状态机 | code | `03` §5 / §9 | `crates/domain/src/*` | lifecycle、release、snapshot、fact、projection unit tests 通过 |
+| Application command/query/job service | code | `03` §8 / §10~§12 | `crates/application/src/services/*` | `TC-CMD-*`、`TC-QUERY-*`、`TC-IDEM-*` 通过 |
+| Port trait 契约 | code | `03` §5.5 / §13.3 | `crates/application/src/ports/*` | application 不依赖 concrete adapter |
+| File store 与状态根 adapter | code | `03` §10 / §13 | `crates/infra/src/stores/*`、`state/*` | integration persistence suite 通过 |
+| Runtime wiring | code | `03` §13 / `04` §9 | `crates/infra/src/runtime_wiring.rs` | CLI / job runtime 可由 `CoreRuntimeConfig` 构建 |
+| CLI 入口 | binary | `03` §7 / §8 | `crates/cli/src/main.rs` | command / query smoke 与错误码验证通过 |
+| Operations jobs 与 relay worker | binary | `03` §7.5 / §8.4 | `crates/jobs/src/bin/*.rs` | `TC-JOB-*`、`TC-OUTBOX-002` 通过 |
 | Outbound events 与 outbox boundary | code / event | `03` §7.4 / §10 | contracts events + outbox store / relay | CloudEvent 字段、event id、pending / failed 通过 |
 | JSON 配置 demo 与 profile fixture | config / test | `04` §7 / §9 | config fixtures / test fixtures | `TC-CONFIG-001~003` 通过 |
 | P0 测试 suite | test | `05` §6 / §9 | target repo test modules / CI jobs | PR/main/release gate 对应 suite 可运行 |
@@ -164,11 +164,11 @@
 | 交付物 | 类型 | 来源章节 | 预计落点 | 完成判定 |
 |---|---|---|---|---|
 | Workspace 与 crate 骨架 | code | `03` §4 | `<l0-core-code-root>/Cargo.toml`、`crates/*` | `cargo check` 或等价门禁通过 |
-| Contract DTO 契约 | code | `03` §7 | `crates/l0_core_contracts/src/*.rs` | `TC-DTO-001`、EV-CONTRACT-001 通过 |
-| Domain 不变量与状态机 | code | `03` §5 / §9 | `crates/l0_core_domain/src/*` | domain unit tests 通过 |
-| Application service 与 port | code | `03` §8 / §10~§12 | `crates/l0_core_application/src/*` | command / query / idempotency tests 通过 |
-| Infra adapter 与 runtime wiring | code | `03` §10 / §13、`04` §9 | `crates/l0_core_infra/src/*` | integration persistence 和 config smoke 通过 |
-| CLI 与 Operations jobs | binary | `03` §7 / §8 | `crates/l0_core_cli`、`crates/l0_core_jobs` | CLI smoke、worker job 和 relay suite 通过 |
+| Contract DTO 契约 | code | `03` §7 | `crates/contracts/src/*.rs` | `TC-DTO-001`、EV-CONTRACT-001 通过 |
+| Domain 不变量与状态机 | code | `03` §5 / §9 | `crates/domain/src/*` | domain unit tests 通过 |
+| Application service 与 port | code | `03` §8 / §10~§12 | `crates/application/src/*` | command / query / idempotency tests 通过 |
+| Infra adapter 与 runtime wiring | code | `03` §10 / §13、`04` §9 | `crates/infra/src/*` | integration persistence 和 config smoke 通过 |
+| CLI 与 Operations jobs | binary | `03` §7 / §8 | `crates/cli`、`crates/jobs` | CLI smoke、worker job 和 relay suite 通过 |
 | JSON 配置、profile 与 fixture | config / test | `04` §7 / §9 | config fixtures / test fixtures | `TC-CONFIG-001~003` 通过 |
 | P0 自动化测试与 evidence index | test / evidence | `05` §6 / §9 / §13、`06` §10 | target repo test modules / CI / artifacts | P0 EV 可定位 |
 

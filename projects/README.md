@@ -40,6 +40,28 @@ projects/
     └── 09-部署与运维手册.md             部署与运行手册(按仓类型可轻写)
 ```
 
+### 1.1 设计仓目录与实现仓目录
+
+`projects/L{n}-{repo}/` 是设计文档目录,不是实现代码仓目录。真实实现仓默认位于 `/home/aris/Projects/quantalithos-{repo}`。
+
+```text
+设计仓目录:
+  projects/L0-core
+  projects/L1-identity
+
+实现仓目录:
+  /home/aris/Projects/quantalithos-core
+  /home/aris/Projects/quantalithos-identity
+```
+
+命名约束以 `standards/document/子项目目录与代码文件组织规范.md` 为准:
+
+- `L0` / `L1` / `L2` 只用于设计仓和架构导航,不得进入代码仓 package、crate、module、file、type 或 function 名称。
+- 实现仓使用 `quantalithos-<project>`。
+- Rust workspace member 目录使用 `crates/<role>`。
+- Cargo package 默认使用 `<project>-<role>`。
+- Rust library crate 默认使用 `<project>_<role>`。
+
 ### 27 个子项目清单
 
 | L 层 | 子项目 | N 节点 | 语言建议 |
@@ -313,6 +335,7 @@ projects/L3-method-library/design-calibration/03_ddd_calibration_flow.md
 - [ ] 完整阅读本项目 03-详细设计,能回答“实现层到底怎么做”
 - [ ] 若已进入交付阶段,完整阅读 04-配置设计 / 05-测试方案 / 06-验收标准
 - [ ] 完整阅读对应语言编码规范(`standards/coding/{rust,python,typescript}.md`)
+- [ ] Rust 实现仓完整阅读 `standards/document/子项目目录与代码文件组织规范.md`
 - [ ] 实现代码全英文,源码标识符、普通注释、rustdoc 和测试名不使用中文
 - [ ] 本 design 文档仓 Commit 遵循项目格式:type 英文,主题正文中文,固定 Co-Authored-By;其他实现仓 Commit message 使用英文
 

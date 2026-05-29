@@ -11,6 +11,9 @@
 
 | 版本 | 日期 | 讨论主题 | 修订内容 |
 |---|---|---|---|
+| v0.9 | 2026-05-29 | 测试证据、报告生成与脚本目录讨论规则 | 在 Step 3 / 7 / 11 / 12 补充 scripts、artifacts/test/<run_id>、reports/runs/<run_id> 和 reports/acceptance 的输入输出 |
+| v0.8 | 2026-05-29 | 代码仓目录与命名前置讨论规则 | 在 Step 3 补充实现仓目录、workspace member、Cargo package、Rust crate 和 binary 命名检查 |
+| v0.7 | 2026-05-29 | 本地多仓依赖实施讨论规则 | 在 Step 3 / Step 8 补充 `/home/aris/Projects` sibling repo、编译期 path dependency、依赖检查和不可用时处理的输入输出 |
 | v0.6 | 2026-05-29 | 补充阶段实施前阅读矩阵 | 在 Step 3 要求把正式章节校准来源转译为按阶段 / commit boundary 的 `design-calibration` 必读门禁，并明确冲突处理规则 |
 | v0.5 | 2026-05-28 | 收紧实现仓 commit message 讨论规则 | 按实践结论补充英文 commit、固定 `type(scope): subject`、一笔提交对应一个 §6 commit boundary、body 按子功能分组、文件名与改动量标记、footer 空行和 `git commit -F` 规则 |
 | v0.4 | 2026-05-28 | 补充代码实现批次讨论规则 | 在 Step 6 增加代码批次问题、输出表和批次规模门禁，约束大段代码按可验证切片分批实现 |
@@ -339,6 +342,9 @@ Step 13. 整理正式实施计划文档
 - Step 2 的实施范围
 - 项目编码规范和提交规范
 - 目标语言、工具链和仓库约定
+- `/home/aris/Projects` 下的本地 sibling repo 布局
+- `standards/document/子项目目录与代码文件组织规范.md`
+- 详细设计中的目录 / package / crate / binary 映射表
 
 #### 本步输出
 
@@ -347,6 +353,9 @@ Step 13. 整理正式实施计划文档
 - git 配置检查清单
 - 编码规范确认清单
 - 工具与环境前置检查表
+- 代码仓目录与命名前置检查表
+- 本地多仓依赖前置检查表
+- 测试脚本与报告工具前置检查表
 
 #### 应问的问题
 
@@ -359,6 +368,16 @@ Step 13. 整理正式实施计划文档
 7. 每个实施阶段或 commit boundary 开工前，必须先读哪些正式章节。
 8. 这些正式章节引用了哪些 `design-calibration` 中间产物，其中哪些会影响当前阶段实现判断。
 9. 如果正式文档和 `design-calibration` 表述不一致，实施者应该以哪个为准，何时暂停回报设计缺口。
+10. 本仓是否依赖 `/home/aris/Projects` 下已经实现的 sibling repo？
+11. 对已确认的编译期依赖，当前应使用本地 path dependency，还是已经具备 private git tag / rev 的中期条件？
+12. 目标实现仓目录是否为 `/home/aris/Projects/quantalithos-<project>`？
+13. workspace member 目录、Cargo package、Rust crate 和 binary 名是否与详细设计一致？
+14. 是否存在 `L0` / `L1` / `l0_` / `l1_` 等架构层级泄漏进代码命名？
+15. 目标实现仓是否需要创建 `scripts/gates/`、`scripts/reports/`、`scripts/checks/` 和 `scripts/dev/`？
+16. 目标实现仓是否需要创建或保留 `artifacts/test/<run_id>` 和 `reports/`？
+17. 哪些 gate / report / check 脚本是本轮实施交付物？
+18. 这些脚本是否必须支持 `--run-id`、`--artifact-root`、`--config-profile`？
+19. 是否明确禁止 `artifacts/test/<project>/<run_id>`、`reports/<project>` 和正式引用 `latest`？
 
 #### 期望产出
 
@@ -383,6 +402,34 @@ git config user.name
 git config user.email
 ```
 
+代码仓目录与命名前置检查表：
+
+| 检查项 | 要求 | 检查方式 | 失败处理 |
+|---|---|---|---|
+| 实现仓目录 | `/home/aris/Projects/quantalithos-<project>` | 检查目录名 | 暂停并回报目录偏离 |
+| workspace member 目录 | `crates/<role>` | 检查 `crates/` | 暂停并回报命名偏离 |
+| Cargo package | `<project>-<role>` | 检查 `Cargo.toml` `[package].name` | 暂停并回报命名偏离 |
+| Rust library crate | `<project>_<role>` | 检查 `Cargo.toml` `[lib].name` | 暂停并回报命名偏离 |
+| binary 名 | `<project>` 或 `<action_name>` | 检查 `[[bin]].name` | 暂停并回报命名偏离 |
+| 架构层级泄漏 | 代码命名中不出现 `L0` / `L1` / `l0_` / `l1_` | 搜索 package / crate / module / file | 暂停并回报设计或实现偏离 |
+
+本地多仓依赖前置检查表：
+
+| 依赖仓库 | 全局依赖类型 | 本地路径 | 当前引用方式 / 协作方式 | 检查方式 | 不存在时处理 |
+|---|---|---|---|---|---|
+| `<repo>` | 编译期依赖 / 运行期依赖 / 事件协作依赖 | `/home/aris/Projects/<repo>` | path dependency / API / SDK / event / projection / fake | 检查目录和 `Cargo.toml` / endpoint / topic / test double | 暂停 / fixture / fake |
+
+测试脚本与报告工具前置检查表：
+
+| 检查项 | 要求 | 检查方式 | 失败处理 |
+|---|---|---|---|
+| gate scripts | `scripts/gates/*.sh` | 检查目录和脚本命名 | 创建或记录为本轮交付物 |
+| report scripts | `scripts/reports/*.sh` | 检查目录和脚本命名 | 创建或记录为本轮交付物 |
+| check scripts | `scripts/checks/*.sh` | 检查目录和脚本命名 | 创建或记录为本轮交付物 |
+| artifact root | `artifacts/test/<run_id>` | 检查配置和脚本默认值 | 修正路径口径 |
+| report root | `reports/` | 检查生成脚本输出 | 修正路径口径 |
+| formal run ref | 固定 `<run_id>`，不使用 `latest` | 检查测试 / 验收文档 | 暂停并修正文档 |
+
 #### 回填位置
 
 - `07-实施计划.md` §3 实施前置条件与阅读清单
@@ -392,6 +439,15 @@ git config user.email
 - 必须明确项目级 git 配置，不使用 `--global`。
 - 必须要求阅读提交规范。
 - 必须要求阅读语言编码规范。
+- 必须要求阅读 `子项目目录与代码文件组织规范.md`。
+- 必须检查实现仓目录、workspace member、Cargo package、Rust crate 和 binary 命名是否与详细设计一致。
+- 不得把 `L0` / `L1` / `L2` 等架构层级写入代码命名。
+- 必须检查已实现跨仓依赖在 `/home/aris/Projects` 下是否存在。
+- 只有已确认的编译期依赖当前阶段默认本地 path dependency；不得默认要求发布到公共 crates.io。
+- 运行期依赖和事件协作依赖必须写协作方式和检查方式，不得写成 Cargo path dependency。
+- 必须检查 gate / report / check 脚本目录和命名是否符合 `子项目目录与代码文件组织规范.md`。
+- 必须明确 artifact root 为 `artifacts/test/<run_id>`，report root 为 `reports/`。
+- 不得把 report 生成脚本放入 `reports/` 输出目录。
 - 子项目存在 `design-calibration/` 时，必须输出阶段实施前阅读矩阵。
 - 阶段实施前阅读矩阵必须按阶段或 commit boundary 组织，不允许只列一个全局 `design-calibration` 文件清单。
 - 不要求实施者一次性阅读全部中间产物；只要求在对应阶段开工前阅读会影响该阶段判断的校准文件。
@@ -633,6 +689,8 @@ git config user.email
 
 - 阶段门禁矩阵
 - 证据归档规则
+- 报告生成规则
+- 验收交接报告审查规则
 - 门禁失败处理口径
 
 #### 应问的问题
@@ -643,10 +701,18 @@ git config user.email
 4. 门禁失败是否允许继续进入下一阶段。
 5. 哪些门禁可以自动化，哪些需要人工审查。
 6. 哪些验收一票否决项需要在实施阶段提前规避。
+7. 每个阶段应调用哪些 `scripts/gates/*.sh`？
+8. 每个阶段会输出哪些 `artifacts/test/<run_id>/...`？
+9. 哪些阶段需要调用 `scripts/reports/*.sh` 生成 `reports/runs/<run_id>`？
+10. 哪些阶段需要生成或更新 `reports/acceptance/*`？
+11. 哪些报告必须由人或 Agent 审查补充后才能进入验收？
 
 #### 期望产出
 
-| 阶段编号 | 测试门禁 | 验收门禁 | 证据产物 | 失败处理 |
+| 阶段编号 | 测试门禁 | 验收门禁 | 执行脚本 | artifact 输出 | report 输出 | 失败处理 |
+|---|---|---|---|---|---|---|
+
+| 阶段编号 | 生成脚本 | 输入 artifact | 输出 report | 人 / Agent 审查要求 |
 |---|---|---|---|---|
 | PH-02 | TC-xxx | AC-xxx | <证据> | <处理> |
 
@@ -659,6 +725,9 @@ git config user.email
 - 每个阶段至少绑定一个测试门禁。
 - 涉及外部可见行为、状态转换、跨仓交互或数据一致性的阶段必须绑定验收门禁。
 - 门禁失败处理必须明确。
+- artifact 输出必须使用 `artifacts/test/<run_id>`。
+- report 输出必须使用 `reports/runs/<run_id>` 和 `reports/acceptance`。
+- `reports/acceptance/*` 可以脚本生成初稿，但必须声明审查补充责任。
 
 #### 进入下一步的条件
 
@@ -677,6 +746,7 @@ git config user.email
 - 详细设计中的配置引用、adapter、port 和外部接口
 - 测试方案中的环境矩阵
 - Step 5 的阶段顺序
+- Step 3 的本地多仓依赖前置检查表
 
 #### 本步输出
 
@@ -692,12 +762,15 @@ git config user.email
 4. 是否允许 fake / mock，允许到什么阶段为止。
 5. 外部依赖不可用时是暂停、降级还是替代。
 6. 哪些依赖需要由其他团队或仓提供。
+7. 已实现仓库依赖是否已经在 `/home/aris/Projects` 下存在。
+8. 哪些依赖是编译期依赖，Cargo 本地 path dependency 写法是否已经与详细设计一致。
+9. 哪些依赖是运行期依赖或事件协作依赖，应该使用 API / SDK / adapter / event / projection / fake，而不是 Cargo path dependency。
 
 #### 期望产出
 
-| 依赖项 | 类型 | 使用阶段 | 提供方 | 检查方式 | 不可用时处理 |
-|---|---|---|---|---|---|
-| <依赖项> | service / repo / config / tool | PH-xx | <提供方> | <检查> | <处理> |
+| 依赖项 | 类型 | 全局依赖类型 | 使用阶段 | 提供方 | 检查方式 | 不可用时处理 |
+|---|---|---|---|---|---|---|
+| <依赖项> | service / repo / config / tool | 编译期依赖 / 运行期依赖 / 事件协作依赖 / 不适用 | PH-xx | <提供方> | <检查> | <处理> |
 
 #### 回填位置
 
@@ -708,6 +781,9 @@ git config user.email
 - 外部依赖必须显式列出。
 - 不允许把依赖失败留给实施者临场判断。
 - fake / mock 必须标明使用边界。
+- repo 类依赖必须写本地路径和当前引用方式；只有编译期依赖当前阶段优先采用本地 path dependency。
+- 运行期依赖和事件协作依赖必须写 API / SDK / adapter / event / projection / fake 等协作方式。
+- private git tag / rev 只能作为中期方案记录，不能替代当前本地开发检查。
 
 #### 进入下一步的条件
 
@@ -840,6 +916,7 @@ git config user.email
 - 提交前检查清单
 - 评审纪律表
 - 交付纪律表
+- artifact / report 交付检查表
 
 #### 应问的问题
 
@@ -869,6 +946,9 @@ git config user.email
 24. 证据如何附到提交、PR 或交付说明中。
 25. 哪些情况下必须拆分提交，哪些情况下允许合并提交。
 26. 当前实施计划中应给出的合格 commit 示例和反例是什么。
+27. 提交或交付说明是否只引用 `reports/runs/<run_id>` 和 `reports/acceptance`，而不是粘贴完整日志？
+28. 如果门禁生成了 raw artifact，是否已经生成对应 report？
+29. `reports/acceptance/handoff.md` 和 `veto-checklist.md` 是否已经由人或 Agent 审查？
 
 #### 期望产出
 
@@ -994,6 +1074,19 @@ commit 3: feat(query): add routes
 | 提交信息 | <subject/body/footer 符合规范> |
 | 格式控制 | <需要精确控制时使用 `git commit -F` 或 `git commit --amend -F`> |
 
+#### artifact / report 交付检查表
+
+| 检查项 | 通过条件 |
+|---|---|
+| artifact root | `artifacts/test/<run_id>` 存在且包含 `meta/context.json`、`evidence-index.json` 和 suite report |
+| report root | `reports/runs/<run_id>` 已生成 |
+| EV 索引 | `reports/runs/<run_id>/evidence-index.md` 可回指 raw artifacts |
+| 门禁结果 | `reports/runs/<run_id>/gate-results.md` 汇总 gate 结果 |
+| 脱敏检查 | `reports/runs/<run_id>/redaction-check.md` 通过 |
+| 验收交接 | `reports/acceptance/handoff.md` 已审查 |
+| 一票否决 | `reports/acceptance/veto-checklist.md` 已审查 |
+| 风险接受 | 有条件通过时 `reports/acceptance/risk-acceptance.md` 已审查 |
+
 #### 回填位置
 
 - `07-实施计划.md` §11 提交、评审与交付纪律
@@ -1021,6 +1114,7 @@ commit 3: feat(query): add routes
 - 必须给出至少一条符合当前项目的 commit 正例和一条反例。
 - 必须说明需要精确控制格式时，应把完整 message 写入文件，再使用 `git commit -F` 或 `git commit --amend -F`。
 - 必须包含提交前检查清单。
+- 必须包含 artifact / report 交付检查表。
 - 不允许把不相关改动混入同一提交。
 
 #### 进入下一步的条件
@@ -1056,12 +1150,23 @@ commit 3: feat(query): add routes
 4. 风险、Spike 和待确认事项是否关闭。
 5. 是否存在一票否决项。
 6. 未完成项如何进入延期、风险接受或 blocker。
+7. `reports/runs/<run_id>` 是否已经从 `artifacts/test/<run_id>` 生成。
+8. `reports/acceptance/handoff.md`、`veto-checklist.md` 和必要的 `risk-acceptance.md` 是否已经审查。
+9. artifact / report 是否通过 redaction 和 link 检查。
 
 #### 期望产出
 
 | 判定项 | 标准 | 证据 | 结论 |
 |---|---|---|---|
 | <判定项> | <标准> | <证据> | 通过 / 不通过 |
+
+| 交付证据项 | 固定路径 | 完成标准 | 结论 |
+|---|---|---|---|
+| raw artifacts | `artifacts/test/<run_id>` | P0 suite 原始证据完整 | 通过 / 不通过 |
+| run reports | `reports/runs/<run_id>` | summary / evidence-index / gate-results / redaction-check 完整 | 通过 / 不通过 |
+| acceptance handoff | `reports/acceptance/handoff.md` | 已经人 / Agent 审查 | 通过 / 不通过 |
+| veto checklist | `reports/acceptance/veto-checklist.md` | 所有 VETO 有结论 | 通过 / 不通过 |
+| risk acceptance | `reports/acceptance/risk-acceptance.md` | 有条件通过时风险接受完整 | 通过 / 不适用 / 不通过 |
 
 #### 回填位置
 
@@ -1072,6 +1177,8 @@ commit 3: feat(query): add routes
 - 不允许使用“基本完成”。
 - 完成判定必须有证据。
 - 未完成项必须分类处理。
+- 不得用 raw artifact 替代人类可读 report。
+- 不得用脚本生成的 `reports/acceptance/*` 初稿替代人 / Agent 审查结论。
 
 #### 进入下一步的条件
 

@@ -11,6 +11,8 @@
 
 | 版本 | 日期 | 变更 | 作者 |
 |---|---|---|---|
+| v0.4 | 2026-05-29 | 在自动化门禁和证据归档 Step 中补充 artifacts / reports / scripts 讨论约束 | codex |
+| v0.3 | 2026-05-29 | 在测试环境 Step 中补充依赖类型、协作方式和拓扑图约束 | codex |
 | v0.2 | 2026-05-28 | 补充通用执行纪律，明确逐 Step、重建、追溯和长文档分批写作规则及正反例 | codex |
 | v0.1 | 2026-05-26 | 建立测试方案讨论流程 | codex |
 
@@ -521,12 +523,14 @@ Step 15. 整理正式测试方案文档
 
 - 详细设计配置 / 外部依赖章节
 - 用例和数据设计
+- 需求 / 架构 / 详细设计中已确认的本仓依赖裁剪结果
 
 #### 本步输出
 
 - 环境矩阵
 - 配置矩阵
 - 必要时输出环境拓扑图
+- 测试依赖类型与协作方式判定表
 
 #### 应问的问题
 
@@ -535,11 +539,13 @@ Step 15. 整理正式测试方案文档
 3. 哪些 feature flag / config 影响测试结果?
 4. 哪些依赖需要 mock 或 fake?
 5. 环境不可用时如何处理?
+6. 哪些依赖是编译期依赖，可用 path dependency?
+7. 哪些依赖是运行期依赖或事件协作依赖，必须用 mock / fake / real-like / event replay?
 
 #### 期望产出
 
-| 环境 | 用途 | 依赖服务 | 关键配置 / feature flag | 数据策略 | 风险 |
-|---|---|---|---|---|---|
+| 环境 | 用途 | 依赖服务 | 全局依赖类型 | 测试协作方式 | 关键配置 / feature flag | 数据策略 | 风险 |
+|---|---|---|---|---|---|---|---|
 
 #### 回填位置
 
@@ -549,6 +555,9 @@ Step 15. 整理正式测试方案文档
 
 - 不得只写“测试环境准备好”。
 - 配置必须可定位。
+- 必须区分编译期依赖、运行期依赖和事件协作依赖。
+- 只有编译期依赖允许写 path dependency；运行期和事件协作依赖必须写测试替身、真实服务或事件回放策略。
+- 环境拓扑图如出现跨仓关系，连线必须标注 `[compile]`、`[runtime]` 或 `[event]`。
 
 #### 进入下一步的条件
 
@@ -570,6 +579,8 @@ Step 15. 整理正式测试方案文档
 
 - 自动化套件表
 - CI/CD 门禁图
+- gate / report / check 脚本表
+- artifact 与 report 输出映射表
 
 #### 应问的问题
 
@@ -578,11 +589,19 @@ Step 15. 整理正式测试方案文档
 3. 哪些 suite 进 nightly?
 4. 哪些 suite 是 staging smoke 或 release gate?
 5. flaky、超时和依赖故障如何处理?
+6. 每个阻断 suite 由哪个 `scripts/gates/*.sh` 执行?
+7. 每个 gate 的默认 `artifact-root` 是否为 `artifacts/test/<run_id>`?
+8. 每个 gate 是否支持 `--run-id`、`--artifact-root`、`--config-profile`?
+9. 哪些 `scripts/checks/*.sh` 必须进入 release gate?
+10. 哪些 `scripts/reports/*.sh` 在 gate 后生成 `reports/runs/<run_id>`?
 
 #### 期望产出
 
-| 套件 | 覆盖范围 | 执行位置 | 触发条件 | 阻断级别 | 报告 |
-|---|---|---|---|---|---|
+| 套件 | 覆盖范围 | 执行位置 | 触发条件 | 阻断级别 | 执行脚本 | artifact 输出 | report 输出 |
+|---|---|---|---|---|---|---|---|
+
+| 脚本 | 类型 | 输入 | 输出 | 失败处理 |
+|---|---|---|---|---|
 
 #### 回填位置
 
@@ -592,6 +611,11 @@ Step 15. 整理正式测试方案文档
 
 - P0 主线不得只依赖手工测试。
 - 阻断级别必须明确。
+- Gate script 必须放在 `scripts/gates/`，report script 必须放在 `scripts/reports/`，check script 必须放在 `scripts/checks/`。
+- 不得把生成脚本放在 `reports/` 输出目录下。
+- artifact 输出必须使用 `artifacts/test/<run_id>`，不得使用 `artifacts/test/<project>/<run_id>`。
+- report 输出必须使用 `reports/runs/<run_id>` 和 `reports/acceptance`，不得使用 `reports/<project>`。
+- 正式门禁不得引用 `latest`。
 
 #### 进入下一步的条件
 
@@ -744,6 +768,10 @@ Step 15. 整理正式测试方案文档
 
 - 证据归档表
 - 测试报告结构
+- artifacts 目录结构
+- reports 目录结构
+- 报告生成脚本映射
+- 人 / Agent 审查补充要求
 
 #### 应问的问题
 
@@ -752,11 +780,48 @@ Step 15. 整理正式测试方案文档
 3. 证据如何关联用例和验收项?
 4. 哪些日志、trace、DB snapshot 或报告必须保留?
 5. 证据保留多久?
+6. 原始机器证据是否统一进入 `artifacts/test/<run_id>`?
+7. 人类可读报告是否统一进入 `reports/runs/<run_id>`?
+8. 验收交接报告是否统一进入 `reports/acceptance`?
+9. 哪些报告由 `scripts/reports/*` 自动生成?
+10. 哪些报告必须由人或 Agent 审查补充?
+11. 失败 suite 是否仍产出 `report.json`、stdout/stderr log 和 failure reason?
+12. redaction / boundary scan 如何证明 artifact 和 report 不含 raw secret 或完整业务正文?
 
 #### 期望产出
 
 | 证据 ID | 证据类型 | 来源 | 保存位置 | 关联用例 | 验收引用 |
 |---|---|---|---|---|---|
+
+| 报告 | 来源 artifact | 生成脚本 | 输出位置 | 人 / Agent 审查要求 |
+|---|---|---|---|---|
+
+```text
+artifacts/test/<run_id>/
+  meta/context.json
+  evidence-index.json
+  suites/<suite>/report.json
+  suites/<suite>/stdout.log
+  suites/<suite>/stderr.log
+
+reports/
+  README.md
+  runs/<run_id>/
+    summary.md
+    evidence-index.md
+    gate-results.md
+    redaction-check.md
+    suites/<suite>.md
+    evidence/EV-<TYPE>-<NNN>.md
+  acceptance/
+    handoff.md
+    veto-checklist.md
+    risk-acceptance.md
+    open-issues.md
+  review/
+    reviewer-notes.md
+    agent-review.md
+```
 
 #### 回填位置
 
@@ -765,6 +830,11 @@ Step 15. 整理正式测试方案文档
 #### 执行约束
 
 - 测试方案只定义证据要求,不填写执行结论。
+- 原始机器证据必须使用 `artifacts/test/<run_id>`，不得带 `<project>` 子目录。
+- 人类可读报告必须使用 `reports/runs/<run_id>`，不得带 `<project>` 子目录。
+- `scripts/reports/*` 负责生成报告初稿，`reports/acceptance/*` 必须允许人 / Agent 审查补充。
+- 所有正式证据引用必须绑定固定 `<run_id>`，不得引用 `latest`。
+- 报告和 artifact 不得包含 raw secret、token、private key、credential value 或完整业务正文。
 
 #### 进入下一步的条件
 

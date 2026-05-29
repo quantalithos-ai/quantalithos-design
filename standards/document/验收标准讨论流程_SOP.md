@@ -11,6 +11,8 @@
 
 | 版本 | 日期 | 变更 | 作者 |
 |---|---|---|---|
+| v0.4 | 2026-05-29 | 补充 artifacts / reports 验收基线与证据门禁讨论规则 | codex |
+| v0.3 | 2026-05-29 | 在跨仓同步验收 Step 中补充依赖类型与验收证据约束 | codex |
 | v0.2 | 2026-05-28 | 补充通用执行纪律，明确逐 Step、重建、追溯和长文档分批写作规则及正反例 | codex |
 | v0.1 | 2026-05-26 | 建立验收标准讨论流程 | codex |
 
@@ -290,6 +292,7 @@ Step 15. 整理正式验收标准文档
 #### 本步输出
 
 - 验收基线表
+- artifact / report / acceptance handoff 基线表
 
 #### 应问的问题
 
@@ -298,11 +301,24 @@ Step 15. 整理正式验收标准文档
 3. 送验 build / commit / image 是什么?
 4. 环境、配置、数据和依赖是什么?
 5. 基线变更如何处理?
+6. 本轮验收固定的 `run_id` 是什么?
+7. 原始机器证据是否位于 `artifacts/test/<run_id>`?
+8. 人类可读报告是否位于 `reports/runs/<run_id>`?
+9. 验收交接文件是否位于 `reports/acceptance/`?
+10. 是否存在 `latest`、`reports/<project>` 或 `artifacts/test/<project>/<run_id>` 这类不可作为正式基线的引用?
 
 #### 期望产出
 
 | 基线类型 | 基线内容 | 版本 / 标识 | 说明 |
 |---|---|---|---|
+
+| 证据入口 | 固定路径 | 版本 / 标识 | 验收用途 |
+|---|---|---|---|
+| 原始 artifact | `artifacts/test/<run_id>/...` | `<run_id>` | 复核机器原始证据 |
+| 运行报告 | `reports/runs/<run_id>/...` | `<run_id>` | 阅读测试摘要、EV 索引和门禁结果 |
+| 验收交接 | `reports/acceptance/handoff.md` | `<review version>` | 送验总说明 |
+| 一票否决检查 | `reports/acceptance/veto-checklist.md` | `<review version>` | 判断 VETO 是否触发 |
+| 风险接受 | `reports/acceptance/risk-acceptance.md` | `<review version>` | 支撑有条件通过 |
 
 #### 回填位置
 
@@ -311,6 +327,9 @@ Step 15. 整理正式验收标准文档
 #### 执行约束
 
 - 不得使用“最新版本”作为基线。
+- 不得使用 `latest` 作为正式验收基线。
+- 不得使用 `artifacts/test/<project>/<run_id>` 或 `reports/<project>`。
+- 如果 `reports/acceptance/*` 尚未生成，必须记录为送验前置缺口。
 
 #### 进入下一步的条件
 
@@ -456,10 +475,12 @@ Step 15. 整理正式验收标准文档
 - 详细设计协议章节
 - 测试方案接口用例
 - 下游接缝说明
+- 已确认的本仓依赖裁剪结果
 
 #### 本步输出
 
 - 接口 / 事件 / 同步验收表
+- 跨仓依赖类型与验收方式映射表
 
 #### 应问的问题
 
@@ -468,11 +489,13 @@ Step 15. 整理正式验收标准文档
 3. 每个 P0 Job 如何证明幂等和恢复?
 4. 跨仓同步成功标准是什么?
 5. 下游未就绪时如何验接缝?
+6. 跨仓验收项分别属于编译期依赖、运行期依赖，还是事件协作依赖?
+7. 每类依赖应使用什么验收证据，而不是误要求源码直接依赖?
 
 #### 期望产出
 
-| 验收项 ID | 接口 / 事件 / 下游 | 通过条件 | 失败条件 | 证据来源 |
-|---|---|---|---|---|
+| 验收项 ID | 接口 / 事件 / 下游 | 全局依赖类型 | 协作方式 | 通过条件 | 失败条件 | 证据来源 |
+|---|---|---|---|---|---|---|
 
 #### 回填位置
 
@@ -481,6 +504,8 @@ Step 15. 整理正式验收标准文档
 #### 执行约束
 
 - 不得要求验收下游仓完整实现,除非本轮范围明确包含。
+- 必须区分编译期依赖、运行期依赖和事件协作依赖。
+- 编译期依赖可以验 package dependency / contract compile；运行期依赖验 API / SDK / adapter；事件协作依赖验 publish / subscribe / replay / projection。
 
 #### 进入下一步的条件
 
@@ -580,6 +605,8 @@ Step 15. 整理正式验收标准文档
 #### 本步输出
 
 - 证据门禁表
+- report 完整性检查表
+- acceptance handoff 检查表
 
 #### 应问的问题
 
@@ -588,11 +615,26 @@ Step 15. 整理正式验收标准文档
 3. 哪些测试报告必须归档?
 4. 证据缺失是否导致不通过?
 5. 证据如何被复查?
+6. `reports/runs/<run_id>/evidence-index.md` 是否覆盖全部 P0 EV?
+7. `reports/runs/<run_id>/gate-results.md` 是否覆盖全部 release gate?
+8. `reports/runs/<run_id>/redaction-check.md` 是否证明 artifact 和 report 不含 raw secret / raw body?
+9. `reports/acceptance/handoff.md` 是否已由人 / Agent 审查补充?
+10. `reports/acceptance/veto-checklist.md` 是否覆盖所有一票否决项?
+11. `reports/acceptance/risk-acceptance.md` 是否支撑有条件通过?
 
 #### 期望产出
 
 | 验收项 ID | 证据主题 | 必须存在的证据 | 通过条件 | 失败条件 |
 |---|---|---|---|---|
+
+| 检查项 | 固定路径 | 通过条件 | 失败影响 |
+|---|---|---|---|
+| EV 索引 | `reports/runs/<run_id>/evidence-index.md` | P0 EV 可回指 artifact | 不通过或送验不成立 |
+| 门禁结果 | `reports/runs/<run_id>/gate-results.md` | release gate 结果完整 | 不通过 |
+| 脱敏检查 | `reports/runs/<run_id>/redaction-check.md` | 无 raw secret / raw body | 一票否决 |
+| 验收交接 | `reports/acceptance/handoff.md` | 已审查并说明送验范围 | 交接不完整 |
+| 否决清单 | `reports/acceptance/veto-checklist.md` | VETO 全部有结论 | 不通过 |
+| 风险接受 | `reports/acceptance/risk-acceptance.md` | 每项风险有接受人和后续动作 | 不得有条件通过 |
 
 #### 回填位置
 
@@ -601,6 +643,9 @@ Step 15. 整理正式验收标准文档
 #### 执行约束
 
 - 不得用口头确认替代证据。
+- P0 证据必须优先从 `reports/runs/<run_id>` 读取，再回指 `artifacts/test/<run_id>`。
+- `reports/acceptance/*` 可以由脚本生成初稿，但验收前必须有人或 Agent 审查补充。
+- redaction / boundary scan 失败时，不得通过证据门禁。
 
 #### 进入下一步的条件
 

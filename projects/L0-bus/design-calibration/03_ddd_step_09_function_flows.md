@@ -146,17 +146,17 @@ job runner:
 
 | 处理流 | 对应协议 | 入口函数 | 主要事务 | 状态变化 | 测试切口 |
 |---|---|---|---|---|---|
-| `AcceptPublicationFlow` | `AcceptPublication` | `BusCommandApi.accept_publication(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)` | 单命令写事务 | `PublicationAcceptance: draft -> accepted/rejected` | accepted、payload 越界、幂等重复、repository failure |
-| `ConsumeCommittedOutboxFactFlow` | `ConsumeCommittedOutboxFact` | `OutboxRelayConsumer.consume(CommittedOutboxFactInput input, ActorContext actor, EventMetadata meta)` | 单 fact 写事务 | `PublicationAcceptance: draft -> accepted/rejected` | accepted、duplicate event、payload 越界、source ack failure |
+| `AcceptPublicationFlow` | `AcceptPublication` | `BusCommandApi.accept_publication(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)` | 单命令写事务 | `PublicationAcceptanceStatus: Pending -> Accepted / Rejected` | accepted、payload 越界、幂等重复、repository failure |
+| `ConsumeCommittedOutboxFactFlow` | `ConsumeCommittedOutboxFact` | `OutboxRelayConsumer.consume(CommittedOutboxFactInput input, ActorContext actor, EventMetadata meta)` | 单 fact 写事务 | `PublicationAcceptanceStatus: Pending -> Accepted / Rejected` | accepted、duplicate event、payload 越界、source ack failure |
 | `RunOutboxRelayFlow` | `RunOutboxRelay` | `OutboxRelayJobRunner.run(RunOutboxRelayJob job, ActorContext actor, JobMetadata meta)` | 每个 fact 一个写事务 | 多个 `PublicationAcceptance` 创建 | batch partial success、cursor 推进、source unavailable |
-| `RunDeliveryProgressionFlow` | `RunDeliveryProgression` | `DeliveryProgressionJobRunner.run(RunDeliveryProgressionJob job, ActorContext actor, JobMetadata meta)` | 每个 delivery 一个写事务 | `DeliveryRecord: scheduled -> dispatched/completed/failed` | dispatch success、backend retryable failure、state conflict |
-| `RecordDeliveryFeedbackFlow` | `RecordDeliveryFeedback` | `DeliveryFeedbackApi.record_feedback(RecordDeliveryFeedbackCommand command, ActorContext actor, CommandMetadata meta)` | 单 feedback 写事务 | `DeliveryRecord: dispatched -> completed/failed/timed_out` | ack、fail、duplicate feedback、unknown delivery |
+| `RunDeliveryProgressionFlow` | `RunDeliveryProgression` | `DeliveryProgressionJobRunner.run(RunDeliveryProgressionJob job, ActorContext actor, JobMetadata meta)` | 每个 delivery 一个写事务 | `DeliveryStatus: Scheduled -> Dispatching -> Delivered / Failed` | dispatch success、backend retryable failure、state conflict |
+| `RecordDeliveryFeedbackFlow` | `RecordDeliveryFeedback` | `DeliveryFeedbackApi.record_feedback(RecordDeliveryFeedbackCommand command, ActorContext actor, CommandMetadata meta)` | 单 feedback 写事务 | `DeliveryStatus: Delivered -> Completed / Failed`; timeout 表达为 `FeedbackStatus::Timeout` | ack、fail、duplicate feedback、unknown delivery |
 | `ConsumeBackendDeliverySignalFlow` | `ConsumeBackendDeliverySignal` | `BackendSignalConsumer.consume(BackendDeliverySignalInput input, ActorContext actor, EventMetadata meta)` | 单 signal 写事务 | `DeliveryAttempt` finish，`DeliveryRecord` 变更 | delivered、failed、unknown delivery、backend private body rejected |
-| `ConsumeTimeoutSignalFlow` | `ConsumeTimeoutSignal` | `TimeoutSignalConsumer.consume(DeliveryTimeoutSignalInput input, ActorContext actor, EventMetadata meta)` | 单 timeout 写事务 | `DeliveryRecord: dispatched -> timed_out/failed` | timeout recorded、duplicate timeout、state conflict |
-| `RequestRetryFlow` | `RequestRetry` | `RecoveryOperationsApi.request_retry(RequestRetryCommand command, ActorContext actor, CommandMetadata meta)` | 单 retry request 写事务 | `RetryPlan: draft -> scheduled` | allowed retry、not eligible、existing active plan |
-| `RunRetryCycleFlow` | `RunRetryCycle` | `RetryCycleJobRunner.run(RunRetryCycleJob job, ActorContext actor, JobMetadata meta)` | 每个 retry plan 一个写事务 | `RetryPlan: scheduled -> running/exhausted`，`DeliveryRecord` 新 attempt | due retry、exhausted、backend failure |
-| `MoveDeliveryToDeadLetterFlow` | `MoveDeliveryToDeadLetter` | `RecoveryOperationsApi.move_delivery_to_dead_letter(MoveDeliveryToDeadLetterCommand command, ActorContext actor, CommandMetadata meta)` | 单 DLQ 写事务 | `DeadLetterEntry: created`，`DeliveryRecord: failed -> dead_lettered` | created、not eligible、missing failure material |
-| `PrepareReplayFlow` | `PrepareReplay` | `RecoveryOperationsApi.prepare_replay(PrepareReplayCommand command, ActorContext actor, CommandMetadata meta)` | 单 replay preparation 写事务 | `ReplayPreparation: draft -> ready/rejected` | ready、missing approval、audit chain invalid |
+| `ConsumeTimeoutSignalFlow` | `ConsumeTimeoutSignal` | `TimeoutSignalConsumer.consume(DeliveryTimeoutSignalInput input, ActorContext actor, EventMetadata meta)` | 单 timeout 写事务 | `DeliveryStatus: Dispatching / Delivered -> Failed`; timeout 表达为 `FeedbackStatus::Timeout` | timeout recorded、duplicate timeout、state conflict |
+| `RequestRetryFlow` | `RequestRetry` | `RecoveryOperationsApi.request_retry(RequestRetryCommand command, ActorContext actor, CommandMetadata meta)` | 单 retry request 写事务 | `RetryPlanStatus: New -> Scheduled` | allowed retry、not eligible、existing active plan |
+| `RunRetryCycleFlow` | `RunRetryCycle` | `RetryCycleJobRunner.run(RunRetryCycleJob job, ActorContext actor, JobMetadata meta)` | 每个 retry plan 一个写事务 | `RetryPlanStatus: Scheduled -> Exhausted / Cancelled`，due retry 保持 `Scheduled` 并创建 attempt metadata | due retry、exhausted、backend failure |
+| `MoveDeliveryToDeadLetterFlow` | `MoveDeliveryToDeadLetter` | `RecoveryOperationsApi.move_delivery_to_dead_letter(MoveDeliveryToDeadLetterCommand command, ActorContext actor, CommandMetadata meta)` | 单 DLQ 写事务 | `DeadLetterStatus: New -> Open`，`DeliveryStatus: Failed -> DeadLettered` | created、not eligible、missing failure material |
+| `PrepareReplayFlow` | `PrepareReplay` | `RecoveryOperationsApi.prepare_replay(PrepareReplayCommand command, ActorContext actor, CommandMetadata meta)` | 单 replay preparation 写事务 | `ReplayPreparationStatus: New -> Draft -> Ready / Rejected / Superseded` | ready、missing approval、audit chain invalid |
 | `RunReadOutputProjectionFlow` | `RunReadOutputProjection` | `ReadOutputProjectionJobRunner.run(RunReadOutputProjectionJob job, ActorContext actor, JobMetadata meta)` | 每个 projection item 一个写事务 | `ProjectionStatus: stale -> current` | incremental update、projection write failure、payload boundary |
 | `RebuildReadProjectionFlow` | `RebuildReadProjection` | `ProjectionRebuildJobRunner.run(RebuildReadProjectionJob job, ActorContext actor, JobMetadata meta)` | 每个 rebuild batch 一个事务 | projection batch replace | dry run、batch replace、version conflict |
 | `CheckBackendCapabilityFlow` | `CheckBackendCapability` | `BackendCapabilityJobRunner.run(CheckBackendCapabilityJob job, ActorContext actor, JobMetadata meta)` | 单 capability check 写事务 | backend health projection updated | available、degraded、secret unavailable |
@@ -251,7 +251,9 @@ job runner:
 | 对应协议 | `AcceptPublication` |
 | 入口函数 | `BusCommandApi.accept_publication(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)` |
 | application service | `PublicationAcceptanceService.accept(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)` |
-| 目标 | 创建或拒绝 publication acceptance，保存 audit，并准备 outbound event |
+| 目标 | 创建或拒绝 publication acceptance，保存 audit，并准备 outbound event；不派生 transport semantic |
+
+PH-02 范围说明：`AcceptPublicationFlow` 只形成 accepted / rejected publication fact、audit 和幂等锚点。`TransportSemantic::derive(...)` 属于 PH-03，基于 accepted material 与 backend capability 派生，不属于 `AcceptPublicationCommand` 输入，也不属于 commit-02-a 的实现范围。
 
 #### 7.3.2 函数级调用图
 
@@ -264,12 +266,11 @@ job runner:
   | call IdempotencyRepository.find(IdempotencyScope scope, IdempotencyKey key)
   v
 [PublicationMaterial + PayloadBoundaryGuard]
-  | call PublicationMaterial::from_accept_command(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)
+  | call PublicationMaterial::from_accept_publication_command(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)
   | call PayloadBoundaryGuard.rejects_body(PublicationMaterial material)
   v
-[PublicationAcceptance + TransportSemantic]
-  | call PublicationAcceptance::start(PublicationMaterial material, ActorContext actor)
-  | call TransportSemantic::derive(PublicationMaterial material, BackendCapabilityRef capability_ref)
+[PublicationAcceptance]
+  | call PublicationAcceptance::start_pending(PublicationMaterial material, ActorContext actor)
   v
 [Repositories]
   | save PublicationRepository.insert(PublicationAcceptance acceptance, UnitOfWorkHandle uow)
@@ -309,9 +310,9 @@ pub async fn accept(command: AcceptPublicationCommand, actor: ActorContext, meta
         return Ok(PublicationAcceptanceResult::from_anchor(anchor));
     }
 
-    // [PublicationMaterial::from_accept_command(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)]
+    // [PublicationMaterial::from_accept_publication_command(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)]
     // 将协议 DTO 转为领域材料，不复制 payload body。
-    let material = PublicationMaterial::from_accept_command(command, actor.clone(), meta.clone())?;
+    let material = PublicationMaterial::from_accept_publication_command(command, actor.clone(), meta.clone())?;
 
     // [PayloadBoundaryGuard.rejects_body(PublicationMaterial material)]
     // 检查 payload body / secret / backend private body 是否越界。
@@ -323,13 +324,9 @@ pub async fn accept(command: AcceptPublicationCommand, actor: ActorContext, meta
         return Ok(PublicationAcceptanceResult::rejected(rejection));
     }
 
-    // [PublicationAcceptance::start(PublicationMaterial material, ActorContext actor)]
-    // 创建 accepted publication acceptance。
-    let acceptance = PublicationAcceptance::start(material.clone(), actor.clone())?;
-
-    // [TransportSemantic::derive(PublicationMaterial material, BackendCapabilityRef capability_ref)]
-    // 固化平台传递语义，不保存后端裸参数。
-    let semantic = TransportSemantic::derive(material, acceptance.backend_capability_ref().clone())?;
+    // [PublicationAcceptance::start_pending(PublicationMaterial material, ActorContext actor)]
+    // 创建 pending publication acceptance，后续只能通过 accept/reject 成为终态。
+    let acceptance = PublicationAcceptance::start_pending(material.clone(), actor.clone())?;
 
     // [PublicationRepository.insert(PublicationAcceptance acceptance, UnitOfWorkHandle uow)]
     // 保存 publication acceptance truth。
@@ -337,7 +334,7 @@ pub async fn accept(command: AcceptPublicationCommand, actor: ActorContext, meta
 
     // [AuditTrailRepository.append(BusAuditEntry entry, UnitOfWorkHandle uow)]
     // 追加接入审计记录。
-    let audit_ref = audit_repository.append(BusAuditEntry::publication_accepted(acceptance.clone(), semantic, actor.clone()), uow.clone()).await?;
+    let audit_ref = audit_repository.append(BusAuditEntry::publication_accepted(acceptance.clone(), actor.clone()), uow.clone()).await?;
 
     // [IdempotencyRepository.bind(IdempotencyAnchor anchor, UnitOfWorkHandle uow)]
     // 绑定幂等键到 publication record。
@@ -373,7 +370,7 @@ pub async fn accept(command: AcceptPublicationCommand, actor: ActorContext, meta
 
 | 对象 | 状态变化 / 副作用 |
 |---|---|
-| `PublicationAcceptance` | `draft -> accepted` 或 `draft -> rejected` |
+| `PublicationAcceptance` | `Pending -> Accepted` 或 `Pending -> Rejected` |
 | `BusAuditEntry` | 追加 publication accepted / rejected audit |
 | `IdempotencyAnchor` | 绑定 publication result |
 | Outbound event | `PublicationAcceptedEvent` 或 `PublicationRejectedEvent` |
@@ -425,6 +422,8 @@ pub async fn accept(command: AcceptPublicationCommand, actor: ActorContext, meta
 关键说明：
 
 - 只消费 `CommittedOutboxFactInput`，不读取 L0-core 未提交状态。
+- `CommittedOutboxFactInput` 必须已经包含 `core_event_ref`、`delivery_mode`、`target_scope`、`payload_kind` 和 `core_event_envelope_ref`，否则不得形成 accepted publication truth。
+- `core_event_envelope_ref` 只是已提交 envelope 实例引用，不能被当成 `core_event_ref`；`core_event_ref` 必须由 outbox source adapter 从 envelope metadata 中解析或补齐。
 - `source_ref + event_id + idempotency_key` 是幂等识别输入。
 - 与 `AcceptPublicationFlow` 复用同一 acceptance 规则。
 
@@ -451,16 +450,16 @@ pub async fn accept_from_outbox_fact(input: CommittedOutboxFactInput, actor: Act
     }
 
     // [PublicationMaterial::from_outbox_fact(CommittedOutboxFactInput input, ActorContext actor, EventMetadata meta)]
-    // 从上游 committed fact 构造 publication material。
+    // 从上游 committed fact 构造 publication material；input 必须携带 core_event_ref、delivery_mode 和 target_scope。
     let material = PublicationMaterial::from_outbox_fact(input.clone(), actor.clone(), meta.clone())?;
 
     // [PayloadBoundaryGuard.rejects_body(PublicationMaterial material)]
     // 拒绝 payload body 越界。
     payload_guard.ensure_reference_only(material.clone())?;
 
-    // [PublicationAcceptance::start(PublicationMaterial material, ActorContext actor)]
+    // [PublicationAcceptance::start_pending(PublicationMaterial material, ActorContext actor)]
     // 创建 accepted publication。
-    let acceptance = PublicationAcceptance::start(material, actor.clone())?;
+    let acceptance = PublicationAcceptance::start_pending(material, actor.clone())?;
 
     // [PublicationRepository.insert(PublicationAcceptance acceptance, UnitOfWorkHandle uow)]
     // 保存接入事实。
@@ -571,7 +570,7 @@ pub async fn run(job: RunOutboxRelayJob, actor: ActorContext, meta: JobMetadata)
 
     for fact in page.items {
         // [CommittedOutboxFactInput::from_fact(CommittedOutboxFact fact, JobMetadata meta)]
-        // 将 source fact 转为 consumer input。
+        // 将 source fact 转为 consumer input，并保留 core_event_ref 与 core_event_envelope_ref 的区别。
         let input = CommittedOutboxFactInput::from_fact(fact.clone(), meta.clone())?;
 
         // [PublicationAcceptanceService.accept_from_outbox_fact(CommittedOutboxFactInput input, ActorContext actor, EventMetadata meta)]
@@ -715,8 +714,8 @@ pub async fn progress_one(delivery_id: DeliveryId, actor: ActorContext, meta: Jo
     let now = clock.now();
 
     // [DeliveryLifecycle.can_transition(DeliveryStatus from_status, DeliveryStatus to_status)]
-    // 验证是否允许进入 dispatched。
-    DeliveryLifecycle::can_transition(delivery.status().clone(), DeliveryStatus::Dispatched)?;
+    // 验证是否允许进入 Dispatching。
+    DeliveryLifecycle::can_transition(delivery.status().clone(), DeliveryStatus::Dispatching)?;
 
     // [DeliveryRecord.start_attempt(BackendCapabilityRef capability_ref, Timestamp occurred_at)]
     // 创建新的 delivery attempt。
@@ -768,8 +767,8 @@ pub async fn progress_one(delivery_id: DeliveryId, actor: ActorContext, meta: Jo
 
 | 对象 | 状态变化 / 副作用 |
 |---|---|
-| `DeliveryRecord` | `scheduled -> dispatched`，后续可能 `completed / failed` |
-| `DeliveryAttempt` | `created -> dispatched -> succeeded/failed` |
+| `DeliveryRecord` | `Scheduled -> Dispatching`，后续可能 `Delivered / Failed` |
+| `DeliveryAttempt` | created -> dispatching -> succeeded/failed |
 | `DeliveryHistoryEntry` | 记录状态迁移 |
 | Outbound event | `DeliveryStateChangedEvent` |
 
@@ -806,7 +805,8 @@ pub async fn progress_one(delivery_id: DeliveryId, actor: ActorContext, meta: Jo
   v
 [FeedbackResult + DeliveryRecord]
   | call FeedbackResult::from_command(RecordDeliveryFeedbackCommand command, ActorContext actor)
-  | call DeliveryRecord.apply_feedback(FeedbackResult feedback, ActorContext actor)
+  | call DeliveryRecord.mark_completed(FeedbackResult feedback, ActorContext actor)
+  | call DeliveryRecord.mark_failed(FailureReason reason, ActorContext actor)
   v
 [Repositories]
   | save FeedbackRepository.insert(FeedbackResult feedback, UnitOfWorkHandle uow)
@@ -853,9 +853,18 @@ pub async fn record(command: RecordDeliveryFeedbackCommand, actor: ActorContext,
     // 将协议 feedback 转成 bus 级 feedback result。
     let feedback = FeedbackResult::from_command(command.clone(), actor.clone())?;
 
-    // [DeliveryRecord.apply_feedback(FeedbackResult feedback, ActorContext actor)]
-    // 根据 ack / fail / timeout 修改 delivery 状态。
-    delivery.apply_feedback(feedback.clone(), actor.clone())?;
+    // [DeliveryRecord.mark_completed(FeedbackResult feedback, ActorContext actor)]
+    // ack feedback 推动 delivery 从 Delivered 进入 Completed。
+    // [DeliveryRecord.mark_failed(FailureReason reason, ActorContext actor)]
+    // fail / timeout feedback 推动 delivery 进入 Failed。
+    match feedback.status {
+        FeedbackStatus::Ack => delivery.mark_completed(feedback.clone(), actor.clone())?,
+        FeedbackStatus::Fail | FeedbackStatus::Timeout => {
+            let reason = FailureReason::from_feedback(feedback.clone());
+            delivery.mark_failed(reason, actor.clone())?;
+        }
+        FeedbackStatus::Duplicate => return Ok(FeedbackRecordResult::from_duplicate(feedback)),
+    }
 
     // [FeedbackRepository.insert(FeedbackResult feedback, UnitOfWorkHandle uow)]
     // 保存 feedback。
@@ -903,7 +912,7 @@ pub async fn record(command: RecordDeliveryFeedbackCommand, actor: ActorContext,
 | 对象 | 状态变化 / 副作用 |
 |---|---|
 | `FeedbackResult` | 创建 recorded feedback |
-| `DeliveryRecord` | `dispatched -> completed/failed/timed_out` |
+| `DeliveryRecord` | `Delivered -> Completed / Failed`; timeout 表达为 `FeedbackStatus::Timeout` + `DeliveryStatus::Failed` |
 | `DeliveryHistoryEntry` | 记录 feedback 触发的状态变化 |
 | Outbound event | `FeedbackRecordedEvent`、可能 `DeliveryStateChangedEvent` |
 
@@ -994,7 +1003,21 @@ pub async fn record_backend_signal(input: BackendDeliverySignalInput, actor: Act
     // [FeedbackResult::from_backend_result(BackendDeliveryResult result, ActorContext actor)]
     // 生成 bus 级 feedback。
     let feedback = FeedbackResult::from_backend_result(backend_result.clone(), actor.clone())?;
-    delivery.apply_feedback(feedback.clone(), actor.clone())?;
+
+    // [DeliveryRecord.mark_delivered(DeliveryAttempt attempt, ActorContext actor)]
+    // 后端 delivered signal 只把 delivery 推进到 Delivered，不进入 Completed。
+    // [DeliveryRecord.mark_failed(FailureReason reason, ActorContext actor)]
+    // 后端 failed signal 推进 delivery 到 Failed。
+    match backend_result.status {
+        BackendDeliveryStatus::Delivered => {
+            let attempt = delivery.current_attempt()?;
+            delivery.mark_delivered(attempt, actor.clone())?;
+        }
+        BackendDeliveryStatus::Failed => {
+            let reason = FailureReason::from_backend_result(backend_result.clone());
+            delivery.mark_failed(reason, actor.clone())?;
+        }
+    }
 
     // [FeedbackRepository.insert(FeedbackResult feedback, UnitOfWorkHandle uow)]
     // 保存 feedback。
@@ -1079,7 +1102,7 @@ pub async fn record_backend_signal(input: BackendDeliverySignalInput, actor: Act
   v
 [FeedbackResult + DeliveryRecord]
   | call FeedbackResult::timeout(DeliveryId delivery_id, TimeoutReason reason, Timestamp occurred_at)
-  | call DeliveryRecord.apply_feedback(FeedbackResult feedback, ActorContext actor)
+  | call DeliveryRecord.mark_failed(FailureReason reason, ActorContext actor)
   | call RecoveryEligibilityPolicy.can_retry(DeliveryRecord delivery, RetryPlan plan)
   v
 [Repositories]
@@ -1126,9 +1149,10 @@ pub async fn record_timeout(input: DeliveryTimeoutSignalInput, actor: ActorConte
     // 创建 timeout feedback。
     let feedback = FeedbackResult::timeout(input.delivery_id.clone(), input.timeout_reason.clone(), input.occurred_at)?;
 
-    // [DeliveryRecord.apply_feedback(FeedbackResult feedback, ActorContext actor)]
-    // timeout 反馈推进 delivery 状态。
-    delivery.apply_feedback(feedback.clone(), actor.clone())?;
+    // [DeliveryRecord.mark_failed(FailureReason reason, ActorContext actor)]
+    // timeout feedback 表达为 FailureReason 后推进 delivery 到 Failed。
+    let reason = FailureReason::from_feedback(feedback.clone());
+    delivery.mark_failed(reason, actor.clone())?;
 
     // [RecoveryEligibilityPolicy.can_retry(DeliveryRecord delivery, RetryPlan plan)]
     // 只判断恢复候选，不创建 retry plan。
@@ -1180,7 +1204,7 @@ pub async fn record_timeout(input: DeliveryTimeoutSignalInput, actor: ActorConte
 | 对象 | 状态变化 / 副作用 |
 |---|---|
 | `FeedbackResult` | timeout feedback created |
-| `DeliveryRecord` | `dispatched -> timed_out/failed` |
+| `DeliveryRecord` | `Dispatching / Delivered -> Failed`; timeout 表达为 `FeedbackStatus::Timeout` |
 | `BusAuditEntry` | timeout audit |
 | Outbound event | `FeedbackRecordedEvent`、`FailureMaterialAvailableEvent` 可选 |
 
@@ -1300,7 +1324,7 @@ pub async fn request_retry(command: RequestRetryCommand, actor: ActorContext, me
 
 | 对象 | 状态变化 / 副作用 |
 |---|---|
-| `RetryPlan` | `draft -> scheduled` |
+| `RetryPlan` | `New -> Scheduled` |
 | `BusAuditEntry` | retry requested audit |
 | Outbound event | 可发布 `DeliveryStateChangedEvent` 或 recovery scheduled event，具体 event kind Step 12/15 细化 |
 
@@ -1462,7 +1486,7 @@ pub async fn run_retry_plan(retry_plan: RetryPlan, actor: ActorContext, meta: Jo
 
 | 对象 | 状态变化 / 副作用 |
 |---|---|
-| `RetryPlan` | `scheduled -> running/attempted/exhausted` |
+| `RetryPlan` | `Scheduled -> Exhausted / Cancelled`; due retry 保持 `Scheduled` 并记录 attempt metadata |
 | `DeliveryRecord` | 新增 retry attempt |
 | `BusAuditEntry` | retry attempted / exhausted audit |
 | Outbound event | `DeliveryStateChangedEvent` |
@@ -1471,7 +1495,7 @@ pub async fn run_retry_plan(retry_plan: RetryPlan, actor: ActorContext, meta: Jo
 
 | 测试 | 验证内容 |
 |---|---|
-| due retry dispatched | 创建 attempt 并更新 retry plan |
+| due retry attempt prepared | 创建 attempt metadata 并保持 retry plan 为 `Scheduled` |
 | exhausted plan | 不调用 backend，标记 exhausted |
 | backend failure | 不保存后端私有正文 |
 | partial batch | 单 plan 失败不影响其他 plan |
@@ -1603,8 +1627,8 @@ pub async fn move_to_dead_letter(command: MoveDeliveryToDeadLetterCommand, actor
 
 | 对象 | 状态变化 / 副作用 |
 |---|---|
-| `DeliveryRecord` | `failed -> dead_lettered` |
-| `DeadLetterEntry` | `created` |
+| `DeliveryRecord` | `Failed -> DeadLettered` |
+| `DeadLetterEntry` | `New -> Open` |
 | `FailureMaterial` | available |
 | Outbound event | `DeadLetterCreatedEvent`、`FailureMaterialAvailableEvent` |
 
@@ -1724,7 +1748,7 @@ pub async fn prepare(command: PrepareReplayCommand, actor: ActorContext, meta: C
 
 | 对象 | 状态变化 / 副作用 |
 |---|---|
-| `ReplayPreparation` | `draft -> ready` |
+| `ReplayPreparation` | `New -> Draft -> Ready` |
 | `BusAuditEntry` | replay preparation ready audit |
 | Outbound event | `ReplayPreparationReadyEvent` |
 

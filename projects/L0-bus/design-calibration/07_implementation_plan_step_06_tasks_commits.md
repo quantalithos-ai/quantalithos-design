@@ -208,7 +208,7 @@
 
 | 任务编号 | 编写顺序 | 实施动作 | 输入 | 输出 | 完成判定 |
 |---|---:|---|---|---|---|
-| IMPL-04-01 | 1 | 定义 committed outbox fact input 和 fixture source | `03` §7 / §13、L0-core contracts | inbound event DTO、source fixture | fixture parse / duplicate tests 通过 |
+| IMPL-04-01 | 1 | 定义 committed outbox fact input 和 fixture source，确保 input 携带 `core_event_ref`、`core_event_envelope_ref`、`delivery_mode`、`target_scope` | `03` §7 / §13、L0-core contracts | inbound event DTO、source fixture | fixture parse / duplicate tests 通过 |
 | IMPL-04-02 | 2 | 实现 `OutboxFactSourcePort`、source ack 语义和 source idempotency | `03` §7 / §10 / §12 | source port、ack after commit rule、idempotency key | ack failure replay tests 通过 |
 | IMPL-04-03 | 3 | 接入 outbox relay consumer / job 到 publication acceptance service | `03` §8、`06` AC-FUNC-007 | consumer、job runner、publication creation from fact | `TC-BUS-OBX-*` 通过 |
 

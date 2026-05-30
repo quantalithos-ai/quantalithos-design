@@ -175,7 +175,7 @@
 | 验收项 ID | 主题 | 通过条件 | 失败条件 | 证据来源 |
 |---|---|---|---|---|
 | AC-STATE-001 | Publication acceptance 状态机 | `Draft -> Accepted / Rejected` 成立;accepted / rejected 终态互改被拒绝;接入结果有 audit | 终态互改成功;rejected fact 无法追溯;accepted 缺 audit | `TC-BUS-PUB-001`~`004`;`EV-BUS-PUB-*` |
-| AC-STATE-002 | Delivery lifecycle 状态机 | scheduled、dispatched、completed、failed、timed out、retry scheduled、dead-lettered 迁移符合设计;history append | completed reopen;跳过 attempt;backend raw status 直接写入 | `TC-BUS-DLV-001`~`004`;`EV-BUS-DLV-*` |
+| AC-STATE-002 | Delivery lifecycle 状态机 | `Scheduled / Dispatching / Delivered / Completed / Failed / DeadLettered` 迁移符合设计;`RunDeliveryProgression` 只推进到 `Delivered / Failed`;`Completed` 由 feedback ack 推动;timeout 表达为 `FeedbackStatus::Timeout` + `DeliveryStatus::Failed`;history append | completed reopen;跳过 attempt;backend raw status 直接写入 | `TC-BUS-DLV-001`~`004`,`TC-BUS-FDB-001`~`004`;`EV-BUS-DLV-*`,`EV-BUS-FDB-*` |
 | AC-STATE-003 | Feedback result 状态机 | ack / fail / timeout 一次生成终态;duplicate 不改变已成立 delivery | feedback 被当多步生命周期;late / unknown feedback 生成孤儿结果 | `TC-BUS-FDB-001`~`004`;`EV-BUS-FDB-*` |
 | AC-STATE-004 | Recovery 状态机 | retry、DLQ、replay preparation 分段受控;ready 依赖 approval / DLQ / history / audit chain | retry exhausted 自动 DLQ;缺材料 replay ready;replay 直接改 delivery | `TC-BUS-REC-001`~`004`;`EV-BUS-REC-*` |
 | AC-STATE-005 | Projection 状态机 | missing / stale / rebuilding / current 只影响只读新鲜度;Query 返回 marker;rebuild 由 job 触发 | Query 写 truth;stale 当 current;projection 改写 bus truth | `TC-BUS-OUT-001`~`002`;`EV-BUS-OUT-*` |

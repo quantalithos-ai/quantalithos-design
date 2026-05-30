@@ -188,16 +188,13 @@ BusCommandApi.accept_publication(AcceptPublicationCommand command, ActorContext 
 PublicationAcceptanceService.accept(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)
   |
   v
-PublicationMaterial::from_publish_command(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)
+PublicationMaterial::from_accept_publication_command(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)
   |
   v
 PayloadBoundaryGuard.rejects_body(PublicationMaterial material)
   |
   v
-PublicationAcceptance::start(PublicationMaterial material, ActorContext actor)
-  |
-  v
-TransportSemantic::derive(PublicationMaterial material, BackendCapabilityRef capability_ref)
+PublicationAcceptance::start_pending(PublicationMaterial material, ActorContext actor)
   |
   v
 PublicationRepository.insert(PublicationAcceptance acceptance)
@@ -212,7 +209,7 @@ PublicationAcceptanceResult / PublicationAcceptedEvent
 关键设计点：
 
 - payload 正文必须在写入 `PublicationAcceptance` 前被拒绝。
-- `TransportSemantic` 只表达平台传递语义，不保存后端裸参数。
+- `AcceptPublication` 不派生 `TransportSemantic`；平台传递语义在 PH-03 基于 accepted material 与 backend capability 派生。
 - acceptance、audit 和 accepted event 必须来自同一已提交事实。
 
 #### `ConsumeCommittedOutboxFact` 处理流
@@ -684,7 +681,7 @@ PublicationAcceptedEvent / DeliveryStateChangedEvent / DeadLetterCreatedEvent / 
 
 | 处理流 | 对应接口 / Job / Consumer | 关键对象 | 关键 repository / port |
 |---|---|---|---|
-| `AcceptPublication` | Command API | `PublicationMaterial`、`PublicationAcceptance`、`TransportSemantic` | `PublicationRepository`、`AuditTrailRepository` |
+| `AcceptPublication` | Command API | `PublicationMaterial`、`PublicationAcceptance`、`PayloadBoundaryGuard`、`BusAuditEntry`、`IdempotencyAnchor` | `PublicationRepository`、`AuditTrailRepository` |
 | `ConsumeCommittedOutboxFact` | Inbound Event Consumer | `PublicationMaterial`、`IdempotencyAnchor`、`PublicationAcceptance` | `PublicationRepository`、`AuditTrailRepository` |
 | `RunDeliveryProgression` | Operations Job | `DeliveryRecord`、`DeliveryAttempt`、`DeliveryLifecycle` | `DeliveryRepository`、`TransportBackendPort` |
 | `RecordDeliveryFeedback` | Command API | `FeedbackResult`、`IdempotencyAnchor`、`DeliveryHistoryEntry` | `DeliveryRepository`、`AuditTrailRepository` |

@@ -182,7 +182,7 @@
 
 | 工厂函数 | 作用 |
 |---|---|
-| `PublicationMaterial::from_publish_command(PublishMaterialCommand command, ActorContext actor, CommandMetadata meta)` | 从发布命令构造发布材料 |
+| `PublicationMaterial::from_accept_publication_command(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta)` | 从接入发布命令构造发布材料 |
 | `PublicationMaterial::from_outbox_fact(CommittedOutboxFact fact, ActorContext actor, CommandMetadata meta)` | 从已提交 outbox fact 构造发布材料 |
 
 | 禁止事项 | 说明 |
@@ -911,7 +911,7 @@
 
 | 后续章节 | 将使用的对象 | 本步定义情况 |
 |---|---|---|
-| Step 8 `AcceptPublication` | `PublicationMaterial`、`PublicationAcceptance`、`TransportSemantic`、`PayloadBoundaryGuard`、`BusAuditEntry` | 已独立定义 |
+| Step 8 `AcceptPublication` | `PublicationMaterial`、`PublicationAcceptance`、`PayloadBoundaryGuard`、`BusAuditEntry`、`IdempotencyAnchor` | 已独立定义 |
 | Step 8 `RunDeliveryProgression` | `DeliveryRecord`、`DeliveryAttempt`、`DeliveryLifecycle`、`BackendCapabilityRef`、`DeliveryHistoryEntry`、`BusAuditEntry` | 已独立定义 |
 | Step 8 `RecordDeliveryFeedback` | `FeedbackResult`、`IdempotencyAnchor`、`DeliveryRecord`、`DeliveryHistoryEntry`、`BusAuditEntry` | 已独立定义 |
 | Step 8 recovery flows | `RetryPlan`、`DeadLetterEntry`、`ReplayPreparation`、`FailureMaterial`、`RecoveryEligibilityPolicy` | 已独立定义 |

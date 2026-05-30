@@ -45,7 +45,7 @@
 | payload reference | payload 边界 | 只包含 ref、digest、size/type metadata,不得包含正文 |
 | committed outbox fact | outbox relay | 标记为 committed,含 source system、source record ref、contract ref |
 | backend capability ref | transport semantic / backend boundary | 提供 available、unsupported、unavailable 三类能力 |
-| delivery record fixture | delivery / feedback / recovery | 提供 scheduled、dispatched、completed、failed、timed_out 状态 |
+| delivery record fixture | delivery / feedback / recovery | delivery suite 提供 `Scheduled / Dispatching / Delivered / Failed` 状态；feedback suite 提供 `Completed` 状态 |
 | audit / history seed | recovery / read-only output | 提供 append-only sequence 和 audit chain ref |
 | config profile fixture | runtime graph | 提供 `ci-test`、`integration-test`、`operations-recovery` JSON |
 
@@ -55,7 +55,7 @@
 |---|---|---|
 | publication 边界 | missing core contract ref、payload body injected、accepted / rejected terminal record | `TC-BUS-PUB-002`~`004` |
 | semantic 边界 | backend private field injected、unsupported semantic、capability mismatch | `TC-BUS-SEM-002`、`TC-BUS-BND-002` |
-| delivery 异常 | backend unavailable、completed delivery reopen attempt、batch success + failure items | `TC-BUS-DLV-002`~`004` |
+| delivery 异常 | backend unavailable、delivered duplicate dispatch attempt、batch success + failure items | `TC-BUS-DLV-002`~`004` |
 | feedback / idempotency | same key same digest、same key different digest、late feedback、unknown delivery | `TC-BUS-FDB-002`~`004` |
 | recovery | failed delivery、retry policy ref、failure material、DLQ、missing approval、valid audit chain | `TC-BUS-REC-001`~`004` |
 | read-only output | current projection、stale projection、missing projection、failure material output | `TC-BUS-OUT-001`~`004` |
@@ -186,7 +186,7 @@
 | `DS-BUS-PUB-001` | publication accepted 正向 | `PublicationFixtureBuilder.valid_material()` | `run_id + source_ref` | runtime 丢弃 | `TC-BUS-PUB-001` |
 | `DS-BUS-PUB-002` | publication negative | missing contract、payload body injected、terminal record | `run_id + negative_case` | runtime 丢弃,redaction 失败保留 artifact | `TC-BUS-PUB-002`~`004` |
 | `DS-BUS-SEM-001` | transport semantic | backend capability available / unsupported / private field sample | `run_id + backend_profile` | runtime 丢弃 | `TC-BUS-SEM-001`~`002`、`TC-BUS-BND-001`~`002` |
-| `DS-BUS-DLV-001` | delivery lifecycle | scheduled、dispatched、completed、failed、batch mixed items | `run_id + delivery_id` | runtime 丢弃 | `TC-BUS-DLV-001`~`004` |
+| `DS-BUS-DLV-001` | delivery lifecycle | `Scheduled / Dispatching / Delivered / Failed`、batch mixed items；`Completed` fixture 归 feedback suite | `run_id + delivery_id` | runtime 丢弃 | `TC-BUS-DLV-001`~`004` |
 | `DS-BUS-FDB-001` | feedback / idempotency | ack、fail、timeout、same digest、different digest、late feedback | `run_id + idempotency_key` | runtime 丢弃 | `TC-BUS-FDB-001`~`004` |
 | `DS-BUS-REC-001` | recovery chain | failed delivery、retry policy、failure material、DLQ、approval ref、audit chain | `run_id + recovery_ref` | runtime 丢弃;release 保留 evidence | `TC-BUS-REC-001`~`004` |
 | `DS-BUS-OUT-001` | read-only output | current / stale / missing projection、failure material、audit sequence | `run_id + projection_key` | runtime 丢弃 | `TC-BUS-OUT-001`~`006` |

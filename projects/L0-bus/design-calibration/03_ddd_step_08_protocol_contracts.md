@@ -267,7 +267,9 @@ pub struct JobMetadata {
 
 ##### 用途
 
-接收发布材料引用，校验 payload boundary 和 transport semantic，创建 `PublicationAcceptance`。
+接收发布材料引用，校验 core contract ref 和 payload boundary，创建 `PublicationAcceptance`。
+
+`AcceptPublicationCommand` 不接收 `transport_semantic`。平台级传递语义由 PH-03 基于 accepted material 与 backend capability 派生，不能由调用方输入。
 
 ##### 函数签名 / 路由
 
@@ -284,11 +286,11 @@ pub struct JobMetadata {
 {
   "source_system": "l2-process",
   "source_record_ref": "process_event_01",
+  "core_event_ref": "core_event_contract_01",
   "payload_ref": "artifact_ref_01",
   "payload_kind": "artifact_ref",
   "payload_digest": "sha256:...",
-  "delivery_mode": "broadcast",
-  "transport_semantic": "at_least_once",
+  "delivery_mode": "at_least_once",
   "target_scope": {
     "project_id": "project_01",
     "topic": "workitem.events"
@@ -303,7 +305,6 @@ pub struct JobMetadata {
   "publication_id": "pub_01",
   "acceptance_status": "accepted",
   "rejection_reason_ref": null,
-  "delivery_plan_ref": "delivery_plan_01",
   "audit_ref": "audit_01"
 }
 ```
@@ -317,16 +318,16 @@ pub struct AcceptPublicationCommand {
     pub source_system: SourceSystem,
     /// 来源记录引用。
     pub source_record_ref: SourceRecordRef,
+    /// 指向 L0-core 中已定义事件契约的引用。
+    pub core_event_ref: CoreEventRef,
     /// payload 引用，禁止携带 payload body。
     pub payload_ref: PayloadRef,
     /// payload 类型。
     pub payload_kind: PayloadKind,
     /// payload 摘要。
     pub payload_digest: PayloadDigest,
-    /// 投递模式。
+    /// 平台投递语义请求值；P0 只允许 at_least_once。
     pub delivery_mode: DeliveryMode,
-    /// 平台传递语义。
-    pub transport_semantic: TransportSemantic,
     /// 目标范围。
     pub target_scope: TargetScope,
 }
@@ -340,6 +341,14 @@ pub struct AcceptPublicationCommand {
 | `BoundaryViolationError` | `422` | 请求携带 payload body、secret 或后端私有参数 |
 | `ConflictError` | `409` | 幂等键冲突或同来源记录重复接入 |
 | `DependencyError` | `503` | repository / publisher 暂时不可用 |
+
+字段约束：
+
+| 字段 | 约束 |
+|---|---|
+| `core_event_ref` | 必填，缺失时 `AcceptPublication` 必须 rejected / validation error，不得形成 accepted truth |
+| `delivery_mode` | P0 只允许协议值 `at_least_once`，映射到领域 `DeliveryMode::AtLeastOnce` |
+| `transport_semantic` | 禁止出现在 request 中；若出现应按非法字段或边界违规处理 |
 
 ##### 幂等与审计要求
 
@@ -654,8 +663,14 @@ pub struct PrepareReplayCommand {
   "publication_id": "pub_01",
   "acceptance_status": "accepted",
   "source_record_ref": "process_event_01",
+  "core_event_ref": "core_event_contract_01",
+  "core_event_envelope_ref": null,
   "payload_ref": "artifact_ref_01",
-  "transport_semantic": "at_least_once",
+  "delivery_mode": "at_least_once",
+  "target_scope": {
+    "project_id": "project_01",
+    "topic": "workitem.events"
+  },
   "audit_ref": "audit_01"
 }
 ```
@@ -1007,10 +1022,18 @@ pub struct GetBackendHealthViewQuery {
   "event_id": "event_01",
   "source_ref": "l0_core_outbox",
   "core_event_envelope_ref": "core_event_01",
+  "core_event_ref": "core_event_contract_01",
   "committed_fact_ref": "outbox_fact_01",
+  "source_system": "l0-core",
   "source_record_ref": "core_record_01",
   "payload_ref": "artifact_ref_01",
+  "payload_kind": "artifact_ref",
   "payload_digest": "sha256:...",
+  "delivery_mode": "at_least_once",
+  "target_scope": {
+    "project_id": "project_01",
+    "topic": "workitem.events"
+  },
   "idempotency_key": "idem_01"
 }
 ```
@@ -1036,18 +1059,40 @@ pub struct CommittedOutboxFactInput {
     pub source_ref: EventSourceRef,
     /// L0-core event envelope 引用。
     pub core_event_envelope_ref: CoreEventEnvelopeRef,
+    /// L0-core 事件契约引用，由 outbox source adapter 从 envelope metadata 中解析或补齐。
+    pub core_event_ref: CoreEventRef,
     /// 已提交 fact 引用。
     pub committed_fact_ref: CommittedOutboxFactRef,
+    /// 来源系统。
+    pub source_system: SourceSystem,
     /// 来源记录引用。
     pub source_record_ref: SourceRecordRef,
     /// payload 引用。
     pub payload_ref: PayloadRef,
+    /// payload 类型。
+    pub payload_kind: PayloadKind,
     /// payload 摘要。
     pub payload_digest: PayloadDigest,
+    /// 平台投递语义请求值；P0 只允许 at_least_once。
+    pub delivery_mode: DeliveryMode,
+    /// 目标范围。
+    pub target_scope: TargetScope,
     /// 幂等键。
     pub idempotency_key: IdempotencyKey,
 }
 ```
+
+outbox fact 到 `PublicationMaterial` 的映射规则：
+
+| 输入字段 | 领域字段 | 规则 |
+|---|---|---|
+| `core_event_ref` | `PublicationMaterial.core_event_ref` | 必填；这是正式 core 事件契约引用 |
+| `core_event_envelope_ref` | `PublicationMaterial.core_event_envelope_ref` | 必填；这是已提交 envelope 实例引用，只用于来源追溯和审计 |
+| `delivery_mode` | `PublicationMaterial.delivery_mode` | 必填；P0 只允许 `at_least_once` |
+| `target_scope` | `PublicationMaterial.target_scope` | 必填；后续 `TransportSemantic::derive(...)` 需要它与订阅范围匹配 |
+| `payload_ref` / `payload_kind` / `payload_digest` | `PublicationMaterial` payload 字段 | 必填；只保存引用、类型和摘要，不读取 payload body |
+
+`core_event_envelope_ref` 不能被当成 `core_event_ref` 使用。若 outbox source adapter 无法从 envelope metadata 中解析或补齐 `core_event_ref`，本 consumer 必须返回 validation / rejected result，不得形成 accepted publication truth。
 
 错误、幂等与审计：
 
@@ -1056,6 +1101,15 @@ pub struct CommittedOutboxFactInput {
 | 错误映射 | validation -> rejected；duplicate -> existing result；dependency -> retryable failure |
 | 幂等 | `event_id + source_ref + idempotency_key` |
 | 审计 | accepted / rejected / duplicate 都必须可追踪 |
+
+字段约束：
+
+| 字段 | 约束 |
+|---|---|
+| `core_event_ref` | 必填，缺失或无法从 envelope metadata 解析时不得 accepted |
+| `core_event_envelope_ref` | 必填，仅表示已提交 envelope 实例，不得替代 `core_event_ref` |
+| `delivery_mode` | P0 只允许协议值 `at_least_once`，映射到领域 `DeliveryMode::AtLeastOnce` |
+| `target_scope` | 必填，必须可映射为领域 `SubscriberScope` |
 
 #### 7.5.2 `ConsumeBackendDeliverySignal`
 
@@ -1216,9 +1270,15 @@ pub struct DeliveryTimeoutSignalInput {
 {
   "schema_version": "v1",
   "publication_id": "pub_01",
+  "core_event_ref": "core_event_contract_01",
+  "core_event_envelope_ref": null,
   "source_record_ref": "process_event_01",
   "payload_ref": "artifact_ref_01",
-  "transport_semantic": "at_least_once",
+  "delivery_mode": "at_least_once",
+  "target_scope": {
+    "project_id": "project_01",
+    "topic": "workitem.events"
+  },
   "audit_ref": "audit_01"
 }
 ```

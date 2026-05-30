@@ -40,7 +40,7 @@ Audit 用于证明 bus truth、recovery chain 和 privileged operation 的可追
 | 行为 | 是否必须有 audit | 验收口径 |
 |---|---|---|
 | Publication accepted / rejected | 是 | 接入判定、拒绝原因、actor、trace ref 可追溯 |
-| Delivery scheduled / dispatched / completed / failed / timed out | 是 | delivery state 与 delivery history 一致 |
+| Delivery `Scheduled / Dispatching / Delivered / Failed`，以及 feedback 推动的 `Completed` | 是 | delivery state 与 delivery history 一致 |
 | Feedback ack / fail / timeout / duplicate / late feedback | 是 | feedback result、idempotency anchor、history 可追溯 |
 | Retry requested / retry exhausted | 是 | retry plan、policy、actor 或 job ref 可追溯 |
 | Dead-letter created / archived | 是 | failure material、DLQ entry、history 可追溯 |

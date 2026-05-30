@@ -39,7 +39,7 @@ P0 正向主线按三个层次执行:
 
 | 主线 | 执行方式 | 关键断言 |
 |---|---|---|
-| 发布到 delivery 主线 | `AcceptPublication` 或 `ConsumeCommittedOutboxFact` -> derive transport semantic -> `RunDeliveryProgression` | acceptance accepted、delivery dispatched / completed、history / audit append |
+| 发布到 delivery 主线 | `AcceptPublication` 或 `ConsumeCommittedOutboxFact` -> derive transport semantic -> `RunDeliveryProgression` | acceptance accepted、delivery `Dispatching / Delivered`、history / audit append |
 | feedback 到只读输出主线 | `RecordDeliveryFeedback` -> projection job -> Query transport view / history | feedback recorded、idempotency anchor、Query no-write、projection current / stale marker |
 | 失败恢复主线 | failed delivery -> `RequestRetry` -> `RunRetryCycle` -> `MoveDeliveryToDeadLetter` -> `PrepareReplay` | retry / DLQ / replay preparation 状态和 audit chain 完整 |
 | 配置与证据主线 | valid JSON profile -> runtime graph -> test gate -> report generator | validated config、redaction scan pass、artifacts / reports 生成 |
@@ -52,7 +52,7 @@ P0 正向主线按三个层次执行:
 | payload 正文越界 | 在 command、event、projection 或 evidence 中注入 payload body | boundary violation,redaction gate fail |
 | 裸后端参数泄漏 | 让 transport semantic 依赖 backend private field | semantic rejection 或 boundary violation |
 | duplicate idempotency | same key same digest / same key different digest | existing result / conflict |
-| 非法状态迁移 | 对 completed delivery 请求 reopen 或跳过 attempt | domain error / conflict |
+| 非法状态迁移 | 对 delivered delivery 请求重复 dispatch 或跳过 attempt | domain error / conflict |
 | 缺失恢复材料 | 无 failure material / audit chain 时 prepare replay | rejected,不生成 ready |
 | Query 写入 | Query 触发 projection rebuild 或 truth mutation | 测试失败,必须无写 UoW |
 | 配置失效 | unsupported key、raw secret、secret unavailable、reload request | fail-fast / fail-closed / rejected |
@@ -64,7 +64,7 @@ P0 正向主线按三个层次执行:
 | 状态机 | 非法迁移断言 | 推荐用例 |
 |---|---|---|
 | Publication acceptance | accepted / rejected 之间不能互改 | `TC-BUS-PUB-004` |
-| Delivery lifecycle | completed 不得 reopen,不能跳过 attempt,backend raw status 不能直接写 truth | `TC-BUS-DLV-003` |
+| Delivery lifecycle | delivered 不得重复 dispatch,不能跳过 attempt,backend raw status 不能直接写 truth | `TC-BUS-DLV-003` |
 | Feedback result | feedback 不是多步生命周期,duplicate / late feedback 不得污染 truth | `TC-BUS-FDB-003` / `TC-BUS-FDB-004` |
 | Retry plan | 非 failed delivery 不得创建 retry,exhausted 后不得继续 running | `TC-BUS-REC-001` |
 | Dead letter | active DLQ 不能重复创建,closed / archived 后不得 replay | `TC-BUS-REC-002` |
@@ -177,11 +177,11 @@ P0 正向主线按三个层次执行:
 | TC-BUS-PUB-004 | TS-BUS-001 | P0 | accepted / rejected publication | 尝试终态互改 | domain error / conflict | final status immutable | unit / service |
 | TC-BUS-SEM-001 | TS-BUS-002 | P0 | accepted material + backend capability ref | derive transport semantic | platform semantic created | no raw backend param in semantic | unit / service |
 | TC-BUS-SEM-002 | TS-BUS-002 | P0 | backend private field 注入 semantic | derive / dispatch | rejected / boundary violation | backend difference not leaked | unit / service |
-| TC-BUS-DLV-001 | TS-BUS-003 | P0 | scheduled delivery + fake backend success | run delivery progression | dispatched / completed | attempt recorded、history append | service / integration |
+| TC-BUS-DLV-001 | TS-BUS-003 | P0 | scheduled delivery + fake backend success | run delivery progression | `Dispatching / Delivered` | attempt recorded、history append、no feedback result | service / integration |
 | TC-BUS-DLV-002 | TS-BUS-003 | P0 | scheduled delivery + backend unavailable | run delivery progression | failed or retryable evidence | no silent success、history / audit append | service / integration |
-| TC-BUS-DLV-003 | TS-BUS-003 | P0 | completed delivery | 尝试 reopen / skip attempt | conflict / domain error | illegal transition rejected | unit / service |
+| TC-BUS-DLV-003 | TS-BUS-003 | P0 | delivered delivery | 尝试重复 dispatch / skip attempt | conflict / domain error | illegal transition rejected | unit / service |
 | TC-BUS-DLV-004 | TS-BUS-003 | P0 | batch has success + failure item | run delivery job | partial success summary | per item UoW、failed item isolated | job runner |
-| TC-BUS-FDB-001 | TS-BUS-004 | P0 | dispatched delivery | record ack feedback | completed + feedback result | feedback terminal、history append | service / API |
+| TC-BUS-FDB-001 | TS-BUS-004 | P0 | delivered delivery | record ack feedback | completed + feedback result | feedback terminal、history append | service / API |
 | TC-BUS-FDB-002 | TS-BUS-004 | P0 | existing idempotency key + same digest | repeat feedback | existing result | no duplicate truth | service / API |
 | TC-BUS-FDB-003 | TS-BUS-004 | P0 | existing idempotency key + different digest | repeat feedback | conflict | no mutation、stable conflict | unit / service |
 | TC-BUS-FDB-004 | TS-BUS-004 | P0 | unknown delivery or late feedback | record feedback | not found / conflict | no orphan feedback | service / API |

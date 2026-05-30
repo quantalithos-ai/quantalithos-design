@@ -43,7 +43,7 @@
 |---|---|---|
 | Publication | `PublicationMaterial`、`PublicationAcceptance`、`PublicationAcceptanceStatus`、`PublicationAcceptanceResult` | 合法材料构造、缺失 core contract、payload body 越界、accepted / rejected 终态不可改写 |
 | Transport semantic | `TransportSemantic`、`PayloadBoundaryGuard` | 平台语义派生、禁止裸后端参数、payload ref / digest / metadata 边界 |
-| Delivery | `DeliveryRecord`、`DeliveryAttempt`、`DeliveryStatus`、`DeliveryLifecycle`、`DeliveryHistoryEntry` | scheduled / dispatched / completed / failed / timed_out / retry / DLQ 迁移、attempt 完成、history 生成 |
+| Delivery | `DeliveryRecord`、`DeliveryAttempt`、`DeliveryStatus`、`DeliveryLifecycle`、`DeliveryHistoryEntry` | `Scheduled / Dispatching / Delivered / Failed / DeadLettered` 迁移、attempt 完成、history 生成；`Completed` 由 feedback 切片覆盖 |
 | Feedback | `FeedbackResult`、`FeedbackStatus`、`FeedbackSource`、`IdempotencyAnchor`、`RequestDigest` | ack / fail / timeout / duplicate / late feedback、same key same digest、same key different digest |
 | Recovery | `RetryPlan`、`RetryPlanStatus`、`DeadLetterEntry`、`DeadLetterStatus`、`ReplayPreparation`、`ReplayPreparationStatus`、`FailureMaterial` | retry eligibility、active retry 唯一、DLQ material 完整性、缺少 audit chain 时 replay rejected |
 | Recovery policy | `RecoveryEligibilityPolicy` | failed delivery 才能 retry / DLQ、retry exhausted 不自动 DLQ、replay 必须依赖 DLQ / approval / audit chain |
@@ -107,7 +107,7 @@ P0 默认采用 in-memory / fake / fixture,但仍要验证 repository、adapter�
 | 横切行为 | 必须单列的测试切口 | 推荐层级 |
 |---|---|---|
 | Publication acceptance state | `Draft -> Accepted`、`Draft -> Rejected`、accepted / rejected 终态不可互改 | domain unit / service |
-| Delivery lifecycle | scheduled / dispatched / completed / failed / timed_out / retry / dead_lettered 合法迁移和非法跳转 | domain unit / service / concurrency |
+| Delivery lifecycle | `Scheduled / Dispatching / Delivered / Failed / DeadLettered` 合法迁移和非法跳转；`Completed` 由 feedback ack 覆盖 | domain unit / service / concurrency |
 | Feedback result | ack / fail / timeout 一次生成即终态,duplicate / late feedback 处理 | domain unit / service |
 | Retry / DLQ / replay state | retry scheduled / exhausted、DLQ active / archived、replay ready / rejected | domain unit / service |
 | Projection status | missing / stale / rebuilding / current,Query 不自动 rebuild | service / repository |

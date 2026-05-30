@@ -166,7 +166,7 @@ Operations Job
 
 | API | 输入骨架 | 输出骨架 | 主要处理 | 写入结果 |
 |---|---|---|---|---|
-| `AcceptPublication` | `AcceptPublicationCommand command`、`ActorContext actor`、`CommandMetadata meta`、`IdempotencyKey idempotency_key` | `PublicationAcceptanceResult result` | 校验发布材料引用、禁止正文边界和传递语义 | `PublicationAcceptance`、`TransportSemantic`、`BusAuditEntry`，可选 delivery schedule 材料 |
+| `AcceptPublication` | `AcceptPublicationCommand command`、`ActorContext actor`、`CommandMetadata meta`、`IdempotencyKey idempotency_key` | `PublicationAcceptanceResult result` | 校验 core contract ref、发布材料引用和禁止正文边界 | `PublicationAcceptance`、`BusAuditEntry`、`IdempotencyAnchor` |
 | `RecordDeliveryFeedback` | `RecordDeliveryFeedbackCommand command`、`ActorContext actor`、`CommandMetadata meta`、`IdempotencyKey idempotency_key` | `FeedbackRecordResult result` | 归一化 ack / fail / timeout / duplicate，执行幂等判断 | `FeedbackResult`、`IdempotencyAnchor`、`DeliveryHistoryEntry`、`BusAuditEntry` |
 | `RequestRetry` | `RequestRetryCommand command`、`ActorContext actor`、`CommandMetadata meta` | `RetryPlanResult result` | 判断恢复允许性并创建或更新 retry plan | `RetryPlan`、`DeliveryHistoryEntry`、`BusAuditEntry` |
 | `MoveDeliveryToDeadLetter` | `MoveDeliveryToDeadLetterCommand command`、`ActorContext actor`、`CommandMetadata meta` | `DeadLetterResult result` | 根据失败材料和恢复策略进入 DLQ | `DeadLetterEntry`、`FailureMaterial`、`DeliveryHistoryEntry`、`BusAuditEntry` |

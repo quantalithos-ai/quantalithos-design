@@ -41,7 +41,7 @@ P0 功能的通过条件不是“接口能调用”,而是对应功能在默认�
 |---|---|---|
 | F-001 契约绑定的发布材料接入 | P0 | 合法 core contract ref + payload ref / outbox fact 可被接受;非法材料被拒绝;不保存 payload body;接入结果有 audit |
 | F-002 统一传递语义形成 | P0 | 合法发布材料能形成平台级 transport semantic;后端能力只作为引用或 capability;无裸 MQ 参数泄漏 |
-| F-003 订阅与 delivery 推进 | P0 | scheduled delivery 能经默认后端路径推进到 dispatched / completed / failed;history 可追溯;批处理隔离成功和失败项 |
+| F-003 订阅与 delivery 推进 | P0 | scheduled delivery 能经默认后端路径推进到 `Dispatching / Delivered / Failed`;history 可追溯;批处理隔离成功和失败项;`Completed` 只由 feedback 主线产生 |
 | F-004 delivery 结果与幂等锚点记录 | P0 | ack / fail / timeout / duplicate feedback 能形成结果、history 和 bus 级 idempotency anchor |
 | F-005 失败恢复与死信 / replay 准备 | P0 | retry、dead-letter、replay preparation 均具备材料、状态、审计链和受控拒绝条件 |
 | F-006 总线级审计、tap 和只读输出 | P0 | transport view、failure material、audit trail 可读且不反写 truth;governance-facing 输出不包含 decision body |
@@ -166,7 +166,7 @@ P1/P2 不进入本步的完整功能门禁。它们只在当前验收中证明�
 |---|---|---|---|---|---|
 | AC-FUNC-001 | F-001 契约绑定的发布材料接入 | P0 | 合法 core contract ref + payload ref / outbox fact 被接受;accepted / rejected 有明确事实和 audit;payload body 未被持久化 | 缺 core contract ref 仍 accepted;payload body 被保存;accepted / rejected 终态互改成功;无 audit | `TC-BUS-PUB-001`~`004`;`EV-BUS-PUB-*`;`RP-BUS-RED-*` |
 | AC-FUNC-002 | F-002 统一传递语义形成 | P0 | accepted material + backend capability ref 形成平台级 transport semantic;不暴露 raw backend param | 裸 MQ 参数进入上层语义;backend private field 被接受;语义与 core contract 冲突 | `TC-BUS-SEM-001`~`002`;`EV-BUS-SEM-*` |
-| AC-FUNC-003 | F-003 订阅与 delivery 推进 | P0 | scheduled delivery 可经默认后端路径推进到 dispatched / completed / failed;history append;批处理成功失败隔离 | delivery 卡在不可解释状态;completed 被 reopen;batch failure 污染成功项;backend unavailable 无失败或重试证据 | `TC-BUS-DLV-001`~`004`;`EV-BUS-DLV-*` |
+| AC-FUNC-003 | F-003 订阅与 delivery 推进 | P0 | scheduled delivery 可经默认后端路径推进到 `Dispatching / Delivered / Failed`;history append;批处理成功失败隔离;`Completed` 只由 feedback 主线产生 | delivery 卡在不可解释状态;delivered 被重复 dispatch;batch failure 污染成功项;backend unavailable 无失败或重试证据 | `TC-BUS-DLV-001`~`004`;`EV-BUS-DLV-*` |
 | AC-FUNC-004 | F-004 delivery 结果与幂等锚点记录 | P0 | ack / fail / timeout / duplicate feedback 形成 result、history 和 idempotency anchor;同 key 同 digest 返回 existing result | duplicate 生成新 truth;同 key 不同 digest 未 conflict;unknown / late feedback 生成孤儿结果;history 缺失 | `TC-BUS-FDB-001`~`004`;`EV-BUS-FDB-*` |
 | AC-FUNC-005 | F-005 失败恢复与死信 / replay preparation | P0 | failed delivery 可受控生成 retry plan、dead-letter material 和 replay preparation;缺 approval / audit chain 时 replay rejected | 非 failed delivery 创建 retry;missing material 仍 dead-letter;缺 approval / audit chain 仍 replay ready;replay 改写 delivery truth | `TC-BUS-REC-001`~`004`;`EV-BUS-REC-*` |
 | AC-FUNC-006 | F-006 总线级审计、tap 和只读输出 | P0 | transport view、failure material、audit trail 可读;stale / missing projection 有一致性标记;Query 不写 truth;governance-facing 输出无 decision body | Query 触发写 UoW 或 rebuild;stale 被当 current;failure material 生成 governance decision;sequence 不单调 | `TC-BUS-OUT-001`~`006`;`EV-BUS-OUT-*` |

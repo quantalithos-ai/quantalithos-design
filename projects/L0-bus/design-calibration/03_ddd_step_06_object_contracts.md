@@ -166,11 +166,32 @@ pub struct PublicationMaterial {
     /// 一次发布材料的唯一标识。
     pub publication_id: PublicationId,
 
+    /// 发布材料来源系统。
+    pub source_system: SourceSystem,
+
+    /// 发布材料来源记录引用。
+    pub source_record_ref: SourceRecordRef,
+
     /// 指向 L0-core 中已定义事件契约的引用。
     pub core_event_ref: CoreEventRef,
 
+    /// 指向 L0-core 已提交事件 envelope 的引用；直接发布入口可以为空。
+    pub core_event_envelope_ref: Option<CoreEventEnvelopeRef>,
+
     /// 指向发布方 payload 正文的引用，不包含 payload body。
     pub payload_ref: PayloadRef,
+
+    /// payload 引用类型。
+    pub payload_kind: PayloadKind,
+
+    /// payload 正文摘要。
+    pub payload_digest: PayloadDigest,
+
+    /// 请求的平台投递语义；P0 只允许 `AtLeastOnce`。
+    pub delivery_mode: DeliveryMode,
+
+    /// 请求的目标订阅范围。
+    pub target_scope: TargetScope,
 
     /// 指向已提交 outbox fact 的引用；同步发布入口可以为空。
     pub outbox_fact_ref: Option<OutboxFactRef>,
@@ -188,8 +209,15 @@ pub struct PublicationMaterial {
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
 | `publication_id` | `PublicationId` | 标识一次发布材料 | 系统生成，不得复用 |
+| `source_system` | `SourceSystem` | 标识发布材料来源系统 | direct command 直接传入；outbox fact 必须从 source metadata 补齐 |
+| `source_record_ref` | `SourceRecordRef` | 标识来源记录 | 与 `source_system` 共同用于幂等 / 唯一约束 |
 | `core_event_ref` | `CoreEventRef` | 指向 core 事件契约 | 必须来自 `core-contracts` 或其正式引用 |
+| `core_event_envelope_ref` | `Option<CoreEventEnvelopeRef>` | 指向已提交 core event envelope 实例 | direct command 可为空；outbox fact 必须有值；不得当成 `core_event_ref` |
 | `payload_ref` | `PayloadRef` | 指向 payload 正文 | 不得包含 payload body |
+| `payload_kind` | `PayloadKind` | payload 引用类型 | P0 只接受引用型 payload |
+| `payload_digest` | `PayloadDigest` | payload 摘要 | 用于幂等和审计，不读取 payload body |
+| `delivery_mode` | `DeliveryMode` | 请求的平台投递语义 | P0 只允许 `AtLeastOnce` |
+| `target_scope` | `TargetScope` | 请求的目标范围 | 工厂映射为 domain `SubscriberScope` 时必须校验 |
 | `outbox_fact_ref` | `Option<OutboxFactRef>` | 关联已提交 outbox fact | 只允许 committed fact |
 | `actor` | `ActorContext` | 审计 actor 上下文 | 不做认证，只透传可信上下文 |
 | `trace_ref` | `TraceContextRef` | trace 关联 | 必须进入后续 audit / event |
@@ -206,8 +234,19 @@ pub struct PublicationMaterial {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `PublicationMaterial::from_publish_command(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta) -> Result<PublicationMaterial, DomainError>` | 从同步发布命令构造发布材料 | `command` 携带引用，`actor` / `meta` 携带上下文 | `Result<PublicationMaterial, DomainError>` | `AcceptPublication` |
-| `PublicationMaterial::from_outbox_fact(CommittedOutboxFact fact, ActorContext actor, CommandMetadata meta) -> Result<PublicationMaterial, DomainError>` | 从已提交 outbox fact 构造发布材料 | `fact` 必须已提交 | `Result<PublicationMaterial, DomainError>` | `ConsumeCommittedOutboxFact` |
+| `PublicationMaterial::from_accept_publication_command(AcceptPublicationCommand command, ActorContext actor, CommandMetadata meta) -> Result<PublicationMaterial, DomainError>` | 从接入发布命令构造发布材料 | `command` 携带 core event、payload、delivery mode、target scope，`actor` / `meta` 携带上下文 | `Result<PublicationMaterial, DomainError>` | `AcceptPublication` |
+| `PublicationMaterial::from_outbox_fact(CommittedOutboxFactInput input, ActorContext actor, EventMetadata meta) -> Result<PublicationMaterial, DomainError>` | 从已提交 outbox fact 输入构造发布材料 | `input` 必须已经包含 `core_event_ref`、`delivery_mode`、`target_scope` 和 `core_event_envelope_ref` | `Result<PublicationMaterial, DomainError>` | `ConsumeCommittedOutboxFact` |
+
+##### outbox fact 字段映射规则
+
+| 输入字段 | 映射到 | 说明 |
+|---|---|---|
+| `input.core_event_ref` | `PublicationMaterial.core_event_ref` | 正式 core 事件契约引用；必须由 outbox source adapter 从 core envelope metadata 中解析或补齐 |
+| `input.core_event_envelope_ref` | `PublicationMaterial.core_event_envelope_ref` | 已提交 envelope 实例引用；只用于来源追溯和审计，不得当成契约引用 |
+| `input.delivery_mode` | `PublicationMaterial.delivery_mode` | P0 只允许 `DeliveryMode::AtLeastOnce` |
+| `input.target_scope` | `PublicationMaterial.target_scope` | 后续 `TransportSemantic::derive(...)` 使用它与订阅范围校验 |
+| `input.source_system` / `input.source_record_ref` | `PublicationMaterial.source_system` / `PublicationMaterial.source_record_ref` | 用于来源追溯、幂等和唯一约束 |
+| `input.payload_ref` / `input.payload_kind` / `input.payload_digest` | `PublicationMaterial` payload 字段 | 只保存引用、类型与摘要，不读取 payload body |
 
 ##### 不变量与禁止事项
 
@@ -215,6 +254,8 @@ pub struct PublicationMaterial {
 |---|---|
 | 不保存 payload body | 只能保存 `PayloadRef` |
 | 不重新定义 core event | 只能引用 `CoreEventRef` |
+| 不混淆 envelope 与 contract | `CoreEventEnvelopeRef` 是已提交 envelope 实例，`CoreEventRef` 是正式事件契约引用 |
+| 保留 delivery 语义输入 | `delivery_mode` 和 `target_scope` 必须随 material 保存，否则 PH-03 无法从 accepted material 派生传递语义 |
 | outbox fact 必须已提交 | 未提交 fact 不得生成接入事实 |
 
 #### 7.3.2 `PublicationAcceptanceStatus`
@@ -269,8 +310,8 @@ pub struct PublicationAcceptance {
     /// 接入成功时间；仅在 accepted 状态下存在。
     pub accepted_at: Option<Timestamp>,
 
-    /// 与接入判定关联的审计引用。
-    pub audit_ref: AuditRef,
+    /// 与最终接入判定关联的审计引用；仅在 Accepted / Rejected 后存在。
+    pub decision_audit_ref: Option<AuditRef>,
 }
 ```
 
@@ -283,7 +324,7 @@ pub struct PublicationAcceptance {
 | `status` | `PublicationAcceptanceStatus` | 表达接入状态 | 只能经成员函数改变 |
 | `reject_reason` | `Option<PublicationRejectReason>` | 记录拒绝原因 | 仅 `Rejected` 非空 |
 | `accepted_at` | `Option<Timestamp>` | 记录接受时间 | 仅 `Accepted` 非空 |
-| `audit_ref` | `AuditRef` | 关联审计条目 | 接受 / 拒绝都必须存在 |
+| `decision_audit_ref` | `Option<AuditRef>` | 关联最终接入判定审计条目 | `Accepted` / `Rejected` 后必须存在 |
 
 ##### 成员函数
 
@@ -297,14 +338,14 @@ pub struct PublicationAcceptance {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `PublicationAcceptance::start(PublicationMaterial material, ActorContext actor, AuditRef audit_ref) -> PublicationAcceptance` | 创建 pending 接入事实 | `material` 为发布材料 | `PublicationAcceptance` | 接入判定开始 |
+| `PublicationAcceptance::start_pending(PublicationMaterial material, ActorContext actor) -> PublicationAcceptance` | 创建 pending 接入事实 | `material` 为发布材料，`actor` 为操作者 | `PublicationAcceptance` | 接入判定开始 |
 | `PublicationAcceptance::rehydrate(PersistedPublicationAcceptance row) -> Result<PublicationAcceptance, DomainError>` | 从持久化记录重建 | `row` 为持久化行 | `Result<PublicationAcceptance, DomainError>` | repository 读取 |
 
 ##### 不变量与禁止事项
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
-| 接受或拒绝必须关联审计 | `audit_ref` 不得为空 |
+| 接受或拒绝必须关联审计 | `decision_audit_ref` 不得为空 |
 | `Rejected` 不得进入 delivery | application 必须检查 `is_accepted()` |
 | 状态终止后不得回退 | `Accepted` / `Rejected` 是终止状态 |
 
@@ -376,7 +417,7 @@ pub struct TransportSemantic {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `TransportSemantic::derive(PublicationMaterial material, BackendCapabilityRef capability_ref, SubscriberScope target_scope) -> Result<TransportSemantic, DomainError>` | 从发布材料和后端能力推导平台语义 | `material` 必须通过接入判定 | `Result<TransportSemantic, DomainError>` | 接入后形成 delivery 语义 |
+| `TransportSemantic::derive(PublicationMaterial material, BackendCapabilityRef capability_ref, SubscriberScope target_scope) -> Result<TransportSemantic, DomainError>` | 从发布材料和后端能力推导平台语义 | `material` 必须通过接入判定；`target_scope` 必须与 `material.target_scope` 归一化后匹配 | `Result<TransportSemantic, DomainError>` | 接入后形成 delivery 语义 |
 
 ##### 不变量与禁止事项
 
@@ -514,6 +555,11 @@ pub struct DeliveryRecord {
 | `last_attempt_ref` | `Option<DeliveryAttemptRef>` | 指向最近投递尝试 | 仅引用，不保存后端正文 |
 
 ##### 成员函数
+
+阶段落地约束：
+
+- PH-03 / commit-03-a 只落地 `start_attempt(...)`、`mark_delivered(...)`、`mark_failed(...)` 和 `can_transition_to(...)`，用于支撑 `RunDeliveryProgressionFlow` 推进到 `Delivered / Failed`。
+- `mark_completed(FeedbackResult feedback, ActorContext actor)` 归 PH-05 / commit-05-a 的 `RecordDeliveryFeedbackFlow`，不得作为 PH-03 delivery domain API 或测试前置。
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|

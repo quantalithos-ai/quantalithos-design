@@ -169,7 +169,7 @@ L0-bus 位于事件传递主干,它必须验对外输出和接缝,但不替下�
 |---|---|---|---|---|
 | Publication acceptance | 功能主链 | P0 | 合法 core contract ref + payload ref / outbox fact 可进入 bus,非法材料被拒绝 | 不裁决 core 契约内部实现 |
 | Transport semantic formation | 功能主链 / 架构边界 | P0 | 合法发布材料形成平台级 transport semantic,不泄漏裸后端参数 | 不裁决所有 MQ 产品语义 |
-| Delivery progression | 功能主链 | P0 | delivery 可从 scheduled 推进到 dispatched / completed / failed 等可追溯状态 | 不承诺全局 exactly-once |
+| Delivery progression | 功能主链 | P0 | delivery 可从 `Scheduled` 推进到 `Dispatching / Delivered / Failed` 等可追溯状态；`Completed` 由 feedback 主线产生 | 不承诺全局 exactly-once |
 | Feedback recording and idempotency anchor | 功能主链 / 一致性 | P0 | ack / fail / timeout / duplicate feedback 形成 history 和幂等锚点 | 不裁决订阅方业务副作用 |
 | Retry / DLQ / replay preparation | 恢复主链 | P0 | retry、dead-letter、replay preparation 有材料、状态和审计链 | 不实现 DLQ Console UI |
 | Read-only output and audit | 输出 / 审计 / 治理接缝 | P0 | transport view、tap、audit material、failure material 可读且不反写 truth | 不裁决 observability 长期存储或 governance decision |

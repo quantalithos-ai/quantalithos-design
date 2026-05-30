@@ -52,12 +52,12 @@ Outbound Event 不按 HTTP 接口测试，而按 `OutboundEventPublishFlow` 和�
 
 | 测试对象 | 合法转换测试 | 非法转换测试 |
 |---|---|---|
-| `PublicationAcceptanceStatus` | `draft -> accepted`、`draft -> rejected` | `accepted -> rejected`、`rejected -> accepted` |
-| `DeliveryStatus` | `scheduled -> dispatched -> completed`、`dispatched -> failed/timed_out`、`failed -> retry_scheduled/dead_lettered` | 终态 reopen、跳过 required attempt、completed 后 dead letter |
+| `PublicationAcceptanceStatus` | `Pending -> Accepted`、`Pending -> Rejected` | `Accepted -> Rejected`、`Rejected -> Accepted` |
+| `DeliveryStatus` | `Scheduled -> Dispatching -> Delivered -> Completed`、`Dispatching / Delivered -> Failed`、`Failed -> Scheduled / DeadLettered` | 终态 reopen、跳过 required attempt、Completed 后 dead letter |
 | `FeedbackStatus` | ack / fail / timeout 一次生成终态 | 把 feedback 当作可多步迁移的状态机 |
-| `RetryPlanStatus` | `draft -> scheduled -> running -> exhausted/completed` | exhausted 后再次 running、非 failed delivery 创建 retry |
-| `DeadLetterStatus` | `created -> replay_prepared`、`created -> archived` | archived 后 replay、同 delivery active DLQ 重复创建 |
-| `ReplayPreparationStatus` | `draft -> ready`、`draft -> rejected` | ready 后 rejected、缺失 approval ref 进入 ready |
+| `RetryPlanStatus` | `New -> Scheduled`、`Scheduled -> Exhausted / Cancelled` | Exhausted 后继续 retry、非 failed delivery 创建 retry |
+| `DeadLetterStatus` | `New -> Open -> Reviewing -> Closed` | Closed 后 replay、同 delivery active DLQ 重复创建 |
+| `ReplayPreparationStatus` | `New -> Draft -> Ready / Rejected / Superseded` | Ready 后 Rejected、缺失 approval ref 进入 Ready |
 | `ProjectionStatus` | `missing/stale -> current`、`current -> stale`、rebuild replace | Query 触发写入、stale 被当作 current 返回 |
 
 ### 3.4 事务、一致性、幂等和并发如何验证？
@@ -209,7 +209,7 @@ Reports
 | `GetFailureSummary` | 返回 failure summary | not found、forbidden body 不出现在 view | API query |
 | `GetBusAuditTrail` | 返回 audit trail page | invalid filter、敏感查询留痕、分页边界 | API query |
 | `GetBackendHealthView` | 返回 backend health view | not found、stale capability marker | API query |
-| `ConsumeCommittedOutboxFact` | fact 被接入为 publication acceptance | duplicate event、payload 越界、source ack failure | consumer |
+| `ConsumeCommittedOutboxFact` | fact 携带 `core_event_ref`、`core_event_envelope_ref`、`delivery_mode`、`target_scope` 后被接入为 publication acceptance | duplicate event、payload 越界、source ack failure、缺失 core event contract ref | consumer |
 | `ConsumeBackendDeliverySignal` | delivered / failed signal 更新 delivery | unknown delivery、backend private body rejected、duplicate signal | consumer |
 | `ConsumeTimeoutSignal` | timeout 更新 delivery / feedback | duplicate timeout、terminal delivery conflict | consumer |
 | 9 个 Outbound Event payload | 每个 event payload 字段、schema version、source ref 正确 | schema violation、forbidden body rejected | contract + publisher |
@@ -238,12 +238,12 @@ Reports
 
 | 状态机 | 合法转换切口 | 非法转换切口 | 建议测试类型 |
 |---|---|---|---|
-| `PublicationAcceptanceStatus` | `draft -> accepted/rejected` | accepted / rejected 互相改写 | domain unit test |
-| `DeliveryStatus` | scheduled、dispatched、completed、failed、timed_out、retry_scheduled、dead_lettered | 终态 reopen、跳跃转换、backend raw status 直接写入 | domain + application |
+| `PublicationAcceptanceStatus` | `Pending -> Accepted / Rejected` | Accepted / Rejected 互相改写 | domain unit test |
+| `DeliveryStatus` | `Scheduled`、`Dispatching`、`Delivered`、`Completed`、`Failed`、`DeadLettered`; timeout 使用 `FeedbackStatus::Timeout` + `DeliveryStatus::Failed`; retry reschedule 使用 `Failed -> Scheduled` | 终态 reopen、跳跃转换、backend raw status 直接写入 | domain + application |
 | `FeedbackStatus` | ack / fail / timeout 一次生成终态 | 把 feedback 当作多步生命周期迁移 | domain unit test |
-| `RetryPlanStatus` | draft、scheduled、running、completed、exhausted | exhausted 后运行、非 failed delivery retry | domain + application |
-| `DeadLetterStatus` | created、replay_prepared、archived | archived 后 replay、重复 active DLQ | domain + application |
-| `ReplayPreparationStatus` | draft、ready、rejected | ready 后 rejected、无 approval ready | domain unit test |
+| `RetryPlanStatus` | `Scheduled`、`Exhausted`、`Cancelled` | Exhausted 后继续 retry、非 failed delivery retry | domain + application |
+| `DeadLetterStatus` | `Open`、`Reviewing`、`Closed` | Closed 后 replay、重复 active DLQ | domain + application |
+| `ReplayPreparationStatus` | `Draft`、`Ready`、`Rejected`、`Superseded` | Ready 后 rejected、无 approval ready | domain unit test |
 | `ProjectionStatus` | missing / stale / current / rebuilding | Query 触发写入、stale 当 current | projection service test |
 
 ### 7.5 一致性 / 幂等 / 并发测试切口表

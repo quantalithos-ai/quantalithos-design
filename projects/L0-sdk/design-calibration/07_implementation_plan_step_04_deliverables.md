@@ -39,7 +39,7 @@
 
 ### 3.2 本轮会新增或修改哪些接口、事件、job 或 adapter?
 
-本轮会交付 6 个 Command API、12 个 Query API、4 个 inbound event consumer、6 个 outbound event payload、8 个 operations job、Rust `ServiceClient` / `EventClient` facade、repository / UoW / source / boundary / runner / artifact / outbox / projection / config port,以及 local / in-memory / fake / filesystem 默认 adapter。真实 production endpoint 全量覆盖、真实 bus runtime、真实 credential provider 和 public registry 发布不在本轮交付范围。
+本轮会交付 6 个 Command API、12 个 Query API、4 个 inbound event consumer、7 个 outbound event payload、8 个 operations job、Rust `ServiceClient` / `EventClient` facade、repository / UoW / source / boundary / runner / artifact / outbox / projection / config port,以及 local / in-memory / fake / filesystem 默认 adapter。真实 production endpoint 全量覆盖、真实 bus runtime、真实 credential provider 和 public registry 发布不在本轮交付范围。
 
 ### 3.3 本轮会新增哪些测试?
 
@@ -128,7 +128,7 @@
 | Query DTO 与 read service | code / API | `03` §7 / §8、`06` AC-IF-002 | `crates/contracts/src/queries.rs`、`crates/application/src/query.rs` | 12 个 Query 不写 truth,stale / missing / unsupported marker tests 通过 |
 | Rust client facade | code / client | `03` §5 / §7、`06` AC-IF-003 | `crates/client/src/*` | `ServiceClient` / `EventClient` 不绕过 guard,返回 ref-only result / diagnostic ref |
 | Inbound event consumer | code / event | `03` §7 / §8、`06` AC-IF-004 | `crates/application/src/consumers/*`、`crates/infra/src/event/*` | duplicate 不重复写 truth,unredacted event 被拒绝 |
-| Outbound event payload 与 SDK outbox | code / event | `03` §7 / §8 / §11、`06` AC-IF-005 | `crates/contracts/src/events.rs`、`crates/application` outbox service、`crates/infra` sink | 6 个 event schema、forbidden body absent、publish failure evidence tests 通过 |
+| Outbound event payload 与 SDK outbox | code / event | `03` §7 / §8 / §11、`06` AC-IF-005 | `crates/contracts/src/events.rs`、`crates/application` outbox service、`crates/infra` sink | 7 个 event schema、forbidden body absent、publish failure evidence tests 通过 |
 | Operations job runners | code / binary | `03` §7 / §8、`06` AC-IF-006 | `crates/jobs/src/*` | 8 个 job 的 job_run_id、item UoW、partial success、summary tests 通过 |
 | Domain 状态机与 policy guard | code | `03` §6 / §10、`06` AC-STATE-* / AC-RED-* | `crates/domain/src/*` | freshness、support、candidate、evidence、redaction、compatibility、deprecated 状态 tests 通过 |
 | Repository、UoW、idempotency 和 store | code | `03` §11 / §13、`06` AC-TX-* / AC-IDEM-* | `crates/application/src/ports/*`、`crates/infra/src/store/*` | expected version、same key same digest / different digest tests 通过 |

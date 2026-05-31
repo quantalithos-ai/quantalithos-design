@@ -33,7 +33,7 @@
 
 4. 哪些已提交事实需要通过 Outbound Event 对外传播？
 
-   回答：SDK 可传播 `SdkSemanticBaselineChangedEvent`、`SdkSnapshotFreshnessChangedEvent`、`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent`、`CompatibilityDecisionRecordedEvent`、`DeprecatedApiRecordedEvent`。这些事件用于 automation、review、reports 或下游通知,不携带业务正文、请求响应正文、事件 payload 或凭据正文。
+   回答：SDK 可传播 `SdkSemanticBaselineChangedEvent`、`SdkSnapshotFreshnessChangedEvent`、`SdkClientViewFreshnessChangedEvent`、`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent`、`CompatibilityDecisionRecordedEvent`、`DeprecatedApiRecordedEvent`。这些事件用于 automation、review、reports 或下游通知,不携带业务正文、请求响应正文、事件 payload 或凭据正文。
 
 5. 哪些恢复、发布、重建、对账动作属于 Operations Job，而不是业务 command？
 
@@ -200,7 +200,8 @@ Inbound Event 边界说明：
 | Event | 产生来源 | 主要消费者 | 说明 |
 |---|---|---|---|
 | `SdkSemanticBaselineChangedEvent` | `SdkSemanticBaseline` committed | automation、docs validation、compatibility checker | 表示 SDK 共同语义基线变化 |
-| `SdkSnapshotFreshnessChangedEvent` | `SnapshotFreshnessState` changed | candidate generator、maintainer、reports | 表示上游快照新鲜度变化 |
+| `SdkSnapshotFreshnessChangedEvent` | `DerivedBindingView` / `LanguageBindingView` freshness changed | candidate generator、maintainer、reports | 表示 PH-02 派生视图新鲜度变化 |
+| `SdkClientViewFreshnessChangedEvent` | `ServiceClientView` / `BusEventClientView` freshness changed | candidate generator、maintainer、reports | 表示 PH-03 service / event client view 新鲜度变化 |
 | `PackageCandidateGeneratedEvent` | `PackageCandidate.status=Draft` | smoke runner、docs runner、review automation | 表示本地 candidate 已生成 |
 | `VerificationEvidenceRecordedEvent` | `VerificationEvidence` committed | candidate validator、compatibility checker、reports | 表示验证证据已记录,不包含正文 |
 | `CompatibilityDecisionRecordedEvent` | `CompatibilityDecision` committed | release review、docs、downstream consumers | 表示兼容判断已形成 |

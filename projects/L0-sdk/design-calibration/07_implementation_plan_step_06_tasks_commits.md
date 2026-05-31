@@ -140,7 +140,7 @@
 |---|---:|---|---|---|---|
 | IMPL-02-01 | 1 | 定义 contracts DTO、semantic baseline DTO 和 contract fixtures | `03` §7、`05` TS-SDK-001 / 002 | DTO、fixtures、contract tests | roundtrip / validation 通过 |
 | IMPL-02-02 | 2 | 实现 semantic baseline、concept map 和 capability model | `03` §6 / §10 | domain objects、state tests | baseline 覆盖三语言 |
-| IMPL-02-03 | 3 | 实现 derived binding view、freshness state 和 upstream changed consumers | `03` §8 / §10 / §13 | view service、consumer、freshness query | contract / semantic / query tests 通过 |
+| IMPL-02-03 | 3 | 实现 derived binding view、freshness state 和 PH-02 owned consumer | `03` §8 / §10 / §13 | view service、core contract changed consumer、freshness query | contract / semantic / query tests 通过 |
 
 #### 代码实现批次
 
@@ -148,14 +148,14 @@
 |---|---|---|---|---|---|---|
 | BATCH-02-01 | 锁定 upstream / semantic 协议和 fixture | `03` §7、`05` TS-SDK-001 | DTO、fixtures、contract tests | 100~300 行 | `TC-SDK-CONTRACT-*` subset | commit-02-a |
 | BATCH-02-02 | 实现 semantic baseline 和 concept map | `03` §6 / §10 | domain state、semantic tests | 100~300 行 | `TC-SDK-SEMANTIC-*` subset | commit-02-a |
-| BATCH-02-03 | 实现 derived view、freshness query 和 consumers | `03` §8 / §13 | service、query、event consumer、tests | 需拆分;每批不超过 300 行 | `TC-SDK-CONTRACT-*`、freshness query | commit-02-b |
+| BATCH-02-03 | 实现 derived view、language view、freshness query 和 core contract changed consumer | `03` §8 / §13 | service、query、core consumer、tests；只读 semantic baseline / concept map | 需拆分;每批不超过 300 行 | `TC-SDK-CONTRACT-*`、freshness query | commit-02-b |
 
 #### 提交边界
 
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
 | commit-02-a | contracts DTO、semantic baseline 和 concept map 单测通过后 | DTO、fixtures、baseline、concept map、capability model | derived view consumer、service boundary、package candidate | fmt/check、contract + semantic unit tests |
-| commit-02-b | derived view、freshness query 和 inbound change consumer 通过后 | derived view、freshness state、query、core/bus changed consumer | service call、event publish、candidate | `TC-SDK-CONTRACT-*`、freshness query tests |
+| commit-02-b | derived view、language view、freshness query 和 PH-02 owned consumer 通过后 | derived view、language view、freshness state、query、core contract changed consumer；只读 semantic baseline / concept map | service view、event view、bus semantic changed consumer、formal API changed consumer、service call、event publish、candidate；semantic baseline / concept map 改写 | `TC-SDK-CONTRACT-*`、freshness query tests |
 
 ### 7.4 PH-03 服务 / 事件边界与安全策略
 
@@ -164,7 +164,7 @@
 | 任务编号 | 编写顺序 | 实施动作 | 输入 | 输出 | 完成判定 |
 |---|---:|---|---|---|---|
 | IMPL-03-01 | 1 | 定义 service capability 和 bus event command / query fixture | `03` §7、`05` TS-SDK-003 / 004 | command/query DTO、boundary fixtures | validation / schema tests 通过 |
-| IMPL-03-02 | 2 | 实现 service / event client view、boundary guard 和 support state | `03` §6 / §10 | domain view、support state、policy | unsupported / fake marker tests 通过 |
+| IMPL-03-02 | 2 | 实现 service / event client view、client view consumers、boundary guard 和 support state | `03` §6 / §10 | domain view、bus / formal changed consumers、support state、policy | unsupported / fake marker tests 通过 |
 | IMPL-03-03 | 3 | 实现 Rust `ServiceClient` / `EventClient` facade 与 fake boundary adapters | `03` §5 / §8 / §13 | client facade、fake adapter、diagnostic ref | boundary / event tests 通过 |
 | IMPL-03-04 | 4 | 实现 error / trace / redaction / credential protection | `03` §12 / §15、`04` §8 / §11 | error mapping、trace propagation、redaction guard | security tests 通过 |
 
@@ -173,14 +173,14 @@
 | 批次编号 | 目标 | 输入 | 输出 | 预计规模 | 验证门禁 | 提交关系 |
 |---|---|---|---|---|---|---|
 | BATCH-03-01 | 锁定 service / event boundary 协议 | `03` §7、`05` TS-SDK-003 / 004 | DTO、fixtures、contract tests | 100~300 行 | contract tests | commit-03-a |
-| BATCH-03-02 | 实现 boundary view、client facade 和 fake adapters | `03` §6 / §8 / §13 | domain view、Rust client、fake adapters | 需拆分;每批不超过 300 行 | `TC-SDK-BOUNDARY-*`、`TC-SDK-EVENT-*` | commit-03-a |
+| BATCH-03-02 | 实现 boundary view、client view consumers、client facade 和 fake adapters | `03` §6 / §8 / §13 | domain view、bus / formal changed consumers、Rust client、fake adapters | 需拆分;每批不超过 300 行 | `TC-SDK-BOUNDARY-*`、`TC-SDK-EVENT-*` | commit-03-a |
 | BATCH-03-03 | 实现 error / trace / redaction / credential guard | `03` §12 / §15、`04` §8 | policy guard、error mapper、trace tests | 100~300 行 | `TC-SDK-TRACE-*`、`TC-SDK-SECURITY-*` | commit-03-b |
 
 #### 提交边界
 
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
-| commit-03-a | service / event boundary 和 Rust client facade tests 通过后 | service view、event view、Rust client facade、fake adapters | package candidate、docs smoke、real endpoint | boundary / event tests |
+| commit-03-a | service / event boundary、client view consumers 和 Rust client facade tests 通过后 | service view、event view、bus semantic changed consumer、formal API changed consumer、Rust client facade、fake adapters | package candidate、docs smoke、real endpoint | boundary / event tests |
 | commit-03-b | error / trace / redaction / credential tests 通过后 | error mapping、trace propagation、redaction policy、credential ref-only guard | real credential provider、public registry | trace + security tests、redaction check |
 
 ### 7.5 PH-04 本地 package candidate 与三语言产物
@@ -189,7 +189,7 @@
 
 | 任务编号 | 编写顺序 | 实施动作 | 输入 | 输出 | 完成判定 |
 |---|---:|---|---|---|---|
-| IMPL-04-01 | 1 | 定义 candidate job input、language artifact metadata 和 package layout fixture | `03` §7 / §8、`05` TS-SDK-007 | job DTO、artifact metadata、fixtures | schema / layout tests 通过 |
+| IMPL-04-01 | 1 | 定义 candidate job input、language artifact metadata 和 package layout fixture；metadata 必须包含来源 `language_view_id` | `03` §7 / §8、`05` TS-SDK-007 | job DTO、artifact metadata、fixtures | schema / layout tests 通过 |
 | IMPL-04-02 | 2 | 实现 package candidate 状态机和 stable gate | `03` §6 / §10、`06` AC-FUNC-007 | candidate domain、status tests | invalid freshness / missing evidence rejected |
 | IMPL-04-03 | 3 | 实现 language generator、package builder 和 local artifact store | `03` §13、`04` §7 | local builders、artifact refs | package build tests 通过 |
 | IMPL-04-04 | 4 | 接入 Rust / Python / TypeScript package surface layout | `03` §4 / §5 | package source skeleton、exports | layout check 通过 |
@@ -291,11 +291,11 @@
 | commit-01-a | 适中 | 是 | 是 | 保留 |
 | commit-01-b | 适中 | 是 | 是 | 保留 |
 | commit-02-a | 适中 | 是 | 是 | 保留 |
-| commit-02-b | 偏大但合理 | 是 | 是 | 保留;derived view / consumer 超 300 行时拆批次 |
-| commit-03-a | 偏大但合理 | 是 | 是 | 保留;client facade 和 adapters 分批实现 |
+| commit-02-b | 适中 | 是 | 是 | 保留;只包含 derived view / language view / freshness / core contract changed consumer,可只读 semantic baseline / concept map,不得读写 service / event view,不得改写 semantic baseline / concept map |
+| commit-03-a | 偏大但合理 | 是 | 是 | 保留;client view consumers、client facade 和 adapters 分批实现 |
 | commit-03-b | 适中 | 是 | 是 | 保留 |
 | commit-04-a | 适中 | 是 | 是 | 保留 |
-| commit-04-b | 偏大但合理 | 是 | 是 | 保留;language packages 分批实现 |
+| commit-04-b | 偏大但合理 | 是 | 是 | 保留;language packages 分批实现;artifact metadata 必须写入来源 `language_view_id` |
 | commit-05-a | 适中 | 是 | 是 | 保留 |
 | commit-05-b | 偏大但合理 | 是 | 是 | 保留;evidence / smoke 分批实现 |
 | commit-06-a | 适中 | 是 | 是 | 保留 |
@@ -309,7 +309,7 @@
 | PH-01 / commit-01-a~b | Cargo package、crate、package surface、artifact root 来自 `03` / `04` | 不新增业务 DTO | evidence root、config profile、path dependency 可定位 | 目标仓或 path dependency 不一致时暂停 |
 | PH-02 / commit-02-a~b | baseline、concept、upstream refs、freshness 字段来源完整 | Command / Event 能构造 baseline 和 derived view | `SnapshotFreshnessState` 与 `03` §10 一致 | core / bus truth 字段不清时暂停回写 |
 | PH-03 / commit-03-a~b | service result ref、diagnostic ref、event payload ref / digest 齐全 | service call / publish command 能构造 boundary request | support state、redaction status、error class 一致 | real endpoint / credential 需求不得临时加入 |
-| PH-04 / commit-04-a~b | candidate id、version、language artifact metadata、digest 齐全 | candidate job input 能构造 `PackageCandidate` | candidate status 不出现 `Built` 等旧状态 | registry publish 需求后移,不改 P0 |
+| PH-04 / commit-04-a~b | candidate id、version、language artifact metadata、digest、来源 `language_view_id` 齐全 | candidate job input 能构造 `PackageCandidate` | candidate status 不出现 `Built` 等旧状态 | registry publish 需求后移,不改 P0 |
 | PH-05 / commit-05-a~b | evidence id、runner result、redaction marker、artifact ref 齐全 | validation event / job input 能构造 `VerificationEvidence` | `Passed + Redacted` 才能支撑 verified / stable | smoke skipped 不得当 passed |
 | PH-06 / commit-06-a | compatibility decision、deprecated record、migration ref 齐全 | command / job input 能构造 decision 和 record | breaking / migration / deprecated lifecycle 与 `03` 一致 | migration ref 缺失时暂停实现 |
 | PH-07 / commit-07-a~b | report run id、artifact path、AC / TC / EV ref 齐全 | report input 能构造 evidence index 和 handoff | VETO、risk acceptance、redaction final check 可判定 | 缺 run_id 或 latest 引用时不得送验 |
@@ -347,8 +347,8 @@
 | 阶段 | 关键任务 | 关键批次 | 提交边界 | 提交前门禁 |
 |---|---|---|---|---|
 | PH-01 | workspace、path deps、package skeleton、config、scripts | BATCH-01-01~02 | commit-01-a / commit-01-b | check、命名、script help、path check |
-| PH-02 | contracts consumption、semantic baseline、derived view、freshness query | BATCH-02-01~03 | commit-02-a / commit-02-b | contract、semantic、freshness tests |
-| PH-03 | service / event boundary、Rust client facade、redaction、error / trace | BATCH-03-01~03 | commit-03-a / commit-03-b | boundary、event、trace、security tests |
+| PH-02 | contracts consumption、semantic baseline、concept map、derived view、language view、freshness query | BATCH-02-01~03 | commit-02-a / commit-02-b | contract、semantic、freshness tests |
+| PH-03 | service / event boundary、client view consumers、Rust client facade、redaction、error / trace | BATCH-03-01~03 | commit-03-a / commit-03-b | boundary、event、trace、security tests |
 | PH-04 | package candidate、language artifacts、三语言 package layout | BATCH-04-01~03 | commit-04-a / commit-04-b | candidate、package layout checks |
 | PH-05 | docs examples、cross-language smoke、verification evidence | BATCH-05-01~03 | commit-05-a / commit-05-b | docs、smoke、security evidence |
 | PH-06 | compatibility、deprecated、migration ref | BATCH-06-01~02 | commit-06-a | compatibility tests |

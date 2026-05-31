@@ -575,9 +575,9 @@ Superseded
 | `New` | `Announced` | `DeprecatedApiRecord::announce(...)` / `DeprecateSdkApiFlow` | api ref 存在；announcement reason present | 创建 deprecated record | `SdkDomainError::DeprecatedReasonRequired` |
 | `Announced` | `Deprecated` | `mark_deprecated(MigrationGuideRef migration_ref, Timestamp now)` | migration ref present | API 标记 deprecated | `SdkDomainError::MigrationGuideRequired` |
 | `Announced` | `Superseded` | supersede operation | replacement ref present | 历史记录归档 | `SdkDomainError::SupersedeRefRequired` |
-| `Deprecated` | `PendingRemoval` | `schedule_removal(RemovalPlan removal_plan, Timestamp now)` | removal plan present | 进入移除窗口 | `SdkDomainError::RemovalPlanRequired` |
+| `Deprecated` | `PendingRemoval` | `schedule_removal(RemovalPlan removal_plan, Timestamp now)` | removal plan present；`target_removal_version`、`removal_not_before`、`document_ref` 有效 | 进入移除窗口 | `SdkDomainError::RemovalPlanRequired` |
 | `Deprecated` | `Superseded` | supersede operation | replacement ref present | 历史记录归档 | `SdkDomainError::SupersedeRefRequired` |
-| `PendingRemoval` | `Removed` | `mark_removed(Timestamp now)` | removal window satisfied | API 不再可用 | `SdkDomainError::RemovalWindowNotSatisfied` |
+| `PendingRemoval` | `Removed` | `mark_removed(Timestamp now)` | `RemovalPlan::is_removal_window_satisfied(now)` 为 true | API 不再可用 | `SdkDomainError::RemovalWindowNotSatisfied` |
 | `PendingRemoval` | `Superseded` | supersede operation | replacement ref present | 历史记录归档 | `SdkDomainError::SupersedeRefRequired` |
 
 #### 7.7.4 非法转换处理

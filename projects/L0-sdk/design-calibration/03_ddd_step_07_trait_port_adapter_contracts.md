@@ -100,7 +100,8 @@ pub trait ExamplePort {
 约束：
 
 - 所有 I/O、repository、source、boundary、runner、artifact 和 outbox 方法必须返回 `Result<..., PortError>` 或更具体的 `RepositoryError` / `BoundaryError` / `RunnerError`。
-- 写入类 repository 方法必须显式携带 `UnitOfWorkHandle`，必要时携带 `ExpectedVersion`。
+- 写入 SDK domain truth 的 repository 方法必须显式携带 `UnitOfWorkHandle`，必要时携带 `ExpectedVersion`。
+- runtime boundary 的幂等技术记录不属于 SDK domain truth；必须通过独立 `RuntimeIdempotencyRepository` 承接，不携带 `UnitOfWorkHandle`，也不得在其中写 domain truth、projection 或 outbox。
 - 只读 query / projection 方法不能携带 `UnitOfWorkHandle`，也不能触发 refresh、candidate 或 evidence 写入。
 - external boundary 方法只能传 command / query / context / ref / redacted payload ref，不能传 raw secret 或生产 request / response body。
 
@@ -191,8 +192,9 @@ infra_adapters
 |---|---|---|---|---|---|
 | `UnitOfWork` | technical port | `crates/application/src/ports/unit_of_work.rs` | `crates/infra/src/uow/memory_unit_of_work.rs` | 管理写路径事务边界 | `begin` / `commit` / `rollback` |
 | `ClockPort` | technical port | `crates/application/src/ports/clock.rs` | `crates/infra/src/time/system_clock.rs` | 提供可替换时间来源 | `now` |
-| `IdGeneratorPort` | technical port | `crates/application/src/ports/id_generator.rs` | `crates/infra/src/id/uuid_generator.rs` | 生成 SDK 本地 ID | `next_baseline_id` / `next_candidate_id` / `next_evidence_id` |
+| `IdGeneratorPort` | technical port | `crates/application/src/ports/id_generator.rs` | `crates/infra/src/id/uuid_generator.rs` | 生成 SDK 本地 ID | `next_baseline_id` / `next_candidate_id` / `next_evidence_id` / `next_compatibility_decision_id` / `next_removal_plan_ref` / `next_outbox_event_id` |
 | `SdkIdempotencyRepository` | repository port | `crates/application/src/ports/idempotency_repository.rs` | `crates/infra/src/repositories/idempotency_memory.rs` | 保存 command / consumer / job 幂等锚点 | `find` / `reserve` / `complete` / `mark_conflict` |
+| `RuntimeIdempotencyRepository` | technical repository port | `crates/application/src/ports/runtime_idempotency_repository.rs` | `crates/infra/src/repositories/runtime_idempotency_memory.rs` | 保存 runtime boundary call / publish 技术幂等记录 | `find` / `reserve` / `complete` / `mark_conflict` |
 | `SemanticBaselineRepository` | repository port | `crates/application/src/ports/semantic_baseline_repository.rs` | `crates/infra/src/repositories/semantic_baseline_memory.rs` | 保存共同语义基线 | `get_current` / `get_for_update` / `save` |
 | `DerivedViewRepository` | repository port | `crates/application/src/ports/derived_view_repository.rs` | `crates/infra/src/repositories/derived_view_memory.rs` | 保存派生 binding view、language view 和 freshness | `get_binding_view` / `save_binding_view` / `mark_stale_by_upstream` |
 | `ServiceClientViewRepository` | repository port | `crates/application/src/ports/service_client_view_repository.rs` | `crates/infra/src/repositories/service_client_view_memory.rs` | 保存 service client view | `get_current` / `save` |
@@ -208,6 +210,7 @@ infra_adapters
 | `CoreContractSourcePort` | source port | `crates/application/src/ports/core_contract_source.rs` | `crates/infra/src/sources/core_contract_local.rs` | 读取 `L0-core` 契约 snapshot | `fetch_snapshot` / `latest_version` |
 | `BusSemanticSourcePort` | source port | `crates/application/src/ports/bus_semantic_source.rs` | `crates/infra/src/sources/bus_semantic_local.rs` | 读取 `L0-bus` 语义 snapshot | `fetch_snapshot` / `latest_version` |
 | `FormalApiSourcePort` | source port | `crates/application/src/ports/formal_api_source.rs` | `crates/infra/src/sources/formal_api_local.rs` | 读取 formal API snapshot | `fetch_snapshot` / `latest_version` |
+| `PublicSdkApiSurfacePort` | source port | `crates/application/src/ports/public_sdk_api_surface.rs` | `crates/infra/src/sources/public_sdk_api_surface_local.rs` | 解析 SDK public API surface 引用 | `resolve_api` |
 | `FormalApiBoundaryPort` | boundary port | `crates/application/src/ports/formal_api_boundary.rs` | `crates/infra/src/boundaries/formal_api_http.rs` | 调用正式服务能力边界 | `call_service` / `read_service` / `check_capability` |
 | `FakeFixtureEndpointPort` | boundary port | `crates/application/src/ports/fake_fixture_endpoint.rs` | `crates/infra/src/boundaries/fake_fixture.rs` | 调用 fake / fixture 验证目标 | `call_fake` / `read_fake` / `assert_fake_marker` |
 | `BusEventBoundaryPort` | boundary port | `crates/application/src/ports/bus_event_boundary.rs` | `crates/infra/src/boundaries/bus_event.rs` | 发布或订阅 bus event client 边界 | `publish_event` / `open_subscription` |
@@ -217,7 +220,8 @@ infra_adapters
 | `DocsExampleRunnerPort` | runner port | `crates/application/src/ports/docs_example_runner.rs` | `crates/infra/src/runners/docs_example_runner_local.rs` | 运行 docs / examples 验证 | `run_examples` |
 | `CompatibilityRunnerPort` | runner port | `crates/application/src/ports/compatibility_runner.rs` | `crates/infra/src/runners/compatibility_runner_local.rs` | 执行兼容检查 | `check_compatibility` |
 | `BoundaryPolicyVerifierPort` | runner port | `crates/application/src/ports/boundary_policy_verifier.rs` | `crates/infra/src/runners/boundary_policy_verifier.rs` | 验证 redaction / credential / fake boundary 底线 | `verify` |
-| `PackageArtifactStorePort` | artifact port | `crates/application/src/ports/package_artifact_store.rs` | `crates/infra/src/artifacts/package_artifact_store.rs` | 保存 package artifact 引用和 digest | `put_artifact` / `get_artifact` / `verify_digest` |
+| `PackageArtifactStorePort` | artifact port | `crates/application/src/ports/package_artifact_store.rs` | `crates/infra/src/artifacts/package_artifact_store.rs` | 保存 package artifact 引用和 digest,并为 runner 物化本地可执行 artifact | `put_artifact` / `get_artifact` / `verify_digest` / `materialize_artifacts` |
+| `EvidenceArtifactReplayPort` | artifact replay port | `crates/application/src/ports/evidence_artifact_replay.rs` | `crates/infra/src/artifacts/evidence_artifact_replay.rs` | 从已提交且脱敏的 evidence artifact 重放 projection 明细 | `replay_docs_examples` |
 | `SdkOutboxPort` | outbox port | `crates/application/src/ports/sdk_outbox.rs` | `crates/infra/src/outbox/sdk_outbox_memory.rs` | 保存本仓已提交事实并驱动后续发布 | `append` / `load_pending` / `mark_published` |
 
 ### 7.2 模块间 trait 调用图
@@ -394,7 +398,7 @@ pub trait ClockPort {
 ```rust
 /// SDK 本地 ID 生成端口。
 ///
-/// 用于生成语义基线、candidate、evidence、compatibility decision 和 outbox event ID。
+/// 用于生成语义基线、candidate、evidence、compatibility decision、removal plan 和 outbox event ID。
 pub trait IdGeneratorPort {
     /// 生成语义基线 ID。
     fn next_baseline_id(&self) -> SdkBaselineId;
@@ -407,6 +411,9 @@ pub trait IdGeneratorPort {
 
     /// 生成 compatibility decision ID。
     fn next_compatibility_decision_id(&self) -> CompatibilityDecisionId;
+
+    /// 生成 removal plan ref。
+    fn next_removal_plan_ref(&self) -> RemovalPlanRef;
 
     /// 生成 SDK outbox event ID。
     fn next_outbox_event_id(&self) -> SdkOutboxEventId;
@@ -421,6 +428,7 @@ pub trait IdGeneratorPort {
 | `next_candidate_id(&self) -> PackageCandidateId` | 生成 candidate ID | 无 | `PackageCandidateId` | 不适用 |
 | `next_evidence_id(&self) -> EvidenceId` | 生成 evidence ID | 无 | `EvidenceId` | 不适用 |
 | `next_compatibility_decision_id(&self) -> CompatibilityDecisionId` | 生成 compatibility decision ID | 无 | `CompatibilityDecisionId` | 不适用 |
+| `next_removal_plan_ref(&self) -> RemovalPlanRef` | 生成 removal plan ref | 无 | `RemovalPlanRef` | 不适用 |
 | `next_outbox_event_id(&self) -> SdkOutboxEventId` | 生成 outbox event ID | 无 | `SdkOutboxEventId` | 不适用 |
 
 ##### 调用方 / 实现方
@@ -444,9 +452,9 @@ Repository port 只负责 SDK 本地 truth 的保存和读取。上游 core / bu
 ##### Trait 定义
 
 ```rust
-/// SDK 幂等锚点仓储端口。
+/// SDK domain 写路径幂等锚点仓储端口。
 ///
-/// 用于 command、consumer 和 job 入口在进入写路径前判断是否重复提交。
+/// 用于 command、consumer 和 job 入口在进入 SDK domain 写路径前判断是否重复提交。
 pub trait SdkIdempotencyRepository {
     /// 查找已有幂等记录。
     async fn find(
@@ -485,23 +493,86 @@ pub trait SdkIdempotencyRepository {
 | 函数签名 | 作用 | 参数说明 | 返回 | 错误类型 |
 |---|---|---|---|---|
 | `find(key: IdempotencyKey)` | 查询幂等记录 | `key` 是入口幂等键 | `Option<IdempotencyRecord>` | `RepositoryError` |
-| `reserve(key: IdempotencyKey, command_digest: CommandDigest, uow: UnitOfWorkHandle)` | 占用幂等键 | `command_digest` 是规范化后的输入摘要 | `IdempotencyReservation` | `RepositoryError` |
-| `complete(key: IdempotencyKey, receipt_ref: CommandReceiptRef, uow: UnitOfWorkHandle)` | 标记完成 | `receipt_ref` 指向命令回执 | `()` | `RepositoryError` |
+| `reserve(key: IdempotencyKey, command_digest: CommandDigest, uow: UnitOfWorkHandle)` | 在 SDK domain 写事务中占用幂等键 | `command_digest` 是规范化后的输入摘要 | `IdempotencyReservation` | `RepositoryError` |
+| `complete(key: IdempotencyKey, receipt_ref: CommandReceiptRef, uow: UnitOfWorkHandle)` | 在 SDK domain 写事务中标记完成 | `receipt_ref` 指向命令回执 | `()` | `RepositoryError` |
 | `mark_conflict(key: IdempotencyKey, observed_digest: CommandDigest, uow: UnitOfWorkHandle)` | 标记冲突 | `observed_digest` 是本次请求摘要 | `()` | `RepositoryError` |
 
 ##### 调用方 / 实现方
 
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
-| 调用方 | 所有 command / consumer / job application service | 进入写路径前先检查幂等 |
+| 调用方 | command / consumer / job application service | 进入 SDK domain 写路径前先检查幂等 |
 | 实现方 | `infra_adapters` | in-memory，后续 durable store |
 
 ##### 不变量与禁止事项
 
 - 相同 `IdempotencyKey` + 相同 `CommandDigest` 必须返回同一业务结果或回执引用。
 - 相同 `IdempotencyKey` + 不同 `CommandDigest` 必须进入 conflict，不能覆盖旧结果。
+- 不得被 `InvokeServiceCapability` / `PublishBusEvent` 这类 runtime boundary 直接调用；runtime 技术幂等必须使用 `RuntimeIdempotencyRepository`。
 
-#### 7.5.2 Semantic 和派生视图 repository
+#### 7.5.2 `RuntimeIdempotencyRepository`
+
+##### Trait 定义
+
+```rust
+/// Runtime boundary 技术幂等仓储端口。
+///
+/// 用于 SDK runtime write-like call 防止 caller retry 重复触发外部边界。
+/// 该端口不写 SDK domain truth，不携带 UnitOfWorkHandle。
+pub trait RuntimeIdempotencyRepository {
+    /// 查找已有 runtime 幂等记录。
+    async fn find(
+        &self,
+        key: IdempotencyKey,
+    ) -> Result<Option<IdempotencyRecord>, RepositoryError>;
+
+    /// 原子占用 runtime 幂等 key。
+    async fn reserve(
+        &self,
+        key: IdempotencyKey,
+        command_digest: CommandDigest,
+    ) -> Result<IdempotencyReservation, RepositoryError>;
+
+    /// 标记 runtime boundary 调用已完成。
+    async fn complete(
+        &self,
+        key: IdempotencyKey,
+        receipt_ref: CommandReceiptRef,
+    ) -> Result<(), RepositoryError>;
+
+    /// 标记相同 key 对应不同 command digest 的冲突。
+    async fn mark_conflict(
+        &self,
+        key: IdempotencyKey,
+        observed_digest: CommandDigest,
+    ) -> Result<(), RepositoryError>;
+}
+```
+
+##### 方法表
+
+| 函数签名 | 作用 | 参数说明 | 返回 | 错误类型 |
+|---|---|---|---|---|
+| `find(key: IdempotencyKey)` | 查询 runtime 技术幂等记录 | `key` 是 invoke / publish 规范化后的运行时幂等键 | `Option<IdempotencyRecord>` | `RepositoryError` |
+| `reserve(key: IdempotencyKey, command_digest: CommandDigest)` | 原子占用 runtime 幂等键 | `command_digest` 是规范化后的 runtime call / publish 摘要 | `IdempotencyReservation` | `RepositoryError` |
+| `complete(key: IdempotencyKey, receipt_ref: CommandReceiptRef)` | 标记完成 | `receipt_ref` 指向 boundary result / diagnostic / publish ref 对应的回执引用 | `()` | `RepositoryError` |
+| `mark_conflict(key: IdempotencyKey, observed_digest: CommandDigest)` | 标记冲突 | `observed_digest` 是本次 runtime 请求摘要 | `()` | `RepositoryError` |
+
+##### 调用方 / 实现方
+
+| 角色 | 模块 / 对象 | 说明 |
+|---|---|---|
+| 调用方 | `ServiceClientAssemblyService`、`EventClientAssemblyService` | 防止 runtime retry 重复触发 formal API / bus boundary |
+| 实现方 | `infra_adapters` | in-memory，后续 durable technical store |
+
+##### 不变量与禁止事项
+
+- 相同 runtime-scoped `IdempotencyKey` + 相同 `CommandDigest` 必须返回同一 `CommandReceiptRef` 或明确 in-progress。
+- 相同 runtime-scoped `IdempotencyKey` + 不同 `CommandDigest` 必须进入 conflict。
+- 不得写 `SdkSemanticBaseline`、`DerivedBindingView`、`ServiceClientView`、`BusEventClientView`、`PackageCandidate`、`VerificationEvidence`、projection 或 outbox。
+- 不得要求调用方开启 `UnitOfWork`；该端口通过自身原子写入或唯一键保证技术记录一致性。
+
+#### 7.5.3 Semantic 和派生视图 repository
 
 ##### Trait 定义
 
@@ -542,7 +613,9 @@ pub trait DerivedViewRepository {
         uow: UnitOfWorkHandle,
     ) -> Result<Version, RepositoryError>;
 
-    /// 读取某个语言的 language view。
+    /// 读取某个语言的当前 language view。
+    ///
+    /// 返回对象必须携带由 `DerivedViewId + LanguageId` 稳定派生的 `language_view_id`。
     async fn get_language_view(
         &self,
         language_id: LanguageId,
@@ -574,7 +647,7 @@ pub trait DerivedViewRepository {
 | `SemanticBaselineRepository` | `save(baseline: SdkSemanticBaseline, expected_version: ExpectedVersion, uow: UnitOfWorkHandle)` | 保存语义基线 | `expected_version` 是乐观锁版本 | `Version` | `RepositoryError` |
 | `DerivedViewRepository` | `get_binding_view(view_id: DerivedViewId)` | 读取派生视图 | `view_id` 是 view ID | `Option<DerivedBindingView>` | `RepositoryError` |
 | `DerivedViewRepository` | `save_binding_view(view: DerivedBindingView, expected_version: ExpectedVersion, uow: UnitOfWorkHandle)` | 保存派生视图 | `view` 是领域视图对象 | `Version` | `RepositoryError` |
-| `DerivedViewRepository` | `get_language_view(language_id: LanguageId)` | 读取语言视图 | `language_id` 是语言 ID | `Option<LanguageBindingView>` | `RepositoryError` |
+| `DerivedViewRepository` | `get_language_view(language_id: LanguageId)` | 读取某语言当前语言视图 | `language_id` 是语言 ID;返回对象必须携带稳定 `language_view_id` | `Option<LanguageBindingView>` | `RepositoryError` |
 | `DerivedViewRepository` | `save_language_view(view: LanguageBindingView, expected_version: ExpectedVersion, uow: UnitOfWorkHandle)` | 保存语言视图 | `view` 是语言视图对象 | `Version` | `RepositoryError` |
 | `DerivedViewRepository` | `mark_stale_by_upstream(upstream_ref: UpstreamVersionRef, uow: UnitOfWorkHandle)` | 标记受影响视图 stale | `upstream_ref` 是上游版本引用 | `StaleMarkResult` | `RepositoryError` |
 
@@ -590,7 +663,7 @@ pub trait DerivedViewRepository {
 - repository 保存的是 SDK 派生视图，不复制 core / bus / formal API 正文。
 - `mark_stale_by_upstream` 只影响 SDK 本地 freshness，不修改上游版本本身。
 
-#### 7.5.3 Client view repository
+#### 7.5.4 Client view repository
 
 ##### Trait 定义
 
@@ -645,7 +718,7 @@ pub trait EventClientViewRepository {
 - `ServiceClientViewRepository` 不保存服务端业务 truth。
 - `EventClientViewRepository` 不保存 bus delivery / retry / replay truth。
 
-#### 7.5.4 Candidate、Evidence、Compatibility 和 Version repository
+#### 7.5.5 Candidate、Evidence、Compatibility 和 Version repository
 
 ##### Trait 定义
 
@@ -919,6 +992,15 @@ pub trait FormalApiSourcePort {
     /// 读取最新可用 formal API 版本引用。
     async fn latest_version(&self) -> Result<UpstreamVersionRef, SourceError>;
 }
+
+/// SDK public API surface 解析端口。
+pub trait PublicSdkApiSurfacePort {
+    /// 按 API 引用解析当前 public SDK surface 条目。
+    async fn resolve_api(
+        &self,
+        api_ref: SdkApiRef,
+    ) -> Result<Option<PublicSdkApiSurfaceEntry>, SourceError>;
+}
 ```
 
 ##### 方法表
@@ -931,18 +1013,21 @@ pub trait FormalApiSourcePort {
 | `BusSemanticSourcePort` | `latest_version()` | 读取最新 bus 版本引用 | 无 | `UpstreamVersionRef` | `SourceError` |
 | `FormalApiSourcePort` | `fetch_snapshot(version_ref: UpstreamVersionRef)` | 读取 formal API snapshot | `version_ref` 是上游版本引用 | `FormalApiSnapshot` | `SourceError` |
 | `FormalApiSourcePort` | `latest_version()` | 读取最新 formal API 版本引用 | 无 | `UpstreamVersionRef` | `SourceError` |
+| `PublicSdkApiSurfacePort` | `resolve_api(api_ref: SdkApiRef)` | 解析 public SDK API 是否存在及其当前版本 | `api_ref` 是 SDK API 引用 | `Option<PublicSdkApiSurfaceEntry>` | `SourceError` |
 
 ##### 调用方 / 实现方
 
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
-| 调用方 | `ContractConsumptionService`、`CheckUpstreamFreshness` job、`RefreshDerivedBindingView` flow | 读取 snapshot 并派生 SDK 本地 view |
+| 调用方 | `ContractConsumptionService`、`CompatibilityGovernanceService`、`CheckUpstreamFreshness` job、`RefreshDerivedBindingView` flow | 读取 snapshot、解析 public API surface,并派生 SDK 本地 view |
 | 实现方 | `infra_adapters` | local file / sibling repo / future remote source adapter |
 
 ##### 不变量与禁止事项
 
 - source port 不写 SDK truth；写入由 application service 调 repository 完成。
 - source port 不复制服务仓源码，不依赖 service implementation crate。
+- `PublicSdkApiSurfacePort` 只解析 public SDK API surface,不得保存 deprecated lifecycle、compatibility decision 或 migration truth。
+- `DeprecateSdkApi` 校验 `api_ref`、`replacement_api_ref` 和当前 API 所属版本时必须读取 `PublicSdkApiSurfacePort`,不得让 `CompatibilityRepository` 伪造 public surface truth。
 
 #### 7.6.3 Boundary port
 
@@ -1071,8 +1156,8 @@ pub trait PackageBuilderPort {
 
 | Trait | 函数签名 | 作用 | 参数说明 | 返回 | 错误类型 |
 |---|---|---|---|---|---|
-| `LanguageBindingGeneratorPort` | `generate(input: LanguageBindingGenerationInput)` | 生成语言 binding surface | `input` 包含 baseline、view、language 和 output ref | `LanguageBindingGenerationResult` | `RunnerError` |
-| `PackageBuilderPort` | `build_candidate(input: PackageBuildInput)` | 构建本地 package artifact | `input` 包含 candidate、语言集合和输出目录 ref | `PackageBuildResult` | `RunnerError` |
+| `LanguageBindingGeneratorPort` | `generate(input: LanguageBindingGenerationInput)` | 生成语言 binding surface | `input` 包含 candidate、`LanguageBindingView`、`language_view_id` 和 output ref | `LanguageBindingGenerationResult` | `RunnerError` |
+| `PackageBuilderPort` | `build_candidate(input: PackageBuildInput)` | 构建本地 package artifact | `input` 包含 candidate、language、`language_view_id`、generated binding ref 和输出目录 ref | `PackageBuildResult` | `RunnerError` |
 
 ##### 调用方 / 实现方
 
@@ -1084,7 +1169,7 @@ pub trait PackageBuilderPort {
 ##### 不变量与禁止事项
 
 - builder 只生成本地 artifact，不发布 public registry。
-- generator 不定义新平台语义，只消费 `SdkSemanticBaseline`、`DerivedBindingView` 和 `LanguageBindingView`。
+- generator 不定义新平台语义，只消费 `SdkSemanticBaseline`、`DerivedBindingView` 和 `LanguageBindingView`;package builder 必须把来源 `language_view_id` 原样带入 artifact metadata。
 
 #### 7.7.2 Runner port
 
@@ -1132,10 +1217,10 @@ pub trait BoundaryPolicyVerifierPort {
 
 | Trait | 函数签名 | 作用 | 参数说明 | 返回 | 错误类型 |
 |---|---|---|---|---|---|
-| `SmokeRunnerPort` | `run_cross_language_smoke(input: CrossLanguageSmokeInput)` | 运行 Rust / Python / TypeScript smoke | `input` 指向 candidate artifact、fixture 和 suite | `CrossLanguageSmokeResult` | `RunnerError` |
-| `DocsExampleRunnerPort` | `run_examples(input: DocsExampleRunInput)` | 验证 docs / examples | `input` 指向 example set 和 candidate artifact | `DocsExampleRunResult` | `RunnerError` |
+| `SmokeRunnerPort` | `run_cross_language_smoke(input: CrossLanguageSmokeInput)` | 运行 Rust / Python / TypeScript smoke | `input` 指向 suite、fixture 和由 `PackageArtifactStorePort.materialize_artifacts(...)` 返回的 materialized artifacts | `CrossLanguageSmokeResult` | `RunnerError` |
+| `DocsExampleRunnerPort` | `run_examples(input: DocsExampleRunInput)` | 验证 docs / examples | `input` 指向 example set 和由 `PackageArtifactStorePort.materialize_artifacts(...)` 返回的 materialized artifacts | `DocsExampleRunResult` | `RunnerError` |
 | `CompatibilityRunnerPort` | `check_compatibility(input: CompatibilityCheckInput)` | 执行兼容检查 | `input` 指向基线、候选和变更集 | `CompatibilityCheckResult` | `RunnerError` |
-| `BoundaryPolicyVerifierPort` | `verify(input: BoundaryPolicyVerificationInput)` | 验证横切边界策略 | `input` 指向 policy、guard、fixture 和 expected failures | `BoundaryPolicyVerificationResult` | `RunnerError` |
+| `BoundaryPolicyVerifierPort` | `verify(input: BoundaryPolicyVerificationInput)` | 验证横切边界策略 | `input` 指向 policy、guard、fixture、expected failures 和 materialized artifacts | `BoundaryPolicyVerificationResult` | `RunnerError` |
 
 ##### 调用方 / 实现方
 
@@ -1181,6 +1266,25 @@ pub trait PackageArtifactStorePort {
         &self,
         candidate_id: PackageCandidateId,
     ) -> Result<Vec<PackageArtifactMetadata>, ArtifactError>;
+
+    /// 将 candidate artifacts 物化到本次 job run 的 runner 可读位置。
+    async fn materialize_artifacts(
+        &self,
+        input: PackageArtifactMaterializationInput,
+    ) -> Result<PackageArtifactMaterializationResult, ArtifactError>;
+}
+
+/// Evidence artifact 重放端口。
+///
+/// 该端口只读取已经由 `VerificationEvidence` 引用、且 `redaction_status = Redacted`
+/// 的 evidence artifact。它不得读取 runner 临时目录,不得把 raw logs、secret 或 package body
+/// 作为 projection 来源。
+pub trait EvidenceArtifactReplayPort {
+    /// 从 docs evidence artifact 重放 docs example projection 行。
+    async fn replay_docs_examples(
+        &self,
+        evidence: VerificationEvidence,
+    ) -> Result<Vec<DocsExampleView>, ArtifactError>;
 }
 
 /// SDK outbox 端口。
@@ -1217,20 +1321,77 @@ pub trait SdkOutboxPort {
 | `PackageArtifactStorePort` | `get_artifact(artifact_ref: PackageArtifactRef)` | 读取 artifact metadata | `artifact_ref` 是 artifact 引用 | `Option<PackageArtifactMetadata>` | `ArtifactError` |
 | `PackageArtifactStorePort` | `verify_digest(artifact_ref: PackageArtifactRef, expected_digest: ArtifactDigest)` | 校验 digest | `expected_digest` 是期望摘要 | `DigestVerificationResult` | `ArtifactError` |
 | `PackageArtifactStorePort` | `list_by_candidate(candidate_id: PackageCandidateId)` | 列出 candidate artifacts | `candidate_id` 是 candidate ID | `Vec<PackageArtifactMetadata>` | `ArtifactError` |
+| `PackageArtifactStorePort` | `materialize_artifacts(input: PackageArtifactMaterializationInput)` | 将 candidate artifacts 物化到 runner 可读的 run-scoped location | `input` 包含 candidate、language set、job run id 和用途 | `PackageArtifactMaterializationResult` | `ArtifactError` |
+| `EvidenceArtifactReplayPort` | `replay_docs_examples(evidence: VerificationEvidence)` | 从 committed docs evidence artifact 解析 docs example projection 行 | `evidence` 必须是 `EvidenceKind::DocsExample` 且已脱敏 | `Vec<DocsExampleView>` | `ArtifactError` |
 | `SdkOutboxPort` | `append(event: SdkOutboxEvent, uow: UnitOfWorkHandle)` | 追加 outbox event | `event` 是已提交 SDK fact | `()` | `OutboxError` |
 | `SdkOutboxPort` | `load_pending(cursor: OutboxCursor, limit: PageLimit)` | 读取待发布 event | `cursor` 是游标；`limit` 是分页大小 | `OutboxEventPage` | `OutboxError` |
 | `SdkOutboxPort` | `mark_published(event_id: SdkOutboxEventId, published_ref: PublishedEventRef, uow: UnitOfWorkHandle)` | 标记已发布 | `published_ref` 是发布引用 | `()` | `OutboxError` |
+
+##### artifact materialization 类型
+
+```rust
+/// artifact 物化用途。
+pub enum ArtifactMaterializationPurpose {
+    /// 用于跨语言 smoke runner。
+    Smoke,
+    /// 用于 docs / examples runner。
+    DocsExamples,
+    /// 用于 boundary policy verifier。
+    BoundaryVerification,
+}
+
+/// artifact store 物化 candidate artifact 的输入。
+pub struct PackageArtifactMaterializationInput {
+    /// 待验证的 candidate。
+    pub candidate_id: PackageCandidateId,
+    /// 需要物化的语言集合。
+    pub language_set: Vec<LanguageId>,
+    /// 当前 job run。
+    pub job_run_id: JobRunId,
+    /// 物化用途。
+    pub purpose: ArtifactMaterializationPurpose,
+}
+
+/// runner 可消费的本地 artifact 引用。
+pub struct MaterializedPackageArtifact {
+    /// 语言标识。
+    pub language_id: LanguageId,
+    /// 原始 artifact 引用。
+    pub artifact_ref: PackageArtifactRef,
+    /// artifact 摘要。
+    pub artifact_digest: ArtifactDigest,
+    /// run-scoped 本地位置引用。
+    pub location_ref: MaterializedArtifactLocationRef,
+}
+
+/// artifact 物化结果。
+pub struct PackageArtifactMaterializationResult {
+    /// 本次物化批次引用。
+    pub materialization_ref: ArtifactMaterializationRef,
+    /// 已物化的 artifact 列表。
+    pub artifacts: Vec<MaterializedPackageArtifact>,
+}
+```
+
+| 类型 / 字段 | 作用 | 约束 |
+|---|---|---|
+| `PackageArtifactMaterializationInput.job_run_id` | 把 runner 输入绑定到固定 run | 来源必须是 `JobMetadata.job_run_id` |
+| `MaterializedPackageArtifact.location_ref` | runner adapter 可解析的 run-scoped artifact location | 不进入 `LanguageArtifact`、`PackageCandidate` 或 domain truth |
+| `PackageArtifactMaterializationResult.artifacts` | 给 smoke / docs / boundary runner 的候选产物 | 必须覆盖输入 `language_set` |
 
 ##### 调用方 / 实现方
 
 | 角色 | 模块 / 对象 | 说明 |
 |---|---|---|
-| 调用方 | `PackageCandidateService`、`CandidateValidationService`、`CompatibilityGovernanceService`、outbox publish job | 保存 artifact、追加 outbox、发布状态更新 |
+| 调用方 | `PackageCandidateService`、`CandidateValidationService`、`DocsExampleValidationService`、`CompatibilityGovernanceService`、`ProjectionRebuildService`、outbox publish job | 保存 artifact、物化 runner artifact、从 committed evidence artifact 重放 projection、追加 outbox、发布状态更新 |
 | 实现方 | `infra_adapters` | filesystem artifact store、in-memory outbox、future durable outbox |
 
 ##### 不变量与禁止事项
 
 - artifact store 只保存 artifact 和 metadata，不保存 raw secret。
+- `materialize_artifacts(...)` 是 runner 前置读侧操作,不得修改 `PackageCandidate`、`LanguageArtifact` 或 evidence truth。
+- `EvidenceArtifactReplayPort` 只能读取已提交且已脱敏的 evidence artifact;docs example projection rebuild 不得读取 runner 临时目录或 projection 旧值。
+- `LanguageArtifact` 仍只保存 `artifact_ref`、digest、language 和来源 `language_view_id`;不得把 filesystem path 或 materialized location 写入 domain object。
 - outbox event 必须在同一业务写事务内 append；发布动作不得反向修改 domain object。
 - outbox event 不等于 `L0-bus` delivery truth，只是 SDK 本地事实输出。
 
@@ -1246,6 +1407,7 @@ pub trait SdkOutboxPort {
 | `LocalCoreContractSourceAdapter` | `CoreContractSourcePort` | `crates/infra/src/sources/core_contract_local.rs` | 是 | 不得复制 core 正文到 SDK truth |
 | `LocalBusSemanticSourceAdapter` | `BusSemanticSourcePort` | `crates/infra/src/sources/bus_semantic_local.rs` | 是 | 不得定义 bus delivery / retry truth |
 | `LocalFormalApiSourceAdapter` | `FormalApiSourcePort` | `crates/infra/src/sources/formal_api_local.rs` | 是 | 不得依赖服务仓源码 |
+| `LocalPublicSdkApiSurfaceAdapter` | `PublicSdkApiSurfacePort` | `crates/infra/src/sources/public_sdk_api_surface_local.rs` | 是 | 不得写 deprecated lifecycle 或 migration truth |
 | `FormalApiHttpBoundaryAdapter` | `FormalApiBoundaryPort` | `crates/infra/src/boundaries/formal_api_http.rs` | P0 可用 profile | 不得执行 auth / governance，不得保存 raw body |
 | `FakeFixtureEndpointAdapter` | `FakeFixtureEndpointPort` | `crates/infra/src/boundaries/fake_fixture.rs` | 是 | 不得把 fake result 映射为 production success |
 | `BusEventBoundaryAdapter` | `BusEventBoundaryPort` | `crates/infra/src/boundaries/bus_event.rs` | P0 可用 profile | 不得生成 bus publication / delivery truth |
@@ -1256,6 +1418,7 @@ pub trait SdkOutboxPort {
 | `LocalCompatibilityRunner` | `CompatibilityRunnerPort` | `crates/infra/src/runners/compatibility_runner_local.rs` | 是 | 不得直接修改 deprecated 状态 |
 | `LocalBoundaryPolicyVerifier` | `BoundaryPolicyVerifierPort` | `crates/infra/src/runners/boundary_policy_verifier.rs` | 是 | 不得允许配置关闭 redaction / credential 下限 |
 | `FilesystemPackageArtifactStore` | `PackageArtifactStorePort` | `crates/infra/src/artifacts/package_artifact_store.rs` | 是 | 不得保存 secret material |
+| `FilesystemEvidenceArtifactReplay` | `EvidenceArtifactReplayPort` | `crates/infra/src/artifacts/evidence_artifact_replay.rs` | 是 | 只能读取 redacted evidence artifact,不得读取 runner 临时目录 |
 | `InMemorySdkOutbox` | `SdkOutboxPort` | `crates/infra/src/outbox/sdk_outbox_memory.rs` | 是 | 不得绕过业务事务 append |
 
 Wiring 边界：
@@ -1284,14 +1447,15 @@ Wiring 边界：
 | Application service / job | 必需 port | 说明 |
 |---|---|---|
 | `SdkSemanticBaselineService` | `UnitOfWork`、`ClockPort`、`IdGeneratorPort`、`SdkIdempotencyRepository`、`SemanticBaselineRepository`、`SdkCapabilityProjectionPort`、`SdkOutboxPort` | 更新共同语义基线、刷新 capability summary、输出 baseline changed fact |
-| `ContractConsumptionService` | `UnitOfWork`、`ClockPort`、`SdkIdempotencyRepository`、`CoreContractSourcePort`、`BusSemanticSourcePort`、`FormalApiSourcePort`、`VersionRefRepository`、`DerivedViewRepository`、`ServiceClientViewRepository`、`EventClientViewRepository`、`SdkOutboxPort` | 消费上游 snapshot、保存版本引用、刷新派生视图和 client view |
-| `ServiceClientAssemblyService` | `FormalApiBoundaryPort`、`FakeFixtureEndpointPort`、`ServiceClientViewRepository`、`EvidenceRepository`、`BoundaryPolicyVerifierPort` | 组装并调用 service client boundary，不写服务端 truth |
-| `EventClientAssemblyService` | `BusEventBoundaryPort`、`EventClientViewRepository`、`EvidenceRepository` | 组装 event client boundary，不写 bus runtime truth |
+| `ContractConsumptionService` | `UnitOfWork`、`ClockPort`、`IdGeneratorPort`、`SdkIdempotencyRepository`、`SemanticBaselineRepository`、`CoreContractSourcePort`、`BusSemanticSourcePort`、`FormalApiSourcePort`、`VersionRefRepository`、`DerivedViewRepository`、`ServiceClientViewRepository`、`EventClientViewRepository`、`SdkOutboxPort` | 消费上游 snapshot、读取当前 concept map、保存版本引用、刷新派生视图和 client view |
+| `ServiceClientAssemblyService` | `RuntimeIdempotencyRepository`、`FormalApiBoundaryPort`、`FakeFixtureEndpointPort`、`ServiceClientViewRepository`、`EvidenceRepository`、`BoundaryPolicyVerifierPort` | 组装并调用 service client boundary；使用 runtime 技术幂等防重复外部调用，不写服务端 truth 或 SDK domain truth |
+| `EventClientAssemblyService` | `RuntimeIdempotencyRepository`、`BusEventBoundaryPort`、`EventClientViewRepository`、`EvidenceRepository` | 组装 event client boundary；使用 runtime 技术幂等防重复 bus publish，不写 bus runtime truth 或 SDK domain truth |
 | `PackageCandidateService` | `UnitOfWork`、`ClockPort`、`IdGeneratorPort`、`CandidateRepository`、`SemanticBaselineRepository`、`DerivedViewRepository`、`ServiceClientViewRepository`、`EventClientViewRepository`、`LanguageBindingGeneratorPort`、`PackageBuilderPort`、`PackageArtifactStorePort`、`SdkOutboxPort` | 生成 candidate、构建 artifact、保存本地候选事实 |
-| `CandidateValidationService` | `UnitOfWork`、`ClockPort`、`IdGeneratorPort`、`CandidateRepository`、`EvidenceRepository`、`SmokeRunnerPort`、`DocsExampleRunnerPort`、`BoundaryPolicyVerifierPort`、`EvidenceProjectionPort`、`DocsExampleProjectionPort`、`SdkOutboxPort` | 运行验证、保存 evidence、更新只读投影 |
-| `CompatibilityGovernanceService` | `UnitOfWork`、`ClockPort`、`IdGeneratorPort`、`CandidateRepository`、`EvidenceRepository`、`CompatibilityRepository`、`CompatibilityRunnerPort`、`CompatibilityProjectionPort`、`SdkOutboxPort` | 形成 compatibility decision、deprecated API record 和 migration ref |
-| `DocsExampleValidationService` | `DocsExampleRunnerPort`、`EvidenceRepository`、`DocsExampleProjectionPort`、`PackageArtifactStorePort` | 验证 docs example 并生成 evidence / projection |
+| `CandidateValidationService` | `UnitOfWork`、`ClockPort`、`IdGeneratorPort`、`CandidateRepository`、`EvidenceRepository`、`SmokeRunnerPort`、`DocsExampleRunnerPort`、`BoundaryPolicyVerifierPort`、`EvidenceProjectionPort`、`DocsExampleProjectionPort`、`PackageArtifactStorePort`、`SdkOutboxPort` | 运行验证、物化 candidate artifact、保存 evidence、更新只读投影 |
+| `CompatibilityGovernanceService` | `UnitOfWork`、`ClockPort`、`IdGeneratorPort`、`CandidateRepository`、`EvidenceRepository`、`CompatibilityRepository`、`PublicSdkApiSurfacePort`、`CompatibilityRunnerPort`、`CompatibilityProjectionPort`、`SdkOutboxPort` | 形成 compatibility decision、deprecated API record、migration ref，并校验 deprecated / replacement API 是否属于 public SDK surface |
+| `DocsExampleValidationService` | `UnitOfWork`、`ClockPort`、`IdGeneratorPort`、`CandidateRepository`、`EvidenceRepository`、`DocsExampleRunnerPort`、`DocsExampleProjectionPort`、`PackageArtifactStorePort`、`SdkOutboxPort` | 物化 candidate artifact,验证 docs example 并生成 evidence / projection |
 | `QueryService` | `SdkCapabilityProjectionPort`、`EvidenceProjectionPort`、`CompatibilityProjectionPort`、`DocsExampleProjectionPort`、`DerivedViewRepository`、`ServiceClientViewRepository`、`EventClientViewRepository` | 只读查询，不开写事务，不触发 refresh |
+| `ProjectionRebuildService` | `UnitOfWork`、`SemanticBaselineRepository`、`CandidateRepository`、`EvidenceRepository`、`CompatibilityRepository`、`SdkCapabilityProjectionPort`、`EvidenceProjectionPort`、`CompatibilityProjectionPort`、`DocsExampleProjectionPort`、`EvidenceArtifactReplayPort` | 从 committed truth 和 redacted evidence artifact 重建 read model,不改写真相 |
 | `CheckUpstreamFreshness` job | `CoreContractSourcePort`、`BusSemanticSourcePort`、`FormalApiSourcePort`、`VersionRefRepository`、`DerivedViewRepository` | 检查 freshness，不复制上游正文 |
 | `GeneratePackageCandidate` job | `PackageCandidateService` 经 runtime handle | 不直接调用 builder / repository |
 | `BuildLanguagePackages` job | `PackageCandidateService` 经 runtime handle | 不直接调用 package builder |
@@ -1299,7 +1463,15 @@ Wiring 边界：
 | `ValidateDocsExamples` job | `DocsExampleValidationService` 经 runtime handle | 不直接调用 docs runner |
 | `CheckCompatibility` job | `CompatibilityGovernanceService` 经 runtime handle | 不直接调用 compatibility runner |
 | `VerifyBoundaryPolicies` job | `CandidateValidationService` 经 runtime handle | 不直接调用 verifier |
-| `RebuildSdkProjections` job | projection ports、truth repositories 经 application service | 只重建 read model，不改写真相 |
+| `RebuildSdkProjections` job | projection ports、truth repositories、`EvidenceArtifactReplayPort` 经 application service | 只重建 read model，不改写真相；docs example projection 只能从 committed docs evidence artifact 重放 |
+
+实施阶段边界说明：
+
+- 本表列的是最终完整依赖集合,不是每个 phase 的一次性构造要求。
+- PH-02 / `commit-02-b` 的 `ContractConsumptionService` 只允许使用 PH-02 已交付的 `SemanticBaselineRepository` 只读访问、source、version ref、derived view、idempotency、UoW、clock、`IdGeneratorPort` 和 outbox 依赖。
+- `commit-02-b` 可以读取 `commit-02-a` 已交付的 `SdkSemanticBaseline` / `CrossLanguageConceptMap` 来构造 `LanguageBindingView`,但不得在该提交中改写 semantic baseline 或 concept map。
+- `ServiceClientViewRepository`、`EventClientViewRepository` 以及对应 `ServiceClientView` / `BusEventClientView` 写路径在 PH-03 / `commit-03-a` 交付。
+- 若实现 `ConsumeBusSemanticChangedFlow` 或 `ConsumeFormalApiChangedFlow`,必须先进入 PH-03,不得在 PH-02 提前补对象或补 port。
 
 ### 7.10 Step 7 统一复核
 
@@ -1308,7 +1480,7 @@ Wiring 边界：
 | 覆盖项 | 是否覆盖 | 说明 |
 |---|---|---|
 | 写事务、时间、ID | 是 | `UnitOfWork`、`ClockPort`、`IdGeneratorPort` |
-| 幂等 | 是 | `SdkIdempotencyRepository` |
+| 幂等 | 是 | `SdkIdempotencyRepository`、`RuntimeIdempotencyRepository` |
 | SDK 本地 truth repository | 是 | semantic、derived view、client view、candidate、evidence、compatibility、version ref |
 | 只读 projection | 是 | capability、evidence、compatibility、docs example projection |
 | 上游 source | 是 | core、bus、formal API source |

@@ -230,7 +230,10 @@ BusSemanticSourcePort.load_snapshot(UpstreamVersionRef upstream_ref)
 FormalApiBoundaryPort.load_snapshot(FormalApiRef formal_api_ref)
   |
   v
-DerivedBindingView.from_upstream_snapshots(CoreContractSnapshot core_snapshot, BusSemanticSnapshot bus_snapshot, FormalApiSnapshot api_snapshot)
+ApplicationExtraction.collect_refs_and_symbols(source snapshots)
+  |
+  v
+DerivedBindingView.from_upstream_refs_and_symbols(Vec<UpstreamVersionRef> refs, Vec<CapabilitySymbol> symbols)
   |
   v
 LanguageBindingView.derive_for_language(LanguageId language_id, DerivedBindingView derived_view)
@@ -389,10 +392,10 @@ EventClientEntry.publish(PublishBusEventCommand command, ClientCallContext conte
 EventClientAssemblyService.resolve_publish(PublishBusEventCommand command, ClientCallContext context)
   |
   v
-BusEventClientView.resolve_event_mapping(EventSemanticId semantic_id)
+BusEventClientView.resolve_event_mapping(TransportSemanticId transport_semantic_id)
   |
   v
-EventSemanticMapping.assert_bus_semantic(BusSemanticId bus_semantic_id)
+EventSemanticMapping.assert_transport_semantic(TransportSemanticId transport_semantic_id)
   |
   v
 BoundaryGuard.assert_body_allowed(BodyDescriptor body_descriptor)
@@ -444,7 +447,7 @@ VersionRefRepository.save(UpstreamVersionRef upstream_ref)
 ProjectionRepository.update(SnapshotFreshnessProjection projection)
   |
   v
-OutboxPublisherPort.publish(SdkSnapshotFreshnessChangedEvent event)
+OutboxPublisherPort.publish(SdkSnapshotFreshnessChangedEvent event / SdkClientViewFreshnessChangedEvent event)
   |
   v
 UpstreamChangeResult
@@ -453,6 +456,7 @@ UpstreamChangeResult
 关键设计点：
 
 - 三类上游变化事件共享消费骨架,差异在影响对象：core 影响 `DerivedBindingView`,bus 影响 `BusEventClientView`,formal API 影响 `ServiceClientView`。
+- core changed 使用 `SdkSnapshotFreshnessChangedEvent`;bus / formal API changed 使用 `SdkClientViewFreshnessChangedEvent`,不得把 `ServiceViewId` / `EventViewId` 塞进 `DerivedViewId`。
 - 该流程只记录版本引用和 freshness 影响,不复制上游契约正文。
 - freshness 进入 pending / stale 后会阻止 candidate 被标记 verified 或 stable。
 - event envelope 字段全集、幂等存储结构和上游 diff 细节留给详细设计。

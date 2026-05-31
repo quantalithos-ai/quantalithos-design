@@ -105,7 +105,7 @@
 | commit-01-a | cargo check、path dependency、命名检查 | bootstrap check log | 否 |
 | commit-01-b | config smoke、script args、artifact/report path check | config smoke log、path check log | 否 |
 | commit-02-a | contract DTO、semantic baseline、concept map unit tests | `EV-SDK-CONTRACT`、`EV-SDK-SEMANTIC` subset | 否 |
-| commit-02-b | derived view、freshness query、inbound changed consumer tests | freshness query evidence、consumer evidence | 否 |
+| commit-02-b | derived view、language view、freshness query、inbound changed consumer tests | freshness query evidence、consumer evidence | 否 |
 | commit-03-a | boundary / event client tests、fake adapter tests | `EV-SDK-BOUNDARY`、`EV-SDK-EVENT` subset | 否 |
 | commit-03-b | trace、error mapping、redaction、credential guard tests | `EV-SDK-TRACE`、`EV-SDK-SECURITY` subset | 否 |
 | commit-04-a | candidate state and stable gate tests | candidate state evidence | 否 |

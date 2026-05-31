@@ -42,7 +42,7 @@ Step 1 已确认详细设计直接承接 00 / 01 / 02 v0.2.0,旧版 03 只作为
 
 2. 本轮必须定义哪些对象、接口、事件、job 和状态机？
 
-   回答：必须定义 `02-概要设计.md` §6 / §7 / §9 / §12 已收稳的所有关键主语，包括 21 个关键对象、6 个 Command API、12 个 Query API、4 个 Inbound Event Consumer、6 个 Outbound Event、8 个 Operations Job，以及 `SnapshotFreshnessState`、`CapabilitySupportState`、`PackageCandidateStatus`、`VerificationEvidence` result / marker、`CompatibilityDecision`、`DeprecatedApiRecord` 等状态主语。
+   回答：必须定义 `02-概要设计.md` §6 / §7 / §9 / §12 已收稳的所有关键主语，包括 21 个关键对象、6 个 Command API、12 个 Query API、4 个 Inbound Event Consumer、7 个 Outbound Event、8 个 Operations Job，以及 `SnapshotFreshnessState`、`CapabilitySupportState`、`PackageCandidateStatus`、`VerificationEvidence` result / marker、`CompatibilityDecision`、`DeprecatedApiRecord` 等状态主语。
 
 3. 哪些能力属于 P1 / 后续阶段，不应在本轮展开？
 
@@ -140,7 +140,7 @@ Step 1 已确认详细设计直接承接 00 / 01 / 02 v0.2.0,旧版 03 只作为
 | Command API | `UpdateSdkSemanticBaseline`、`RefreshDerivedBindingView`、`InvokeServiceCapability`、`PublishBusEvent`、`RecordCompatibilityDecision`、`DeprecateSdkApi` |
 | Query API | `GetSdkCapabilitySummary`、`GetUpstreamVersionRefs`、`GetSnapshotFreshness`、`GetServiceClientView`、`GetEventClientView`、`ReadServiceCapability`、`OpenEventSubscription`、`GetPackageCandidateStatus`、`GetVerificationEvidence`、`GetCompatibilityDecision`、`ListDeprecatedApis`、`GetMigrationGuideRef` |
 | Inbound Event Consumer | `ConsumeCoreContractChanged`、`ConsumeBusSemanticChanged`、`ConsumeFormalApiChanged`、`ConsumeValidationRunFinished` |
-| Outbound Event | `SdkSemanticBaselineChangedEvent`、`SdkSnapshotFreshnessChangedEvent`、`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent`、`CompatibilityDecisionRecordedEvent`、`DeprecatedApiRecordedEvent` |
+| Outbound Event | `SdkSemanticBaselineChangedEvent`、`SdkSnapshotFreshnessChangedEvent`、`SdkClientViewFreshnessChangedEvent`、`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent`、`CompatibilityDecisionRecordedEvent`、`DeprecatedApiRecordedEvent` |
 | Operations Job | `CheckUpstreamFreshness`、`GeneratePackageCandidate`、`BuildLanguagePackages`、`RunCrossLanguageSmoke`、`ValidateDocsExamples`、`CheckCompatibility`、`VerifyBoundaryPolicies`、`RebuildSdkProjections` |
 | 状态主语 | `SnapshotFreshnessState`、`CapabilitySupportState`、`PackageCandidateStatus`、`VerificationEvidence` result / marker、`CompatibilityDecision`、`DeprecatedApiRecord` |
 | Port / repository / adapter | source ports、formal API boundary port、fake fixture endpoint port、bus boundary port、language binding generator port、package builder port、smoke runner port、docs example runner port、evidence repository、candidate repository、version ref repository、projection repository、outbox publisher port |

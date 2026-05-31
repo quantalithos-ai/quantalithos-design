@@ -243,6 +243,9 @@ Event 失败不等同于同步 HTTP / RPC 失败：
 | `PublishBusEvent` payload body 直接传入 | `RedactionPolicy` / `BoundaryGuard` | 返回 `BoundaryViolation`，不调用 bus boundary | 不写 bus publish success |
 | `RecordCompatibilityDecision` evidence 缺失 | evidence lookup | 返回 `NotFound` 或 `Validation`，不写 decision | 不写 compatibility event |
 | migration required 但缺 migration ref | compatibility domain | 返回 `Validation`，不写 decision | 不写 compatibility event |
+| `DeprecateSdkApi` api ref 不在 public SDK surface | `PublicSdkApiSurfacePort.resolve_api(api_ref)` | 返回 `NotFound` 或 `Validation`，不保存 deprecated record | 不写 deprecated success event |
+| `DeprecateSdkApi` replacement ref 不在 public SDK surface | `PublicSdkApiSurfacePort.resolve_api(replacement_api_ref)` | 返回 `NotFound` 或 `Validation`，不保存 deprecated record | 不写 deprecated success event |
+| `DeprecateSdkApi` target removal version 不大于当前 API 所属版本 | `RemovalPlan::create(...)` | 返回 `Validation`，不保存 deprecated record | 不写 deprecated success event |
 | deprecated lifecycle 非法迁移 | deprecated domain | 返回 `Conflict`，不保存 record | 可写失败诊断，不写成功事件 |
 | inbound upstream event 缺 source ref | event validation | 返回 rejected / `Validation`，不派生 ref | 可写 consumer diagnostic |
 | inbound validation event evidence unredacted | evidence domain | UoW 回滚，返回 `BoundaryViolation` | 不写 evidence recorded event |

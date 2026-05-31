@@ -50,7 +50,7 @@ Outbox publish 在 truth 提交后执行，发布失败不能回滚 truth。
 | `VerificationEvidence` | 是 | SDK 验证证据 truth |
 | `CompatibilityDecision` / `DeprecatedApiRecord` / `MigrationGuideRef` | 是 | SDK 兼容和演进 truth / reference |
 | `UpstreamVersionRef` | 是，但只作为引用 | SDK 保存上游版本、snapshot、digest 引用，不保存上游正文 |
-| `IdempotencyRecord` | 是 | SDK 写路径、consumer 和 job 幂等锚点 |
+| `IdempotencyRecord` | 是 | SDK 写路径、consumer、job 幂等锚点；runtime boundary 可保存 runtime-scoped 技术幂等记录但不写 SDK domain truth |
 | `SdkOutboxEvent` | 是 | SDK 已提交事实的 outbox 记录 |
 | capability / evidence / compatibility / docs projection | 是，但为可重建 read model | 不反写真相 |
 
@@ -58,7 +58,7 @@ Outbox publish 在 truth 提交后执行，发布失败不能回滚 truth。
 
 | 类别 | 示例 | 持久化口径 |
 |---|---|---|
-| 上游引用 | `CoreContractRef`、`CoreSnapshotRef`、`BusSemanticRef`、`FormalApiRef` | 只保存 ref / version / digest / observed_at |
+| 上游引用 | `CoreContractRef`、`CoreSnapshotRef`、`TransportSemanticId`、`FormalApiRef` | 只保存 ref / version / digest / observed_at |
 | 外部 payload 引用 | `PayloadRef`、`PayloadDigest` | 只保存 ref / digest，不保存 payload body |
 | Artifact 引用 | `PackageArtifactRef`、`ArtifactDigest` | truth 保存 metadata；artifact body 在 artifact store |
 | 文档引用 | `DocumentRef`、`MigrationGuideRef.document_ref` | 只保存 document ref，不复制文档正文 |
@@ -153,16 +153,16 @@ Outbox publish 在 truth 提交后执行，发布失败不能回滚 truth。
 | `CrossLanguageConceptMap` | `domain_semantic` | `SdkSemanticBaselineService` | generator、candidate、query | 必须与 supported languages 一致 |
 | `UpstreamVersionRef` | `domain_upstream_view` | `ContractConsumptionService`、upstream consumer | freshness job、query、candidate service | 只保存 ref / digest / observed_at，不保存上游正文 |
 | `DerivedBindingView` | `domain_upstream_view` | `ContractConsumptionService` | package candidate service、query | 保存时带 version；freshness 必须为 `Fresh` 才可生成 candidate |
-| `LanguageBindingView` | `domain_upstream_view` | `ContractConsumptionService` | generator、package builder、query | 不允许新增 derived view 中不存在的能力 |
+| `LanguageBindingView` | `domain_upstream_view` | `ContractConsumptionService` | generator、package builder、query | `language_view_id` 由 `DerivedViewId + LanguageId` 稳定派生；不允许新增 derived view 中不存在的能力 |
 | `ServiceClientView` | `domain_service_client` | `ContractConsumptionService` | runtime service call、query、candidate service | 保存时带 version；support 状态不能由 runtime call 反写 |
 | `BusEventClientView` | `domain_event_client` | `ContractConsumptionService` | runtime event call、query、candidate service | 不保存 bus runtime truth |
 | `PackageCandidate` | `domain_package_candidate` | `PackageCandidateService`、validation / compatibility service | query、validation、compatibility | 状态更新必须通过 `get_for_update` + expected version |
-| `LanguageArtifact` metadata | `domain_package_candidate` | package build flow | candidate query、evidence flow | truth 只保存 artifact ref / digest，不保存 artifact body |
+| `LanguageArtifact` metadata | `domain_package_candidate` | package build flow | candidate query、evidence flow | truth 只保存 artifact ref / digest 和来源 `language_view_id`，不保存 artifact body |
 | `VerificationEvidence` | `domain_evidence` | validation consumer / smoke / docs / boundary jobs | query、compatibility service | 不保存 raw body / secret；result 与 redaction 分离 |
 | `CompatibilityDecision` | `domain_compatibility_evolution` | compatibility command / job | query、candidate gate | RequiresMigration 必须有 migration ref |
 | `DeprecatedApiRecord` | `domain_compatibility_evolution` | deprecate command | query、docs / migration consumer | lifecycle 更新必须带 expected version |
 | `MigrationGuideRef` | `domain_compatibility_evolution` | deprecate / compatibility flow | query、docs | 只保存 document ref，不复制文档正文 |
-| `IdempotencyRecord` | `application_ports` / `infra_adapters` | all write flows / consumers / jobs | all write flows | key + digest 唯一；同 key 不同 digest 冲突 |
+| `IdempotencyRecord` | `application_ports` / `infra_adapters` | SDK domain write flows / consumers / jobs；runtime boundary technical flow | write flows；runtime replay lookup | key + digest 唯一；同 key 不同 digest 冲突；runtime 技术记录不反写 SDK domain truth |
 | `SdkOutboxEvent` | `application_ports` / `infra_adapters` | write flows | outbox publisher | append 与 truth 同事务；publish 后单独 mark published |
 | Projection views | `infra_adapters` / projection ports | write flows / rebuild job | query | 可重建；不得反写真相 |
 
@@ -186,11 +186,11 @@ Outbox publish 在 truth 提交后执行，发布失败不能回滚 truth。
 | `semantic_baselines` | 保存当前和历史 SDK semantic baseline | `baseline_id`；`baseline_version` unique | `is_current`、`created_at` | `version` |
 | `upstream_version_refs` | 保存 core / bus / formal API 当前引用 | `(source_kind, version_ref)` | `source_kind`、`observed_at` | `version` |
 | `derived_binding_views` | 保存 derived binding view | `view_id` | `freshness_state`、`upstream_ref` | `version` |
-| `language_binding_views` | 保存 language-specific view | `(view_id, language_id)` | `language_id`、`freshness_state` | `version` |
+| `language_binding_views` | 保存 language-specific view | `language_view_id`；`(view_id, language_id)` unique | `language_id`、`view_id`、`freshness_state` | `version` |
 | `service_client_views` | 保存 service client view | `service_view_id` | `freshness_state`、`capability_id` | `version` |
 | `event_client_views` | 保存 bus event client view | `event_view_id` | `freshness_state`、`event_type` | `version` |
 | `package_candidates` | 保存 package candidate truth | `candidate_id`；`candidate_version` unique | `status`、`baseline_version` | `version` |
-| `language_artifact_metadata` | 保存 candidate artifact metadata | `artifact_ref` | `candidate_id`、`language_id`、`digest` | `version` |
+| `language_artifact_metadata` | 保存 candidate artifact metadata | `artifact_ref` | `candidate_id`、`language_id`、`language_view_id`、`digest` | `version` |
 | `verification_evidence` | 保存验证证据 | `evidence_id` | `candidate_id`、`result`、`redaction_status` | `version` |
 | `compatibility_decisions` | 保存 compatibility decision | `decision_id` | `candidate_id`、`decision_state` | `version` |
 | `deprecated_api_records` | 保存 deprecated API lifecycle | `api_ref` | `lifecycle_state`、`language_id` | `version` |
@@ -227,11 +227,14 @@ Outbox publish 在 truth 提交后执行，发布失败不能回滚 truth。
 | `VersionRefRepository.upsert_upstream_ref(UpstreamVersionRef upstream_ref, UnitOfWorkHandle uow)` | 保存上游版本引用 | UoW 内；source + version 唯一 | `Version` | `RepositoryError` |
 | `SdkIdempotencyRepository.reserve(IdempotencyKey key, CommandDigest digest, UnitOfWorkHandle uow)` | 占用幂等 key | 必须与业务 truth 同事务 | `IdempotencyReservation` | `RepositoryError::IdempotencyConflict` |
 | `SdkIdempotencyRepository.complete(IdempotencyKey key, CommandReceiptRef receipt_ref, UnitOfWorkHandle uow)` | 完成幂等记录 | 必须与业务结果同事务 | `()` | `RepositoryError` |
+| `RuntimeIdempotencyRepository.reserve(IdempotencyKey key, CommandDigest digest)` | 占用 runtime-scoped 幂等 key | 不开启 SDK domain UoW；通过原子写入 / 唯一键保护技术记录 | `IdempotencyReservation` | `RepositoryError::IdempotencyConflict` |
+| `RuntimeIdempotencyRepository.complete(IdempotencyKey key, CommandReceiptRef receipt_ref)` | 完成 runtime 幂等记录 | boundary 返回后写技术记录；不得写 domain truth、projection 或 outbox | `()` | `RepositoryError` |
 | `SdkOutboxPort.append(SdkOutboxEvent event, UnitOfWorkHandle uow)` | 写入 outbox fact | 必须与业务 truth 同事务 | `()` | `OutboxError` |
 | `SdkOutboxPort.load_pending(OutboxCursor cursor, PageLimit limit)` | 读取待发布 event | 无写事务；读取 committed outbox | `OutboxEventPage` | `OutboxError` |
 | `SdkOutboxPort.mark_published(SdkOutboxEventId event_id, PublishedEventRef published_ref, UnitOfWorkHandle uow)` | 标记已发布 | 单独小事务 | `()` | `OutboxError` |
 | `PackageArtifactStorePort.put_artifact(PackageArtifactWrite artifact)` | 写 artifact body / metadata source | 不参与 UoW；返回 ref 后再提交 truth | `PackageArtifactRef` | `ArtifactError` |
 | `PackageArtifactStorePort.verify_digest(PackageArtifactRef artifact_ref, ArtifactDigest expected_digest)` | 校验 artifact digest | 无写事务 | `DigestVerificationResult` | `ArtifactError` |
+| `PackageArtifactStorePort.materialize_artifacts(PackageArtifactMaterializationInput input)` | 为 smoke / docs / boundary runner 物化 candidate artifact | runner 前置读侧操作；不写 domain truth | `PackageArtifactMaterializationResult` | `ArtifactError` |
 | `SdkCapabilityProjectionPort.upsert_summary(SdkCapabilitySummaryView summary, UnitOfWorkHandle uow)` | 更新 capability projection | 写后必要 projection 与 truth 同事务 | `()` | `ProjectionError` |
 | `EvidenceProjectionPort.upsert_evidence_view(EvidenceView view, UnitOfWorkHandle uow)` | 更新 evidence projection | 与 evidence 写入同事务 | `()` | `ProjectionError` |
 | `CompatibilityProjectionPort.upsert_compatibility_view(CompatibilityView view, UnitOfWorkHandle uow)` | 更新 compatibility projection | 与 decision 写入同事务 | `()` | `ProjectionError` |
@@ -242,11 +245,11 @@ Outbox publish 在 truth 提交后执行，发布失败不能回滚 truth。
 | 场景 | 开始位置 | 提交位置 | 回滚条件 | 同事务内必须完成 |
 |---|---|---|---|---|
 | `UpdateSdkSemanticBaselineFlow` | baseline lock 后 | baseline、capability projection、outbox、idempotency 完成后 | domain validation、version conflict、projection failure、outbox append failure | baseline save、capability projection upsert、outbox append、idempotency complete |
-| `RefreshDerivedBindingViewFlow` | source snapshot 读取和 digest 校验成功后 | derived view、language views、version refs、outbox 完成后 | snapshot derivation failure、view conflict、outbox append failure | derived view save、language view save、version ref upsert、freshness event append |
+| `RefreshDerivedBindingViewFlow` | source snapshot 和 current semantic baseline / concept map 读取成功后 | derived view、language views、version refs、outbox 完成后 | snapshot derivation failure、concept map missing / mismatch、view conflict、outbox append failure | derived view save、language view save、version ref upsert、freshness event append |
 | Upstream changed consumer | event 基础校验后 | version ref、stale mark、outbox、idempotency 完成后 | missing ref、duplicate conflict、repository failure | version ref upsert、affected view stale mark、outbox append、idempotency complete |
 | `GeneratePackageCandidateFlow` | baseline / view fresh gate 通过后 | candidate、outbox、idempotency 完成后 | freshness gate failed、candidate duplicate、outbox failure | candidate insert、candidate generated event append、idempotency complete |
 | `BuildLanguagePackagesFlow` | artifact build + digest verify 成功后 | candidate artifact metadata 保存后 | candidate version conflict、metadata save failure | candidate save、artifact metadata attach、idempotency complete |
-| `RunCrossLanguageSmokeFlow` / `ValidateDocsExamplesFlow` / `VerifyBoundaryPoliciesFlow` | runner result 返回并通过 redaction / boundary 校验后 | evidence、candidate update、projection、outbox 完成后 | unredacted、failed gate where blocking, repository failure, outbox failure | evidence insert、candidate status update if allowed、projection update、outbox append |
+| `RunCrossLanguageSmokeFlow` / `ValidateDocsExamplesFlow` / `VerifyBoundaryPoliciesFlow` | candidate artifact 物化成功,runner result 返回并通过 redaction / boundary 校验后 | evidence、candidate update、projection、outbox 完成后 | artifact missing / materialization failure、unredacted、failed gate where blocking、repository failure、outbox failure | evidence insert、candidate status update if allowed、projection update、outbox append |
 | `ConsumeValidationRunFinishedFlow` | event 基础校验后 | evidence、candidate、projection、outbox、idempotency 完成后 | candidate missing、unredacted evidence、repository failure | evidence insert、candidate update、projection update、outbox append、idempotency complete |
 | `RecordCompatibilityDecisionFlow` | candidate / evidence lookup 成功后 | decision、compatibility projection、outbox、idempotency 完成后 | missing evidence、migration ref missing、outbox failure | decision save、projection update、outbox append、idempotency complete |
 | `CheckCompatibilityFlow` | compatibility runner result 返回后 | decision、projection、outbox 完成后 | runner failure、missing evidence、repository failure | decision save、projection update、outbox append |
@@ -254,7 +257,7 @@ Outbox publish 在 truth 提交后执行，发布失败不能回滚 truth。
 | `RebuildSdkProjectionsFlow` | truth batch 读取后 | 每个 projection batch replace 后 | projection write failure | projection batch replace |
 | `OutboundEventPublishFlow` | outbox pending event 读取后 | mark published 小事务 | publisher failure 不回滚 truth；mark published failure 保留可重试 | outbox published marker |
 | Query read only | 不开启写事务 | 不适用 | 不适用 | 不写 truth，不写 projection |
-| Runtime boundary call / publish | 不开启 SDK truth 写事务 | 不适用 | formal / fake / bus boundary error 只返回 result | 不写 SDK truth |
+| Runtime boundary call / publish | 不开启 SDK domain truth 写事务；write-like runtime call 可写幂等技术记录 | boundary 返回并完成幂等记录后 | formal / fake / bus boundary error 只返回 result；idempotency conflict 返回冲突 | 不写 SDK domain truth，不生成 service / bus runtime truth |
 
 ### 7.6 一致性策略表
 
@@ -289,8 +292,8 @@ Outbox publish 在 truth 提交后执行，发布失败不能回滚 truth。
 
 | 接口 / Job / Event | 幂等键 | digest 来源 | 重复请求处理 |
 |---|---|---|---|
-| Command API | `CommandMetadata.idempotency_key` | normalized command DTO | 同 key 同 digest 返回已有 receipt；不同 digest conflict |
-| Inbound Event Consumer | `event_id + source_ref` | event payload digest | duplicate skip / return prior result |
+| Command API | `CommandMetadata.request.idempotency_key` | normalized command DTO | 缺失则 validation；同 key 同 digest 返回已有 receipt；不同 digest conflict |
+| Inbound Event Consumer | `event_id + source_ref + idempotency_key` | event payload digest | duplicate skip / return prior result |
 | Operations Job | `job_run_id + target id / scope` | job input digest | same digest replay summary；different digest conflict |
 | Outbox publish | `outbox_event_id` | outbox payload digest | already published 返回 published ref |
 
@@ -339,6 +342,7 @@ Outbox publish 在 truth 提交后执行，发布失败不能回滚 truth。
 | 场景 | 规则 |
 |---|---|
 | artifact 写入成功，digest verify 成功 | 可以在 candidate truth 事务中保存 `PackageArtifactRef` / `ArtifactDigest` |
+| artifact 物化成功 | 只作为 runner 输入,不得写入 `LanguageArtifact`、`PackageCandidate` 或 evidence truth |
 | artifact 写入成功，truth 事务失败 | artifact 成为 orphan，不出现在 candidate view；可由后续 cleanup 处理 |
 | digest verify 失败 | 不保存 candidate artifact metadata；返回 validation error |
 | artifact store 不可用 | build flow 返回 dependency error；candidate 状态不推进 |

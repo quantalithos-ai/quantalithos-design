@@ -25,11 +25,11 @@
 已确认结论：
 
 ```text
-Command API 必须携带 CommandMetadata.idempotency_key。
+Command API 必须携带 CommandMetadata.request.idempotency_key，且写路径必须校验其为 Some(...)。
 Inbound Event Consumer 必须能从 event_id + source_ref + idempotency_key 形成消费幂等键。
 Operations Job 必须携带 job_run_id；写路径 job 还必须形成业务 item 幂等键。
 Query API 不需要幂等键，不开启写事务，不触发 refresh / rebuild。
-Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等键避免重复边界调用。
+Runtime boundary call / publish 不写 SDK domain truth，但 write-like runtime call 仍需要调用层幂等键和 `RuntimeIdempotencyRepository` 技术控制记录，避免重复边界调用。
 同 key 同 digest 返回既有 receipt；同 key 不同 digest 返回 Conflict。
 ```
 
@@ -61,13 +61,13 @@ Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等�
 | Inbound Event Consumer | 4 个 consumer | at-least-once event、source ack 失败、scheduler 重放 | duplicate skip 或返回既有处理结果 |
 | Outbound Event publisher | 6 个 SDK outbound event topic | publisher 失败重试、mark published 失败后重放 | 使用同一 outbox event id / CloudEvent id 重发，最终只标记一次 published |
 | Operations Job | 8 个 job | scheduler 重跑、多实例、部分失败后恢复 | job summary 按 `job_run_id`；业务 item 按 target id / scope 去重 |
-| Runtime boundary call | `InvokeServiceCapability`、`PublishBusEvent`、`ReadServiceCapability`、`OpenEventSubscription` | caller 超时或 client retry | 不写 SDK truth；同 key 同 digest 可返回既有 boundary result ref 或让 caller 显式重试 |
+| Runtime boundary call | `InvokeServiceCapability`、`PublishBusEvent`、`ReadServiceCapability`、`OpenEventSubscription` | caller 超时或 client retry | 不写 SDK domain truth；write-like runtime call 可写 `RuntimeIdempotencyRepository` 技术控制记录，同 key 同 digest 可返回既有 boundary result ref 或让 caller 显式重试 |
 
 ### 3.3 幂等键来自请求、事件、job 参数还是数据库唯一约束？
 
 | 来源 | 使用位置 | 说明 |
 |---|---|---|
-| `CommandMetadata.idempotency_key` | Command API、runtime write-like client method | 进入 `SdkIdempotencyRepository` 前规范化为带 operation scope 的 key |
+| `CommandMetadata.request.idempotency_key` | Command API、runtime write-like client method | Command API 进入 `SdkIdempotencyRepository` 前校验为 `Some(...)`；runtime write-like method 进入 `RuntimeIdempotencyRepository` 前校验为 `Some(...)`；二者都规范化为带 operation scope 的 key |
 | normalized command DTO digest | Command API | 与 idempotency key 绑定，用于区分同请求 replay 和 key 复用冲突 |
 | `event_id + source_ref + idempotency_key` | Inbound Event Consumer | 规范化为消费幂等 key；缺任一字段按 Step 12 返回 validation / rejected |
 | `job_run_id` | Job summary | 标识一次 job run，不单独作为业务 item 去重依据 |
@@ -96,7 +96,7 @@ Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等�
 | 乐观锁 | 两个写事务基于同一 `ExpectedVersion` 保存同一对象，后提交者 `Conflict` |
 | command replay | 同一 command 同 key 同 digest 第二次返回既有 receipt |
 | command key conflict | 同 key 不同 digest 返回 `Conflict` |
-| inbound event duplicate | 同一 `event_id + source_ref` 消费两次，第二次不重复写 truth / outbox |
+| inbound event duplicate | 同一 `event_id + source_ref + idempotency_key` 消费两次，第二次不重复写 truth / outbox |
 | candidate 多 job 并发 | build / smoke / docs / boundary / compatibility 并发更新同一 candidate，只有合法转换成功 |
 | outbox retry | publish 成功但 mark published 失败后重跑，使用同一 event id 并最终标记一次 |
 | projection rebuild 并发 | rebuild batch 不反写真相，旧 projection version 不能覆盖新 projection |
@@ -107,7 +107,7 @@ Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等�
 
 | 问题 | 影响 | 本步修正 |
 |---|---|---|
-| Step 8 已写幂等要求，但 key 计算分散在各接口 | 实现者难以统一 `SdkIdempotencyRepository.reserve(...)` 入参 | 本步汇总规范化 key 和 digest 来源 |
+| Step 8 已写幂等要求，但 key 计算分散在各接口 | 实现者难以统一 `SdkIdempotencyRepository.reserve(...)` / `RuntimeIdempotencyRepository.reserve(...)` 入参 | 本步汇总规范化 key 和 digest 来源 |
 | Step 11 已写锁 / 版本，但未按资源列出并发冲突 | 实现者不知道哪些 flow 会互相冲突 | 本步按 SDK truth / view / candidate / outbox / projection 汇总冲突 |
 | `job_run_id` 容易被误认为业务幂等键 | 新 job run 扫描旧 item 可能重复写 evidence 或 projection | 本步区分 job summary key 与业务 item key |
 | runtime boundary 不写 truth，但仍可能重复调用外部边界 | caller retry 可能重复触发 formal API 或 bus publish | 本步要求 runtime write-like call 也带 idempotency key，结果不反写 SDK truth |
@@ -132,7 +132,7 @@ Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等�
 
 | 决策点 | 方案 A | 方案 B | 推荐 | 原因 |
 |---|---|---|---|---|
-| 幂等是否只依赖 repository 唯一约束 | 只靠唯一键 | 使用 `SdkIdempotencyRepository` + digest + 唯一约束兜底 | B | 唯一键不能判断同 key 不同 payload，也不能返回既有 receipt |
+| 幂等是否只依赖 repository 唯一约束 | 只靠唯一键 | 使用 `SdkIdempotencyRepository` / `RuntimeIdempotencyRepository` + digest + 唯一约束兜底 | B | 唯一键不能判断同 key 不同 payload，也不能返回既有 receipt / result ref |
 | 幂等 key 是否扩展 repository 签名增加 scope | 修改 `reserve(scope, key, digest, uow)` | 在调用前把 operation scope 编入 `IdempotencyKey` | B | 不改 Step 7 port 签名，同时保留 key 可计算性 |
 | job 幂等是否只用 `job_run_id` | 只用 `job_run_id` | `job_run_id` 管 summary，target item key 管业务写入 | B | 新 job run 仍可能扫描到同一业务 item |
 | 并发冲突是否自动重试 | Command 和 job 都自动重试 | Command 返回 `Conflict`；job item 可有限 retry / skip | B | Command 调用方需要显式看到冲突，job 可在 item 粒度恢复 |
@@ -149,7 +149,7 @@ Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等�
   |
   | compute canonical IdempotencyKey + CommandDigest
   v
-[SdkIdempotencyRepository.find/reserve]
+[Idempotency repository]
   |-- completed + same digest ----> return existing receipt
   |-- in_progress + same digest --> Conflict, retry later
   |-- same key + different digest -> Conflict
@@ -168,6 +168,7 @@ Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等�
 关键说明：
 
 - 幂等保护发生在 application service 边界，domain object 不感知 idempotency key。
+- SDK domain 写路径使用 `SdkIdempotencyRepository` 并携带 `UnitOfWorkHandle`；runtime boundary write-like call 使用 `RuntimeIdempotencyRepository`，不携带 `UnitOfWorkHandle`，不写 SDK domain truth。
 - `IdempotencyKey` 在调用 repository 前完成规范化，内容包含 operation / source / target / caller key。
 - 乐观锁保护同一资源并发更新；幂等记录保护同一调用重复进入。
 - outbox publish 是 post-commit 重放边界，不回滚 command truth。
@@ -195,12 +196,12 @@ Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等�
 
 | 接口 / Job / Event | 幂等键 | 幂等窗口 | 重复请求处理 |
 |---|---|---|---|
-| `UpdateSdkSemanticBaseline` | `operation:update_baseline + CommandMetadata.idempotency_key` | 至少覆盖 baseline history | 同 digest 返回既有 receipt；不同 digest `Conflict` |
-| `RefreshDerivedBindingView` | `operation:refresh_view + CommandMetadata.idempotency_key + refresh_scope digest` | 至少覆盖 source ref version | 同 digest replay；source newer 时需新 key |
-| `InvokeServiceCapability` | `operation:invoke_service + CommandMetadata.idempotency_key + capability_ref` | caller 控制的短窗口 | 不写 SDK truth；同 digest 可返回既有 result ref / diagnostic ref |
-| `PublishBusEvent` | `operation:publish_bus_event + CommandMetadata.idempotency_key + event_mapping_ref` | caller 控制的短窗口 | 不写 SDK truth；同 digest 可返回既有 bus publish ref |
-| `RecordCompatibilityDecision` | `operation:record_compatibility + CommandMetadata.idempotency_key + candidate_id` | 覆盖 candidate / baseline decision 追溯 | 同 digest replay；不同 decision digest `Conflict` |
-| `DeprecateSdkApi` | `operation:deprecate_api + CommandMetadata.idempotency_key + api_ref` | 覆盖 deprecated lifecycle | 同 digest replay；非法 lifecycle `Conflict` |
+| `UpdateSdkSemanticBaseline` | `operation:update_baseline + CommandMetadata.request.idempotency_key` | 至少覆盖 baseline history | 缺失则 validation；同 digest 返回既有 receipt；不同 digest `Conflict` |
+| `RefreshDerivedBindingView` | `operation:refresh_view + CommandMetadata.request.idempotency_key + refresh_scope digest` | 至少覆盖 source ref version | 缺失则 validation；同 digest replay；source newer 时需新 key |
+| `InvokeServiceCapability` | `operation:invoke_service + CommandMetadata.request.idempotency_key + capability_ref` | caller 控制的短窗口 | 缺失则 validation；使用 `RuntimeIdempotencyRepository`；不写 SDK domain truth；同 digest 可返回既有 result ref / diagnostic ref |
+| `PublishBusEvent` | `operation:publish_bus_event + CommandMetadata.request.idempotency_key + event_mapping_ref` | caller 控制的短窗口 | 缺失则 validation；使用 `RuntimeIdempotencyRepository`；不写 SDK domain truth；同 digest 可返回既有 bus publish ref |
+| `RecordCompatibilityDecision` | `operation:record_compatibility + CommandMetadata.request.idempotency_key + candidate_id` | 覆盖 candidate / baseline decision 追溯 | 缺失则 validation；同 digest replay；不同 decision digest `Conflict` |
+| `DeprecateSdkApi` | `operation:deprecate_api + CommandMetadata.request.idempotency_key + api_ref` | 覆盖 deprecated lifecycle | 缺失则 validation；同 digest replay；非法 lifecycle `Conflict` |
 | `ConsumeCoreContractChanged` | `event_id + source_ref + idempotency_key` | 永久或随 source ref 保留 | duplicate skip / prior result |
 | `ConsumeBusSemanticChanged` | `event_id + source_ref + idempotency_key` | 永久或随 source ref 保留 | duplicate skip / prior result |
 | `ConsumeFormalApiChanged` | `event_id + source_ref + idempotency_key` | 永久或随 source ref 保留 | duplicate skip / prior result |
@@ -219,7 +220,7 @@ Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等�
 
 | 场景 | 重入来源 | 保护方式 | 恢复方式 |
 |---|---|---|---|
-| Command 超时后 caller 重试 | CLI / Rust client retry | `SdkIdempotencyRepository.find/reserve/complete` | completed 返回 receipt；in progress 稍后重试 |
+| Command 超时后 caller 重试 | CLI / Rust client retry | SDK domain 写路径使用 `SdkIdempotencyRepository.find/reserve/complete`；runtime boundary 使用 `RuntimeIdempotencyRepository.find/reserve/complete` | completed 返回 receipt / runtime result ref；in progress 稍后重试 |
 | 同 key 不同 payload | caller 误用 idempotency key | digest 比对 + `mark_conflict` | 返回 `Conflict`，要求更换 key |
 | inbound event ack 失败后重复投递 | event bus at-least-once | canonical event idempotency key | skip / prior result，并允许 ack |
 | validation event 重复进入 | runner event replay | `event_id + run_ref` + evidence unique key | 不重复写 evidence |
@@ -227,13 +228,13 @@ Runtime boundary call / publish 不写 SDK truth，但仍需要调用层幂等�
 | artifact orphan 后重跑 build | truth 事务失败 | candidate truth 不引用 orphan；digest verify 后重新 attach | cleanup job 可删除 orphan |
 | outbox publish 成功但 mark failed | publisher crash | same outbox event id / CloudEvent id | 重发同一 event，mark published 幂等 |
 | projection rebuild 中断 | process crash / dependency failure | rebuild scope + batch UoW | 从 scope / cursor 重跑 batch |
-| runtime boundary call 超时 | client retry | caller idempotency key + boundary result ref / diagnostic ref | 不写 SDK truth，caller 决定重试 |
+| runtime boundary call 超时 | client retry | `RuntimeIdempotencyRepository` + caller idempotency key + boundary result ref / diagnostic ref | 不写 SDK domain truth，caller 决定重试 |
 
 ### 7.5 实现约束
 
 | 约束 | 内容 |
 |---|---|
-| key 规范化 | application service 在调用 `SdkIdempotencyRepository.reserve(IdempotencyKey key, CommandDigest digest, UnitOfWorkHandle uow)` 前构造 canonical key |
+| key 规范化 | SDK domain 写路径在调用 `SdkIdempotencyRepository.reserve(IdempotencyKey key, CommandDigest digest, UnitOfWorkHandle uow)` 前构造 canonical key；runtime boundary 在调用 `RuntimeIdempotencyRepository.reserve(IdempotencyKey key, CommandDigest digest)` 前构造 runtime-scoped canonical key |
 | digest 计算 | digest 来自 normalized DTO / event payload / job item input，不包含 trace id、timestamp、diagnostic message |
 | receipt replay | `complete(...)` 保存 `CommandReceiptRef`，重复请求返回 receipt 指向的结果视图 |
 | in-progress 处理 | P0 不阻塞等待；返回 `Conflict`，调用方稍后重试 |

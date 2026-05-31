@@ -18,7 +18,7 @@
 | 输入 | 内容 | 本步使用方式 |
 |---|---|---|
 | Step 5 模块实现契约主轴 | 16 个实现职责模块 | 固定模块测试切口 |
-| Step 8 协议契约 | 6 个 Command、12 个 Query、4 个 Inbound Event、6 个 Outbound Event、8 个 Job | 固定接口测试切口 |
+| Step 8 协议契约 | 6 个 Command、12 个 Query、4 个 Inbound Event、7 个 Outbound Event、8 个 Job | 固定接口测试切口 |
 | Step 9 函数级处理流 | 写路径、只读流、runtime boundary、outbox、job flow | 固定正向和异常验证路径 |
 | Step 10 状态机矩阵 | 7 个正式状态集合 | 固定合法 / 非法状态转换测试 |
 | Step 11~13 一致性、错误、幂等 | UoW、repository、projection、outbox、artifact、idempotency、并发冲突 | 固定一致性与重入测试 |
@@ -171,7 +171,7 @@ reports/runs/<run_id>
 | `DeprecateSdkApi` | lifecycle changed，deprecated event appended | missing migration ref、invalid lifecycle transition | application |
 | 12 个 Query API | 命中 view / evidence / candidate / compatibility / migration ref | not found、stale marker、pagination、Query 不写入 | query |
 | 4 个 Inbound Event Consumer | core / bus / formal / validation event 正常消费 | duplicate event、missing source ref、unredacted evidence rejected | consumer |
-| 6 个 Outbound Event | event schema、topic、CloudEvent metadata 正确 | schema violation、forbidden body、publisher retry | contract + publisher |
+| 7 个 Outbound Event | event schema、topic、CloudEvent metadata 正确 | schema violation、forbidden body、publisher retry | contract + publisher |
 | 8 个 Operations Job | freshness / candidate / build / smoke / docs / compatibility / boundary / projection 成功路径 | runner unavailable、failed evidence、job rerun、partial failure | job runner |
 
 ### 7.4 Outbound Event schema 测试切口
@@ -179,7 +179,8 @@ reports/runs/<run_id>
 | Outbound Event | 正向测试 | 异常 / 边界测试 |
 |---|---|---|
 | `SdkSemanticBaselineChangedEvent` | baseline id、old / new version、capability summary ref 正确 | 不包含 baseline 正文或 source snapshot 正文 |
-| `SdkSnapshotFreshnessChangedEvent` | source refs、freshness state、affected views 正确 | stale 不伪装 fresh |
+| `SdkSnapshotFreshnessChangedEvent` | derived view id、source refs、freshness state、affected languages 正确 | stale 不伪装 fresh；不得承载 service / event client view |
+| `SdkClientViewFreshnessChangedEvent` | service / event client view target、source refs、freshness state 正确 | stale 不伪装 fresh；不得包含 `affected_languages` 或 `DerivedViewId` |
 | `PackageCandidateGeneratedEvent` | candidate id、baseline ref、language set 正确 | 不等同 public registry publish |
 | `VerificationEvidenceRecordedEvent` | evidence kind、result、redaction status、artifact ref 正确 | unredacted evidence 不可发布为可引用证据 |
 | `CompatibilityDecisionRecordedEvent` | decision state、candidate id、migration ref 正确 | missing evidence 不可发布 compatible |

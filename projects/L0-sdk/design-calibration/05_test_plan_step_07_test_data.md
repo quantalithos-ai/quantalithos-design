@@ -35,8 +35,8 @@
 |---|---|---|
 | upstream snapshot fixture | `TC-SDK-CONTRACT-*` | core contract ref、bus semantic ref、formal API snapshot ref、digest、version |
 | semantic baseline fixture | `TC-SDK-SEMANTIC-*` | baseline version、Rust / Python / TypeScript language set、capability model、concept map |
-| service boundary fixture | `TC-SDK-BOUNDARY-*` | `ServiceCapabilityRef`、`CapabilitySupportState`、fake marker、diagnostic ref |
-| event semantic fixture | `TC-SDK-EVENT-*` | SDK event name、bus semantic ref、payload ref、mapping version |
+| service boundary fixture | `TC-SDK-BOUNDARY-*` | `ServiceCapabilityRefId`、`ServiceCapabilityRef`、`CapabilitySupportState`、fake marker、diagnostic ref |
+| event semantic fixture | `TC-SDK-EVENT-*` | `EventSemanticMappingRef`、SDK event name、bus semantic ref、payload ref、mapping version |
 | policy fixture | `TC-SDK-TRACE-*`、`TC-SDK-SECURITY-*` | error mapping sample、trace context sample、redaction rule、credential ref sample |
 | config fixture | `TC-SDK-SECURITY-*` | valid config、invalid config、strict JSON、source priority samples |
 | candidate fixture | `TC-SDK-CANDIDATE-*` | candidate id、candidate version、language artifact metadata、artifact digest |
@@ -128,8 +128,8 @@
 |---|---|---|---|---|---|
 | `DS-SDK-UPSTREAM` | upstream snapshot 和 freshness | fixture builder 生成 refs / digest / versions | `run_id + source_kind` | 删除临时 source root | `TC-SDK-CONTRACT-*` |
 | `DS-SDK-SEMANTIC` | baseline、capability、concept map | deterministic builder | `run_id + baseline_id` | reset in-memory store | `TC-SDK-SEMANTIC-*` |
-| `DS-SDK-BOUNDARY` | service / fake boundary | fake adapter seed | `run_id + capability_id` | reset adapter state | `TC-SDK-BOUNDARY-*` |
-| `DS-SDK-EVENT` | bus event mapping | fixture semantic mapping | `run_id + event_name` | reset event boundary | `TC-SDK-EVENT-*` |
+| `DS-SDK-BOUNDARY` | service / fake boundary | fake adapter seed + stable capability ref id | `run_id + capability_id` | reset adapter state | `TC-SDK-BOUNDARY-*` |
+| `DS-SDK-EVENT` | bus event mapping | fixture semantic mapping + stable mapping ref id | `run_id + event_name` | reset event boundary | `TC-SDK-EVENT-*` |
 | `DS-SDK-POLICY` | error / trace / redaction / credential | policy sample builder | `run_id + policy_id` | discard temporary inputs | `TC-SDK-TRACE-*`、`TC-SDK-SECURITY-*` |
 | `DS-SDK-CONFIG` | config validation | valid / invalid config fixture builder | `run_id + config_case` | delete temp config root | `TC-SDK-SECURITY-*` |
 | `DS-SDK-CANDIDATE` | package candidate and artifact metadata | candidate builder + artifact metadata builder | `run_id + candidate_id` | artifacts retained until report | `TC-SDK-CANDIDATE-*` |

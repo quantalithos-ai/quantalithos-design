@@ -44,7 +44,7 @@ Outbound Event 使用一个通用 outbox 发布流并列 event kind 差异。
 | Inbound Event Consumer | `ConsumeCoreContractChanged`、`ConsumeBusSemanticChanged`、`ConsumeFormalApiChanged`、`ConsumeValidationRunFinished` | 每个 consumer 独立处理流 |
 | Operations Job | `CheckUpstreamFreshness`、`GeneratePackageCandidate`、`BuildLanguagePackages`、`RunCrossLanguageSmoke`、`ValidateDocsExamples`、`CheckCompatibility`、`VerifyBoundaryPolicies`、`RebuildSdkProjections` | 每个 job 独立处理流 |
 | Query API | 12 个 Query API | 一个通用只读流，逐个列入口差异 |
-| Outbound Event | 6 个 Outbound Event | 一个通用 outbox 发布流，逐个列 event kind 差异 |
+| Outbound Event | 7 个 Outbound Event | 一个通用 outbox 发布流，逐个列 event kind 差异 |
 
 ### 3.2 每个处理流的入口函数是什么？
 
@@ -79,7 +79,7 @@ job:
 | 流类型 | 事务边界 | 回滚错误 |
 |---|---|---|
 | 本地写 Command | application service 内部 `UnitOfWork.begin()` 到 `UnitOfWork.commit()` | validation 之后的 repository / domain / outbox staging 错误 |
-| runtime boundary Command / Query | 不写 SDK truth，不开启本地写事务 | 不适用 |
+| runtime boundary Command / Query | 不写 SDK domain truth，不开启本地 domain 写事务；write-like runtime call 可写幂等技术记录 | 不适用 |
 | Inbound Event Consumer | consumer service 内部每个 event 一个事务 | 幂等冲突以外的写入错误 |
 | Operations Job | 每个 target item 一个事务，job summary 单独记录 | 单 item 错误只回滚该 item |
 | Query API | 不开启写事务 | 不适用 |
@@ -153,11 +153,11 @@ job:
 | `RecordCompatibilityDecisionFlow` | `RecordCompatibilityDecision` | `CompatibilityGovernanceService.record_decision(RecordCompatibilityDecisionCommand command, ActorContext actor, CommandMetadata meta)` | 单命令写事务 | compatibility decision recorded | missing evidence、migration required、outbox append |
 | `DeprecateSdkApiFlow` | `DeprecateSdkApi` | `CompatibilityGovernanceService.deprecate_api(DeprecateSdkApiCommand command, ActorContext actor, CommandMetadata meta)` | 单命令写事务 | deprecated API lifecycle changed | missing migration ref、invalid lifecycle transition、outbox append |
 | `ConsumeCoreContractChangedFlow` | `ConsumeCoreContractChanged` | `ContractConsumptionService.consume_core_contract_changed(CoreContractChangedEvent event, EventConsumeMetadata meta)` | 单 event 写事务 | affected views stale | duplicate event、missing snapshot ref |
-| `ConsumeBusSemanticChangedFlow` | `ConsumeBusSemanticChanged` | `ContractConsumptionService.consume_bus_semantic_changed(BusSemanticChangedEvent event, EventConsumeMetadata meta)` | 单 event 写事务 | event view stale | duplicate event、missing bus semantic ref |
+| `ConsumeBusSemanticChangedFlow` | `ConsumeBusSemanticChanged` | `ContractConsumptionService.consume_bus_semantic_changed(BusSemanticChangedEvent event, EventConsumeMetadata meta)` | 单 event 写事务 | event view refreshed / stale | duplicate event、missing bus semantic ref、bus snapshot unavailable |
 | `ConsumeFormalApiChangedFlow` | `ConsumeFormalApiChanged` | `ContractConsumptionService.consume_formal_api_changed(FormalApiChangedEvent event, EventConsumeMetadata meta)` | 单 event 写事务 | service view stale / compatibility impacted | duplicate event、missing formal API ref |
 | `ConsumeValidationRunFinishedFlow` | `ConsumeValidationRunFinished` | `CandidateValidationService.consume_validation_finished(ValidationRunFinishedEvent event, EventConsumeMetadata meta)` | 单 event 写事务 | evidence recorded、candidate may advance | duplicate run、unredacted evidence rejected |
 | `QueryReadOnlyFlow` | 12 个 Query API | `QueryService.query(QueryRequest query, ActorContext actor, QueryMetadata meta)` | 无写事务 | 无 truth 状态变化 | not found、projection stale marker、pagination |
-| `OutboundEventPublishFlow` | 6 个 Outbound Event | `SdkOutboxPublisher.publish_committed(SdkOutboxEvent event, TraceContext trace)` | truth 已提交后发布 | 无 truth 状态变化 | schema violation、publisher retry、no raw body |
+| `OutboundEventPublishFlow` | 7 个 Outbound Event | `SdkOutboxPublisher.publish_committed(SdkOutboxEvent event, TraceContext trace)` | truth 已提交后发布 | 无 truth 状态变化 | schema violation、publisher retry、no raw body |
 | `CheckUpstreamFreshnessFlow` | `CheckUpstreamFreshness` | `CheckUpstreamFreshnessRunner.run(CheckUpstreamFreshnessJobInput input, JobMetadata meta)` | 每 source 一个事务或只读检查 | optional affected views stale | stale detected、source unavailable |
 | `GeneratePackageCandidateFlow` | `GeneratePackageCandidate` | `GeneratePackageCandidateRunner.run(GeneratePackageCandidateJobInput input, JobMetadata meta)` | 单 candidate 写事务 | `PackageCandidateStatus: Draft` | stale view blocked、candidate duplicate |
 | `BuildLanguagePackagesFlow` | `BuildLanguagePackages` | `BuildLanguagePackagesRunner.run(BuildLanguagePackagesJobInput input, JobMetadata meta)` | 单 candidate 写事务 | candidate artifacts attached / built | builder failure、digest mismatch |
@@ -166,6 +166,21 @@ job:
 | `CheckCompatibilityFlow` | `CheckCompatibility` | `CheckCompatibilityRunner.run(CheckCompatibilityJobInput input, JobMetadata meta)` | 单 decision 写事务 | compatibility decision recorded | missing evidence、breaking change |
 | `VerifyBoundaryPoliciesFlow` | `VerifyBoundaryPolicies` | `VerifyBoundaryPoliciesRunner.run(VerifyBoundaryPoliciesJobInput input, JobMetadata meta)` | 单 evidence 写事务 | boundary evidence recorded | plain secret rejected、raw body rejected |
 | `RebuildSdkProjectionsFlow` | `RebuildSdkProjections` | `RebuildSdkProjectionsRunner.run(RebuildSdkProjectionsJobInput input, JobMetadata meta)` | 每 projection batch 一个事务 | projection rebuilt | dry run、batch failure |
+
+### 7.1.1 实施阶段边界
+
+| 处理流 | phase boundary |
+|---|---|
+| `ConsumeCoreContractChangedFlow` | PH-02 / `commit-02-b`。只允许写 version ref、derived / language freshness stale mark 和 outbox。 |
+| `ConsumeBusSemanticChangedFlow` | PH-03 / `commit-03-a`。该流会读写 `BusEventClientView`,不得放入 `commit-02-b`。 |
+| `ConsumeFormalApiChangedFlow` | PH-03 / `commit-03-a`。该流会读写 `ServiceClientView`,不得放入 `commit-02-b`。 |
+
+补充边界:
+
+- PH-02 / `commit-02-b` 的 `RefreshDerivedBindingViewFlow` 可以只读 `commit-02-a` 已交付的 `SdkSemanticBaseline` / `CrossLanguageConceptMap`,用于构造 `LanguageBindingView`。
+- `commit-02-b` 不得改写 semantic baseline 或 concept map;语义基线变更仍只属于 `UpdateSdkSemanticBaselineFlow` / `commit-02-a`。
+
+PH-02 的 upstream changed consumer 不得提前引入 `domain_service_client` 或 `domain_event_client` 对象。若当前实现阶段需要处理 bus semantic 或 formal API changed event,必须先进入 PH-03 并完成对应 client view 对象。
 
 ### 7.2 通用函数级规则
 
@@ -201,12 +216,14 @@ job:
 
 ```text
 [Rust Client Facade]
-  | call ServiceClient.call(ServiceCapabilityCall command)
-  | call EventClient.publish(PublishBusEventCommand command)
+  | call ServiceClient.call(ServiceCapabilityCall command, CommandMetadata meta)
+  | call EventClient.publish(PublishBusEventCommand command, CommandMetadata meta)
   v
 [Application Service]
+  | call RuntimeIdempotencyRepository.find/reserve(IdempotencyKey key)
   | call ViewRepository.get_current()
   | call BoundaryGuard.assert_capability_allowed(ClientCapabilityId capability_id)
+  | call BoundaryGuard.assert_event_mapping_allowed(EventSemanticMapping mapping)
   | call CredentialProtectionPolicy.assert_no_plain_secret(ClientCallContext context)
   | call RedactionPolicy.assert_ref_only(PayloadRef ref)
   v
@@ -221,7 +238,7 @@ job:
 
 关键说明：
 
-- runtime boundary 不开启 SDK truth 写事务。
+- runtime boundary 不开启 SDK domain truth 写事务；write-like runtime call 可写幂等技术记录。
 - fake result 必须保留 fake marker。
 - boundary result 不包含 raw request / response body。
 
@@ -299,8 +316,8 @@ job:
 
 ```rust
 // [SdkIdempotencyRepository.find(IdempotencyKey key)]
-// 使用 meta.idempotency_key 检查是否为重复命令。
-let replay = idempotency.find(meta.idempotency_key).await?;
+// 使用 meta.request.idempotency_key 检查是否为重复命令；缺失时返回 validation。
+let replay = idempotency.find(required_idempotency_key(meta.request.idempotency_key)?).await?;
 
 // [UnitOfWork.begin()]
 // 开启语义基线更新写事务。
@@ -366,14 +383,21 @@ unit_of_work.commit(uow).await?;
   | call CoreContractSourcePort.fetch_snapshot(UpstreamVersionRef ref)
   | call BusSemanticSourcePort.fetch_snapshot(UpstreamVersionRef ref)
   | call FormalApiSourcePort.fetch_snapshot(UpstreamVersionRef ref)
+  | call SemanticBaselineRepository.get_current()
+  v
+[Application Derivation]
+  | extract Vec<UpstreamVersionRef> from snapshot metadata
+  | derive Vec<CapabilitySymbol> from snapshot content
   v
 [Domain View]
-  | call DerivedBindingView.from_upstream_snapshots(...)
+  | call DerivedBindingView::from_upstream_refs_and_symbols(Vec<UpstreamVersionRef> refs, Vec<CapabilitySymbol> symbols)
+  | call LanguageBindingView::derive_for_language(DerivedBindingView view, LanguageId language_id, CrossLanguageConceptMap concept_map)
   | call SnapshotFreshnessState.mark_fresh(Timestamp now)
   v
 [Repository + Outbox]
   | tx begin
   | save derived view / language views / version refs
+  | call IdGeneratorPort.next_outbox_event_id()
   | append SdkSnapshotFreshnessChangedEvent
   | tx commit
 ```
@@ -393,21 +417,62 @@ let bus_snapshot = bus_source.fetch_snapshot(bus_ref).await?;
 // 读取 formal API snapshot。
 let formal_snapshot = formal_source.fetch_snapshot(formal_ref).await?;
 
+// [SemanticBaselineRepository.get_current()]
+// 读取当前 semantic baseline,用于取得 CrossLanguageConceptMap。
+let baseline = semantic_baseline_repo.get_current().await?;
+
+// [SdkSemanticBaseline.concept_map()]
+// 取得当前共同概念映射,RefreshDerivedBindingViewCommand 不携带该对象。
+let concept_map = baseline.concept_map()?;
+
+// [Application derivation]
+// 从 snapshot metadata 收集参与派生的上游版本引用。
+let source_refs = collect_upstream_refs(&core_snapshot, &bus_snapshot, &formal_snapshot)?;
+
+// [Application derivation]
+// 从 source snapshot 内容提取 SDK 领域符号;不得把 source snapshot DTO 传入 domain 工厂。
+let symbols = derive_capability_symbols(&core_snapshot, &bus_snapshot, &formal_snapshot, &baseline)?;
+
 // [UnitOfWork.begin()]
 // 开启派生视图保存事务。
 let uow = unit_of_work.begin().await?;
 
-// [DerivedBindingView::from_upstream_snapshots(CoreContractSnapshot core, BusSemanticSnapshot bus, FormalApiSnapshot formal)]
-// 从上游 snapshot 派生 SDK 本地视图,不复制上游正文。
-let view = DerivedBindingView::from_upstream_snapshots(core_snapshot, bus_snapshot, formal_snapshot)?;
+// [DerivedBindingView::from_upstream_refs_and_symbols(Vec<UpstreamVersionRef> refs, Vec<CapabilitySymbol> symbols)]
+// 从上游引用和应用层提取出的能力符号创建 SDK 本地视图,不复制上游正文。
+let view = DerivedBindingView::from_upstream_refs_and_symbols(source_refs.clone(), symbols)?;
+
+// [LanguageBindingView::derive_for_language(DerivedBindingView view, LanguageId language_id, CrossLanguageConceptMap concept_map)]
+// 基于共同派生视图和当前 concept map 派生语言视图。
+let language_views = command
+    .refresh_scope
+    .languages
+    .iter()
+    .map(|language_id| LanguageBindingView::derive_for_language(view.clone(), language_id.clone(), concept_map.clone()))
+    .collect::<Result<Vec<_>, _>>()?;
 
 // [DerivedViewRepository.save_binding_view(DerivedBindingView view, ExpectedVersion expected_version, UnitOfWorkHandle uow)]
 // 保存派生视图。
 derived_repo.save_binding_view(view, expected_version, uow.clone()).await?;
 
+// [DerivedViewRepository.save_language_view(LanguageBindingView view, ExpectedVersion expected_version, UnitOfWorkHandle uow)]
+// 保存每个语言视图;语言视图不得新增 derived view 中不存在的能力。
+for language_view in language_views {
+    derived_repo.save_language_view(language_view, expected_version, uow.clone()).await?;
+}
+
 // [VersionRefRepository.upsert_upstream_ref(UpstreamVersionRef upstream_ref, UnitOfWorkHandle uow)]
 // 保存当前上游版本引用。
-version_repo.upsert_upstream_ref(upstream_ref, uow.clone()).await?;
+for source_ref in source_refs {
+    version_repo.upsert_upstream_ref(source_ref, uow.clone()).await?;
+}
+
+// [IdGeneratorPort.next_outbox_event_id()]
+// 生成 outbox event id;不得从 digest、业务字段或 repository 返回值拼接。
+let outbox_event_id = id_generator.next_outbox_event_id();
+
+// [SdkSnapshotFreshnessChangedEvent::from_refresh(...)]
+// 基于已保存 view 和生成的 outbox event id 构造待发布事件。
+let event = SdkSnapshotFreshnessChangedEvent::from_refresh(outbox_event_id, view.view_id.clone(), actor, meta)?;
 
 // [SdkOutboxPort.append(SdkOutboxEvent event, UnitOfWorkHandle uow)]
 // 写入 freshness changed event。
@@ -422,13 +487,14 @@ unit_of_work.commit(uow).await?;
 
 | 开始位置 | 提交位置 | 回滚条件 | 同事务内必须完成 |
 |---|---|---|---|
-| source snapshot 成功读取后 | view / ref / outbox 保存后 | snapshot digest mismatch、view 保存失败、outbox append 失败 | derived view、language view、version refs、freshness event |
+| source snapshot 和 current semantic baseline / concept map 成功读取后 | view / ref / outbox 保存后 | snapshot digest mismatch、concept map missing / mismatch、view 保存失败、outbox append 失败 | derived view、language view、version refs、freshness event |
 
 ##### 错误映射
 
 | 场景 | 检测位置 | 错误 |
 |---|---|---|
 | source 暂不可用 | source port | `Dependency` |
+| semantic baseline 或 concept map 缺失 | `SemanticBaselineRepository.get_current` / baseline validation | `Validation` |
 | snapshot digest 不匹配 | application service | `Validation` |
 | view version 冲突 | repository | `Conflict` |
 
@@ -449,10 +515,12 @@ unit_of_work.commit(uow).await?;
 
 ```text
 [ServiceClient]
-  | call ServiceClient.call(ServiceCapabilityCall command)
+  | call ServiceClient.call(ServiceCapabilityCall command, CommandMetadata meta)
   v
 [ServiceClientAssemblyService]
+  | call RuntimeIdempotencyRepository.find/reserve(canonical invoke key)
   | call ServiceClientViewRepository.get_current()
+  | call ServiceClientView.resolve_capability(ServiceCapabilityRefId capability_ref)
   | call BoundaryGuard.assert_capability_allowed(ClientCapabilityId capability_id)
   | call CredentialProtectionPolicy.assert_no_plain_secret(ClientCallContext context)
   | call RedactionPolicy.assert_ref_only(PayloadRef input_ref)
@@ -467,13 +535,24 @@ unit_of_work.commit(uow).await?;
 ##### 关键伪代码
 
 ```rust
+// [RuntimeIdempotencyRepository.find/reserve(IdempotencyKey key, CommandDigest digest)]
+// runtime write-like call 虽不写 SDK domain truth,但必须防止 caller retry 重复触发外部边界。
+let key = IdempotencyKey::for_runtime_invoke(meta.request.idempotency_key, command.capability_ref.clone())?;
+let digest = CommandDigest::from_service_call(&command, &context)?;
+let replay = runtime_idempotency.find(key.clone()).await?;
+let reservation = runtime_idempotency.reserve(key.clone(), digest.clone()).await?;
+
 // [ServiceClientViewRepository.get_current()]
 // 读取当前 service client view。
 let view = service_view_repo.get_current().await?;
 
+// [ServiceClientView.resolve_capability(ServiceCapabilityRefId ref_id)]
+// command.capability_ref 是稳定引用 ID,不是完整 ServiceCapabilityRef 对象。
+let capability = view.resolve_capability(command.capability_ref.clone())?;
+
 // [BoundaryGuard.assert_capability_allowed(ClientCapabilityId capability_id)]
 // 校验 capability 是否可由 SDK 暴露。
-boundary_guard.assert_capability_allowed(command.capability_ref.capability_id)?;
+boundary_guard.assert_capability_allowed(capability.capability_id.clone())?;
 
 // [CredentialProtectionPolicy.assert_no_plain_secret(ClientCallContext context)]
 // 确认上下文中不含明文 secret。
@@ -490,13 +569,17 @@ let result = formal_boundary.call_service(command, context).await?;
 // [FakeFixtureEndpointPort.assert_fake_marker(FakeBoundaryResultRef result_ref)]
 // fake profile 必须校验 fake marker。
 fake_boundary.assert_fake_marker(result.fake_result_ref).await?;
+
+// [RuntimeIdempotencyRepository.complete(IdempotencyKey key, CommandReceiptRef receipt_ref)]
+// 将 ref-only result 记录为幂等结果;该记录是技术控制记录,不是 SDK domain truth。
+runtime_idempotency.complete(key, result.result_ref.clone().into()).await?;
 ```
 
 ##### 事务边界
 
 | 开始位置 | 提交位置 | 回滚条件 | 同事务内必须完成 |
 |---|---|---|---|
-| 不开启写事务 | 不适用 | 不适用 | 不写 SDK truth |
+| 不开启 domain 写事务；只允许 `RuntimeIdempotencyRepository` 技术记录 | boundary 返回并完成 runtime 幂等记录后 | capability unsupported、payload 越界、boundary failure、idempotency conflict | 不写 SDK domain truth；不使用 `UnitOfWorkHandle`；可写 runtime idempotency 记录 |
 
 ##### 错误映射
 
@@ -524,11 +607,13 @@ fake_boundary.assert_fake_marker(result.fake_result_ref).await?;
 
 ```text
 [EventClient]
-  | call EventClient.publish(PublishBusEventCommand command)
+  | call EventClient.publish(PublishBusEventCommand command, CommandMetadata meta)
   v
 [EventClientAssemblyService]
+  | call RuntimeIdempotencyRepository.find/reserve(canonical publish key)
   | call EventClientViewRepository.get_current()
-  | call BoundaryGuard.assert_capability_allowed(ClientCapabilityId capability_id)
+  | call BusEventClientView.mapping_by_ref(EventSemanticMappingRef event_mapping_ref)
+  | call BoundaryGuard.assert_event_mapping_allowed(EventSemanticMapping mapping)
   | call TracePropagationPolicy.build_trace(TraceContext context)
   | call RedactionPolicy.assert_ref_only(PayloadRef payload_ref)
   v
@@ -541,13 +626,24 @@ fake_boundary.assert_fake_marker(result.fake_result_ref).await?;
 ##### 关键伪代码
 
 ```rust
+// [RuntimeIdempotencyRepository.find/reserve(IdempotencyKey key, CommandDigest digest)]
+// runtime write-like publish 必须防止 caller retry 重复触发 bus boundary。
+let key = IdempotencyKey::for_runtime_publish(meta.request.idempotency_key, command.event_mapping_ref.clone())?;
+let digest = CommandDigest::from_publish_command(&command, &context)?;
+let replay = runtime_idempotency.find(key.clone()).await?;
+let reservation = runtime_idempotency.reserve(key.clone(), digest.clone()).await?;
+
 // [EventClientViewRepository.get_current()]
 // 读取 event client view 和 semantic mapping。
 let view = event_view_repo.get_current().await?;
 
-// [EventSemanticMapping.resolve(EventSemanticMappingRef event_mapping_ref)]
+// [BusEventClientView.mapping_by_ref(EventSemanticMappingRef event_mapping_ref)]
 // 解析 event semantic mapping。
-let mapping = view.resolve(command.event_mapping_ref)?;
+let mapping = view.mapping_by_ref(command.event_mapping_ref.clone())?;
+
+// [BoundaryGuard.assert_event_mapping_allowed(EventSemanticMapping mapping)]
+// 校验该 SDK event mapping 可以通过 SDK event boundary 暴露。
+boundary_guard.assert_event_mapping_allowed(mapping.clone())?;
 
 // [RedactionPolicy.assert_ref_only(PayloadRef payload_ref)]
 // 确保不传 payload body。
@@ -556,13 +652,17 @@ redaction_policy.assert_ref_only(command.payload_ref)?;
 // [BusEventBoundaryPort.publish_event(PublishBusEventCommand command, ClientCallContext context)]
 // 通过 L0-bus 边界发布请求。
 let result = bus_boundary.publish_event(command, context).await?;
+
+// [RuntimeIdempotencyRepository.complete(IdempotencyKey key, CommandReceiptRef receipt_ref)]
+// 将 bus publish ref 记录为幂等结果;不生成 L0-bus publication / delivery truth。
+runtime_idempotency.complete(key, result.bus_publish_ref.clone().into()).await?;
 ```
 
 ##### 事务边界
 
 | 开始位置 | 提交位置 | 回滚条件 | 同事务内必须完成 |
 |---|---|---|---|
-| 不开启写事务 | 不适用 | 不适用 | 不写 SDK truth |
+| 不开启 domain 写事务；只允许 `RuntimeIdempotencyRepository` 技术记录 | bus boundary 返回并完成 runtime 幂等记录后 | mapping missing、payload 越界、boundary failure、idempotency conflict | 不写 SDK domain truth；不使用 `UnitOfWorkHandle`；不生成 bus runtime truth |
 
 ##### 错误映射
 
@@ -595,9 +695,10 @@ let result = bus_boundary.publish_event(command, context).await?;
   | tx begin
   | call CandidateRepository.get(PackageCandidateId candidate_id)
   | call EvidenceRepository.list_by_candidate(PackageCandidateId candidate_id)
+  | call IdGeneratorPort.next_compatibility_decision_id()
   v
 [CompatibilityDecision]
-  | call CompatibilityDecision.record_decision(...)
+  | call CompatibilityDecision.record(...)
   v
 [Repository + Projection + Outbox]
   | save decision
@@ -621,9 +722,20 @@ let evidence = evidence_repo.list_by_candidate(command.candidate_id).await?;
 // 开启 compatibility decision 写事务。
 let uow = unit_of_work.begin().await?;
 
-// [CompatibilityDecision::record_decision(RecordCompatibilityDecisionCommand command, Vec<VerificationEvidence> evidence, ActorContext actor)]
+// [IdGeneratorPort.next_compatibility_decision_id()]
+// 生成 compatibility decision ID。
+let decision_id = id_generator.next_compatibility_decision_id();
+
+// [CompatibilityDecision::record(CompatibilityDecisionId decision_id, PackageCandidateId candidate_id, SdkBaselineVersion baseline_version, CompatibilityDecisionState decision_state, Vec<VerificationEvidenceRef> evidence_refs, Option<MigrationGuideRef> migration_ref)]
 // 根据证据形成兼容判断。
-let decision = CompatibilityDecision::record_decision(command, evidence, actor)?;
+let decision = CompatibilityDecision::record(
+    decision_id,
+    command.candidate_id,
+    command.baseline_version,
+    command.decision_state,
+    evidence_refs,
+    command.migration_ref,
+)?;
 
 // [CompatibilityRepository.save_decision(CompatibilityDecision decision, UnitOfWorkHandle uow)]
 // 保存 compatibility decision。
@@ -672,8 +784,11 @@ outbox.append(event, uow.clone()).await?;
   | call CompatibilityGovernanceService.deprecate_api(DeprecateSdkApiCommand command, ActorContext actor, CommandMetadata meta)
   v
 [Application Service]
+  | call PublicSdkApiSurfacePort.resolve_api(SdkApiRef api_ref)
+  | call PublicSdkApiSurfacePort.resolve_api(replacement_api_ref) when present
   | tx begin
   | call CompatibilityRepository.get_deprecated_api(SdkApiRef api_ref)
+  | call IdGeneratorPort.next_removal_plan_ref() when target is PendingRemoval
   v
 [DeprecatedApiRecord]
   | call DeprecatedApiRecord.announce(...) OR mark_deprecated(...) OR schedule_removal(...)
@@ -687,6 +802,28 @@ outbox.append(event, uow.clone()).await?;
 ##### 关键伪代码
 
 ```rust
+// [PublicSdkApiSurfacePort.resolve_api(SdkApiRef api_ref)]
+// 校验被 deprecated 的 API 必须属于 SDK public surface,并取得当前 API 所属版本。
+let api_entry = public_api_surface
+    .resolve_api(command.api_ref)
+    .await?
+    .ok_or(SdkApplicationError::NotFound)?;
+if !api_entry.is_public {
+    return Err(SdkProtocolError::Validation);
+}
+
+// [PublicSdkApiSurfacePort.resolve_api(SdkApiRef replacement_api_ref)]
+// replacement API 有值时也必须解析到 public surface。
+if let Some(replacement_api_ref) = command.removal_plan.as_ref().and_then(|plan| plan.replacement_api_ref) {
+    let replacement_entry = public_api_surface
+        .resolve_api(replacement_api_ref)
+        .await?
+        .ok_or(SdkApplicationError::NotFound)?;
+    if !replacement_entry.is_public {
+        return Err(SdkProtocolError::Validation);
+    }
+}
+
 // [CompatibilityRepository.get_deprecated_api(SdkApiRef api_ref)]
 // 读取已有 deprecated API 记录。
 let current = compat_repo.get_deprecated_api(command.api_ref).await?;
@@ -695,9 +832,38 @@ let current = compat_repo.get_deprecated_api(command.api_ref).await?;
 // 开启 deprecated API 写事务。
 let uow = unit_of_work.begin().await?;
 
-// [DeprecatedApiRecord.mark_deprecated(MigrationGuideRef migration_ref, Timestamp now)]
-// 按目标 lifecycle 推进状态。
-let record = current.mark_deprecated(command.migration_ref, clock.now())?;
+let record = match command.target_lifecycle_state {
+    DeprecatedApiLifecycleState::Deprecated => {
+        // [DeprecatedApiRecord.mark_deprecated(MigrationGuideRef migration_ref, Timestamp now)]
+        // 目标状态为 Deprecated 时推进状态。
+        current.mark_deprecated(command.migration_ref, clock.now())?
+    }
+    DeprecatedApiLifecycleState::PendingRemoval => {
+        // [IdGeneratorPort.next_removal_plan_ref()]
+        // 目标状态为 PendingRemoval 时，先生成 removal plan ref。
+        let removal_plan_ref = id_generator.next_removal_plan_ref();
+
+        // [RemovalPlan::create(RemovalPlanRef removal_plan_ref, PackageCandidateVersion target_removal_version, PackageCandidateVersion current_api_version, Timestamp removal_not_before, Option<SdkApiRef> replacement_api_ref, DocumentRef document_ref)]
+        // 由 command.removal_plan input 和 public API surface entry 构造 domain RemovalPlan。
+        let plan_input = command.removal_plan.ok_or(SdkDomainError::RemovalPlanRequired)?;
+        let removal_plan = RemovalPlan::create(
+            removal_plan_ref,
+            plan_input.target_removal_version,
+            api_entry.api_version,
+            plan_input.removal_not_before,
+            plan_input.replacement_api_ref,
+            plan_input.document_ref,
+        )?;
+
+        // [DeprecatedApiRecord.schedule_removal(RemovalPlan removal_plan, Timestamp now)]
+        // 目标状态为 PendingRemoval 时推进状态。
+        current.schedule_removal(removal_plan, clock.now())?
+    }
+    DeprecatedApiLifecycleState::Removed => {
+        current.mark_removed(clock.now())?
+    }
+    _ => return Err(SdkDomainError::InvalidStateTransition),
+};
 
 // [CompatibilityRepository.save_deprecated_api(DeprecatedApiRecord record, ExpectedVersion expected_version, UnitOfWorkHandle uow)]
 // 保存 deprecated API 记录。
@@ -716,13 +882,15 @@ unit_of_work.commit(uow).await?;
 
 | 开始位置 | 提交位置 | 回滚条件 | 同事务内必须完成 |
 |---|---|---|---|
-| 读取当前 deprecated record 后 | record / outbox 保存后 | lifecycle illegal、migration missing、repository failure | deprecated record、outbox、幂等完成 |
+| public API surface 解析成功并读取当前 deprecated record 后 | record / outbox 保存后 | API ref missing、replacement not public、target removal version invalid、lifecycle illegal、migration missing、repository failure | deprecated record、outbox、幂等完成 |
 
 ##### 错误映射
 
 | 场景 | 检测位置 | 错误 |
 |---|---|---|
 | API ref 不存在 | lookup | `NotFound` |
+| replacement API ref 不存在或不是 public surface | public API surface lookup | `NotFound` / `Validation` |
+| target removal version 不大于当前 API 所属版本 | `RemovalPlan::create(...)` | `Validation` |
 | migration ref 缺失 | domain object | `Validation` |
 | lifecycle 非法迁移 | domain object | `Conflict` |
 
@@ -735,6 +903,9 @@ unit_of_work.commit(uow).await?;
 
 - deprecated without migration rejected。
 - pending removal without removal plan rejected。
+- API ref not in public SDK surface rejected。
+- replacement API ref not in public SDK surface rejected。
+- target removal version not greater than public surface entry version rejected。
 - removed 后再次修改 rejected。
 
 ### 7.4 Inbound Event Consumer 处理流
@@ -760,8 +931,9 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 // [SdkIdempotencyRepository.find(IdempotencyKey key)]
-// 使用 event_id + source_ref 判断重复消费。
-let replay = idempotency.find(meta.idempotency_key).await?;
+// 使用 event_id + source_ref + idempotency_key 形成消费幂等键并判断重复消费。
+let consume_key = EventConsumeIdempotencyKey::from(meta.event_id, meta.source_ref, meta.idempotency_key)?;
+let replay = idempotency.find(consume_key).await?;
 
 // [UnitOfWork.begin()]
 // 开启 event 消费事务。
@@ -807,6 +979,8 @@ outbox.append(freshness_event, uow.clone()).await?;
 
 #### 7.4.2 `ConsumeBusSemanticChangedFlow`
 
+实施阶段: PH-03 / `commit-03-a`。该流读写 `BusEventClientView`,不得作为 PH-02 / `commit-02-b` 的实现内容。
+
 ##### 函数级调用图
 
 ```text
@@ -814,16 +988,40 @@ outbox.append(freshness_event, uow.clone()).await?;
   | call ContractConsumptionService.consume_bus_semantic_changed(BusSemanticChangedEvent event, EventConsumeMetadata meta)
   v
 [Application Service]
+  | call SdkIdempotencyRepository.find(IdempotencyKey key)
+  | fetch BusSemanticSnapshot via BusSemanticSourcePort
   | tx begin
   | save bus upstream ref
-  | mark event client view stale
-  | append SdkSnapshotFreshnessChangedEvent
+  | derive EventSemanticMapping set
+  | save event client view
+  | append SdkClientViewFreshnessChangedEvent
   | tx commit
 ```
 
 ##### 关键伪代码
 
 ```rust
+// [SdkIdempotencyRepository.find(IdempotencyKey key)]
+// 使用 event_id + source_ref + idempotency_key 形成消费幂等键并判断重复消费。
+let consume_key = EventConsumeIdempotencyKey::from(meta.event_id, meta.source_ref, meta.idempotency_key)?;
+let replay = idempotency.find(consume_key).await?;
+
+// [BusSemanticSourcePort.fetch_snapshot(UpstreamVersionRef version_ref)]
+// 事件只携带 bus 侧 ref / version;SDK 通过 source port 拉取语义 snapshot,不得要求 L0-bus 事件携带 SDK 专属字段。
+let bus_snapshot = bus_source.fetch_snapshot(event.version_ref.clone()).await?;
+
+// [BusSemanticSnapshot.assert_contains(TransportSemanticId transport_semantic_id, SnapshotDigest digest)]
+// 校验 event 中的 semantic ref / digest 与 source snapshot 一致。
+bus_snapshot.assert_contains(event.transport_semantic_id.clone(), event.digest.clone())?;
+
+// [SemanticBaselineRepository.get_current()]
+// 读取当前 SDK semantic baseline / concept map,用于把 bus semantic 派生为 SDK 事件映射。
+let baseline = semantic_repo.get_current().await?;
+
+// [UnitOfWork.begin()]
+// 开启 event 消费事务;外部 source 读取不放入本地写事务。
+let uow = unit_of_work.begin().await?;
+
 // [VersionRefRepository.upsert_upstream_ref(UpstreamVersionRef upstream_ref, UnitOfWorkHandle uow)]
 // 保存 bus semantic 版本引用。
 version_repo.upsert_upstream_ref(event.version_ref, uow.clone()).await?;
@@ -832,20 +1030,53 @@ version_repo.upsert_upstream_ref(event.version_ref, uow.clone()).await?;
 // 读取当前 event client view。
 let event_view = event_view_repo.get_current().await?;
 
-// [BusEventClientView.mark_stale(UpstreamVersionRef upstream_ref, Timestamp now)]
-// 标记 event client view stale。
-let stale_view = event_view.mark_stale(event.version_ref, clock.now())?;
+// [Application mapping extraction]
+// application 层从 bus snapshot + concept map 提取 typed mapping input;不得把 source snapshot DTO 直接传入 domain factory。
+let mapping_inputs: Vec<EventSemanticMappingInput> =
+    ContractConsumptionService::extract_event_mapping_inputs(bus_snapshot, baseline.concept_map())?;
+
+// [EventSemanticMapping::from_input(EventSemanticMappingInput input)]
+// domain factory 根据 typed input 创建 mapping,并由 SDK event name + bus transport semantic id + operation 稳定生成 mapping_ref。
+let mappings = mapping_inputs
+    .into_iter()
+    .map(EventSemanticMapping::from_input)
+    .collect::<Result<Vec<_>, _>>()?;
+
+// [BusEventClientView::from_bus_semantics(Vec<EventSemanticMapping> mappings, SnapshotFreshnessState freshness_state)]
+// 保存刷新后的 event client view;若只能确认变化而无法拉取 snapshot,则保存 stale 视图并返回 retryable dependency。
+let refreshed_view = event_view.refresh_mappings(mappings, event.version_ref.clone(), clock.now())?;
+
+// [SdkClientViewFreshnessChangedEvent]
+// 为 event client view 写入 freshness changed event;不得复用 DerivedViewId / affected_languages schema。
+let freshness_event = SdkClientViewFreshnessChangedEvent {
+    target_view: SdkClientViewFreshnessTarget::Event(refreshed_view.event_view_id.clone()),
+    freshness_state: refreshed_view.freshness_state.clone(),
+    upstream_refs: vec![event.version_ref.clone()],
+    changed_at: clock.now(),
+};
 
 // [EventClientViewRepository.save(BusEventClientView view, ExpectedVersion expected_version, UnitOfWorkHandle uow)]
-// 保存 stale view。
-event_view_repo.save(stale_view, expected_version, uow.clone()).await?;
+// 保存 event client view。
+event_view_repo.save(refreshed_view, expected_version, uow.clone()).await?;
+
+// [SdkOutboxPort.append(SdkOutboxEvent event, UnitOfWorkHandle uow)]
+// 写入 client view freshness changed event。
+outbox.append(freshness_event, uow.clone()).await?;
+
+// [SdkIdempotencyRepository.complete(IdempotencyKey key, CommandReceiptRef receipt_ref)]
+// 完成 event 消费幂等记录。
+idempotency.complete(consume_key, event.event_id.clone().into(), uow.clone()).await?;
+
+// [UnitOfWork.commit(UnitOfWorkHandle uow)]
+// 提交 bus ref、event client view、outbox 和幂等完成记录。
+unit_of_work.commit(uow).await?;
 ```
 
 ##### 事务边界
 
 | 开始位置 | 提交位置 | 回滚条件 | 同事务内必须完成 |
 |---|---|---|---|
-| event 校验后 | bus ref / event view / outbox 保存后 | missing ref、view conflict、outbox failure | version ref、event view stale、outbox |
+| event 校验和 bus semantic snapshot 读取成功后 | bus ref / event view / outbox 保存后 | missing ref、snapshot dependency failure、view conflict、outbox failure | version ref、event mapping 派生、event view、outbox |
 
 ##### 错误映射
 
@@ -857,16 +1088,20 @@ event_view_repo.save(stale_view, expected_version, uow.clone()).await?;
 
 ##### 状态与事件副作用
 
-- `BusEventClientView` freshness 变为 stale。
+- 正常路径刷新 `BusEventClientView.mapping_set` 并更新 freshness / upstream version。
+- 正常路径写入 `SdkClientViewFreshnessChangedEvent`，目标为 `Event(EventViewId)`。
+- snapshot 暂不可用时只允许保留或标记 stale 状态并返回 retryable dependency。
 - 不修改 bus runtime truth。
 
 ##### 测试切口
 
 - duplicate bus event 幂等。
 - missing semantic ref rejected。
-- stale event view saved。
+- event mapping 刷新后保存 event view。
 
 #### 7.4.3 `ConsumeFormalApiChangedFlow`
+
+实施阶段: PH-03 / `commit-03-a`。该流读写 `ServiceClientView`,不得作为 PH-02 / `commit-02-b` 的实现内容。
 
 ##### 函数级调用图
 
@@ -879,7 +1114,7 @@ event_view_repo.save(stale_view, expected_version, uow.clone()).await?;
   | save formal API upstream ref
   | mark service client view stale
   | mark related compatibility affected
-  | append SdkSnapshotFreshnessChangedEvent
+  | append SdkClientViewFreshnessChangedEvent
   | tx commit
 ```
 
@@ -898,9 +1133,22 @@ let service_view = service_view_repo.get_current().await?;
 // 标记受影响 service client view stale。
 let stale_view = service_view.mark_stale(event.formal_api_ref, clock.now())?;
 
+// [SdkClientViewFreshnessChangedEvent]
+// 为 service client view 写入 freshness changed event;不得复用 DerivedViewId / affected_languages schema。
+let freshness_event = SdkClientViewFreshnessChangedEvent {
+    target_view: SdkClientViewFreshnessTarget::Service(stale_view.service_view_id.clone()),
+    freshness_state: stale_view.freshness_state.clone(),
+    upstream_refs: vec![event.version_ref.clone()],
+    changed_at: clock.now(),
+};
+
 // [ServiceClientViewRepository.save(ServiceClientView view, ExpectedVersion expected_version, UnitOfWorkHandle uow)]
 // 保存 stale service view。
 service_view_repo.save(stale_view, expected_version, uow.clone()).await?;
+
+// [SdkOutboxPort.append(SdkOutboxEvent event, UnitOfWorkHandle uow)]
+// 写入 client view freshness changed event。
+outbox.append(freshness_event, uow.clone()).await?;
 ```
 
 ##### 事务边界
@@ -920,6 +1168,7 @@ service_view_repo.save(stale_view, expected_version, uow.clone()).await?;
 ##### 状态与事件副作用
 
 - `ServiceClientView` freshness 变为 stale。
+- 写入 `SdkClientViewFreshnessChangedEvent`，目标为 `Service(ServiceViewId)`。
 - compatibility 后续由 job / command 重新判断。
 
 ##### 测试切口
@@ -1029,7 +1278,7 @@ candidate.apply_evidence(evidence, clock.now())?;
 | `GetVerificationEvidence` | `EvidenceRepository` / `EvidenceProjectionPort` | `VerificationEvidenceView` |
 | `GetCompatibilityDecision` | `CompatibilityRepository` / `CompatibilityProjectionPort` | `CompatibilityDecisionView` |
 | `ListDeprecatedApis` | `CompatibilityProjectionPort` | `DeprecatedApiPage` |
-| `GetMigrationGuideRef` | `CompatibilityRepository` | `MigrationGuideRefView` |
+| `GetMigrationGuideRef` | `CompatibilityRepository.get_deprecated_api(api_ref)`，再匹配 `DeprecatedApiRecord.migration_ref` 的版本范围 | `MigrationGuideRefView` |
 
 ##### 关键伪代码
 
@@ -1097,6 +1346,7 @@ let marker = ConsistencyMarker::from_projection(view.version);
 |---|---|---|---|
 | `SdkSemanticBaselineChangedEvent` | `SdkSemanticBaseline` | `sdk.semantic_baseline.changed.v1` | mark published |
 | `SdkSnapshotFreshnessChangedEvent` | `DerivedBindingView` / freshness | `sdk.snapshot_freshness.changed.v1` | mark published |
+| `SdkClientViewFreshnessChangedEvent` | `ServiceClientView` / `BusEventClientView` / freshness | `sdk.client_view_freshness.changed.v1` | mark published |
 | `PackageCandidateGeneratedEvent` | `PackageCandidate` | `sdk.package_candidate.generated.v1` | mark published |
 | `VerificationEvidenceRecordedEvent` | `VerificationEvidence` | `sdk.verification_evidence.recorded.v1` | mark published |
 | `CompatibilityDecisionRecordedEvent` | `CompatibilityDecision` | `sdk.compatibility_decision.recorded.v1` | mark published |
@@ -1277,23 +1527,64 @@ candidate_repo.insert(candidate, uow.clone()).await?;
 ```rust
 // [CandidateRepository.get_for_update(PackageCandidateId candidate_id, UnitOfWorkHandle uow)]
 // 锁定 candidate。
-let candidate = candidate_repo.get_for_update(input.candidate_id, uow.clone()).await?;
+let mut candidate = candidate_repo.get_for_update(input.candidate_id, uow.clone()).await?;
 
-// [LanguageBindingGeneratorPort.generate(LanguageBindingGenerationInput input)]
-// 生成语言 binding。
-let generated = generator.generate(binding_input).await?;
+// [SemanticBaselineRepository.get_current()]
+// 读取当前 concept map,用于校验语言视图语义仍对齐。
+let baseline = baseline_repo.get_current().await?;
+let concept_map = baseline.concept_map()?;
 
-// [PackageBuilderPort.build_candidate(PackageBuildInput input)]
-// 构建 package artifact。
-let built = package_builder.build_candidate(build_input).await?;
+// [DerivedViewRepository.get_language_view(LanguageId language_id)]
+// 按构建语言读取当前语言视图;artifact 必须追溯到该视图的 stable language_view_id。
+let language_views = input
+    .language_set
+    .iter()
+    .map(|language_id| derived_repo.get_language_view(language_id.clone()))
+    .collect::<Result<Vec<_>, _>>()?
+    .into_iter()
+    .map(|view| view.ok_or(SdkApplicationError::NotFound)?)
+    .collect::<Result<Vec<LanguageBindingView>, _>>()?;
 
-// [PackageArtifactStorePort.put_artifact(PackageArtifactWrite artifact)]
-// 保存 artifact 并返回 artifact ref。
-let artifact_ref = artifact_store.put_artifact(built.artifact).await?;
+for language_view in language_views {
+    // [LanguageBindingView.assert_semantic_alignment(CrossLanguageConceptMap concept_map)]
+    // 校验语言视图仍与当前共同概念映射对齐。
+    language_view.assert_semantic_alignment(concept_map.clone())?;
 
-// [PackageCandidate.attach_artifact(LanguageArtifact artifact, Timestamp now)]
-// 将 artifact 关联到 candidate。
-candidate.attach_artifact(language_artifact, clock.now())?;
+    // [LanguageBindingGeneratorPort.generate(LanguageBindingGenerationInput input)]
+    // 基于语言视图生成语言 binding;不得脱离 LanguageBindingView 独立生成。
+    let generated = generator.generate(LanguageBindingGenerationInput {
+        candidate_id: candidate.candidate_id.clone(),
+        language_view: language_view.clone(),
+        output_root_ref: input.output_root_ref.clone(),
+    }).await?;
+
+    // [PackageBuilderPort.build_candidate(PackageBuildInput input)]
+    // 构建该语言的 package artifact。
+    let built = package_builder.build_candidate(PackageBuildInput {
+        candidate_id: candidate.candidate_id.clone(),
+        language_id: language_view.language_id.clone(),
+        language_view_id: language_view.language_view_id.clone(),
+        generated_binding_ref: generated.generated_binding_ref,
+        output_root_ref: input.output_root_ref.clone(),
+    }).await?;
+
+    // [PackageArtifactStorePort.put_artifact(PackageArtifactWrite artifact)]
+    // 保存 artifact 并返回 artifact ref。
+    let artifact_ref = artifact_store.put_artifact(built.artifact).await?;
+
+    // [LanguageArtifact::record(LanguageId language_id, PackageArtifactRef artifact_ref, ContentDigest artifact_digest, LanguageBindingViewId language_view_id)]
+    // artifact 的 language_view_id 必须来自参与构建的 LanguageBindingView,不得由 artifact digest 或 candidate version 派生。
+    let language_artifact = LanguageArtifact::record(
+        language_view.language_id.clone(),
+        artifact_ref,
+        built.artifact_digest,
+        language_view.language_view_id.clone(),
+    )?;
+
+    // [PackageCandidate.attach_artifact(LanguageArtifact artifact, Timestamp now)]
+    // 将 artifact 关联到 candidate。
+    candidate.attach_artifact(language_artifact, clock.now())?;
+}
 ```
 
 ##### 事务边界
@@ -1319,7 +1610,8 @@ candidate.attach_artifact(language_artifact, clock.now())?;
   | call CandidateValidationService.run_smoke(RunCrossLanguageSmokeJobInput input, JobMetadata meta)
   v
 [Application Service]
-  | lock candidate
+  | load candidate
+  | call PackageArtifactStorePort.materialize_artifacts(...)
   | call SmokeRunnerPort.run_cross_language_smoke(...)
   | call VerificationEvidence::from_runner_result(...)
   | save evidence
@@ -1329,9 +1621,28 @@ candidate.attach_artifact(language_artifact, clock.now())?;
 ##### 关键伪代码
 
 ```rust
+// [CandidateRepository.get(PackageCandidateId candidate_id)]
+// 只读加载 candidate,用于确认三语言 artifact 输入。
+let candidate = candidate_repo.get(input.candidate_id.clone()).await?.ok_or(SdkApplicationError::NotFound)?;
+
+// [PackageArtifactStorePort.materialize_artifacts(PackageArtifactMaterializationInput input)]
+// 将 candidate artifact 物化到本次 job run 的 runner 可读位置。
+let materialized = artifact_store.materialize_artifacts(PackageArtifactMaterializationInput {
+    candidate_id: input.candidate_id.clone(),
+    language_set: candidate.required_language_set(),
+    job_run_id: meta.job_run_id.clone(),
+    purpose: ArtifactMaterializationPurpose::Smoke,
+}).await?;
+
 // [SmokeRunnerPort.run_cross_language_smoke(CrossLanguageSmokeInput input)]
 // 运行三语言 smoke。
-let smoke = smoke_runner.run_cross_language_smoke(smoke_input).await?;
+let smoke = smoke_runner.run_cross_language_smoke(CrossLanguageSmokeInput {
+    candidate_id: input.candidate_id.clone(),
+    target_profile: input.target_profile.clone(),
+    suite_ref: input.suite_ref.clone(),
+    materialized_artifacts: materialized.artifacts,
+    materialization_ref: materialized.materialization_ref,
+}).await?;
 
 // [VerificationEvidence::from_runner_result(RunnerResult result, PackageCandidateId candidate_id, Timestamp now)]
 // 生成 smoke evidence。
@@ -1356,9 +1667,9 @@ candidate.apply_evidence(evidence, clock.now())?;
 
 | 项 | 内容 |
 |---|---|
-| 错误 | runner unavailable -> `Dependency`；unredacted -> `BoundaryViolation` |
+| 错误 | artifact missing / materialization failure -> `Dependency`；runner unavailable -> `Dependency`；unredacted -> `BoundaryViolation` |
 | 状态副作用 | evidence recorded；candidate 可推进验证状态 |
-| 测试切口 | fake marker present、failed smoke cannot verify、unredacted rejected |
+| 测试切口 | missing artifact blocks smoke、fake marker present、failed smoke cannot verify、unredacted rejected |
 
 #### 7.6.5 `ValidateDocsExamplesFlow`
 
@@ -1367,6 +1678,9 @@ candidate.apply_evidence(evidence, clock.now())?;
 ```text
 [validate_docs_examples binary]
   | call DocsExampleValidationService.validate_examples(ValidateDocsExamplesJobInput input, JobMetadata meta)
+  v
+[PackageArtifactStorePort]
+  | materialize candidate artifacts for docs examples
   v
 [DocsExampleRunnerPort]
   | run_examples(...)
@@ -1379,13 +1693,45 @@ candidate.apply_evidence(evidence, clock.now())?;
 ##### 关键伪代码
 
 ```rust
+// [CandidateRepository.get(PackageCandidateId candidate_id)]
+// 只读加载 candidate,用于确认 docs runner 的目标 candidate 存在。
+let candidate = candidate_repo.get(input.candidate_id.clone()).await?.ok_or(SdkApplicationError::NotFound)?;
+
+// [PackageArtifactStorePort.materialize_artifacts(PackageArtifactMaterializationInput input)]
+// 根据 candidate_id 和 language_set 物化 docs runner 可执行的本地 package artifact。
+let materialized = artifact_store.materialize_artifacts(PackageArtifactMaterializationInput {
+    candidate_id: candidate.candidate_id.clone(),
+    language_set: input.language_set.clone(),
+    job_run_id: meta.job_run_id.clone(),
+    purpose: ArtifactMaterializationPurpose::DocsExamples,
+}).await?;
+
 // [DocsExampleRunnerPort.run_examples(DocsExampleRunInput input)]
 // 运行文档示例验证。
-let docs_result = docs_runner.run_examples(run_input).await?;
+let docs_result = docs_runner.run_examples(DocsExampleRunInput {
+    candidate_id: input.candidate_id.clone(),
+    docs_example_set_ref: input.docs_example_set_ref.clone(),
+    language_set: input.language_set.clone(),
+    materialized_artifacts: materialized.artifacts,
+    materialization_ref: materialized.materialization_ref,
+}).await?;
+
+// [Vec<DocsExampleView>]
+// 同步生成当前写路径 projection 行;这些行与 evidence artifact replay payload 同源。
+let checked_at = clock.now();
+let examples = docs_result.example_results.iter().map(|item| DocsExampleView {
+    candidate_id: input.candidate_id.clone(),
+    docs_example_set_ref: input.docs_example_set_ref.clone(),
+    language_id: item.language_id.clone(),
+    example_ref: item.example_ref.clone(),
+    result: item.result,
+    checked_at: checked_at.clone(),
+}).collect::<Vec<_>>();
 
 // [VerificationEvidence::from_docs_result(DocsExampleRunResult result, PackageCandidateId candidate_id, Timestamp now)]
-// 生成 docs evidence。
-let evidence = VerificationEvidence::from_docs_result(docs_result, input.candidate_id, clock.now())?;
+// 生成 docs evidence。docs_result.artifact_ref 指向已脱敏 artifact,该 artifact 必须包含
+// candidate_id、docs_example_set_ref、checked_at 和逐 example 结果,用于后续 projection rebuild。
+let evidence = VerificationEvidence::from_docs_result(docs_result, input.candidate_id.clone(), checked_at)?;
 
 // [DocsExampleProjectionPort.replace_examples(Vec<DocsExampleView> examples, UnitOfWorkHandle uow)]
 // 更新 docs example projection。
@@ -1402,9 +1748,9 @@ docs_projection.replace_examples(examples, uow.clone()).await?;
 
 | 项 | 内容 |
 |---|---|
-| 错误 | docs runner unavailable -> `Dependency`; example failure -> evidence failed |
+| 错误 | artifact missing / materialization failure -> `Dependency`; docs runner unavailable -> `Dependency`; example failure -> evidence failed |
 | 状态副作用 | docs evidence recorded |
-| 测试切口 | failed example creates failed evidence、docs pass does not imply compatibility pass |
+| 测试切口 | missing candidate artifact blocks docs runner、failed example creates failed evidence、docs pass does not imply compatibility pass |
 
 #### 7.6.6 `CheckCompatibilityFlow`
 
@@ -1414,8 +1760,9 @@ docs_projection.replace_examples(examples, uow.clone()).await?;
 [check_compatibility binary]
   | call CompatibilityGovernanceService.check_compatibility(CheckCompatibilityJobInput input, JobMetadata meta)
   v
-[CompatibilityRunnerPort]
-  | check_compatibility(...)
+[Application Service]
+  | call CompatibilityRunnerPort.check_compatibility(...)
+  | call IdGeneratorPort.next_compatibility_decision_id()
   v
 [CompatibilityDecision]
   | record decision
@@ -1433,9 +1780,20 @@ let evidence = evidence_repo.list_by_candidate(input.candidate_id).await?;
 // 执行兼容检查。
 let result = compatibility_runner.check_compatibility(check_input).await?;
 
-// [CompatibilityDecision::from_runner_result(CompatibilityCheckResult result, Vec<VerificationEvidence> evidence, ActorContext actor)]
+// [IdGeneratorPort.next_compatibility_decision_id()]
+// 生成 compatibility decision ID。
+let decision_id = id_generator.next_compatibility_decision_id();
+
+// [CompatibilityDecision::from_runner_result(CompatibilityDecisionId decision_id, PackageCandidateId candidate_id, SdkBaselineVersion baseline_version, CompatibilityCheckResult result, Vec<VerificationEvidence> evidence, ActorContext actor)]
 // 生成 compatibility decision。
-let decision = CompatibilityDecision::from_runner_result(result, evidence, actor)?;
+let decision = CompatibilityDecision::from_runner_result(
+    decision_id,
+    input.candidate_id,
+    input.baseline_version,
+    result,
+    evidence,
+    actor,
+)?;
 
 // [CompatibilityRepository.save_decision(CompatibilityDecision decision, UnitOfWorkHandle uow)]
 // 保存 decision。
@@ -1464,6 +1822,9 @@ compat_repo.save_decision(decision, uow.clone()).await?;
 [verify_boundary_policies binary]
   | call CandidateValidationService.verify_boundary_policies(VerifyBoundaryPoliciesJobInput input, JobMetadata meta)
   v
+[PackageArtifactStorePort]
+  | materialize candidate artifacts for boundary verification
+  v
 [BoundaryPolicyVerifierPort]
   | verify(...)
   v
@@ -1474,9 +1835,28 @@ compat_repo.save_decision(decision, uow.clone()).await?;
 ##### 关键伪代码
 
 ```rust
+// [CandidateRepository.get(PackageCandidateId candidate_id)]
+// 只读加载 candidate,用于派生需要扫描的语言 artifact 集合。
+let candidate = candidate_repo.get(input.candidate_id.clone()).await?.ok_or(SdkApplicationError::NotFound)?;
+
+// [PackageArtifactStorePort.materialize_artifacts(PackageArtifactMaterializationInput input)]
+// 物化 candidate artifact,供 verifier 扫描 package surface、fixture 和生成物边界。
+let materialized = artifact_store.materialize_artifacts(PackageArtifactMaterializationInput {
+    candidate_id: input.candidate_id.clone(),
+    language_set: candidate.required_language_set(),
+    job_run_id: meta.job_run_id.clone(),
+    purpose: ArtifactMaterializationPurpose::BoundaryVerification,
+}).await?;
+
 // [BoundaryPolicyVerifierPort.verify(BoundaryPolicyVerificationInput input)]
 // 验证 redaction / credential / fake boundary 底线。
-let result = verifier.verify(verification_input).await?;
+let result = verifier.verify(BoundaryPolicyVerificationInput {
+    candidate_id: input.candidate_id.clone(),
+    policy_set_ref: input.policy_set_ref.clone(),
+    fixture_ref: input.fixture_ref.clone(),
+    materialized_artifacts: materialized.artifacts,
+    materialization_ref: materialized.materialization_ref,
+}).await?;
 
 // [VerificationEvidence::from_boundary_policy_result(BoundaryPolicyVerificationResult result, PackageCandidateId candidate_id, Timestamp now)]
 // 生成 boundary evidence。
@@ -1511,6 +1891,7 @@ evidence_repo.insert(evidence, uow.clone()).await?;
   v
 [Truth Repositories]
   | read semantic / candidate / evidence / compatibility truth
+  | read docs evidence artifact through EvidenceArtifactReplayPort
   v
 [Projection Ports]
   | rebuild capability / evidence / compatibility / docs example projection
@@ -1529,6 +1910,15 @@ let baseline = baseline_repo.get_current().await?;
 // 读取 evidence truth。
 let evidence = evidence_repo.list_by_candidate(candidate_id).await?;
 
+// [EvidenceArtifactReplayPort.replay_docs_examples(VerificationEvidence evidence)]
+// 仅对 EvidenceKind::DocsExample 且 Redacted 的 committed evidence 读取 artifact_ref,
+// 从 redacted docs evidence artifact 重放 DocsExampleView 明细。
+let mut docs_examples = Vec::new();
+for item in evidence.iter().filter(|item| item.evidence_kind == EvidenceKind::DocsExample) {
+    let mut replayed = evidence_artifact_replay.replay_docs_examples(item.clone()).await?;
+    docs_examples.append(&mut replayed);
+}
+
 // [UnitOfWork.begin()]
 // 开启 projection batch replace 事务。
 let uow = unit_of_work.begin().await?;
@@ -1536,6 +1926,10 @@ let uow = unit_of_work.begin().await?;
 // [SdkCapabilityProjectionPort.rebuild_from_truth(CapabilityProjectionRebuildInput input, UnitOfWorkHandle uow)]
 // 从 truth 重建 capability projection。
 cap_projection.rebuild_from_truth(input, uow.clone()).await?;
+
+// [DocsExampleProjectionPort.replace_examples(Vec<DocsExampleView> examples, UnitOfWorkHandle uow)]
+// 从 committed docs evidence artifact 重建 docs example projection。
+docs_projection.replace_examples(docs_examples, uow.clone()).await?;
 
 // [UnitOfWork.commit(UnitOfWorkHandle uow)]
 // 提交 projection batch。
@@ -1554,7 +1948,7 @@ unit_of_work.commit(uow).await?;
 |---|---|
 | 错误 | projection write failure -> `Dependency`; invalid projection set -> `Validation` |
 | 状态副作用 | projection marker 更新；truth 不变 |
-| 测试切口 | dry run 不写 projection、projection failure 不改 truth |
+| 测试切口 | dry run 不写 projection、projection failure 不改 truth、docs evidence artifact 缺失 / schema drift 时 rebuild failed |
 
 ### 7.7 Step 9 统一复核
 
@@ -1565,7 +1959,7 @@ unit_of_work.commit(uow).await?;
 | 6 个 Command API | 是 | §7.3 |
 | 4 个 Inbound Event Consumer | 是 | §7.4 |
 | 12 个 Query API | 是 | §7.5.1 通用只读流 + 入口差异 |
-| 6 个 Outbound Event | 是 | §7.5.2 通用发布流 + event 差异 |
+| 7 个 Outbound Event | 是 | §7.5.2 通用发布流 + event 差异 |
 | 8 个 Operations Job | 是 | §7.6 |
 | 事务边界 | 是 | 每个写流均列 begin / commit / rollback 规则 |
 | DTO 构造闭环 | 是 | 每个流回指 Step 8 DTO 和 Step 6 domain 对象 |

@@ -72,7 +72,7 @@
 | 事务主题 | 必须原子提交的内容 | 回滚条件 |
 |---|---|---|
 | semantic baseline 写入 | baseline、capability projection、outbox append、idempotency complete | validation、version conflict、projection failure、outbox append failure |
-| derived view refresh | derived view、language view、version ref、freshness outbox event | source digest mismatch、derivation failure、repository conflict、outbox append failure |
+| derived view refresh | derived view、language view、version ref、freshness outbox event | source digest mismatch、concept map missing / mismatch、derivation failure、repository conflict、outbox append failure |
 | upstream changed consumer | upstream version ref、affected view stale mark、outbox append、idempotency complete | missing source ref、duplicate conflict、repository failure |
 | package candidate 生成 | candidate insert、candidate generated event、idempotency complete | freshness gate failed、candidate duplicate、outbox append failure |
 | validation / docs / smoke / boundary evidence | evidence insert、candidate update、projection update、outbox append | unredacted evidence、failed blocking gate、repository or outbox failure |
@@ -193,7 +193,7 @@
 | AC-TX-001 | 写路径 UoW 原子性 | truth、required projection、outbox append、idempotency complete 同事务成功或同事务回滚 | projection / outbox append 失败后 truth 仍提交；idempotency 与业务结果不一致 | `SPECIAL-SDK-CONSISTENCY-001`、`EV-SDK-CONSISTENCY-001` |
 | AC-TX-002 | outbox append 与 publish 一致性 | append 与 truth 同事务；publish post-commit；publish failure 保持 pending / retryable | publish failure 回滚 truth；retry 生成新 truth 或新 event identity | `SPECIAL-SDK-RECOVERY-001`、outbox retry evidence |
 | AC-TX-003 | Query / projection 只读一致性 | Query 不开写事务；projection rebuild 不写 truth；stale 返回 marker | Query 自动 refresh；projection 反写 baseline、view、candidate 或 evidence | `SPECIAL-SDK-CONSISTENCY-001`、projection rebuild evidence |
-| AC-TX-004 | artifact metadata 一致性 | artifact body digest verified 后，truth 只保存 ref / digest；truth failure 时 orphan 不可见 | digest 失败仍 attach；orphan artifact 出现在 candidate view | `TC-SDK-CANDIDATE-002`、`SPECIAL-SDK-RECOVERY-001` |
+| AC-TX-004 | artifact metadata 一致性 | artifact body digest verified 后，truth 只保存 ref / digest / 来源 `language_view_id`；truth failure 时 orphan 不可见 | digest 失败仍 attach；artifact 缺来源 language view；orphan artifact 出现在 candidate view | `TC-SDK-CANDIDATE-002`、`SPECIAL-SDK-RECOVERY-001` |
 | AC-IDEM-001 | Command 幂等 | same key + same digest replay receipt；same key + different digest conflict | 重放重复写 truth / outbox；key 冲突覆盖旧记录 | `SPECIAL-SDK-IDEMPOTENCY-001`、`EV-SDK-IDEMPOTENCY-001` |
 | AC-IDEM-002 | Event / Job 幂等 | duplicate event skip；job rerun 按 item key skip / replay；partial failure 可恢复 | duplicate event 写第二份 truth；job rerun 重复写 evidence / candidate | `TC-SDK-CONTRACT-003`、`SPECIAL-SDK-IDEMPOTENCY-001` |
 | AC-CONC-001 | 乐观锁和 expected version | 同资源并发写只允许一个 expected version 成功，后提交者 `Conflict` | 后提交者覆盖旧 truth；version conflict 被吞掉 | `candidate_jobs_race_on_expected_version`、nightly concurrency evidence |

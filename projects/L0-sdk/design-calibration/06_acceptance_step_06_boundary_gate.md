@@ -173,7 +173,7 @@ P1/P2 能力可以作为后续专项或风险记录,但不得改变 P0 official 
 | AC-BOUND-002 | upstream / service / endpoint 只保存 snapshot 或 reference | core / bus / formal API / fake endpoint 均以 ref / digest / marker 保存 | SDK 保存上游正文、业务对象正文、事件 payload body 或生产请求响应正文 | `TC-SDK-CONTRACT-*`、`TC-SDK-BOUNDARY-*`、`TC-SDK-EVENT-*` |
 | AC-BOUND-003 | forbidden body 不进入 truth / snapshot / event / log / audit / report | redaction check 证明 raw secret、credential value、request / response / payload body 缺席 | 任一 forbidden body 出现在持久化、输出、日志、artifact 或 report | `TC-SDK-SECURITY-004`、`EV-SDK-SECURITY-001` |
 | AC-BOUND-004 | projection / query / cache 只读派生 | query 不开启写事务,projection rebuild 不写 truth,stale 返回 marker | query、projection、cache 自动补写 baseline、view、candidate 或 evidence truth | `SPECIAL-SDK-CONSISTENCY-001`、`SPECIAL-SDK-RECOVERY-001` |
-| AC-BOUND-005 | runtime boundary call 不写 SDK truth | formal / fake / bus boundary result 只返回 result ref / diagnostic ref | `InvokeServiceCapability` 或 `PublishBusEvent` 直接写 SDK truth 或 service truth | `TC-SDK-BOUNDARY-*`、`TC-SDK-EVENT-*` |
+| AC-BOUND-005 | runtime boundary call 不写 SDK domain truth | formal / fake / bus boundary result 只返回 result ref / diagnostic ref；write-like runtime call 只允许写幂等技术记录 | `InvokeServiceCapability` 或 `PublishBusEvent` 直接写 SDK domain truth、service truth 或 bus runtime truth | `TC-SDK-BOUNDARY-*`、`TC-SDK-EVENT-*` |
 | AC-BOUND-006 | report / artifact 只作证据,不补写事实 | report 能回链到固定 `<run_id>` artifact,不跨 run 拼接 | report 反向补造缺失 truth;使用 `latest` 或跨 run artifact | `TC-SDK-SMOKE-003`、`TC-SDK-SECURITY-004`、`reports/runs/<run_id>` |
 
 ### 7.2 架构红线验收表

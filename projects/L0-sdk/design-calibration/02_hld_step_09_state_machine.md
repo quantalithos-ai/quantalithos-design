@@ -34,7 +34,7 @@
 
 5. 状态变化如何影响 outbox、projection、下游感知或只读供给？
 
-   回答：状态变化通过本仓 outbox 事件和 projection 传播给 automation、review、reports 或下游通知。`SdkSnapshotFreshnessChangedEvent` 表达上游变化对视图可用性的影响；`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent`、`CompatibilityDecisionRecordedEvent`、`DeprecatedApiRecordedEvent` 表达 candidate、evidence、compatibility 和 deprecated 记录的本地 truth 变化。Query 只能读取 projection，不得反向改写状态。
+   回答：状态变化通过本仓 outbox 事件和 projection 传播给 automation、review、reports 或下游通知。`SdkSnapshotFreshnessChangedEvent` 表达上游变化对 derived / language view 可用性的影响；`SdkClientViewFreshnessChangedEvent` 表达上游变化对 service / event client view 可用性的影响；`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent`、`CompatibilityDecisionRecordedEvent`、`DeprecatedApiRecordedEvent` 表达 candidate、evidence、compatibility 和 deprecated 记录的本地 truth 变化。Query 只能读取 projection，不得反向改写状态。
 
 ### 4. 当前文档问题诊断
 

@@ -29,7 +29,7 @@
 
 3. Step 5 的对象候选池中，哪些名称只是字段类型、DTO、port、repository、API、trigger 或实现细节，不应作为关键对象展开？
 
-   回答：`Entry`、`Trigger`、`Port`、`Repository`、`Runner`、`Adapter`、DTO、schema、package layout、具体语言目录和 backend SDK 原始响应都不在本步当领域对象展开。`CoreContractRef`、`BusSemanticRef`、`FakeBoundaryRef`、`LanguageRuntimeRef`、`PackageArtifactRef`、`RunnerRef` 等可作为字段类型或引用类型出现，但当前不单独成节。
+   回答：`Entry`、`Trigger`、`Port`、`Repository`、`Runner`、`Adapter`、DTO、schema、package layout、具体语言目录和 backend SDK 原始响应都不在本步当领域对象展开。`CoreContractRef`、`TransportSemanticId`、`FakeBoundaryRef`、`LanguageRuntimeRef`、`PackageArtifactRef`、`RunnerRef` 等可作为字段类型或引用类型出现，但当前不单独成节。
 
 4. 每个对象属于哪个主要组成部分？
 
@@ -134,7 +134,7 @@
 | `SdkCapabilityProjection` | projection | 不独立展开 | 当前作为查询视图字段来源,Step 7 展开 query skeleton |
 | `EvidenceProjection` | projection | 不独立展开 | 当前由 `VerificationEvidence` 支撑,Step 7 / 详细设计展开读取接口 |
 | `Entry` / `Trigger` / `Port` / `Repository` / `Runner` / `Adapter` | API / implementation boundary | 不独立展开 | 属于 Step 7 接口骨架或详细设计实现边界 |
-| `CoreContractRef` / `BusSemanticRef` / `FakeBoundaryRef` / `LanguageRuntimeRef` / `PackageArtifactRef` / `RunnerRef` | reference field type | 仅作字段类型 | 当前只需作为字段类型支撑对象引用,不独立承担对象责任 |
+| `CoreContractRef` / `TransportSemanticId` / `FakeBoundaryRef` / `LanguageRuntimeRef` / `PackageArtifactRef` / `RunnerRef` | reference field type | 仅作字段类型 | 当前只需作为字段类型支撑对象引用,不独立承担对象责任 |
 
 #### 7.2 关键对象分布说明
 
@@ -315,7 +315,7 @@
 
 | 工厂函数 | 作用 |
 |---|---|
-| `from_upstream_snapshots(CoreContractSnapshot core_snapshot, BusSemanticSnapshot bus_snapshot, FormalApiSnapshot api_snapshot)` | 从上游快照集合派生 SDK binding 视图 |
+| `from_upstream_refs_and_symbols(Vec<UpstreamVersionRef> refs, Vec<CapabilitySymbol> symbols)` | 从上游版本引用和 application 层提取出的能力符号派生 SDK binding 视图 |
 | `rehydrate(DerivedBindingViewRecord record)` | 从持久化记录恢复派生视图 |
 
 ##### 7.6.5 禁止事项
@@ -581,7 +581,7 @@
 | 字段 | 类型 | 作用 |
 |---|---|---|
 | `view_id` | `BusEventClientViewId` | 标识一份事件 client 视图 |
-| `bus_semantic_ref` | `BusSemanticRef` | 指向 `L0-bus` 事件语义来源 |
+| `transport_semantic_id` | `TransportSemanticId` | 指向 `L0-bus` transport semantic 来源;类型复用 `bus-contracts::metadata::TransportSemanticId` |
 | `event_mappings` | `EventSemanticMappingSet` | 记录 SDK 事件表达与 bus semantic 的映射 |
 | `supported_operations` | `EventClientOperationSet` | 表达当前支持的事件发布、订阅或结果读取能力 |
 | `freshness_state` | `SnapshotFreshnessState` | 表达事件视图是否仍对齐 bus 语义 |
@@ -591,9 +591,9 @@
 
 | 成员函数 | 作用 |
 |---|---|
-| `resolve_event_mapping(EventSemanticId semantic_id)` | 根据 bus 语义查找 SDK 事件映射 |
+| `resolve_event_mapping(TransportSemanticId transport_semantic_id)` | 根据 bus transport semantic 查找 SDK 事件映射 |
 | `supports_operation(EventClientOperation operation)` | 判断事件 client 是否支持某类操作 |
-| `assert_bus_semantic_aligned(BusSemanticRef bus_semantic_ref)` | 判断视图是否仍对齐指定 bus 语义版本 |
+| `assert_transport_semantic_aligned(TransportSemanticId transport_semantic_id)` | 判断视图是否仍对齐指定 bus transport semantic 版本 |
 | `apply_policy(ClientPolicySet policy_set)` | 绑定错误、trace、redaction 等横切默认策略 |
 
 ##### 7.12.4 工厂函数骨架
@@ -627,7 +627,7 @@
 |---|---|---|
 | `mapping_id` | `EventSemanticMappingId` | 标识一条事件语义映射 |
 | `sdk_event_name` | `SdkEventName` | 表达 SDK 对调用方暴露的事件名称 |
-| `bus_semantic_id` | `BusSemanticId` | 指向 `L0-bus` 中对应语义 |
+| `transport_semantic_id` | `TransportSemanticId` | 指向 `L0-bus` 中对应 transport semantic |
 | `operation_kind` | `EventClientOperationKind` | 标识发布、订阅、反馈或恢复相关操作类别 |
 | `semantic_constraints` | `EventSemanticConstraintSet` | 记录事件映射必须遵守的 bus 语义约束 |
 
@@ -636,14 +636,14 @@
 | 成员函数 | 作用 |
 |---|---|
 | `matches_sdk_event(SdkEventName sdk_event_name)` | 判断映射是否匹配指定 SDK 事件名称 |
-| `assert_bus_semantic(BusSemanticId bus_semantic_id)` | 判断映射是否指向指定 bus 语义 |
+| `assert_transport_semantic(TransportSemanticId transport_semantic_id)` | 判断映射是否指向指定 bus transport semantic |
 | `explain_constraints()` | 输出该映射所承接的 bus 语义约束说明 |
 
 ##### 7.13.4 工厂函数骨架
 
 | 工厂函数 | 作用 |
 |---|---|
-| `from_bus_semantic(BusSemanticRef bus_semantic_ref, SdkEventName sdk_event_name)` | 从 bus 语义引用和 SDK 事件名称创建映射 |
+| `from_transport_semantic(TransportSemanticId transport_semantic_id, SdkEventName sdk_event_name)` | 从 bus transport semantic 和 SDK 事件名称创建映射 |
 | `from_mapping_entry(EventMappingEntry mapping_entry)` | 从映射条目恢复事件语义映射 |
 
 ##### 7.13.5 禁止事项

@@ -39,7 +39,7 @@ L0-sdk P0 不提供 HTTP / RPC server。同步入口验收对象是 Rust DTO、R
 
 | 协议族 | 验收口径 | 关键证据 |
 |---|---|---|
-| 6 个 Command API | DTO 字段闭环、`CommandMetadata.idempotency_key`、validation、UoW、outbox、audit / evidence 和错误映射符合 `03` | `TC-SDK-CONTRACT-*`、`TC-SDK-SEMANTIC-*`、`TC-SDK-BOUNDARY-*`、`TC-SDK-EVENT-*`、`TC-SDK-COMPAT-*` |
+| 6 个 Command API | DTO 字段闭环、`CommandMetadata.request.idempotency_key`、validation、UoW、outbox、audit / evidence 和错误映射符合 `03` | `TC-SDK-CONTRACT-*`、`TC-SDK-SEMANTIC-*`、`TC-SDK-BOUNDARY-*`、`TC-SDK-EVENT-*`、`TC-SDK-COMPAT-*` |
 | 12 个 Query API | Query 不写 truth,不触发 projection rebuild,stale / missing / unsupported 有明确 marker 或错误 | read-only tests、`TC-SDK-CONTRACT-*`、`TC-SDK-CANDIDATE-*`、`TC-SDK-COMPAT-*` |
 | Rust client method | `ServiceClient::call`、`ServiceClient::read`、`EventClient::publish`、`EventClient::open_subscription` 不绕过 application service 和 boundary guard | `TC-SDK-BOUNDARY-*`、`TC-SDK-EVENT-*` |
 | CLI command | CLI 只能作为 DTO / job input 入口,不得成为额外业务 truth | CLI / contract / config evidence |
@@ -188,7 +188,7 @@ L0-sdk 的 P0 编译期依赖是 `L0-core` 和 `L0-bus` 的 contracts。服务�
 | AC-IF-002 | 12 个 Query API | 只读消费边界 | Rust DTO / CLI / client -> query service | Query 不写 truth,不触发 rebuild;stale / missing / unsupported 有 marker | Query 写 UoW;自动补写 truth;stale 当 current | query tests、projection evidence |
 | AC-IF-003 | Rust client method | 本仓运行期入口 | client facade -> application service / boundary port | `ServiceClient` / `EventClient` 不绕过 boundary guard,返回 ref-only result / diagnostic ref | client method 直接写 truth;返回 raw body;绕过 redaction / credential policy | `TC-SDK-BOUNDARY-*`、`TC-SDK-EVENT-*` |
 | AC-IF-004 | 4 个 Inbound Event Consumer | 事件协作依赖 | event fixture / replay -> application service | event idempotency 成立;duplicate 不重复 truth;source failure 不写 local truth | duplicate 生成新 truth;unredacted validation result 被接受;core / bus truth 被复制 | `TC-SDK-CONTRACT-*`、`TC-SDK-SECURITY-003` |
-| AC-IF-005 | 6 个 Outbound Event | 事件协作依赖 | committed SDK truth -> outbox sink | topic / schema 可验证;只携带 ref、status、digest、summary 和 marker;publish failure retryable | 未提交 truth 发布;schema 破坏;event 泄漏 forbidden body | outbox sink evidence、`EV-SDK-SECURITY-001` |
+| AC-IF-005 | 7 个 Outbound Event | 事件协作依赖 | committed SDK truth -> outbox sink | topic / schema 可验证;只携带 ref、status、digest、summary 和 marker;publish failure retryable;derived freshness event 与 client view freshness event schema 不混用 | 未提交 truth 发布;schema 破坏;event 泄漏 forbidden body;用 `DerivedViewId` 承载 service / event client view | outbox sink evidence、`EV-SDK-SECURITY-001` |
 | AC-IF-006 | 8 个 Operations Job | 运行期入口 | job JSON input -> one-shot job binary | job_run_id、item key、partial success、evidence output 和 idempotency 可审计 | job 重跑重复副作用;skipped 当 passed;artifact orphan 对外可见 | `TC-SDK-CANDIDATE-*`、`TC-SDK-DOCS-*`、`TC-SDK-SMOKE-*` |
 | AC-IF-007 | `L0-core` contracts | 编译期依赖 | Cargo path dependency / contract compile | core contracts 可编译;SDK 不复制 ErrorCode / TraceContext / Metadata truth | 手写同名 DTO;复制 core schema;dependency snapshot 缺失 | dependency snapshot、`TC-SDK-CONTRACT-*` |
 | AC-IF-008 | `L0-bus` contracts / semantic | 编译期依赖 + 事件协作 | Cargo path dependency + event semantic fixture / boundary adapter | bus contracts 可编译;event view 消费 bus semantic;不实现 bus runtime | SDK 生成 delivery / retry / DLQ / replay truth;bus runtime 不可用阻断 P0 | dependency snapshot、`TC-SDK-EVENT-*` |

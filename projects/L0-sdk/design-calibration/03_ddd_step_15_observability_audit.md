@@ -49,7 +49,7 @@ trace context 贯穿 client、cli、jobs、application service、adapter、outbo
 | `RecordCompatibilityDecisionFlow` | 必须 | 形成 compatibility decision 和 migration ref |
 | `DeprecateSdkApiFlow` | 必须 | 形成 deprecated API lifecycle 事实 |
 | 4 个 inbound event consumer | 必须 | 上游变化、bus semantic、formal API、validation finished 会改变 freshness / evidence |
-| 6 个 outbound event publish | 必须记录 publish evidence | 发布 SDK 已提交维护事实，失败可重放 |
+| 7 个 outbound event publish | 必须记录 publish evidence | 发布 SDK 已提交维护事实，失败可重放 |
 | 8 个 operations job | 必须 | candidate、artifact、smoke、docs、compatibility、boundary、projection 均需证据 |
 | Query read-only flow | 普通查询只打日志 / 指标；敏感 evidence / compatibility / deprecated 查询可留 access audit | Query 不改写真相 |
 

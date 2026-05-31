@@ -113,7 +113,7 @@ L0-sdk 是官方客户端接入层,必须验对外接入体验和接缝,但不�
 | 状态 enum | `SnapshotFreshnessState`、`CapabilitySupportState`、`PackageCandidateStatus`、`EvidenceResult`、`EvidenceRedactionStatus`、`CompatibilityDecisionState`、`DeprecatedApiLifecycleState` | 状态机、一致性、candidate、evidence、compatibility、deprecated 验收 |
 | Command API | `UpdateSdkSemanticBaseline`、`RefreshDerivedBindingView`、`InvokeServiceCapability`、`PublishBusEvent`、`RecordCompatibilityDecision`、`DeprecateSdkApi` | 功能、接口、事务和错误验收 |
 | Query API | `GetSdkCapabilitySummary`、`GetUpstreamVersionRefs`、`GetSnapshotFreshness`、`GetServiceClientView`、`GetEventClientView`、`ReadServiceCapability`、`OpenEventSubscription`、`GetPackageCandidateStatus`、`GetVerificationEvidence`、`GetCompatibilityDecision`、`ListDeprecatedApis`、`GetMigrationGuideRef` | 只读边界、projection、query 不反写 truth 验收 |
-| Event / Consumer | `ConsumeCoreContractChanged`、`ConsumeBusSemanticChanged`、`ConsumeFormalApiChanged`、`ConsumeValidationRunFinished`、`SdkSemanticBaselineChangedEvent`、`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent` | 跨仓同步、event 协作和 evidence 验收 |
+| Event / Consumer | `ConsumeCoreContractChanged`、`ConsumeBusSemanticChanged`、`ConsumeFormalApiChanged`、`ConsumeValidationRunFinished`、`SdkSemanticBaselineChangedEvent`、`SdkSnapshotFreshnessChangedEvent`、`SdkClientViewFreshnessChangedEvent`、`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent` | 跨仓同步、event 协作和 evidence 验收 |
 | Operations Job | `CheckUpstreamFreshness`、`GeneratePackageCandidate`、`BuildLanguagePackages`、`RunCrossLanguageSmoke`、`ValidateDocsExamples`、`CheckCompatibility`、`VerifyBoundaryPolicies`、`RebuildSdkProjections` | candidate、docs、smoke、compatibility、boundary、projection 验收 |
 
 ---

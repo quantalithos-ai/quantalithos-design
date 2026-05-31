@@ -35,7 +35,7 @@
 
 | 场景 | 正向主线 |
 |---|---|
-| `TS-SDK-001` | 读取 core / bus / formal snapshot，执行 `RefreshDerivedBindingView`，形成 `SnapshotFreshnessState::Fresh` 和 derived / language views |
+| `TS-SDK-001` | 读取 core / bus / formal snapshot 和 current semantic baseline / concept map，执行 `RefreshDerivedBindingView`，形成 `SnapshotFreshnessState::Fresh` 和 derived / language views |
 | `TS-SDK-002` | 执行 `UpdateSdkSemanticBaseline`，校验三语言概念映射和 package surface 形状一致 |
 | `TS-SDK-003` | 通过 formal API 或 fake boundary 执行 `InvokeServiceCapability`，返回 result ref / diagnostic ref 且不写 SDK truth |
 | `TS-SDK-004` | 通过 `PublishBusEvent` 和 event client view 校验 bus semantic mapping，不生成 bus runtime truth |
@@ -87,7 +87,7 @@
 |---|---|---|
 | dependency unavailable | source / runner / boundary adapter 注入 unavailable | 修复依赖后用同一业务输入重新执行 |
 | command replay | same idempotency key + same digest 重放 | 返回既有 receipt / result ref |
-| event duplicate | 同一 `event_id + source_ref` 消费两次 | 第二次 skip 或返回 prior result |
+| event duplicate | 同一 `event_id + source_ref + idempotency_key` 消费两次 | 第二次 skip 或返回 prior result |
 | outbox retry | publish 成功但 mark published 失败后重跑 | 使用同一 event id，最终只标记一次 |
 | projection rebuild | 删除 projection 后执行 `RebuildSdkProjections` | read model 恢复，truth 不变 |
 
@@ -146,16 +146,16 @@
 
 | 用例 ID | 场景 | 优先级 | 前置条件 | 输入 / 操作 | 预期结果 | 断言点 | 自动化候选 |
 |---|---|---|---|---|---|---|---|
-| `TC-SDK-CONTRACT-001` | 上游 snapshot 正常派生 | P0 | core / bus / formal snapshot 可读 | `RefreshDerivedBindingView` | view refreshed | `SnapshotFreshnessState::Fresh`；derived / language view 保存 | contract + service |
+| `TC-SDK-CONTRACT-001` | 上游 snapshot 正常派生 | P0 | core / bus / formal snapshot 可读；current semantic baseline / concept map 已存在 | `RefreshDerivedBindingView` | view refreshed | `SnapshotFreshnessState::Fresh`；derived / language view 保存；language view 使用 current concept map | contract + service |
 | `TC-SDK-CONTRACT-002` | source 失败或 digest mismatch | P0 | source ref 不可读或 digest 错 | `RefreshDerivedBindingView` | 操作失败且不写 view | `SdkProtocolError::Dependency` / `Validation`；truth 写入 0 | service |
-| `TC-SDK-CONTRACT-003` | upstream changed 标记 stale | P0 | 已有 fresh view | consume core / bus / formal changed event | affected views stale | `SnapshotFreshnessState::Stale`；outbox append | service + integration |
+| `TC-SDK-CONTRACT-003` | upstream changed 标记 stale | P0 | 已有 fresh view | consume core / bus / formal changed event | affected views stale | `SnapshotFreshnessState::Stale`；core changed append `SdkSnapshotFreshnessChangedEvent`；bus / formal changed append `SdkClientViewFreshnessChangedEvent` | service + integration |
 | `TC-SDK-SEMANTIC-001` | baseline 三语言一致 | P0 | Rust / Python / TypeScript 均启用 | `UpdateSdkSemanticBaseline` | baseline committed | language set 完整；`SdkSemanticBaselineChangedEvent` | unit + service |
 | `TC-SDK-SEMANTIC-002` | concept drift 被拒绝 | P0 | language surface 存在漂移 | concept map validation | validation failed | drift marker / semantic error；不写 baseline | unit |
 | `TC-SDK-SEMANTIC-003` | package surface 不定义第二 truth | P0 | language package surface 可生成 | surface contract compare | compare passed | surface shape 对齐 semantic baseline | contract |
-| `TC-SDK-BOUNDARY-001` | service capability 最小调用 | P0 | capability `Supported` 或 explicit fake | `InvokeServiceCapability` | 返回 result ref / diagnostic ref | SDK truth 写入 0；trace retained | service + integration |
+| `TC-SDK-BOUNDARY-001` | service capability 最小调用 | P0 | capability `Supported` 或 explicit fake | `InvokeServiceCapability` 携带 `ServiceCapabilityRefId` | 返回 result ref / diagnostic ref | lookup 完整 `ServiceCapabilityRef`；SDK domain truth 写入 0；runtime 幂等记录可审计；trace retained | service + integration |
 | `TC-SDK-BOUNDARY-002` | unsupported capability 被拒绝 | P0 | `CapabilitySupportState::Unsupported` | `InvokeServiceCapability` | 调用被拒绝 | `SdkProtocolError::Validation` / `BoundaryViolation` | service |
 | `TC-SDK-BOUNDARY-003` | fake success 不污染 production | P0 | fake boundary active | fake capability call | fake marker retained | `CapabilitySupportState::FakeOnly` 不支撑 `Stable` | integration |
-| `TC-SDK-EVENT-001` | event semantic mapping 正常 | P0 | bus semantic ref 可用 | `PublishBusEvent` | boundary 返回 publish ref | mapping 对齐；不生成 bus delivery truth | service + contract |
+| `TC-SDK-EVENT-001` | event semantic mapping 正常 | P0 | bus semantic ref 可用 | `PublishBusEvent` 携带 `EventSemanticMappingRef` | boundary 返回 publish ref | lookup 完整 `EventSemanticMapping`；mapping 对齐；不生成 bus delivery truth；runtime 幂等记录可审计 | service + contract |
 | `TC-SDK-EVENT-002` | raw payload body 被拒绝 | P0 | DTO 传 raw body | `PublishBusEvent` | 拒绝 publish | `SdkProtocolError::BoundaryViolation` | contract |
 | `TC-SDK-EVENT-003` | mapping missing | P0 | event mapping 不存在 | `PublishBusEvent` | 操作失败 | `SdkProtocolError::NotFound`；bus boundary 未调用 | service |
 | `TC-SDK-TRACE-001` | error mapping 一致 | P0 | 三语言错误样本一致 | error mapping test | error envelope 一致 | `SdkProtocolError` 分类一致 | unit + contract |
@@ -166,7 +166,7 @@
 | `TC-SDK-SECURITY-003` | unredacted evidence 拒绝 | P0 | runner 返回 unredacted evidence | consume validation result | 不写 evidence | `EvidenceRedactionStatus::Unredacted` 阻断 | service |
 | `TC-SDK-SECURITY-004` | artifacts / reports 安全扫描 | P0 | artifacts / reports 已生成 | redaction check | scan passed | raw body / secret count = 0 | CI gate |
 | `TC-SDK-CANDIDATE-001` | generate candidate | P0 | views `Fresh`，capabilities 合法 | `GeneratePackageCandidate` | candidate `Draft` | `PackageCandidateStatus::Draft`；outbox append | service |
-| `TC-SDK-CANDIDATE-002` | build language packages | P0 | candidate `Draft` | `BuildLanguagePackages` | artifact metadata attached | artifact ref / digest saved；`Built` 不是状态 | integration |
+| `TC-SDK-CANDIDATE-002` | build language packages | P0 | candidate `Draft` | `BuildLanguagePackages` | artifact metadata attached | artifact ref / digest / source `language_view_id` saved；`Built` 不是状态 | integration |
 | `TC-SDK-CANDIDATE-003` | non-fresh blocks candidate | P0 | view `Stale` / `Unknown` | `GeneratePackageCandidate` | gate rejected | `CandidateGateRejected` | service |
 | `TC-SDK-CANDIDATE-004` | local stable 不发布 public registry | P0 | candidate verified | local candidate gate | candidate 可进入 `Stable` | no public publish side effect | gate |
 | `TC-SDK-DOCS-001` | quickstart runs | P0 | local package candidate 可安装 | run quickstart | docs evidence passed | `EvidenceResult::Passed` | docs gate |

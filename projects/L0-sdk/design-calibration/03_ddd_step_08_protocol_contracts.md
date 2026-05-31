@@ -58,7 +58,7 @@ Step 7 已确认 Trait / Port / Adapter 契约。
 | Command API | `UpdateSdkSemanticBaseline`、`RefreshDerivedBindingView`、`InvokeServiceCapability`、`PublishBusEvent`、`RecordCompatibilityDecision`、`DeprecateSdkApi` |
 | Query API | `GetSdkCapabilitySummary`、`GetUpstreamVersionRefs`、`GetSnapshotFreshness`、`GetServiceClientView`、`GetEventClientView`、`ReadServiceCapability`、`OpenEventSubscription`、`GetPackageCandidateStatus`、`GetVerificationEvidence`、`GetCompatibilityDecision`、`ListDeprecatedApis`、`GetMigrationGuideRef` |
 | Inbound Event Consumer | `ConsumeCoreContractChanged`、`ConsumeBusSemanticChanged`、`ConsumeFormalApiChanged`、`ConsumeValidationRunFinished` |
-| Outbound Event | `SdkSemanticBaselineChangedEvent`、`SdkSnapshotFreshnessChangedEvent`、`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent`、`CompatibilityDecisionRecordedEvent`、`DeprecatedApiRecordedEvent` |
+| Outbound Event | `SdkSemanticBaselineChangedEvent`、`SdkSnapshotFreshnessChangedEvent`、`SdkClientViewFreshnessChangedEvent`、`PackageCandidateGeneratedEvent`、`VerificationEvidenceRecordedEvent`、`CompatibilityDecisionRecordedEvent`、`DeprecatedApiRecordedEvent` |
 | Operations Job | `CheckUpstreamFreshness`、`GeneratePackageCandidate`、`BuildLanguagePackages`、`RunCrossLanguageSmoke`、`ValidateDocsExamples`、`CheckCompatibility`、`VerifyBoundaryPolicies`、`RebuildSdkProjections` |
 
 ### 3.2 每个协议的调用方、处理方、传输方式是什么？
@@ -117,7 +117,7 @@ Step 7 已确认 Trait / Port / Adapter 契约。
 | 字段 A | 字段 B | 不得混同原因 |
 |---|---|---|
 | `core_contract_ref` | `core_snapshot_ref` | 前者指契约定义引用，后者指某次 snapshot 引用 |
-| `bus_semantic_ref` | `bus_event_ref` | 前者指 bus 语义版本，后者指具体事件发布引用 |
+| `transport_semantic_id` | `bus_event_ref` | 前者指 `bus-contracts::metadata::TransportSemanticId`,后者指具体事件发布引用 |
 | `formal_api_ref` | `service_capability_ref` | 前者指 formal API 契约，后者指 SDK 暴露的服务能力引用 |
 | `payload_ref` | `payload_digest` | 前者是外部 payload 引用，后者是摘要 |
 | `artifact_ref` | `document_ref` | 前者指构建产物，后者指文档或迁移说明 |
@@ -209,8 +209,8 @@ Step 7 已确认 Trait / Port / Adapter 契约。
 |---|---|---|---|---|---|
 | `UpdateSdkSemanticBaseline` | Command API | maintainer / CLI / Rust caller | `SdkSemanticBaselineService` | Rust DTO + `sdk semantic update` | 是 |
 | `RefreshDerivedBindingView` | Command API | maintainer / job / CLI | `ContractConsumptionService` | Rust DTO + `sdk views refresh` | 是 |
-| `InvokeServiceCapability` | Command API | Rust SDK consumer | `ServiceClientAssemblyService` | Rust client method `ServiceClient::call` | 是 |
-| `PublishBusEvent` | Command API | Rust SDK consumer | `EventClientAssemblyService` | Rust client method `EventClient::publish` | 是 |
+| `InvokeServiceCapability` | Command API | Rust SDK consumer | `ServiceClientAssemblyService` | Rust client method `ServiceClient::call(command, meta)` | 是 |
+| `PublishBusEvent` | Command API | Rust SDK consumer | `EventClientAssemblyService` | Rust client method `EventClient::publish(command, meta)` | 是 |
 | `RecordCompatibilityDecision` | Command API | maintainer / compatibility job | `CompatibilityGovernanceService` | Rust DTO + `sdk compatibility record` | 是 |
 | `DeprecateSdkApi` | Command API | maintainer / CLI | `CompatibilityGovernanceService` | Rust DTO + `sdk api deprecate` | 是 |
 | `GetSdkCapabilitySummary` | Query API | Rust caller / CLI | `QueryService` | Rust DTO + `sdk capabilities summary` | 通用只读流 |
@@ -218,8 +218,8 @@ Step 7 已确认 Trait / Port / Adapter 契约。
 | `GetSnapshotFreshness` | Query API | Rust caller / CLI | `QueryService` | Rust DTO + `sdk freshness get` | 通用只读流 |
 | `GetServiceClientView` | Query API | Rust caller / CLI | `QueryService` | Rust DTO + `sdk service view` | 通用只读流 |
 | `GetEventClientView` | Query API | Rust caller / CLI | `QueryService` | Rust DTO + `sdk event view` | 通用只读流 |
-| `ReadServiceCapability` | Query API | Rust SDK consumer | `ServiceClientAssemblyService` | Rust client method `ServiceClient::read` | 是 |
-| `OpenEventSubscription` | Query API | Rust SDK consumer | `EventClientAssemblyService` | Rust client method `EventClient::open_subscription` | 是 |
+| `ReadServiceCapability` | Query API | Rust SDK consumer | `ServiceClientAssemblyService` | Rust client method `ServiceClient::read(query, meta)` | 是 |
+| `OpenEventSubscription` | Query API | Rust SDK consumer | `EventClientAssemblyService` | Rust client method `EventClient::open_subscription(query, meta)` | 是 |
 | `GetPackageCandidateStatus` | Query API | maintainer / CLI | `QueryService` | Rust DTO + `sdk candidate status` | 通用只读流 |
 | `GetVerificationEvidence` | Query API | maintainer / CLI | `QueryService` | Rust DTO + `sdk evidence get` | 通用只读流 |
 | `GetCompatibilityDecision` | Query API | maintainer / CLI | `QueryService` | Rust DTO + `sdk compatibility get` | 通用只读流 |
@@ -230,7 +230,8 @@ Step 7 已确认 Trait / Port / Adapter 契约。
 | `ConsumeFormalApiChanged` | Inbound Event Consumer | formal API source | `ContractConsumptionService` | topic `formal_api.changed.v1` | 是 |
 | `ConsumeValidationRunFinished` | Inbound Event Consumer | runner / job | `CandidateValidationService` | topic `sdk.validation.finished.v1` | 是 |
 | `SdkSemanticBaselineChangedEvent` | Outbound Event | `SdkSemanticBaselineService` / outbox | automation / docs / compatibility | topic `sdk.semantic_baseline.changed.v1` | 通用发布流 |
-| `SdkSnapshotFreshnessChangedEvent` | Outbound Event | `ContractConsumptionService` / outbox | candidate generator / reports | topic `sdk.snapshot_freshness.changed.v1` | 通用发布流 |
+| `SdkSnapshotFreshnessChangedEvent` | Outbound Event | `ContractConsumptionService` / outbox | candidate generator / reports | topic `sdk.snapshot_freshness.changed.v1` | 通用发布流；只承载 derived / language view freshness |
+| `SdkClientViewFreshnessChangedEvent` | Outbound Event | `ContractConsumptionService` / outbox | candidate generator / reports | topic `sdk.client_view_freshness.changed.v1` | 通用发布流；承载 service / event client view freshness |
 | `PackageCandidateGeneratedEvent` | Outbound Event | `PackageCandidateService` / outbox | smoke / docs / review automation | topic `sdk.package_candidate.generated.v1` | 通用发布流 |
 | `VerificationEvidenceRecordedEvent` | Outbound Event | `CandidateValidationService` / outbox | compatibility / reports | topic `sdk.verification_evidence.recorded.v1` | 通用发布流 |
 | `CompatibilityDecisionRecordedEvent` | Outbound Event | `CompatibilityGovernanceService` / outbox | release review / docs | topic `sdk.compatibility_decision.recorded.v1` | 通用发布流 |
@@ -249,32 +250,21 @@ Step 7 已确认 Trait / Port / Adapter 契约。
 #### 7.2.1 公共 Rust DTO 类型
 
 ```rust
-/// SDK 命令元数据。
-pub struct CommandMetadata {
-    /// 请求 ID。
-    pub request_id: RequestId,
-
-    /// 幂等键。
-    pub idempotency_key: IdempotencyKey,
-
-    /// 发起时间。
-    pub requested_at: Timestamp,
-
-    /// 追踪上下文。
-    pub trace_context: TraceContext,
-}
-
-/// SDK 查询元数据。
-pub struct QueryMetadata {
-    /// 请求 ID。
-    pub request_id: RequestId,
-
-    /// 追踪上下文。
-    pub trace_context: TraceContext,
-
-    /// 分页请求。
-    pub page: Option<PageRequest>,
-}
+/// SDK 不重新定义请求 / 命令 / 查询元数据，直接复用 core-contracts 真相源。
+///
+/// CommandMetadata 结构为:
+/// - request: RequestMetadata { request_id, trace_id, idempotency_key, requested_at }
+/// - reason: Option<ChangeReason>
+/// - external_ref: Option<ExternalReferenceRef>
+///
+/// QueryMetadata 结构为:
+/// - request: RequestMetadata { request_id, trace_id, idempotency_key, requested_at }
+/// - page: Option<PageRequest>
+/// - consistency: QueryConsistency
+pub use core_contracts::metadata::{
+    ChangeReason, CommandMetadata, ExternalReferenceRef, IdempotencyKey, PageRequest,
+    QueryConsistency, QueryMetadata, RequestMetadata, RequestId, Timestamp, TraceId,
+};
 
 /// SDK job 元数据。
 pub struct JobMetadata {
@@ -287,8 +277,8 @@ pub struct JobMetadata {
     /// 触发来源。
     pub trigger_source: JobTriggerSource,
 
-    /// 追踪上下文。
-    pub trace_context: TraceContext,
+    /// 追踪 ID。
+    pub trace_id: TraceId,
 }
 
 /// SDK 协议错误 envelope。
@@ -306,6 +296,17 @@ pub struct SdkErrorEnvelope {
     pub diagnostic_ref: Option<DiagnosticRef>,
 }
 ```
+
+#### 7.2.1.1 Rust client facade metadata 规则
+
+| facade 方法 | 必须传入的 metadata | 来源 | 规则 |
+|---|---|---|---|
+| `ServiceClient::call(command, meta)` | `CommandMetadata` | Rust SDK consumer 显式构造并传入 | `meta.request.idempotency_key` 必须为 `Some(...)`；`ClientContext` 不隐式生成 |
+| `EventClient::publish(command, meta)` | `CommandMetadata` | Rust SDK consumer 显式构造并传入 | `meta.request.idempotency_key` 必须为 `Some(...)`；`ClientContext` 不隐式生成 |
+| `ServiceClient::read(query, meta)` | `QueryMetadata` | Rust SDK consumer 显式构造并传入 | `meta` 承载 request、consistency 和 page；不要求幂等键 |
+| `EventClient::open_subscription(query, meta)` | `QueryMetadata` | Rust SDK consumer 显式构造并传入 | `meta` 承载 request、consistency 和 page；不要求幂等键 |
+
+`ClientContext` 只提供 actor、trace、credential ref 和 target profile。它可以作为构造 `ClientCallContext` 的输入,但不能替调用方合成 `request_id`、`idempotency_key`、`requested_at`、query consistency 或 page。
 
 #### 7.2.2 公共 JSON response envelope
 
@@ -369,8 +370,8 @@ pub struct SdkErrorEnvelope {
 | 字段类别 | 来源 | 缺失处理 |
 |---|---|---|
 | `actor` | gateway / CLI / job trigger 传入 `ActorContext` | reject |
-| `trace_context` | caller / CLI / scheduler 传入或系统生成 | 系统生成最小 trace |
-| `idempotency_key` | caller / job trigger 传入 | 写路径 reject |
+| `request.trace_id` | caller / CLI / scheduler 传入或系统生成 | 系统生成最小 trace id |
+| `request.idempotency_key` | caller / job trigger 传入 | 写路径缺失时 reject |
 | `*_id` | caller 输入或 `IdGeneratorPort` 生成 | 需要已有对象时 not_found，否则生成 |
 | `*_ref` | caller 输入、repository lookup、source port 或 artifact store | 缺失时 reject / dependency error |
 | `*_digest` | source / artifact store / runner result | 不能由 caller 伪造 |
@@ -458,7 +459,7 @@ pub struct SdkErrorEnvelope {
 
 ##### 幂等与审计要求
 
-- 必须携带 `CommandMetadata.idempotency_key`。
+- 必须携带 `CommandMetadata.request.idempotency_key`，且写路径必须校验其为 `Some(...)`。
 - 成功后必须写 `SdkSemanticBaselineChangedEvent` 到 `SdkOutboxPort`。
 - 需要记录 actor、reason、old version 和 new version。
 
@@ -466,7 +467,7 @@ pub struct SdkErrorEnvelope {
 
 ##### 用途
 
-从 core / bus / formal API snapshot 派生 SDK binding view、language view 和 freshness。
+从 core / bus / formal API snapshot 派生 SDK binding view、language view 和 freshness。语言视图必须使用当前 `SdkSemanticBaseline` 中的 `CrossLanguageConceptMap` 派生;该 concept map 来自 `SemanticBaselineRepository`,不是调用方请求字段。
 
 ##### 函数签名 / 路由
 
@@ -511,13 +512,26 @@ pub struct SdkErrorEnvelope {
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `refresh_scope.languages` | `Vec<LanguageId>` | `LanguageBindingView.language_id` | caller 输入 | reject |
-| `refresh_scope.sources` | `Vec<UpstreamSourceKind>` | `DerivedBindingView.upstream_refs` | caller 输入 | reject |
-| `source_refs` | `Vec<UpstreamVersionRef>` | `UpstreamVersionRef` | caller 输入或 source latest lookup | lookup / dependency error |
+| `refresh_scope.languages` + derived view id | `Vec<LanguageId>` + `DerivedViewId` | `LanguageBindingView.language_view_id` | `LanguageBindingViewId::from_derived_view_language(derived_view_id, language_id)` 稳定派生 | derivation error |
+| `refresh_scope.sources` | `Vec<UpstreamSourceKind>` | source lookup selector | caller 输入 | reject |
+| `source_refs` | `Vec<UpstreamVersionRef>` | `DerivedBindingView.source_refs` | caller 输入或 source latest lookup；读取 snapshot 后用 snapshot metadata 复核 | lookup / dependency error |
+| source snapshot content | `CoreContractSnapshot` / `BusSemanticSnapshot` / `FormalApiSnapshot` | `DerivedBindingView.capability_symbols` | source port 读取后由 application 层提取为 `Vec<CapabilitySymbol>` | dependency error / derivation error |
 | `force` | `bool` | processing option | caller 输入 | default false |
+| generated outbox event id | `SdkOutboxEventId` | `DerivedBindingRefreshResult.outbox_event_ref` | `IdGeneratorPort.next_outbox_event_id()` | dependency error |
+
+补充构造规则:
+
+- `RefreshDerivedBindingViewCommand` 不携带 `CrossLanguageConceptMap`。
+- `ContractConsumptionService.refresh_views(...)` 必须从 `SemanticBaselineRepository.get_current()` 读取当前 `SdkSemanticBaseline`。
+- `LanguageBindingView::derive_for_language(...)` 使用当前 baseline 的 `concept_map`。
+- `LanguageBindingView.language_view_id` 必须由 `DerivedViewId + LanguageId` 稳定派生,不得由 `IdGeneratorPort`、repository 返回值、artifact digest 或构建输出生成。
+- `ContractConsumptionService.refresh_views(...)` 必须先通过 source port 读取 snapshot,再在 application 层提取 `Vec<UpstreamVersionRef>` 和 `Vec<CapabilitySymbol>`,最后调用 `DerivedBindingView::from_upstream_refs_and_symbols(...)`；domain 工厂不直接接收 source snapshot DTO。
+- `outbox_event_ref` 必须来自 `IdGeneratorPort.next_outbox_event_id()`,不得由 repository、digest 或业务字段拼接。
+- 如果当前 baseline 或 concept map 缺失,返回 `SdkProtocolError::Validation`,不得写入 derived view、language view、version ref 或 outbox。
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `RefreshDerivedBindingViewCommand` | `DerivedBindingView`、`LanguageBindingView`、`SnapshotFreshnessState` | 是 | snapshot 由 source port 获取；freshness 由 domain method 派生 | `formal_api_ref` 不等于 `service_capability_ref` | dependency error / reject |
+| `RefreshDerivedBindingViewCommand` | `DerivedBindingView`、`LanguageBindingView`、`SnapshotFreshnessState`、`SdkSnapshotFreshnessChangedEvent` | 是 | snapshot 由 source port 获取；refs / symbols 由 application 层提取；freshness 由 domain method 派生；outbox id 由 `IdGeneratorPort` 生成 | `formal_api_ref` 不等于 `service_capability_ref`；source snapshot DTO 不等于 domain factory 参数 | dependency error / reject |
 
 ##### 错误映射
 
@@ -544,7 +558,7 @@ pub struct SdkErrorEnvelope {
 | 项 | 内容 |
 |---|---|
 | 函数签名 | `invoke_service_capability(command: ServiceCapabilityCall, context: ClientCallContext, meta: CommandMetadata) -> Result<ServiceCapabilityCallResult, SdkProtocolError>` |
-| Rust client / CLI | `ServiceClient::call` / 无默认 CLI |
+| Rust client / CLI | `ServiceClient::call(command, meta: CommandMetadata)` / 无默认 CLI |
 | 调用方 | Rust SDK consumer |
 | 处理方 | `ServiceClientAssemblyService` |
 
@@ -575,7 +589,7 @@ pub struct SdkErrorEnvelope {
 
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
-| `capability_ref` | `ServiceCapabilityRef` | `ServiceClientView.capability_refs` | caller 输入 + repository lookup | not_found |
+| `capability_ref` | `ServiceCapabilityRefId` | `ServiceClientView.capability_refs[].ref_id` | caller 输入；application service 从 `ServiceClientView` lookup 完整 `ServiceCapabilityRef` | not_found |
 | `target_profile` | `ClientTargetProfile` | `ClientContext.target_profile` | caller 输入 | reject |
 | `input_ref` | `PayloadRef` | boundary request | caller 输入 | reject |
 | `input_digest` | `PayloadDigest` | boundary request | caller 输入 / computed | reject |
@@ -609,7 +623,7 @@ pub struct SdkErrorEnvelope {
 | 项 | 内容 |
 |---|---|
 | 函数签名 | `publish_bus_event(command: PublishBusEventCommand, context: ClientCallContext, meta: CommandMetadata) -> Result<BusEventPublishResult, SdkProtocolError>` |
-| Rust client / CLI | `EventClient::publish` / 无默认 CLI |
+| Rust client / CLI | `EventClient::publish(command, meta: CommandMetadata)` / 无默认 CLI |
 | 调用方 | Rust SDK consumer |
 | 处理方 | `EventClientAssemblyService` |
 
@@ -641,7 +655,7 @@ pub struct SdkErrorEnvelope {
 
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
-| `event_mapping_ref` | `EventSemanticMappingRef` | `EventSemanticMapping` | caller 输入 + repository lookup | not_found |
+| `event_mapping_ref` | `EventSemanticMappingRef` | `BusEventClientView.mapping_set[].mapping_ref` | caller 输入；application service 从 `BusEventClientView` lookup 完整 `EventSemanticMapping` | not_found |
 | `payload_ref` | `PayloadRef` | bus boundary request | caller 输入 | reject |
 | `payload_digest` | `PayloadDigest` | bus boundary request | caller 输入 / computed | reject |
 | `target_scope` | `BusTargetScope` | bus boundary request | caller 输入 | reject |
@@ -649,7 +663,7 @@ pub struct SdkErrorEnvelope {
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `PublishBusEventCommand` | `BusEventClientView`、`EventSemanticMapping`、`BoundaryGuard` | 是 | bus boundary 从 event client view 派生 | `bus_semantic_ref` 不等于 `bus_event_ref` | reject / dependency error |
+| `PublishBusEventCommand` | `BusEventClientView`、`EventSemanticMapping`、`BoundaryGuard` | 是 | bus boundary 从 event client view 派生 | `transport_semantic_id` 不等于 `bus_event_ref` | reject / dependency error |
 
 ##### 错误映射
 
@@ -707,15 +721,16 @@ pub struct SdkErrorEnvelope {
 
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
+| `decision_id` | `CompatibilityDecisionId` | `CompatibilityDecision.decision_id` | `IdGeneratorPort.next_compatibility_decision_id()` | generator failure reject |
 | `candidate_id` | `PackageCandidateId` | `CompatibilityDecision.candidate_id` | caller 输入 | not_found |
 | `baseline_version` | `SdkBaselineVersion` | `CompatibilityDecision.baseline_version` | caller 输入 / repository lookup | reject |
-| `decision_state` | `CompatibilityDecisionState` | `CompatibilityDecision.state` | caller 输入或 runner result | reject |
+| `decision_state` | `CompatibilityDecisionState` | `CompatibilityDecision.decision_state` | caller 输入或 runner result | reject |
 | `evidence_refs` | `Vec<EvidenceId>` | `CompatibilityDecision.evidence_refs` | caller 输入 + evidence lookup | not_found |
 | `migration_ref` | `Option<MigrationGuideRef>` | `CompatibilityDecision.migration_ref` | caller 输入 | required when migration |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `RecordCompatibilityDecisionCommand` | `CompatibilityDecision` | 是 | decision ID / time 由系统生成 | `evidence_id` 不等于 `diagnostic_ref` | reject / not_found |
+| `RecordCompatibilityDecisionCommand` | `CompatibilityDecision` | 是 | decision ID 由 `IdGeneratorPort.next_compatibility_decision_id()` 生成；time 由 context 提供 | `evidence_id` 不等于 `diagnostic_ref`；不得在 factory 后补写 decision id | reject / not_found |
 
 ##### 错误映射
 
@@ -751,14 +766,19 @@ pub struct SdkErrorEnvelope {
 ```json
 {
   "api_ref": "sdk_api_ref_01",
-  "target_lifecycle_state": "Deprecated",
+  "target_lifecycle_state": "PendingRemoval",
   "migration_ref": {
     "document_ref": "doc_migration_01",
     "from_version": "pkg_1.0.0",
     "to_version": "pkg_1.1.0",
     "language_set": ["rust", "python", "typescript"]
   },
-  "removal_plan": null,
+  "removal_plan": {
+    "target_removal_version": "pkg_2.0.0",
+    "removal_not_before": "2026-12-31T00:00:00Z",
+    "replacement_api_ref": "sdk_api_ref_02",
+    "document_ref": "doc_removal_plan_01"
+  },
   "reason": "replaced by stable typed capability"
 }
 ```
@@ -768,7 +788,7 @@ pub struct SdkErrorEnvelope {
 ```json
 {
   "api_ref": "sdk_api_ref_01",
-  "lifecycle_state": "Deprecated",
+  "lifecycle_state": "PendingRemoval",
   "outbox_event_ref": "sdk_outbox_06"
 }
 ```
@@ -777,15 +797,24 @@ pub struct SdkErrorEnvelope {
 
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
-| `api_ref` | `SdkApiRef` | `DeprecatedApiRecord.api_ref` | caller 输入 | reject / not_found |
+| `api_ref` | `SdkApiRef` | `DeprecatedApiRecord.api_ref` | caller 输入；必须通过 `PublicSdkApiSurfacePort.resolve_api(api_ref)` 解析到 public SDK surface | reject / not_found |
 | `target_lifecycle_state` | `DeprecatedApiLifecycleState` | `DeprecatedApiRecord.lifecycle_state` | caller 输入 | reject |
-| `migration_ref` | `Option<MigrationGuideRef>` | `DeprecatedApiRecord.migration_ref` | caller 输入 | required for deprecated / pending removal |
-| `removal_plan` | `Option<RemovalPlan>` | `DeprecatedApiRecord.removal_plan` | caller 输入 | required for pending removal |
+| `migration_ref` | `Option<MigrationGuideRef>` | `DeprecatedApiRecord.migration_ref` | caller 输入；API 绑定由外层 `api_ref` 写入 `DeprecatedApiRecord.api_ref` | required for deprecated / pending removal |
+| `removal_plan` | `Option<RemovalPlanInput>` | `DeprecatedApiRecord.removal_plan` | caller 输入；`removal_plan_ref` 由 `IdGeneratorPort.next_removal_plan_ref()` 生成后构造 `RemovalPlan` | required for pending removal |
 | `reason` | `String` | audit reason | caller 输入 | reject |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `DeprecateSdkApiCommand` | `DeprecatedApiRecord`、`MigrationGuideRef` | 是 | time / actor 由 context 提供 | `document_ref` 不等于 `artifact_ref` | reject |
+| `DeprecateSdkApiCommand` | `DeprecatedApiRecord`、`MigrationGuideRef`、`RemovalPlan` | 是 | time / actor 由 context 提供；migration 与 API 的绑定来自 `DeprecatedApiRecord.api_ref`；public surface 与当前 API 版本来自 `PublicSdkApiSurfacePort.resolve_api(api_ref)`；removal plan ref 由 `IdGeneratorPort.next_removal_plan_ref()` 生成 | migration `document_ref` 不等于 `artifact_ref`；removal `document_ref` 不等于 migration `document_ref`；`MigrationGuideRef` 不含 API 覆盖集合 | reject |
+
+`RemovalPlanInput` wire schema:
+
+| 字段 | 类型 | 目标字段 | 约束 |
+|---|---|---|---|
+| `target_removal_version` | `PackageCandidateVersion` | `RemovalPlan.target_removal_version` | 必须大于 `PublicSdkApiSurfaceEntry.api_version` |
+| `removal_not_before` | `Timestamp` | `RemovalPlan.removal_not_before` | `mark_removed` 不得早于该时间 |
+| `replacement_api_ref` | `Option<SdkApiRef>` | `RemovalPlan.replacement_api_ref` | 有值时必须通过 `PublicSdkApiSurfacePort.resolve_api(replacement_api_ref)` 解析到 `is_public = true` 的 SDK public surface 条目 |
+| `document_ref` | `DocumentRef` | `RemovalPlan.document_ref` | 不复制移除计划正文 |
 
 ##### 错误映射
 
@@ -794,6 +823,8 @@ pub struct SdkErrorEnvelope {
 | migration ref 缺失 | `Validation` |
 | lifecycle 非法迁移 | `Conflict` |
 | API ref 不存在 | `NotFound` |
+| replacement API ref 不存在或不是 public surface | `NotFound` / `Validation` |
+| `target_removal_version <= PublicSdkApiSurfaceEntry.api_version` | `Validation` |
 
 ##### 幂等与审计要求
 
@@ -961,7 +992,7 @@ Query API 只读，不携带幂等键，不开启写事务，不触发 refresh�
 | 项 | 内容 |
 |---|---|
 | 函数签名 | `read_service_capability(query: ServiceCapabilityReadQuery, context: ClientCallContext, meta: QueryMetadata) -> Result<ServiceCapabilityReadResult, SdkProtocolError>` |
-| Rust client / CLI | `ServiceClient::read` / 无默认 CLI |
+| Rust client / CLI | `ServiceClient::read(query, meta: QueryMetadata)` / 无默认 CLI |
 | 调用方 | Rust SDK consumer |
 | 处理方 | `ServiceClientAssemblyService` |
 
@@ -984,7 +1015,7 @@ Query API 只读，不携带幂等键，不开启写事务，不触发 refresh�
 
 | 输入字段 | 类型 | 读取来源 | 缺失处理 |
 |---|---|---|---|
-| `capability_ref` | `ServiceCapabilityRef` | `ServiceClientViewRepository` | not_found |
+| `capability_ref` | `ServiceCapabilityRefId` | `ServiceClientViewRepository` lookup 完整 `ServiceCapabilityRef` | not_found |
 | `target_profile` | `ClientTargetProfile` | `ClientContext` | reject |
 | `query_ref` | `PayloadRef` | external payload reference | reject |
 | `query_digest` | `PayloadDigest` | caller / computed | reject |
@@ -994,7 +1025,7 @@ Query API 只读，不携带幂等键，不开启写事务，不触发 refresh�
 | 项 | 内容 |
 |---|---|
 | 函数签名 | `open_event_subscription(query: OpenEventSubscriptionQuery, context: ClientCallContext, meta: QueryMetadata) -> Result<EventSubscriptionView, SdkProtocolError>` |
-| Rust client / CLI | `EventClient::open_subscription` / 无默认 CLI |
+| Rust client / CLI | `EventClient::open_subscription(query, meta: QueryMetadata)` / 无默认 CLI |
 | 调用方 | Rust SDK consumer |
 | 处理方 | `EventClientAssemblyService` |
 
@@ -1016,7 +1047,7 @@ Query API 只读，不携带幂等键，不开启写事务，不触发 refresh�
 
 | 输入字段 | 类型 | 读取来源 | 缺失处理 |
 |---|---|---|---|
-| `event_mapping_ref` | `EventSemanticMappingRef` | `EventClientViewRepository` | not_found |
+| `event_mapping_ref` | `EventSemanticMappingRef` | `EventClientViewRepository` lookup 完整 `EventSemanticMapping` | not_found |
 | `cursor` | `Option<SubscriptionCursor>` | bus boundary | default start |
 | `limit` | `PageLimit` | query option | default / cap |
 
@@ -1103,6 +1134,7 @@ Query API 只读，不携带幂等键，不开启写事务，不触发 refresh�
 {
   "decision_id": "compat_decision_01",
   "candidate_id": "candidate_01",
+  "baseline_version": "baseline_v2",
   "decision_state": "Compatible",
   "evidence_refs": ["evidence_01"]
 }
@@ -1179,9 +1211,21 @@ Query API 只读，不携带幂等键，不开启写事务，不触发 refresh�
 
 | 输入字段 | 类型 | 读取来源 | 缺失处理 |
 |---|---|---|---|
-| `api_ref` | `SdkApiRef` | `CompatibilityRepository` | not_found |
-| `from_version` | `PackageCandidateVersion` | `MigrationGuideRef` | reject if version range invalid |
-| `to_version` | `PackageCandidateVersion` | `MigrationGuideRef` | reject if version range invalid |
+| `api_ref` | `SdkApiRef` | `CompatibilityRepository.get_deprecated_api(api_ref)` / `DeprecatedApiRecord.api_ref` | not_found |
+| `from_version` | `PackageCandidateVersion` | query input，与 `DeprecatedApiRecord.migration_ref.from_version` 比对 | reject if version range invalid；mismatch not_found |
+| `to_version` | `PackageCandidateVersion` | query input，与 `DeprecatedApiRecord.migration_ref.to_version` 比对 | reject if version range invalid；mismatch not_found |
+
+查询规则:
+
+```text
+1. validate from_version < to_version
+2. read DeprecatedApiRecord by api_ref
+3. if record missing or migration_ref missing -> not_found
+4. if migration_ref.matches_version_range(from_version, to_version) -> return MigrationGuideRefView
+5. otherwise -> not_found
+```
+
+`MigrationGuideRef` 自身不实现 `covers_api`。API 覆盖关系由 `DeprecatedApiRecord.api_ref` 和 repository key 决定，不在 migration guide ref 内重复保存。
 
 ### 7.5 Inbound Event Consumer 协议
 
@@ -1211,7 +1255,7 @@ Query API 只读，不携带幂等键，不开启写事务，不触发 refresh�
 | `core_snapshot_ref` | `CoreSnapshotRef` | `UpstreamVersionRef` | event payload | reject |
 | `digest` | `SnapshotDigest` | `UpstreamVersionRef.digest` | event payload | reject |
 
-幂等与审计：使用 `event_id + source_ref` 作为消费幂等键；成功后可标记 affected views stale。
+幂等与审计：使用 `event_id + source_ref + idempotency_key` 作为消费幂等键；成功后可标记 affected views stale。
 
 #### 7.5.2 `ConsumeBusSemanticChanged`
 
@@ -1226,20 +1270,30 @@ Query API 只读，不携带幂等键，不开启写事务，不触发 refresh�
 {
   "event_id": "evt_bus_01",
   "source_ref": "bus",
-  "bus_semantic_ref": "bus_semantic_ref_01",
+  "transport_semantic_id": "transport_semantic_01",
   "version_ref": "bus_semantic_v2",
   "digest": "sha256:...",
   "changed_at": "2026-05-30T00:00:00Z"
 }
 ```
 
+构造闭环说明：
+
+- `ConsumeBusSemanticChanged` 事件只携带 bus 侧 transport semantic id / version / digest,不携带 SDK 专属的 `sdk_event_name` 或 `event_mapping_ref`。
+- `ContractConsumptionService` 必须通过 `BusSemanticSourcePort.fetch_snapshot(version_ref)` 读取对应 `BusSemanticSnapshot`,校验 `transport_semantic_id` / `digest`,再结合当前 `SdkSemanticBaseline` / `CrossLanguageConceptMap` 派生 `EventSemanticMapping`。
+- `transport_semantic_id` 的正式类型是 `bus-contracts::metadata::TransportSemanticId`;SDK 不定义独立 `BusSemanticId` 或 `BusSemanticRef`。
+- 派生出的 `EventSemanticMapping.mapping_ref` 由 `EventSemanticMappingRef::from_mapping_key(...)` 生成,并保存到 `BusEventClientView.mapping_set`。
+
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
-| `bus_semantic_ref` | `BusSemanticRef` | `BusEventClientView.semantic_refs` | event payload | reject |
-| `version_ref` | `UpstreamVersionRef` | `UpstreamVersionRef` | event payload | reject |
+| `transport_semantic_id` | `TransportSemanticId` | snapshot semantic identity validation | event payload / bus-contracts typed projection | reject |
+| `version_ref` | `UpstreamVersionRef` | `UpstreamVersionRef` / `BusSemanticSourcePort.fetch_snapshot(...)` 入参 | event payload | reject |
 | `digest` | `SnapshotDigest` | `UpstreamVersionRef.digest` | event payload | reject |
+| derived mappings | `Vec<EventSemanticMapping>` | `BusEventClientView.mapping_set` | bus semantic snapshot + SDK semantic baseline / concept map | dependency / validation |
 
-幂等与审计：使用 `event_id + source_ref`；不得重新定义 bus publication / delivery truth。
+幂等与审计：使用 `event_id + source_ref + idempotency_key`；不得重新定义 bus publication / delivery truth。
+
+出站事件口径：成功保存 `BusEventClientView` 后必须写入 `SdkClientViewFreshnessChangedEvent`，目标使用 `EventViewId`；不得复用 `SdkSnapshotFreshnessChangedEvent` 或伪造 `DerivedViewId` / `affected_languages`。
 
 #### 7.5.3 `ConsumeFormalApiChanged`
 
@@ -1267,7 +1321,9 @@ Query API 只读，不携带幂等键，不开启写事务，不触发 refresh�
 | `version_ref` | `UpstreamVersionRef` | `UpstreamVersionRef` | event payload | reject |
 | `digest` | `SnapshotDigest` | `UpstreamVersionRef.digest` | event payload | reject |
 
-幂等与审计：使用 `event_id + source_ref`；不得依赖服务仓源码。
+幂等与审计：使用 `event_id + source_ref + idempotency_key`；不得依赖服务仓源码。
+
+出站事件口径：成功保存 `ServiceClientView` 后必须写入 `SdkClientViewFreshnessChangedEvent`，目标使用 `ServiceViewId`；不得复用 `SdkSnapshotFreshnessChangedEvent` 或伪造 `DerivedViewId` / `affected_languages`。
 
 #### 7.5.4 `ConsumeValidationRunFinished`
 
@@ -1331,7 +1387,7 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 | Event type / topic | `sdk.snapshot_freshness.changed.v1` |
 | 发布方 | `ContractConsumptionService` |
 | 订阅方 | candidate generator、reports |
-| 版本策略 | payload v1，状态名必须与 `SnapshotFreshnessState` 一致 |
+| 版本策略 | payload v1，状态名必须与 `SnapshotFreshnessState` 一致；该 event 只承载 `DerivedBindingView` / `LanguageBindingView` freshness |
 
 ```json
 {
@@ -1342,7 +1398,70 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 }
 ```
 
-#### 7.6.3 `PackageCandidateGeneratedEvent`
+字段约束：
+
+| 字段 | 类型 | 作用 | 约束 |
+|---|---|---|---|
+| `view_id` | `DerivedViewId` | 标识 derived binding view | 不得填入 `ServiceViewId` 或 `EventViewId` |
+| `freshness_state` | `SnapshotFreshnessState` | 表示 derived / language view freshness | 不得比实际视图更乐观 |
+| `affected_languages` | `Vec<LanguageId>` | 表示受影响 language binding view | 必须来自 derived view 下游语言视图，不得为 service / event client view 伪造 |
+| `upstream_refs` | `Vec<UpstreamVersionRef>` | 表示触发 freshness 变化的上游版本 | 不携带上游 snapshot body |
+
+#### 7.6.3 `SdkClientViewFreshnessChangedEvent`
+
+| 项 | 内容 |
+|---|---|
+| Event type / topic | `sdk.client_view_freshness.changed.v1` |
+| 发布方 | `ContractConsumptionService` |
+| 订阅方 | candidate generator、reports |
+| 版本策略 | payload v1，状态名必须与 `SnapshotFreshnessState` 一致；该 event 只承载 `ServiceClientView` / `BusEventClientView` freshness |
+
+```json
+{
+  "target_view": {
+    "kind": "event_client",
+    "event_view_id": "event_view_01"
+  },
+  "freshness_state": "Stale",
+  "upstream_refs": ["bus_semantic_v2"],
+  "changed_at": "2026-05-30T00:00:00Z"
+}
+```
+
+Rust DTO 约束：
+
+```rust
+pub struct SdkClientViewFreshnessChangedEvent {
+    pub target_view: SdkClientViewFreshnessTarget,
+    pub freshness_state: SnapshotFreshnessState,
+    pub upstream_refs: Vec<UpstreamVersionRef>,
+    pub changed_at: Timestamp,
+}
+
+pub enum SdkClientViewFreshnessTarget {
+    Service(ServiceViewId),
+    Event(EventViewId),
+}
+```
+
+字段约束：
+
+| 字段 | 类型 | 作用 | 约束 |
+|---|---|---|---|
+| `target_view` | `SdkClientViewFreshnessTarget` | 标识受影响 client view | 必须且只能是 `Service(ServiceViewId)` 或 `Event(EventViewId)` 之一 |
+| `freshness_state` | `SnapshotFreshnessState` | 表示 service / event client view freshness | 不得比实际视图更乐观 |
+| `upstream_refs` | `Vec<UpstreamVersionRef>` | 表示触发 freshness 变化的 upstream ref | 不携带 formal API / bus semantic body |
+| `changed_at` | `Timestamp` | freshness event 形成时间 | 由 `ClockPort` 生成 |
+
+禁止事项：
+
+| 禁止项 | 原因 |
+|---|---|
+| 用 `DerivedViewId` 承载 service / event client view | 会破坏 PH-02 derived view 事件 schema |
+| 为 service / event client view 伪造 `affected_languages` | 这两类视图没有自然 language fan-out |
+| 修改 PH-02 `SdkSnapshotFreshnessChangedEvent` schema 来适配 PH-03 | 会破坏已交付 derived / language freshness 事件 |
+
+#### 7.6.4 `PackageCandidateGeneratedEvent`
 
 | 项 | 内容 |
 |---|---|
@@ -1360,7 +1479,7 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 }
 ```
 
-#### 7.6.4 `VerificationEvidenceRecordedEvent`
+#### 7.6.5 `VerificationEvidenceRecordedEvent`
 
 | 项 | 内容 |
 |---|---|
@@ -1380,7 +1499,7 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 }
 ```
 
-#### 7.6.5 `CompatibilityDecisionRecordedEvent`
+#### 7.6.6 `CompatibilityDecisionRecordedEvent`
 
 | 项 | 内容 |
 |---|---|
@@ -1393,13 +1512,14 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 {
   "decision_id": "compat_decision_01",
   "candidate_id": "candidate_01",
+  "baseline_version": "baseline_v2",
   "decision_state": "Compatible",
   "evidence_refs": ["evidence_01"],
   "migration_ref": null
 }
 ```
 
-#### 7.6.6 `DeprecatedApiRecordedEvent`
+#### 7.6.7 `DeprecatedApiRecordedEvent`
 
 | 项 | 内容 |
 |---|---|
@@ -1411,18 +1531,21 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 ```json
 {
   "api_ref": "sdk_api_ref_01",
-  "lifecycle_state": "Deprecated",
+  "lifecycle_state": "PendingRemoval",
   "migration_ref": "migration_ref_01",
-  "removal_plan_ref": null
+  "removal_plan_ref": "removal_plan_01"
 }
 ```
 
-#### 7.6.7 Outbound Event 统一字段闭环
+`DeprecatedApiRecordedEvent.removal_plan_ref` 来自 `DeprecatedApiRecord.removal_plan.as_ref().map(|plan| plan.removal_plan_ref)`。事件只发布 ref，不发布 removal plan 文档正文。
+
+#### 7.6.8 Outbound Event 统一字段闭环
 
 | Event | 来源对象 | 必填字段来源 | 不得携带 |
 |---|---|---|---|
 | `SdkSemanticBaselineChangedEvent` | `SdkSemanticBaseline` | repository committed object + actor | concept map body |
 | `SdkSnapshotFreshnessChangedEvent` | `DerivedBindingView` / `SnapshotFreshnessState` | repository committed view | upstream snapshot body |
+| `SdkClientViewFreshnessChangedEvent` | `ServiceClientView` / `BusEventClientView` / `SnapshotFreshnessState` | repository committed client view | service response body / bus event payload body |
 | `PackageCandidateGeneratedEvent` | `PackageCandidate` | candidate repository + artifact refs | package file body |
 | `VerificationEvidenceRecordedEvent` | `VerificationEvidence` | evidence repository | raw test logs / secrets |
 | `CompatibilityDecisionRecordedEvent` | `CompatibilityDecision` | compatibility repository | full ADR / migration doc body |
@@ -1527,6 +1650,16 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 }
 ```
 
+artifact 物化规则:
+
+| 项 | 口径 |
+|---|---|
+| artifact 来源 | `PackageArtifactStorePort.list_by_candidate(candidate_id)` |
+| 物化方式 | `PackageArtifactStorePort.materialize_artifacts(...)` |
+| run 绑定 | `JobMetadata.job_run_id` |
+| runner 输入 | `CrossLanguageSmokeInput.materialized_artifacts` |
+| 禁止事项 | 不从 job input 直接传 filesystem path;不把 materialized location 写入 `LanguageArtifact` |
+
 ```json
 {
   "evidence_id": "evidence_smoke_01",
@@ -1555,16 +1688,44 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 }
 ```
 
+artifact 物化规则:
+
+| 项 | 口径 |
+|---|---|
+| artifact 来源 | `PackageArtifactStorePort.list_by_candidate(candidate_id)` |
+| 物化方式 | `PackageArtifactStorePort.materialize_artifacts(PackageArtifactMaterializationInput { candidate_id, language_set, job_run_id, purpose: DocsExamples })` |
+| run 绑定 | `JobMetadata.job_run_id` |
+| runner 输入 | `DocsExampleRunInput.docs_example_set_ref` + `DocsExampleRunInput.materialized_artifacts` |
+| 缺失时行为 | candidate 缺 artifact 或 language set 未覆盖时返回 not_found / runner input error |
+| 禁止事项 | 不从 job input 直接传 artifact root;不把本地 package path 写入 candidate truth |
+
 ```json
 {
   "evidence_id": "evidence_docs_01",
   "result": "Passed",
   "validated_examples": 12,
-  "failed_examples": 0
+  "failed_examples": 0,
+  "checked_at": "2026-05-30T00:00:00Z",
+  "results": [
+    {
+      "language_id": "rust",
+      "example_ref": "docs_example_quickstart",
+      "result": "Passed"
+    }
+  ]
 }
 ```
 
 幂等与审计：使用 `job_run_id + candidate_id + docs_example_set_ref`；docs pass 不等于 compatibility pass。
+
+docs evidence artifact replay 规则:
+
+| 项 | 口径 |
+|---|---|
+| artifact 类型 | committed redacted docs evidence artifact |
+| 必填字段 | `candidate_id`、`docs_example_set_ref`、`checked_at`、`results[].language_id`、`results[].example_ref`、`results[].result` |
+| projection 来源 | `EvidenceArtifactReplayPort.replay_docs_examples(VerificationEvidence)` |
+| 禁止事项 | 不从 runner 临时目录、旧 projection 或 job input path 重建 docs example projection |
 
 #### 7.7.6 `CheckCompatibility`
 
@@ -1610,6 +1771,16 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 }
 ```
 
+artifact 物化规则:
+
+| 项 | 口径 |
+|---|---|
+| artifact 来源 | `PackageArtifactStorePort.list_by_candidate(candidate_id)` |
+| language set | 从 candidate 已绑定的 language artifacts 派生 |
+| 物化方式 | `PackageArtifactStorePort.materialize_artifacts(PackageArtifactMaterializationInput { candidate_id, language_set, job_run_id, purpose: BoundaryVerification })` |
+| runner 输入 | `BoundaryPolicyVerificationInput.materialized_artifacts` |
+| 禁止事项 | 不从 job input 直接传 artifact root;不把 materialized location 写入 candidate truth |
+
 ```json
 {
   "evidence_id": "evidence_boundary_01",
@@ -1651,6 +1822,17 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 
 幂等与审计：使用 `job_run_id + projection_set + rebuild_scope`；只重建 read model，不改写真相。
 
+projection rebuild 来源:
+
+| projection | 合法来源 |
+|---|---|
+| `capability` | semantic baseline、derived view、service / event client view committed truth |
+| `evidence` | `EvidenceRepository` 中的 `VerificationEvidence` |
+| `compatibility` | `CompatibilityRepository` 中的 compatibility / deprecated committed truth |
+| `docs_example` | `EvidenceRepository` 中 `EvidenceKind::DocsExample` 且 `Redacted` 的 `VerificationEvidence` + `EvidenceArtifactReplayPort.replay_docs_examples(...)` |
+
+`docs_example` 不拥有新的 domain truth。若 docs evidence artifact 缺失、未脱敏、schema 不含 docs 明细或 candidate 不匹配,`RebuildSdkProjections` 必须返回 projection rebuild failure,不得从旧 projection 或 runner 临时目录补数据。
+
 #### 7.7.9 Job 字段闭环表
 
 | Job | 主要输入 | 目标对象 / 输出 | 必填字段是否齐全 | 缺失处理 |
@@ -1659,9 +1841,9 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 | `GeneratePackageCandidate` | baseline version、language set、candidate version | `PackageCandidate` | 是 | reject / not_found |
 | `BuildLanguagePackages` | candidate ID、language set、output ref | `LanguageArtifact`、artifact refs | 是 | not_found / runner error |
 | `RunCrossLanguageSmoke` | candidate ID、target profile、suite ref | `VerificationEvidence` | 是 | not_found / runner error |
-| `ValidateDocsExamples` | candidate ID、docs example set ref | `VerificationEvidence`、docs projection | 是 | not_found / runner error |
+| `ValidateDocsExamples` | candidate ID、docs example set ref、artifact store materialized artifacts | `VerificationEvidence`、docs projection | 是 | not_found / materialization error / runner error |
 | `CheckCompatibility` | candidate ID、baseline version、evidence refs | `CompatibilityDecision` | 是 | validation / not_found |
-| `VerifyBoundaryPolicies` | candidate ID、policy set ref、fixture ref | `VerificationEvidence` | 是 | validation / runner error |
+| `VerifyBoundaryPolicies` | candidate ID、policy set ref、fixture ref、artifact store materialized artifacts | `VerificationEvidence` | 是 | materialization error / validation / runner error |
 | `RebuildSdkProjections` | projection set、scope | projection views | 是 | validation / projection error |
 
 ### 7.8 Step 8 统一复核
@@ -1673,7 +1855,7 @@ Outbound Event 使用 outbox 写入后发布。payload 只包含 SDK 已提交�
 | Command API | 是 | 6 个 command 已定义签名、入口、schema、字段闭环、错误、幂等 |
 | Query API | 是 | 12 个 query 已定义签名、入口、schema、读取来源 |
 | Inbound Event Consumer | 是 | 4 个 consumer 已定义 topic、schema、字段闭环、幂等 |
-| Outbound Event | 是 | 6 个 event 已定义 topic、payload、版本策略、禁止携带正文 |
+| Outbound Event | 是 | 7 个 event 已定义 topic、payload、版本策略、禁止携带正文 |
 | Operations Job | 是 | 8 个 job 已定义 binary、input、output、幂等、审计 |
 | 公共错误 envelope | 是 | §7.2.3 / §7.2.4 |
 | DTO 落点 | 是 | `crates/contracts/src/{commands,queries,events,jobs}.rs` |

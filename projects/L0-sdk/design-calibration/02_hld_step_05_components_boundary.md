@@ -102,9 +102,9 @@
 | 组成部分 | Truth / State | Policy / Invariant | Projection / Read model | Reference / Boundary | Audit / History | Step 6 必须独立展开 |
 |---|---|---|---|---|---|---|
 | 官方客户端语义核心 | `SdkSemanticBaseline`、`ClientCapabilityModel` | 语义一致性规则 | `SdkCapabilityProjection` | `LanguageRuntimeRef` | semantic change history | `SdkSemanticBaseline`、`ClientCapabilityModel`、`CrossLanguageConceptMap` |
-| 上游契约消费与派生视图 | `DerivedBindingView`、`LanguageBindingView`、`SnapshotFreshnessState` | upstream truth boundary rule | contract / bus snapshot projection | `UpstreamVersionRef`、`CoreContractRef`、`BusSemanticRef` | snapshot refresh history | `DerivedBindingView`、`LanguageBindingView`、`UpstreamVersionRef`、`SnapshotFreshnessState` |
+| 上游契约消费与派生视图 | `DerivedBindingView`、`LanguageBindingView`、`SnapshotFreshnessState` | upstream truth boundary rule | contract / bus snapshot projection | `UpstreamVersionRef`、`CoreContractRef`、`TransportSemanticId` | snapshot refresh history | `DerivedBindingView`、`LanguageBindingView`、`UpstreamVersionRef`、`SnapshotFreshnessState` |
 | 平台能力访问与正式边界适配 | `ServiceClientView` | formal boundary policy | service capability projection | `ServiceCapabilityRef`、`FakeBoundaryRef` | service client change history | `ServiceClientView`、`ServiceCapabilityRef` |
-| 事件客户端视图 | `BusEventClientView`、event client state | event semantic consistency rule | event capability projection | `BusSemanticRef`、`EventBoundaryRef` | event client mapping history | `BusEventClientView`、`EventSemanticMapping` |
+| 事件客户端视图 | `BusEventClientView`、event client state | event semantic consistency rule | event capability projection | `TransportSemanticId`、`EventBoundaryRef` | event client mapping history | `BusEventClientView`、`EventSemanticMapping` |
 | 横切默认行为 | default behavior state | `ErrorMappingPolicy`、`TracePropagationPolicy`、`RedactionPolicy`、`CredentialProtectionPolicy`、`BoundaryGuard` | security / trace capability projection | credential material boundary | redaction / leakage audit | `ErrorMappingPolicy`、`TracePropagationPolicy`、`RedactionPolicy`、`CredentialProtectionPolicy`、`BoundaryGuard` |
 | package candidate 与验证证据 | `PackageCandidate`、candidate status、`VerificationEvidence` | verification gate policy | `EvidenceProjection` | package artifact ref、runner ref | smoke / validation history | `PackageCandidate`、`VerificationEvidence` |
 | 文档、兼容与演进 | `CompatibilityDecision`、`DeprecatedApiRecord` | `CompatibilityPolicy` | `CompatibilityProjection`、docs example projection | `MigrationGuideRef`、upstream version ref | compatibility / deprecated history | `CompatibilityDecision`、`DeprecatedApiRecord`、`MigrationGuideRef` |
@@ -214,7 +214,7 @@
 |---|---|---|
 | state | `SnapshotFreshnessState` | 独立成节 |
 | projection | `DerivedBindingView`、`LanguageBindingView` | 独立成节 |
-| reference | `UpstreamVersionRef`、`CoreContractRef`、`BusSemanticRef` | `UpstreamVersionRef` 独立成节,其余筛选 |
+| reference | `UpstreamVersionRef`、`CoreContractRef`、`TransportSemanticId` | `UpstreamVersionRef` 独立成节,其余筛选 |
 | history | snapshot refresh history | 作为 history record 候选 |
 
 ##### 本部分不承担什么
@@ -293,7 +293,7 @@
 | truth / view | `BusEventClientView` | 独立成节 |
 | policy | event semantic consistency rule | Step 6 筛选 |
 | projection | event capability projection | 可作为 projection 候选 |
-| reference | `BusSemanticRef`、`EventBoundaryRef` | 筛选为引用对象或字段类型 |
+| reference | `TransportSemanticId`、`EventBoundaryRef` | 筛选为引用对象或字段类型 |
 | history | event client mapping history | 可作为 history record 候选 |
 
 ##### 本部分不承担什么

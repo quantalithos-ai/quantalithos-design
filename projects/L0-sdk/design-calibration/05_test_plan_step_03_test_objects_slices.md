@@ -99,7 +99,7 @@
 
 | 负向切口 | 来源章节 | 必须断言 |
 |---|---|---|
-| `CommandMetadata.idempotency_key` 缺失或复用冲突 | `03` §7.3 / §12 | 返回 `Validation` 或 `Conflict`，不写 truth |
+| `CommandMetadata.request.idempotency_key` 缺失或复用冲突 | `03` §7.3 / §12 | 返回 `Validation` 或 `Conflict`，不写 truth |
 | inbound event 缺 `event_id`、`source_ref` 或幂等字段 | `03` §7.3 / §12 | 拒绝消费，不写 view / evidence |
 | source ref、snapshot ref、digest 不匹配 | `03` §7.4 / §11 | 返回 `Dependency` / `Validation`，不保存派生视图 |
 | payload body、request body、response body 直接进入 DTO / evidence | `03` §7.4 / §11 / §14 | 返回 `BoundaryViolation`，不调用 boundary 或不写 evidence |

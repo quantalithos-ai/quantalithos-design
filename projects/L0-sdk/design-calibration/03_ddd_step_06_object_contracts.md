@@ -169,6 +169,7 @@ Step 5 已确认模块实现契约主轴和对象归属。
 | `Timestamp` | 优先使用 `core-contracts` 时间值对象 | 不直接使用裸字符串 |
 | `ActorContext` / `TraceContextRef` | 优先来自 `core-contracts` 或本仓轻量 wrapper | 不做认证授权实现 |
 | `LanguageId` / `SdkConceptId` / `ClientCapabilityId` | `domain_semantic` | 使用 newtype，避免裸 `String` 扩散 |
+| `LanguageBindingViewId` | `domain_upstream_view` | 使用 newtype；必须由 `DerivedViewId + LanguageId` 稳定派生，例如 `LanguageBindingViewId::from_derived_view_language(...)` |
 | `ArtifactRef` / `DiagnosticRef` | `domain_evidence` 或 `domain_package_candidate` | 只保存引用，不保存 raw artifact body |
 
 ### 7.3 `domain_semantic` 对象实现契约
@@ -505,11 +506,12 @@ pub struct DerivedBindingView {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `DerivedBindingView::from_upstream_snapshots(refs: Vec<UpstreamVersionRef>, symbols: Vec<CapabilitySymbol>) -> Result<DerivedBindingView, SdkDomainError>` | 从上游引用和符号创建派生视图 | `refs` 和 `symbols` | `DerivedBindingView` | `RefreshDerivedBindingView` |
+| `DerivedBindingView::from_upstream_refs_and_symbols(refs: Vec<UpstreamVersionRef>, symbols: Vec<CapabilitySymbol>) -> Result<DerivedBindingView, SdkDomainError>` | 从上游引用和符号创建派生视图 | `refs` 是已确认参与派生的上游版本引用；`symbols` 是 application 层从 source snapshot 提取出的能力符号 | `DerivedBindingView` | `RefreshDerivedBindingView` |
 
 ##### 不变量与禁止事项
 
 - 不复制 core / bus / formal API 正文。
+- 不允许把 `CoreContractSnapshot`、`BusSemanticSnapshot`、`FormalApiSnapshot` 等 source DTO 直接作为 domain 工厂参数；snapshot 到 `UpstreamVersionRef` / `CapabilitySymbol` 的提取属于 application 编排职责。
 - `capability_symbols` 不能绕过 `ClientCapabilityModel` 直接暴露给 package。
 - stale / unsupported / unknown 视图不得生成 verified candidate。
 
@@ -523,6 +525,12 @@ pub struct DerivedBindingView {
 /// 该对象表达某一种语言对 `DerivedBindingView` 的 idiomatic 投影,
 /// 但不得改变 SDK 平台语义。
 pub struct LanguageBindingView {
+    /// 单语言视图标识。
+    ///
+    /// 该 ID 由来源 `DerivedViewId` 与 `LanguageId` 稳定派生,
+    /// 不得使用随机 ID 或 artifact 构建结果反向生成。
+    pub language_view_id: LanguageBindingViewId,
+
     /// 目标语言。
     pub language_id: LanguageId,
 
@@ -541,6 +549,7 @@ pub struct LanguageBindingView {
 
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
+| `language_view_id` | `LanguageBindingViewId` | 标识单语言 binding 视图 | 必须由 `DerivedViewId + LanguageId` 稳定派生 |
 | `language_id` | `LanguageId` | 目标语言 | P0 为 Rust / Python / TypeScript |
 | `derived_view_id` | `DerivedViewId` | 来源派生视图 | 必须存在且 fresh |
 | `symbol_map` | `Vec<LanguageSymbolMapping>` | 语言符号映射 | 必须可由 concept map 校验 |
@@ -557,10 +566,11 @@ pub struct LanguageBindingView {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `LanguageBindingView::derive_for_language(view: DerivedBindingView, language_id: LanguageId, concept_map: CrossLanguageConceptMap) -> Result<LanguageBindingView, SdkDomainError>` | 从共同派生视图生成语言视图 | `view`、`language_id`、`concept_map` | `LanguageBindingView` | package build 前 |
+| `LanguageBindingView::derive_for_language(view: DerivedBindingView, language_id: LanguageId, concept_map: CrossLanguageConceptMap) -> Result<LanguageBindingView, SdkDomainError>` | 从共同派生视图生成语言视图 | `view`、`language_id`、`concept_map`;函数内部必须用 `LanguageBindingViewId::from_derived_view_language(view.view_id, language_id)` 生成稳定 ID | `LanguageBindingView` | package build 前 |
 
 ##### 不变量与禁止事项
 
+- `language_view_id` 必须可由 `derived_view_id` 和 `language_id` 重算,实现中不得由 `IdGeneratorPort`、repository 自增值、artifact digest 或构建输出生成。
 - 不允许语言视图新增未在 `DerivedBindingView` 中出现的能力。
 - 不允许语言 idiomatic 表达改变平台概念含义。
 - 不直接读取 package 目录或生成器输出。
@@ -623,10 +633,18 @@ pub enum CapabilitySupportState {
 ##### 类型定义
 
 ```rust
+/// 服务能力引用 ID。
+///
+/// 该值是 runtime command / query 中传入的稳定 lookup key,不等于完整的 `ServiceCapabilityRef` 对象。
+pub struct ServiceCapabilityRefId(pub String);
+
 /// 服务能力引用。
 ///
 /// 该对象指向 formal API 背后的服务能力,用于 SDK 判断是否可以封装调用入口。
 pub struct ServiceCapabilityRef {
+    /// 服务能力引用 ID。
+    pub ref_id: ServiceCapabilityRefId,
+
     /// 服务能力标识。
     pub capability_id: ClientCapabilityId,
 
@@ -648,6 +666,7 @@ pub struct ServiceCapabilityRef {
 
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
+| `ref_id` | `ServiceCapabilityRefId` | runtime command / query 的稳定 lookup key | 由能力模型和边界类别派生或导入,不得等同完整对象 |
 | `capability_id` | `ClientCapabilityId` | 标识 SDK 能力 | 必须存在于能力模型 |
 | `formal_api_ref` | `Option<FormalApiRef>` | 指向正式服务边界 | `Supported` 必须有值 |
 | `fake_boundary_ref` | `Option<FakeBoundaryRef>` | 指向 fake / fixture 目标 | 仅证明最小接入 |
@@ -658,6 +677,7 @@ pub struct ServiceCapabilityRef {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
+| `matches_ref(&self, ref_id: ServiceCapabilityRefId) -> bool` | 判断是否匹配 runtime lookup key | `ref_id` 是命令传入的能力引用 ID | `bool` | 只读 |
 | `is_supported(&self) -> bool` | 判断是否正式支持 | 无 | `bool` | 只有 `Supported` 返回 true |
 | `requires_formal_api(&self) -> bool` | 判断是否需要 formal API | 无 | `bool` | `Supported` 必须 true |
 | `assert_callable(&self) -> Result<(), SdkDomainError>` | 校验是否允许调用 | 无 | `Result<(), SdkDomainError>` | `Unsupported` / `Pending` 返回错误 |
@@ -666,8 +686,9 @@ pub struct ServiceCapabilityRef {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `ServiceCapabilityRef::from_formal_api(capability_id: ClientCapabilityId, formal_api_ref: FormalApiRef) -> Result<ServiceCapabilityRef, SdkDomainError>` | 从 formal API 构造正式能力引用 | 能力和 formal API 引用 | `ServiceCapabilityRef` | formal API changed |
-| `ServiceCapabilityRef::fake_only(capability_id: ClientCapabilityId, fake_ref: FakeBoundaryRef) -> Result<ServiceCapabilityRef, SdkDomainError>` | 构造 fake-only 能力引用 | 能力和 fake 引用 | `ServiceCapabilityRef` | smoke / docs 验证 |
+| `ServiceCapabilityRefId::from_capability(capability_id: ClientCapabilityId, boundary_kind: ServiceBoundaryKind) -> Result<ServiceCapabilityRefId, SdkDomainError>` | 生成稳定能力引用 ID | 能力 ID 和边界类别 | `ServiceCapabilityRefId` | formal API / fake boundary 派生 |
+| `ServiceCapabilityRef::from_formal_api(ref_id: ServiceCapabilityRefId, capability_id: ClientCapabilityId, formal_api_ref: FormalApiRef) -> Result<ServiceCapabilityRef, SdkDomainError>` | 从 formal API 构造正式能力引用 | 能力引用 ID、能力和 formal API 引用 | `ServiceCapabilityRef` | formal API changed |
+| `ServiceCapabilityRef::fake_only(ref_id: ServiceCapabilityRefId, capability_id: ClientCapabilityId, fake_ref: FakeBoundaryRef) -> Result<ServiceCapabilityRef, SdkDomainError>` | 构造 fake-only 能力引用 | 能力引用 ID、能力和 fake 引用 | `ServiceCapabilityRef` | smoke / docs 验证 |
 
 ##### 不变量与禁止事项
 
@@ -711,8 +732,9 @@ pub struct ServiceClientView {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `assert_capability_supported(&self, capability_ref: ServiceCapabilityRef) -> Result<(), SdkDomainError>` | 校验能力可调用 | `capability_ref` 是服务能力引用 | `Result<(), SdkDomainError>` | 只读 |
-| `requires_fake_boundary(&self, capability_ref: ServiceCapabilityRef) -> Result<bool, SdkDomainError>` | 判断是否 fake-only | `capability_ref` 是服务能力引用 | `Result<bool, SdkDomainError>` | 只读 |
+| `resolve_capability(&self, ref_id: ServiceCapabilityRefId) -> Result<ServiceCapabilityRef, SdkDomainError>` | 根据 runtime lookup key 解析完整能力引用 | `ref_id` 是命令或查询传入的能力引用 ID | `ServiceCapabilityRef` | 只读 |
+| `assert_capability_supported(&self, ref_id: ServiceCapabilityRefId) -> Result<(), SdkDomainError>` | 校验能力可调用 | `ref_id` 是服务能力引用 ID | `Result<(), SdkDomainError>` | 只读 |
+| `requires_fake_boundary(&self, ref_id: ServiceCapabilityRefId) -> Result<bool, SdkDomainError>` | 判断是否 fake-only | `ref_id` 是服务能力引用 ID | `Result<bool>` | 只读 |
 | `supported_capabilities(&self) -> Vec<ClientCapabilityId>` | 列出正式支持能力 | 无 | `Vec<ClientCapabilityId>` | 只读 |
 
 ##### 工厂 / 静态函数
@@ -764,8 +786,10 @@ pub struct BusEventClientView {
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `supports_operation(&self, operation: EventClientOperation) -> bool` | 判断操作是否支持 | `operation` 是事件操作 | `bool` | 只读 |
-| `assert_bus_semantic_aligned(&self, semantic_ref: BusSemanticRef) -> Result<(), SdkDomainError>` | 校验 bus semantic 对齐 | `semantic_ref` 是 bus 语义引用 | `Result<(), SdkDomainError>` | 不读取 bus runtime |
+| `assert_transport_semantic_aligned(&self, transport_semantic_id: TransportSemanticId) -> Result<(), SdkDomainError>` | 校验 bus transport semantic 对齐 | `transport_semantic_id` 是来自 `bus-contracts::metadata::TransportSemanticId` 的语义标识 | `Result<(), SdkDomainError>` | 不读取 bus runtime |
+| `mapping_by_ref(&self, mapping_ref: EventSemanticMappingRef) -> Result<EventSemanticMapping, SdkDomainError>` | 根据 runtime lookup key 查找事件映射 | `mapping_ref` 是命令或查询传入的映射引用 ID | `EventSemanticMapping` | 只读 |
 | `mapping_for(&self, sdk_event_name: SdkEventName) -> Result<EventSemanticMapping, SdkDomainError>` | 查找事件映射 | `sdk_event_name` 是 SDK 事件名 | `EventSemanticMapping` | 只读 |
+| `refresh_mappings(&self, mappings: Vec<EventSemanticMapping>, upstream_ref: UpstreamVersionRef, now: Timestamp) -> Result<BusEventClientView, SdkDomainError>` | 刷新事件映射并更新 freshness | 新映射集合、上游版本引用和当前时间 | `BusEventClientView` | 不写 bus runtime truth |
 
 ##### 工厂 / 静态函数
 
@@ -784,13 +808,42 @@ pub struct BusEventClientView {
 ##### 类型定义
 
 ```rust
-/// SDK 事件表达到 L0-bus 语义的映射。
-pub struct EventSemanticMapping {
+/// 事件语义映射引用 ID。
+///
+/// 该值是 runtime publish / subscription 中传入的稳定 lookup key,不等于完整的 `EventSemanticMapping` 对象。
+pub struct EventSemanticMappingRef(pub String);
+
+/// 事件语义映射构造输入。
+///
+/// 该值由 application 层从 bus semantic snapshot 和 SDK concept map 中提取,用于避免 source snapshot DTO 直接进入 domain factory。
+pub struct EventSemanticMappingInput {
     /// SDK 侧事件名。
     pub sdk_event_name: SdkEventName,
 
-    /// L0-bus 语义标识。
-    pub bus_semantic_id: BusSemanticId,
+    /// L0-bus transport semantic 标识。
+    ///
+    /// 该字段必须复用 `bus-contracts::metadata::TransportSemanticId`,SDK 不定义独立 `BusSemanticId`。
+    pub transport_semantic_id: TransportSemanticId,
+
+    /// 对应事件 client 操作。
+    pub operation: EventClientOperation,
+
+    /// 映射版本。
+    pub mapping_version: MappingVersion,
+}
+
+/// SDK 事件表达到 L0-bus 语义的映射。
+pub struct EventSemanticMapping {
+    /// 事件语义映射引用 ID。
+    pub mapping_ref: EventSemanticMappingRef,
+
+    /// SDK 侧事件名。
+    pub sdk_event_name: SdkEventName,
+
+    /// L0-bus transport semantic 标识。
+    ///
+    /// 该字段必须复用 `bus-contracts::metadata::TransportSemanticId`,SDK 不定义独立 `BusSemanticId`。
+    pub transport_semantic_id: TransportSemanticId,
 
     /// 对应事件 client 操作。
     pub operation: EventClientOperation,
@@ -804,8 +857,13 @@ pub struct EventSemanticMapping {
 
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
+| `EventSemanticMappingInput.sdk_event_name` | `SdkEventName` | SDK 事件名构造输入 | 由 application 层从 snapshot / concept map 提取 |
+| `EventSemanticMappingInput.transport_semantic_id` | `TransportSemanticId` | bus transport semantic 构造输入 | 必须来自 `bus-contracts::metadata::TransportSemanticId` 或其 snapshot typed projection |
+| `EventSemanticMappingInput.operation` | `EventClientOperation` | 事件操作构造输入 | 必须在 SDK 支持范围内 |
+| `EventSemanticMappingInput.mapping_version` | `MappingVersion` | 映射版本构造输入 | 来自上游版本或映射规则版本 |
+| `mapping_ref` | `EventSemanticMappingRef` | runtime publish / subscription 的稳定 lookup key | 由 SDK 事件名、bus transport semantic 和操作派生,不得等同 bus runtime truth |
 | `sdk_event_name` | `SdkEventName` | SDK 事件名 | 不得替代 bus semantic |
-| `bus_semantic_id` | `BusSemanticId` | bus 语义引用 | 必须来自 `bus-contracts` |
+| `transport_semantic_id` | `TransportSemanticId` | bus transport semantic 引用 | 必须来自 `bus-contracts::metadata::TransportSemanticId`,SDK 不定义独立 `BusSemanticId` |
 | `operation` | `EventClientOperation` | 事件操作 | publish / subscribe 等 client 视图操作 |
 | `mapping_version` | `MappingVersion` | 映射版本 | 上游变化后可更新 |
 
@@ -813,19 +871,23 @@ pub struct EventSemanticMapping {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
+| `matches_ref(&self, mapping_ref: EventSemanticMappingRef) -> bool` | 判断是否匹配 runtime lookup key | `mapping_ref` 是命令或查询传入的映射引用 ID | `bool` | 只读 |
 | `matches_sdk_event(&self, sdk_event_name: SdkEventName) -> bool` | 判断是否匹配 SDK 事件名 | `sdk_event_name` 是待匹配事件名 | `bool` | 只读 |
-| `assert_bus_semantic(&self, bus_semantic_id: BusSemanticId) -> Result<(), SdkDomainError>` | 校验 bus 语义一致 | `bus_semantic_id` 是目标语义 | `Result<(), SdkDomainError>` | 只读 |
+| `assert_transport_semantic(&self, transport_semantic_id: TransportSemanticId) -> Result<(), SdkDomainError>` | 校验 bus transport semantic 一致 | `transport_semantic_id` 是目标语义 | `Result<(), SdkDomainError>` | 只读 |
 
 ##### 工厂 / 静态函数
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `EventSemanticMapping::create(sdk_event_name: SdkEventName, bus_semantic_id: BusSemanticId, operation: EventClientOperation) -> Result<EventSemanticMapping, SdkDomainError>` | 创建事件语义映射 | SDK 事件、bus 语义和操作 | `EventSemanticMapping` | 事件视图刷新 |
+| `EventSemanticMappingRef::from_mapping_key(sdk_event_name: SdkEventName, transport_semantic_id: TransportSemanticId, operation: EventClientOperation) -> Result<EventSemanticMappingRef, SdkDomainError>` | 生成稳定映射引用 ID | SDK 事件名、bus transport semantic 和操作 | `EventSemanticMappingRef` | bus semantic changed / view refresh |
+| `EventSemanticMapping::create(mapping_ref: EventSemanticMappingRef, sdk_event_name: SdkEventName, transport_semantic_id: TransportSemanticId, operation: EventClientOperation, mapping_version: MappingVersion) -> Result<EventSemanticMapping, SdkDomainError>` | 创建事件语义映射 | 映射引用 ID、SDK 事件、bus transport semantic、操作和版本 | `EventSemanticMapping` | 事件视图刷新 |
+| `EventSemanticMapping::from_input(input: EventSemanticMappingInput) -> Result<EventSemanticMapping, SdkDomainError>` | 从 typed 构造输入创建事件语义映射并生成稳定 `mapping_ref` | `input` 是 application 层提取后的 typed input | `EventSemanticMapping` | `ConsumeBusSemanticChangedFlow` |
 
 ##### 不变量与禁止事项
 
 - 不能把 SDK 事件名当成 bus truth。
-- 不能为未知 bus semantic 创建 mapping。
+- 不能为未知 bus transport semantic 创建 mapping。
+- 不能在 SDK 中新增 `BusSemanticId`;实现必须复用 `bus-contracts::metadata::TransportSemanticId`。
 
 ### 7.6 `domain_boundary_policy` 对象实现契约
 
@@ -1051,6 +1113,7 @@ pub struct BoundaryGuard {
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `assert_capability_allowed(&self, capability_id: ClientCapabilityId) -> Result<(), SdkDomainError>` | 校验能力允许 | `capability_id` 是能力标识 | `Result<(), SdkDomainError>` | 不修改状态 |
+| `assert_event_mapping_allowed(&self, mapping: EventSemanticMapping) -> Result<(), SdkDomainError>` | 校验事件映射允许通过 SDK event boundary 暴露 | `mapping` 是从 `BusEventClientView` lookup 的完整映射对象 | `Result<(), SdkDomainError>` | 不生成 bus runtime truth |
 | `assert_body_allowed(&self, message: ObservedMessage) -> Result<(), SdkDomainError>` | 校验正文边界 | `message` 是待检查材料 | `Result<(), SdkDomainError>` | 委托 redaction policy |
 | `assert_not_fake_success(&self, evidence: VerificationEvidence) -> Result<(), SdkDomainError>` | 阻止 fake success 伪装生产成功 | `evidence` 是验证证据 | `Result<(), SdkDomainError>` | fake-only 不得支撑 stable |
 
@@ -1159,7 +1222,7 @@ pub struct LanguageArtifact {
 | `language_id` | `LanguageId` | 产物语言 | P0 为 Rust / Python / TypeScript |
 | `artifact_ref` | `PackageArtifactRef` | 产物引用 | 不保存包体 |
 | `artifact_digest` | `ContentDigest` | 产物摘要 | 用于 evidence 和审计 |
-| `language_view_id` | `LanguageBindingViewId` | 来源语言视图 | 必须可追溯 |
+| `language_view_id` | `LanguageBindingViewId` | 来源语言视图 | 必须等于构建该 artifact 的 `LanguageBindingView.language_view_id` |
 
 ##### 成员函数
 
@@ -1172,13 +1235,16 @@ pub struct LanguageArtifact {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `LanguageArtifact::record(language_id: LanguageId, artifact_ref: PackageArtifactRef, artifact_digest: ContentDigest, language_view_id: LanguageBindingViewId) -> Result<LanguageArtifact, SdkDomainError>` | 记录语言包产物 | 语言、引用、摘要、来源视图 | `LanguageArtifact` | package build 完成 |
+| `LanguageArtifact::record(language_id: LanguageId, artifact_ref: PackageArtifactRef, artifact_digest: ContentDigest, language_view_id: LanguageBindingViewId) -> Result<LanguageArtifact, SdkDomainError>` | 记录语言包产物 | 语言、引用、摘要、来源视图;`language_view_id` 必须来自参与构建的 `LanguageBindingView` | `LanguageArtifact` | package build 完成 |
 
 ##### 不变量与禁止事项
 
 - 不保存 package body。
+- 不保存 filesystem path、runner sandbox path 或 materialized artifact location。
 - 不能脱离 `LanguageBindingView` 独立生成。
+- 不得用 `LanguageId`、artifact digest 或 candidate version 替代 `language_view_id`。
 - 三语言 candidate 必须至少各有一个 artifact。
+- docs / smoke runner 所需本地可执行位置必须由 `PackageArtifactStorePort.materialize_artifacts(...)` 基于 `artifact_ref` 在运行时物化。
 
 #### 7.7.3 `PackageCandidate`
 
@@ -1398,6 +1464,7 @@ pub struct VerificationEvidence {
 - 不保存 raw request / response / payload / secret。
 - `Passed + Unredacted` 不得支撑 candidate。
 - fake target 证据必须显式标记。
+- `EvidenceKind::DocsExample` 的 `artifact_ref` 必须指向已脱敏 docs evidence artifact;该 artifact 需包含 `candidate_id`、`docs_example_set_ref`、`checked_at` 和逐 example 结果,用于 `DocsExampleView` projection rebuild。该明细不提升为新的 domain truth。
 
 ### 7.9 `domain_compatibility_evolution` 对象实现契约
 
@@ -1470,6 +1537,9 @@ pub struct CompatibilityDecision {
     /// 关联 candidate。
     pub candidate_id: PackageCandidateId,
 
+    /// 兼容性判断所依据的 SDK semantic baseline 版本。
+    pub baseline_version: SdkBaselineVersion,
+
     /// 决策状态。
     pub decision_state: CompatibilityDecisionState,
 
@@ -1487,6 +1557,7 @@ pub struct CompatibilityDecision {
 |---|---|---|---|
 | `decision_id` | `CompatibilityDecisionId` | 标识决策 | 系统生成 |
 | `candidate_id` | `PackageCandidateId` | 关联 candidate | 必须存在 |
+| `baseline_version` | `SdkBaselineVersion` | 记录兼容判断依据的 semantic baseline | 必须来自 command / job input 或 candidate 关联基线 |
 | `decision_state` | `CompatibilityDecisionState` | 兼容状态 | 状态影响 stable 门禁 |
 | `evidence_refs` | `Vec<VerificationEvidenceRef>` | 证据引用 | 不保存证据正文 |
 | `migration_ref` | `Option<MigrationGuideRef>` | 迁移说明引用 | `RequiresMigration` 必填 |
@@ -1503,7 +1574,8 @@ pub struct CompatibilityDecision {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `CompatibilityDecision::record(candidate_id: PackageCandidateId, decision_state: CompatibilityDecisionState, evidence_refs: Vec<VerificationEvidenceRef>, migration_ref: Option<MigrationGuideRef>) -> Result<CompatibilityDecision, SdkDomainError>` | 记录兼容决策 | candidate、状态、证据、迁移引用 | `CompatibilityDecision` | `CheckCompatibility` |
+| `CompatibilityDecision::record(decision_id: CompatibilityDecisionId, candidate_id: PackageCandidateId, baseline_version: SdkBaselineVersion, decision_state: CompatibilityDecisionState, evidence_refs: Vec<VerificationEvidenceRef>, migration_ref: Option<MigrationGuideRef>) -> Result<CompatibilityDecision, SdkDomainError>` | 记录兼容决策 | `decision_id` 由 `IdGeneratorPort.next_compatibility_decision_id()` 生成；`baseline_version` 来自 command / job input 或 candidate 关联基线；其余参数为状态、证据、迁移引用 | `CompatibilityDecision` | `RecordCompatibilityDecision` |
+| `CompatibilityDecision::from_runner_result(decision_id: CompatibilityDecisionId, candidate_id: PackageCandidateId, baseline_version: SdkBaselineVersion, result: CompatibilityCheckResult, evidence: Vec<VerificationEvidence>, actor: ActorContext) -> Result<CompatibilityDecision, SdkDomainError>` | 从兼容检查结果生成决策 | `decision_id` 由 `IdGeneratorPort.next_compatibility_decision_id()` 生成；candidate、baseline、runner result、证据和 actor 均由 application service 提供 | `CompatibilityDecision` | `CheckCompatibility` |
 
 ##### 不变量与禁止事项
 
@@ -1562,11 +1634,23 @@ pub enum DeprecatedApiLifecycleState {
 
 - 禁止静默移除：`Announced` 不能直接到 `Removed`。
 
-#### 7.9.4 `MigrationGuideRef` 与 `DeprecatedApiRecord`
+#### 7.9.4 `PublicSdkApiSurfaceEntry`、`MigrationGuideRef` 与 `DeprecatedApiRecord`
 
 ##### 类型定义
 
 ```rust
+/// SDK public API surface 解析结果。
+pub struct PublicSdkApiSurfaceEntry {
+    /// API 引用。
+    pub api_ref: SdkApiRef,
+
+    /// API 当前所属 SDK 版本。
+    pub api_version: PackageCandidateVersion,
+
+    /// API 是否仍属于 public surface。
+    pub is_public: bool,
+}
+
 /// 迁移说明引用。
 pub struct MigrationGuideRef {
     /// 迁移说明标识。
@@ -1582,6 +1666,24 @@ pub struct MigrationGuideRef {
     pub language_set: Vec<LanguageId>,
 
     /// 迁移说明文档引用。
+    pub document_ref: DocumentRef,
+}
+
+/// API 移除计划。
+pub struct RemovalPlan {
+    /// 移除计划引用。
+    pub removal_plan_ref: RemovalPlanRef,
+
+    /// 计划移除目标版本。
+    pub target_removal_version: PackageCandidateVersion,
+
+    /// 不早于该时间才允许移除。
+    pub removal_not_before: Timestamp,
+
+    /// 替代 API 引用。
+    pub replacement_api_ref: Option<SdkApiRef>,
+
+    /// 移除计划说明文档引用。
     pub document_ref: DocumentRef,
 }
 
@@ -1608,23 +1710,32 @@ pub struct DeprecatedApiRecord {
 
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
+| `PublicSdkApiSurfaceEntry.api_ref` | `SdkApiRef` | public SDK API 引用 | 由 `PublicSdkApiSurfacePort.resolve_api(api_ref)` 返回 |
+| `PublicSdkApiSurfaceEntry.api_version` | `PackageCandidateVersion` | 当前 API 所属 SDK 版本 | 作为 `RemovalPlan.target_removal_version` 比较来源 |
+| `PublicSdkApiSurfaceEntry.is_public` | `bool` | 是否属于 public SDK surface | replacement API 有值时必须为 true |
 | `guide_id` | `MigrationGuideId` | 标识迁移说明 | 系统生成 |
 | `from_version` | `PackageCandidateVersion` | 起始版本 | 小于目标版本 |
 | `to_version` | `PackageCandidateVersion` | 目标版本 | 大于起始版本 |
 | `language_set` | `Vec<LanguageId>` | 覆盖语言 | 必须覆盖受影响语言 |
-| `document_ref` | `DocumentRef` | 文档引用 | 不复制正文 |
-| `api_ref` | `SdkApiRef` | API 引用 | 指向 SDK public surface |
+| `MigrationGuideRef.document_ref` | `DocumentRef` | 迁移说明文档引用 | 不复制正文 |
+| `removal_plan_ref` | `RemovalPlanRef` | 标识移除计划 | 系统生成 |
+| `target_removal_version` | `PackageCandidateVersion` | 计划移除目标版本 | 必须大于 `PublicSdkApiSurfaceEntry.api_version` |
+| `removal_not_before` | `Timestamp` | 最早允许移除时间 | `mark_removed` 必须检查该窗口 |
+| `replacement_api_ref` | `Option<SdkApiRef>` | 替代 API | 可为空；有值时必须指向 SDK public surface |
+| `RemovalPlan.document_ref` | `DocumentRef` | 移除计划说明文档引用 | 不复制正文 |
+| `api_ref` | `SdkApiRef` | API 引用 | 必须能通过 `PublicSdkApiSurfacePort.resolve_api(api_ref)` 解析到 public SDK surface |
 | `lifecycle_state` | `DeprecatedApiLifecycleState` | deprecated 状态 | 受状态机控制 |
 | `announced_at` | `Timestamp` | 公告时间 | 必填 |
-| `migration_ref` | `Option<MigrationGuideRef>` | 迁移说明 | deprecated 后应有值 |
+| `migration_ref` | `Option<MigrationGuideRef>` | 迁移说明 | deprecated 后应有值；API 绑定来自 `DeprecatedApiRecord.api_ref` |
 | `removal_plan` | `Option<RemovalPlan>` | 移除计划 | pending removal 必填 |
 
 ##### 成员函数
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `covers_api(&self, api_ref: SdkApiRef) -> bool` | 判断 migration 是否覆盖 API | `api_ref` 是 API 引用 | `bool` | `MigrationGuideRef` 只读函数 |
+| `matches_version_range(&self, from_version: PackageCandidateVersion, to_version: PackageCandidateVersion) -> bool` | 判断 migration 是否覆盖指定版本范围 | `from_version` 是起始版本；`to_version` 是目标版本 | `bool` | 只比较 `MigrationGuideRef` 自身字段，不判断 API 绑定 |
 | `covers_language(&self, language_id: LanguageId) -> bool` | 判断是否覆盖语言 | `language_id` 是语言 | `bool` | 只读 |
+| `is_removal_window_satisfied(&self, now: Timestamp) -> bool` | 判断移除窗口是否已满足 | `now` 是当前时间 | `bool` | `RemovalPlan` 只读函数 |
 | `mark_deprecated(&mut self, migration_ref: MigrationGuideRef, now: Timestamp) -> Result<(), SdkDomainError>` | 标记 deprecated | 迁移引用和时间 | `Result<(), SdkDomainError>` | 从 announced 到 deprecated |
 | `schedule_removal(&mut self, removal_plan: RemovalPlan, now: Timestamp) -> Result<(), SdkDomainError>` | 计划移除 | 移除计划和时间 | `Result<(), SdkDomainError>` | 需要已有 migration |
 | `mark_removed(&mut self, now: Timestamp) -> Result<(), SdkDomainError>` | 标记已移除 | 时间 | `Result<(), SdkDomainError>` | 只能从 pending removal |
@@ -1634,11 +1745,18 @@ pub struct DeprecatedApiRecord {
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
 | `MigrationGuideRef::create(from_version: PackageCandidateVersion, to_version: PackageCandidateVersion, language_set: Vec<LanguageId>, document_ref: DocumentRef) -> Result<MigrationGuideRef, SdkDomainError>` | 创建迁移引用 | 版本、语言和文档引用 | `MigrationGuideRef` | 兼容治理 |
+| `RemovalPlan::create(removal_plan_ref: RemovalPlanRef, target_removal_version: PackageCandidateVersion, current_api_version: PackageCandidateVersion, removal_not_before: Timestamp, replacement_api_ref: Option<SdkApiRef>, document_ref: DocumentRef) -> Result<RemovalPlan, SdkDomainError>` | 创建移除计划 | `removal_plan_ref` 由 `IdGeneratorPort.next_removal_plan_ref()` 生成；`current_api_version` 来自 `PublicSdkApiSurfaceEntry.api_version`；其余参数来自 `RemovalPlanInput` | `RemovalPlan` | `DeprecateSdkApi` 进入 pending removal |
 | `DeprecatedApiRecord::announce(api_ref: SdkApiRef, migration_ref: Option<MigrationGuideRef>, now: Timestamp) -> Result<DeprecatedApiRecord, SdkDomainError>` | 创建 deprecated 公告 | API、迁移引用、时间 | `DeprecatedApiRecord` | `DeprecateSdkApi` |
 
 ##### 不变量与禁止事项
 
 - 不复制迁移文档正文，只保存 `DocumentRef`。
+- `MigrationGuideRef` 不保存 API 覆盖集合，也不判断 `SdkApiRef` 覆盖关系。
+- migration guide 与 API 的绑定只来自 `DeprecatedApiRecord.api_ref` 以及 `CompatibilityRepository.get_deprecated_api(api_ref)` 的 repository 关联。
+- `RemovalPlan` 不保存移除文档正文，只保存 `DocumentRef`。
+- `RemovalPlanRef` 由 application service 通过 `IdGeneratorPort.next_removal_plan_ref()` 生成，不由调用方提供。
+- `RemovalPlan.target_removal_version` 必须大于 `PublicSdkApiSurfaceEntry.api_version`;`RemovalPlan` 不保存当前 API 版本,只在构造时接收该值完成校验。
+- `replacement_api_ref` 有值时必须先通过 `PublicSdkApiSurfacePort.resolve_api(replacement_api_ref)` 解析到 `is_public = true` 的条目。
 - `PendingRemoval` 必须有 `RemovalPlan`。
 - `Removed` 后不得再作为可用能力返回。
 
@@ -1649,7 +1767,7 @@ pub struct DeprecatedApiRecord {
 | Service 对象 | 建议文件 | 主要责任 | 本 Step 固定内容 | 后续展开 |
 |---|---|---|---|---|
 | `SdkSemanticBaselineService` | `crates/application/src/semantic_baseline_service.rs` | 编排 `UpdateSdkSemanticBaseline` | service 名称、归属、依赖 domain_semantic | Step 7 / Step 9 |
-| `ContractConsumptionService` | `crates/application/src/contract_consumption_service.rs` | 编排上游 snapshot 消费、derived view 和 freshness | service 名称、归属、依赖 domain_upstream_view | Step 7 / Step 9 |
+| `ContractConsumptionService` | `crates/application/src/contract_consumption_service.rs` | 编排上游 snapshot 消费、derived view、event mapping input 提取和 freshness | service 名称、归属、依赖 domain_upstream_view / domain_event_client | Step 7 / Step 9 |
 | `ServiceClientAssemblyService` | `crates/application/src/service_client_assembly.rs` | 编排 formal / fake service boundary 调用与 read | service 名称、归属、依赖 service client / boundary policy | Step 7 / Step 9 |
 | `EventClientAssemblyService` | `crates/application/src/event_client_assembly.rs` | 编排 bus publish / subscription boundary | service 名称、归属、依赖 event client / boundary policy | Step 7 / Step 9 |
 | `PackageCandidateService` | `crates/application/src/package_candidate_service.rs` | 编排 candidate 和 language package build | service 名称、归属、依赖 candidate / artifact port | Step 7 / Step 9 |
@@ -1674,7 +1792,7 @@ pub struct DeprecatedApiRecord {
 /// Rust SDK client 调用上下文。
 ///
 /// 该对象承接调用方传入的 actor、trace 和 credential 引用,不执行认证授权,
-/// 不保存明文 credential material。
+/// 不保存明文 credential material,也不负责生成 request metadata。
 pub struct ClientContext {
     /// 调用方 actor 上下文。
     pub actor: ActorContext,
@@ -1717,6 +1835,9 @@ pub struct ClientContext {
 - 不执行认证、授权或 governance。
 - 不保存 secret body。
 - fake target 必须显式出现在 `target_profile`。
+- 不生成 `request_id`、`idempotency_key`、`requested_at`、query consistency 或 page。
+- Rust facade 的 write-like 方法必须显式接收 `CommandMetadata`。
+- Rust facade 的 read / subscription 方法必须显式接收 `QueryMetadata`。
 
 #### 7.11.2 `SdkClient`
 
@@ -1814,10 +1935,10 @@ pub struct EventClient {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `call(&self, command: ServiceCapabilityCall) -> Result<ServiceCapabilityCallResult, SdkClientError>` | 调用服务能力 | `command` 是服务能力调用 | `ServiceCapabilityCallResult` | 不写 SDK truth |
-| `read(&self, query: ServiceCapabilityReadQuery) -> Result<ServiceCapabilityReadResult, SdkClientError>` | 读取服务能力 | `query` 是只读请求 | `ServiceCapabilityReadResult` | 不改写状态 |
-| `publish(&self, command: PublishBusEventCommand) -> Result<BusEventPublishResult, SdkClientError>` | 发布 bus 事件 | `command` 是 SDK 事件发布请求 | `BusEventPublishResult` | 不生成 bus delivery truth |
-| `open_subscription(&self, query: OpenEventSubscriptionQuery) -> Result<EventSubscriptionView, SdkClientError>` | 打开事件订阅视图 | `query` 是订阅请求 | `EventSubscriptionView` | 不保存事件 payload |
+| `call(&self, command: ServiceCapabilityCall, meta: CommandMetadata) -> Result<ServiceCapabilityCallResult, SdkClientError>` | 调用服务能力 | `command` 是服务能力调用；`meta` 由 caller 显式传入且必须含幂等键 | `ServiceCapabilityCallResult` | 不写 SDK truth |
+| `read(&self, query: ServiceCapabilityReadQuery, meta: QueryMetadata) -> Result<ServiceCapabilityReadResult, SdkClientError>` | 读取服务能力 | `query` 是只读请求；`meta` 由 caller 显式传入,承载 request / consistency / page | `ServiceCapabilityReadResult` | 不改写状态 |
+| `publish(&self, command: PublishBusEventCommand, meta: CommandMetadata) -> Result<BusEventPublishResult, SdkClientError>` | 发布 bus 事件 | `command` 是 SDK 事件发布请求；`meta` 由 caller 显式传入且必须含幂等键 | `BusEventPublishResult` | 不生成 bus delivery truth |
+| `open_subscription(&self, query: OpenEventSubscriptionQuery, meta: QueryMetadata) -> Result<EventSubscriptionView, SdkClientError>` | 打开事件订阅视图 | `query` 是订阅请求；`meta` 由 caller 显式传入,承载 request / consistency / page | `EventSubscriptionView` | 不保存事件 payload |
 
 ##### 工厂 / 静态函数
 
@@ -1831,6 +1952,8 @@ pub struct EventClient {
 - `ServiceClient` 不拥有服务端业务 truth。
 - `EventClient` 不拥有 bus runtime truth。
 - 两者都不得绕过 `BoundaryGuard` 和 application service。
+- 两者都不得从 `ClientContext` 隐式合成 `CommandMetadata` 或 `QueryMetadata`。
+- `call` / `publish` 在进入 application service 前必须校验 `meta.request.idempotency_key = Some(...)`。
 
 ### 7.12 Step 6 统一复核表
 

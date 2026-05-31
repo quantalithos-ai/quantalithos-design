@@ -177,8 +177,8 @@ Co-Authored-By: Codex <noreply@openai.com>
 | `commit-01-a` | `bootstrap` | workspace、crate skeleton、core / bus path dependency |
 | `commit-01-b` | `config` | package skeleton、config fixtures、scripts、artifact / report roots |
 | `commit-02-a` | `semantic` | contracts DTO、semantic baseline、concept map |
-| `commit-02-b` | `semantic` | derived view、freshness query、upstream changed consumers |
-| `commit-03-a` | `boundary` | service / event boundary、Rust client facade、fake adapters |
+| `commit-02-b` | `semantic` | derived view、language view、freshness query、core contract changed consumer；只读 semantic baseline / concept map |
+| `commit-03-a` | `boundary` | service / event boundary、client view consumers、Rust client facade、fake adapters |
 | `commit-03-b` | `security` | error mapping、trace propagation、redaction、credential guard |
 | `commit-04-a` | `candidate` | package candidate protocol、state machine、stable gate |
 | `commit-04-b` | `packages` | local generator / builder、artifact metadata、three-language package layout |

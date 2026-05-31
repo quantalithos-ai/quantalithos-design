@@ -465,6 +465,7 @@ pub struct RecordDeliveryFeedbackCommand {
   "retry_plan_id": "retry_01",
   "delivery_id": "delivery_01",
   "retry_status": "scheduled",
+  "remaining_attempts": 3,
   "next_run_at": "2026-05-29T10:05:00Z",
   "audit_ref": "audit_03"
 }
@@ -505,7 +506,7 @@ pub struct RequestRetryCommand {
 
 ##### 用途
 
-将不可继续 retry 的 delivery 移入 DLQ，并保存 failure material。
+将不可继续 retry 的 delivery 移入 DLQ，并关联既有 failure material。
 
 ##### 函数签名 / 路由
 
@@ -615,8 +616,8 @@ pub struct PrepareReplayCommand {
     pub dead_letter_id: DeadLetterId,
     /// 审计链引用。
     pub audit_chain_ref: AuditChainRef,
-    /// 审批引用。
-    pub approval_ref: ApprovalRef,
+    /// Replay 审批引用。
+    pub approval_ref: ReplayApprovalRef,
     /// replay 原因。
     pub replay_reason: ReplayReason,
 }

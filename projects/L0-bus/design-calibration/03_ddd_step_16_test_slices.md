@@ -199,9 +199,9 @@ Reports
 |---|---|---|---|
 | `AcceptPublication` | accepted publication 生成 delivery 候选和 audit | payload body 越界、same key different digest、repository failure | API + application |
 | `RecordDeliveryFeedback` | ack / fail feedback 更新 delivery | unknown delivery、duplicate feedback、late feedback conflict | API + application |
-| `RequestRetry` | failed delivery 创建 retry plan | delivery 不可重试、active retry 已存在、missing actor | API + application |
-| `MoveDeliveryToDeadLetter` | failed delivery 进入 DLQ | completed delivery 不可 DLQ、missing failure material | API + application |
-| `PrepareReplay` | approved DLQ 生成 replay preparation | missing approval、audit chain invalid、duplicate approval ref | API + application |
+| `RequestRetry` | failed delivery 使用 `max_attempts` 创建 retry plan | delivery 不可重试、active retry 已存在、missing actor、invalid max attempts | API + application |
+| `MoveDeliveryToDeadLetter` | failed delivery 使用既有 `failure_material_ref` 进入 DLQ | completed delivery 不可 DLQ、missing failure material | API + application |
+| `PrepareReplay` | approved DLQ 使用 `ReplayApprovalRef` 生成 replay preparation | missing approval、audit chain invalid、duplicate approval ref | API + application |
 | `GetPublicationAcceptance` | 返回 accepted / rejected view | not found、projection stale marker、Query 不写入 | API query |
 | `GetDeliveryStatus` | 返回 delivery 当前状态 | not found、stale marker、终态字段映射 | API query |
 | `ListDeliveryHistory` | 分页返回 history | invalid page、not found、敏感访问 audit | API query |

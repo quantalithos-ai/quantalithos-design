@@ -383,7 +383,7 @@ Scheduled
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| `New` | `Scheduled` | `RetryPlan::create(DeliveryRecord delivery, FailureReason reason, RetryPolicyRef policy_ref)` | delivery 为 `Failed`；failure material 合法 | 创建 retry plan，写 audit | `DomainError::RetryNotAllowed` |
+| `New` | `Scheduled` | `RetryPlan::create(DeliveryRecord delivery, FailureReason reason, RetryPolicyRef policy_ref, AttemptLimit max_attempts, Timestamp now)` | delivery 为 `Failed`；failure material 合法；`max_attempts` 合法 | 创建 retry plan，写 audit，`remaining_attempts` 初始等于 `max_attempts` | `DomainError::RetryNotAllowed` |
 | `Scheduled` | `Scheduled` | `RetryPlan.mark_attempted(AttemptId attempt_id, BackendDeliveryResult result)` | 仍有剩余次数 | 更新 attempt metadata，保留 scheduled | `DomainError::RetryNotAllowed` |
 | `Scheduled` | `Exhausted` | `mark_exhausted(&mut self, ActorContext actor)` | 已无剩余次数 | 写 exhausted audit，进入 DLQ 判断候选 | `DomainError::InvalidStateTransition` |
 | `Scheduled` | `Cancelled` | `cancel(&mut self, ActorContext actor, RecoveryReason reason)` | cancel reason 合法 | 写 cancelled audit | `DomainError::InvalidStateTransition` |

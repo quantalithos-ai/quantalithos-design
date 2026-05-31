@@ -942,7 +942,7 @@ pub enum RetryPlanStatus {
 ```rust
 /// 失败 delivery 的重试计划。
 ///
-/// 该对象表达下一次重试时间、剩余次数和状态，不直接执行投递。
+/// 该对象表达下一次重试时间、最大次数、剩余次数和状态，不直接执行投递。
 pub struct RetryPlan {
     /// 重试计划唯一标识。
     pub retry_plan_id: RetryPlanId,
@@ -952,6 +952,9 @@ pub struct RetryPlan {
 
     /// 下一次尝试时间。
     pub next_attempt_at: Timestamp,
+
+    /// 最大尝试次数。
+    pub max_attempts: AttemptLimit,
 
     /// 剩余重试次数。
     pub remaining_attempts: AttemptCount,
@@ -968,6 +971,7 @@ pub struct RetryPlan {
 | `retry_plan_id` | `RetryPlanId` | 标识重试计划 | 系统生成 |
 | `delivery_id` | `DeliveryId` | 关联 delivery | 必须处于失败恢复候选 |
 | `next_attempt_at` | `Timestamp` | 下次尝试时间 | 必须来自策略计算 |
+| `max_attempts` | `AttemptLimit` | 本次 retry request 允许的最大尝试次数 | 来自 `RequestRetryCommand.max_attempts`，必须通过策略校验 |
 | `remaining_attempts` | `AttemptCount` | 剩余次数 | 不得为负 |
 | `status` | `RetryPlanStatus` | 重试计划状态 | 只能经成员函数改变 |
 
@@ -983,13 +987,14 @@ pub struct RetryPlan {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `RetryPlan::create(DeliveryRecord delivery, FailureReason reason, RetryPolicyRef policy_ref, Timestamp now) -> Result<RetryPlan, DomainError>` | 基于失败 delivery 创建重试计划 | `policy_ref` 指向重试策略 | `Result<RetryPlan, DomainError>` | `RequestRetry` / retry cycle |
+| `RetryPlan::create(DeliveryRecord delivery, FailureReason reason, RetryPolicyRef policy_ref, AttemptLimit max_attempts, Timestamp now) -> Result<RetryPlan, DomainError>` | 基于失败 delivery 创建重试计划 | `max_attempts` 是本次请求允许的最大尝试次数，`remaining_attempts` 初始等于该值 | `Result<RetryPlan, DomainError>` | `RequestRetry` / retry cycle |
 
 ##### 不变量与禁止事项
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
 | 不直接执行投递 | retry dispatch 由 application / worker 调用 |
+| `remaining_attempts` 来源明确 | 初始值必须来自 `RequestRetryCommand.max_attempts` |
 | 耗尽后必须进入 DLQ 判断 | 不能静默丢弃失败 |
 | 不保存完整 retry 算法正文 | 参数细节由配置和策略引用承接 |
 
@@ -1073,7 +1078,7 @@ pub struct DeadLetterEntry {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `DeadLetterEntry::from_failed_delivery(DeliveryRecord delivery, FailureMaterial material, AuditChainRef audit_chain_ref) -> Result<DeadLetterEntry, DomainError>` | 从失败 delivery 创建死信 | `material` 为失败材料 | `Result<DeadLetterEntry, DomainError>` | `MoveDeliveryToDeadLetter` |
+| `DeadLetterEntry::from_failed_delivery(DeliveryRecord delivery, FailureMaterial material) -> Result<DeadLetterEntry, DomainError>` | 从失败 delivery 创建死信 | `material` 为既有失败材料，必须具备可追溯审计链来源 | `Result<DeadLetterEntry, DomainError>` | `MoveDeliveryToDeadLetter` |
 
 ##### 不变量与禁止事项
 
@@ -1081,6 +1086,7 @@ pub struct DeadLetterEntry {
 |---|---|
 | 必须具备 history / audit chain | replay preparation 依赖可信链 |
 | 不直接触发 replay | replay 必须通过 `ReplayPreparation` |
+| 不从命令补审计链 | `audit_chain_ref` 由既有 failure material / audit trail 约束承接 |
 | 不保存业务正文 | 只保存引用和失败摘要 |
 
 #### 7.6.5 `ReplayPreparationStatus`

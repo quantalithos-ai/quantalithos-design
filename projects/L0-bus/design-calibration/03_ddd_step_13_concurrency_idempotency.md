@@ -282,8 +282,8 @@ pub struct IdempotencyAnchor {
 |---|---|---|---|
 | `AcceptPublication` | `scope=command.accept_publication + x-idempotency-key`；兜底 `source_system + source_record_ref` | 与 acceptance truth 同生命周期 | same digest 返回 existing acceptance；different digest 返回 `409` |
 | `RecordDeliveryFeedback` | `scope=command.record_feedback + x-idempotency-key`；兜底 `delivery_id + external_feedback_ref` | 与 feedback truth 同生命周期 | same digest 返回 existing feedback；different digest 返回 `409` |
-| `RequestRetry` | 有 header 时 `scope=command.request_retry + x-idempotency-key`；无 header 时 `delivery_id + failure_material_ref + retry_policy_ref` | retry plan active 生命周期 | 返回 existing retry plan 或 `409 active retry conflict` |
-| `MoveDeliveryToDeadLetter` | 有 header 时 `scope=command.move_to_dead_letter + x-idempotency-key`；无 header 时 `delivery_id + failure_material_id` | DLQ active 生命周期 | existing DLQ 返回既有结果；不一致返回 `409` |
+| `RequestRetry` | 有 header 时 `scope=command.request_retry + x-idempotency-key`；无 header 时 `delivery_id + failure_material_ref + retry_policy_ref + max_attempts` | retry plan active 生命周期 | 返回 existing retry plan 或 `409 active retry conflict` |
+| `MoveDeliveryToDeadLetter` | 有 header 时 `scope=command.move_to_dead_letter + x-idempotency-key`；无 header 时 `delivery_id + failure_material_ref` | DLQ active 生命周期 | existing DLQ 返回既有结果；不一致返回 `409` |
 | `PrepareReplay` | 有 header 时 `scope=command.prepare_replay + x-idempotency-key`；无 header 时 `dead_letter_id + approval_ref` | replay preparation 生命周期 | existing preparation 返回既有结果；closed DLQ 返回 conflict |
 | `GetPublicationAcceptance` | 不需要 | 不适用 | 重复查询返回当前结果 |
 | `GetDeliveryStatus` | 不需要 | 不适用 | 重复查询返回当前结果和 consistency marker |

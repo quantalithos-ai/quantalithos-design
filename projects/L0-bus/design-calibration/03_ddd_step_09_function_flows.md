@@ -1240,8 +1240,8 @@ pub async fn record_timeout(input: DeliveryTimeoutSignalInput, actor: ActorConte
   | call RecoveryRepository.get_failure_material(FailureMaterialId failure_material_id)
   v
 [RecoveryEligibilityPolicy + RetryPlan]
+  | call RetryPlan::create(DeliveryRecord delivery, FailureReason reason, RetryPolicyRef policy_ref, AttemptLimit max_attempts, Timestamp now)
   | call RecoveryEligibilityPolicy.can_retry(DeliveryRecord delivery, RetryPlan plan)
-  | call RetryPlan::create(DeliveryRecord delivery, FailureReason reason, RetryPolicyRef policy_ref)
   v
 [Repositories]
   | save RecoveryRepository.save_retry_plan(RetryPlan retry_plan, Option<Version> expected_version, UnitOfWorkHandle uow)
@@ -1279,13 +1279,13 @@ pub async fn request_retry(command: RequestRetryCommand, actor: ActorContext, me
     // 读取失败材料。
     let material = recovery_repository.get_failure_material(command.failure_material_ref.clone().into()).await?.ok_or(ApplicationError::missing_failure_material(command.failure_material_ref.clone()))?;
 
-    // [RecoveryEligibilityPolicy.can_retry(DeliveryRecord delivery, RetryPlan plan)]
-    // 判断是否允许 retry。
-    recovery_policy.can_retry(delivery.clone(), RetryPlan::empty_for(delivery.delivery_id().clone()))?;
+    // [RetryPlan::create(DeliveryRecord delivery, FailureReason reason, RetryPolicyRef policy_ref, AttemptLimit max_attempts, Timestamp now)]
+    // 创建 retry plan；remaining_attempts 初始值来自 command.max_attempts。
+    let retry_plan = RetryPlan::create(delivery.clone(), material.failure_reason().clone(), command.retry_policy_ref.clone(), command.max_attempts.clone(), clock.now())?;
 
-    // [RetryPlan::create(DeliveryRecord delivery, FailureReason reason, RetryPolicyRef policy_ref)]
-    // 创建 retry plan。
-    let retry_plan = RetryPlan::create(delivery.clone(), material.failure_reason().clone(), command.retry_policy_ref.clone())?;
+    // [RecoveryEligibilityPolicy.can_retry(DeliveryRecord delivery, RetryPlan plan)]
+    // 判断 delivery 和 retry plan 是否允许进入受控重试。
+    recovery_policy.can_retry(delivery.clone(), retry_plan.clone())?;
 
     // [RecoveryRepository.save_retry_plan(RetryPlan retry_plan, Option<Version> expected_version, UnitOfWorkHandle uow)]
     // 保存 retry plan。
@@ -1509,7 +1509,7 @@ pub async fn run_retry_plan(retry_plan: RetryPlan, actor: ActorContext, meta: Jo
 | 对应协议 | `MoveDeliveryToDeadLetter` |
 | 入口函数 | `RecoveryOperationsApi.move_delivery_to_dead_letter(MoveDeliveryToDeadLetterCommand command, ActorContext actor, CommandMetadata meta)` |
 | application service | `RecoveryOrchestrationService.move_to_dead_letter(MoveDeliveryToDeadLetterCommand command, ActorContext actor, CommandMetadata meta)` |
-| 目标 | 将失败 delivery 收纳为 dead letter，并保存 failure material |
+| 目标 | 将失败 delivery 收纳为 dead letter，并关联既有 failure material |
 
 #### 7.12.2 函数级调用图
 
@@ -1520,11 +1520,10 @@ pub async fn run_retry_plan(retry_plan: RetryPlan, actor: ActorContext, meta: Jo
 [RecoveryOrchestrationService]
   | tx UnitOfWork.begin(UnitOfWorkPurpose purpose, ActorContext actor)
   | call DeliveryRepository.get_for_update(DeliveryId delivery_id, UnitOfWorkHandle uow)
-  | call FeedbackRepository.get_failure(DeliveryId delivery_id)
+  | call RecoveryRepository.get_failure_material(FailureMaterialId failure_material_id)
   | call DeliveryRepository.load_history(DeliveryId delivery_id, PageRequest page)
   v
 [FailureMaterial + DeadLetterEntry]
-  | call FailureMaterial::from_feedback(FeedbackResult feedback, DeliveryHistoryEntry history)
   | call RecoveryEligibilityPolicy.can_dead_letter(DeliveryRecord delivery, FailureMaterial material)
   | call DeadLetterEntry::from_failed_delivery(DeliveryRecord delivery, FailureMaterial material)
   v
@@ -1538,7 +1537,7 @@ pub async fn run_retry_plan(retry_plan: RetryPlan, actor: ActorContext, meta: Jo
 关键说明：
 
 - DLQ 是失败事实收纳，不执行 replay。
-- `FailureMaterial` 只保存失败材料引用和摘要。
+- `MoveDeliveryToDeadLetterCommand.failure_material_ref` 指向既有失败材料，本流程只消费并关联它。
 - governance decision 不由本流程生成。
 
 #### 7.12.3 关键伪代码
@@ -1562,17 +1561,13 @@ pub async fn move_to_dead_letter(command: MoveDeliveryToDeadLetterCommand, actor
     let mut delivery = delivery_repository.get_for_update(command.delivery_id.clone(), uow.clone()).await?.ok_or(ApplicationError::not_found(command.delivery_id.clone()))?;
     let expected_version = delivery.version();
 
-    // [FeedbackRepository.get_failure(DeliveryId delivery_id)]
-    // 获取失败 feedback。
-    let feedback = feedback_repository.get_failure(command.delivery_id.clone()).await?.ok_or(ApplicationError::missing_failure(command.delivery_id.clone()))?;
+    // [RecoveryRepository.get_failure_material(FailureMaterialId failure_material_id)]
+    // 读取命令引用的既有失败材料。
+    let material = recovery_repository.get_failure_material(command.failure_material_ref.clone().into()).await?.ok_or(ApplicationError::missing_failure_material(command.failure_material_ref.clone()))?;
 
     // [DeliveryRepository.load_history(DeliveryId delivery_id, PageRequest page)]
-    // 读取必要 history，用于形成 failure material。
+    // 读取必要 history，用于验证 failure material 与 delivery 历史链一致。
     let history = delivery_repository.load_history(command.delivery_id.clone(), PageRequest::latest()).await?;
-
-    // [FailureMaterial::from_feedback(FeedbackResult feedback, DeliveryHistoryEntry history)]
-    // 生成失败材料，不包含治理决策。
-    let material = FailureMaterial::from_feedback(feedback.clone(), history.latest_entry()?)?;
 
     // [RecoveryEligibilityPolicy.can_dead_letter(DeliveryRecord delivery, FailureMaterial material)]
     // 判断是否允许进入 DLQ。
@@ -1619,7 +1614,7 @@ pub async fn move_to_dead_letter(command: MoveDeliveryToDeadLetterCommand, actor
 | 错误 | 处理 | 回滚 |
 |---|---|---|
 | missing delivery | `404` | 回滚 |
-| missing failure feedback | `404` / `422` | 回滚 |
+| missing failure material | `404` / `422` | 回滚 |
 | not eligible | `409` | 回滚 |
 | repository failure | `503` / `500` | 回滚 |
 
@@ -1666,6 +1661,7 @@ pub async fn move_to_dead_letter(command: MoveDeliveryToDeadLetterCommand, actor
 [RecoveryEligibilityPolicy + ReplayPreparation]
   | call RecoveryEligibilityPolicy.can_prepare_replay(DeadLetterEntry entry, AuditChainRef audit_chain_ref)
   | call ReplayPreparation::prepare(DeadLetterEntry entry, ActorContext actor)
+  | call ReplayPreparation.mark_ready(ReplayApprovalRef approval_ref, ActorContext actor)
   v
 [Repositories]
   | save RecoveryRepository.save_replay_preparation(ReplayPreparation preparation, UnitOfWorkHandle uow)
@@ -1676,7 +1672,7 @@ pub async fn move_to_dead_letter(command: MoveDeliveryToDeadLetterCommand, actor
 关键说明：
 
 - replay preparation 不是 replay execution。
-- 必须有 dead letter、audit chain 和 approval ref。
+- 必须有 dead letter、audit chain 和 replay approval ref。
 - 不读取或写入 payload body。
 
 #### 7.13.3 关键伪代码
@@ -1708,8 +1704,12 @@ pub async fn prepare(command: PrepareReplayCommand, actor: ActorContext, meta: C
     recovery_policy.can_prepare_replay(entry.clone(), command.audit_chain_ref.clone())?;
 
     // [ReplayPreparation::prepare(DeadLetterEntry entry, ActorContext actor)]
-    // 创建 ready replay preparation。
-    let preparation = ReplayPreparation::prepare(entry.clone(), command.approval_ref.clone(), audit_chain.chain_ref().clone(), actor.clone())?;
+    // 从 dead letter 创建 Draft replay preparation。
+    let mut preparation = ReplayPreparation::prepare(entry.clone(), actor.clone())?;
+
+    // [ReplayPreparation.mark_ready(ReplayApprovalRef approval_ref, ActorContext actor)]
+    // 使用命令中的 replay approval ref 将 Draft 推进为 Ready。
+    preparation.mark_ready(command.approval_ref.clone(), actor.clone())?;
 
     // [RecoveryRepository.save_replay_preparation(ReplayPreparation preparation, UnitOfWorkHandle uow)]
     // 保存 replay preparation。

@@ -46,7 +46,7 @@
 | `PayloadRef` / `PayloadDigest` | 引用 | 只引用 payload，不保存 payload body |
 | `CoreEventEnvelopeRef` / `CommittedOutboxFactRef` | 外部已提交事实引用 | 引用 L0-core outbox / event envelope |
 | `BackendCapabilityRef` / `BackendResultRef` | 外部能力 / 结果引用 | 不保存 secret 或后端私有响应正文 |
-| `ApprovalRef` / `AuditChainRef` | 外部治理 / 审计链引用 | replay preparation 的前置引用 |
+| `ReplayApprovalRef` / `AuditChainRef` | 外部治理 / 审计链引用 | replay preparation 的前置引用 |
 | `TransportViewProjection` / `FailureSummaryProjection` / `BackendHealthView` | 投影 | 只读输出，不拥有业务真相 |
 
 ### 3.3 repository 函数如何命名，参数和返回是什么？
@@ -184,7 +184,7 @@
 | `CoreEventEnvelopeRef` | L0-core event envelope 引用 | 否 | envelope ref、trace ref |
 | `BackendCapabilityRef` | backend 能力引用 | 否 | profile ref、backend kind、capability version |
 | `BackendResultRef` | backend 结果引用 | 否 | result ref、归一化状态摘要 |
-| `ApprovalRef` | 外部审批引用 | 否 | approval ref |
+| `ReplayApprovalRef` | 外部 replay 审批引用 | 否 | approval ref |
 | `AuditChainRef` | 审计链引用 | 否 | audit chain ref |
 | `TransportViewProjection` | 投影 | 是，只读 projection | delivery 状态视图和 consistency marker |
 | `FailureSummaryProjection` | 投影 | 是，只读 projection | failure material ref 和失败摘要 |

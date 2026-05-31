@@ -63,7 +63,7 @@ L1/L2/L3/L4 服务能力、formal API、fake / fixture、bus runtime 和 runner 
 | `SdkRuntimeConfig.sources` | `SourceSnapshotConfig` | source adapter builder | local sibling repo / fixture snapshot source | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.boundaries` | `BoundaryConfig` | formal / fake / bus boundary builder | fake / fixture explicit profile | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.runners` | `RunnerConfig` | runner adapter builder | local process runner profile | 后续 `04-配置设计.md` |
-| `SdkRuntimeConfig.artifacts` | `ArtifactStoreConfig` | artifact store builder | `./artifacts/sdk` | 后续 `04-配置设计.md` |
+| `SdkRuntimeConfig.artifacts` | `ArtifactStoreConfig` | artifact store builder | `./artifacts/test` base;run 输出为 `artifacts/test/<run_id>` | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.outbox` | `OutboxConfig` | outbox adapter builder | in-memory outbox / local file outbox profile | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.projections` | `ProjectionConfig` | projection adapter builder | in-memory projection / local projection root | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.language_packages` | `LanguagePackageConfig` | generator / package builder | Rust + Python + TypeScript enabled for P0 candidate | 后续 `04-配置设计.md` |
@@ -222,7 +222,7 @@ Config file / CLI profile / job profile
 | `SdkRuntimeConfig.sources` | `SourceSnapshotConfig` | source adapter builder | local sibling repo / fixture snapshot source | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.boundaries` | `BoundaryConfig` | boundary adapter builder | fake / fixture explicit profile | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.runners` | `RunnerConfig` | runner adapter builder | local process runner profile | 后续 `04-配置设计.md` |
-| `SdkRuntimeConfig.artifacts` | `ArtifactStoreConfig` | artifact store builder | `./artifacts/sdk` | 后续 `04-配置设计.md` |
+| `SdkRuntimeConfig.artifacts` | `ArtifactStoreConfig` | artifact store builder | `./artifacts/test` base;run 输出为 `artifacts/test/<run_id>` | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.outbox` | `OutboxConfig` | outbox adapter builder | in-memory / local file outbox | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.projections` | `ProjectionConfig` | projection adapter builder | in-memory / local projection root | 后续 `04-配置设计.md` |
 | `SdkRuntimeConfig.language_packages` | `LanguagePackageConfig` | generator / package builder | Rust + Python + TypeScript enabled for P0 | 后续 `04-配置设计.md` |

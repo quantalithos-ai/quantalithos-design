@@ -118,21 +118,21 @@
 | `boundaries.bus_event_boundary_ref` | `BoundaryRef` | local fake bus boundary | P0 非必填 | defaults / JSON / env | integration / candidate | 启动读取 | sensitive-ref | 不可用则 pending / failed | bus boundary adapter |
 | `runners.generator_profile` | `RunnerProfile` | `local_process` | 外部非必填;candidate 必需 | defaults / JSON / env | candidate | job 启动读取 | internal | profile 非法 fail-fast | language generator |
 | `runners.validation_profile` | `RunnerProfile` | `local_process` | candidate 必需 | defaults / JSON / env | candidate | job 启动读取 | internal | runner 不可用 evidence failed / skipped | smoke / docs / compatibility / boundary runners |
-| `artifacts.root` | `PathRef` | `./artifacts/sdk` | 外部非必填;candidate 必需 | defaults / JSON / env | all P0 | 启动读取 | internal | 不可写 fail-fast | artifact store |
+| `artifacts.root` | `PathRef` | `./artifacts/test` | 外部非必填;candidate 必需 | defaults / JSON / env | all P0 | 启动读取 | internal | 不可写或含项目名重复层级 fail-fast | artifact store |
 | `artifacts.report_root` | `PathRef` | `./reports` | 外部非必填 | defaults / JSON / env / job-local | CI / candidate | job 启动读取 | internal | 不可写 fail-fast | reports generator |
 | `outbox.kind` | `OutboxKind` | `in_memory` | 外部非必填 | defaults / JSON / env | all P0 | 启动读取 | internal | 非法 kind fail-fast | outbox adapter |
 | `outbox.root` | `PathRef` | `./state/outbox` | local file outbox 时必需 | defaults / JSON / env | integration / candidate | 启动读取 | internal | publish 失败保留 pending / failed | outbox relay |
 | `projections.kind` | `ProjectionKind` | `in_memory` | 外部非必填 | defaults / JSON / env | all P0 | 启动读取 | internal | 非法 kind fail-fast | projection store |
 | `projections.root` | `PathRef` | `./state/projections` | local projection 时必需 | defaults / JSON / env | integration / candidate | 启动读取 | internal | 失败标记 stale / rebuild | query projection |
 | `language_packages.enabled_languages` | `LanguageTarget[]` | `["rust","python","typescript"]` | candidate 必需 | defaults / JSON / env | candidate | job 启动读取 | public | 不支持 language fail-fast | generator / package surface |
-| `language_packages.output_root` | `PathRef` | `./artifacts/sdk/packages` | candidate 必需 | defaults / JSON / env | candidate | job 启动读取 | internal | 不可写 fail-fast | package builder |
+| `language_packages.output_root` | `PathRef` | `<artifacts.root>/<run_id>/candidate/packages` | candidate 必需 | defaults / JSON / env / job-local | candidate | job 启动读取 | internal | 不可写或未绑定 run id fail-fast | package builder |
 | `policies.redaction` | `PolicyProfile` | `strict` | runtime 必需 | defaults / JSON / env | all P0 | 启动读取 | public | 关闭或降级 fail-fast | redaction policy |
 | `policies.credential_protection` | `PolicyProfile` | `ref_only` | runtime 必需 | defaults / JSON / env | all P0 | 启动读取 | public | raw secret / raw token fail-fast | credential policy |
 | `policies.fake_marker_required` | `bool` | `true` | runtime 必需 | defaults / JSON / env | all P0 | 启动读取 | public | false fail-fast | boundary guard |
 | `policies.compatibility_gate` | `PolicyProfile` | `required` | candidate 必需 | defaults / JSON / env | candidate | job 启动读取 | public | 绕过 gate fail-fast | compatibility service |
 | `cli.default_config_path` | `PathRef` | `./config/sdk.json` | CLI 可选 | defaults / env / CLI selector | local / CI | CLI 启动读取 | internal | 指定文件不可读 fail-fast | cli entry |
 | `cli.default_profile` | `ProfileName` | `local-dev` | CLI 可选 | defaults / JSON / env / CLI selector | local / CI | CLI 启动读取 | public | profile 不支持 fail-fast | cli entry |
-| `jobs.artifact_root` | `PathRef` | `./artifacts/sdk` | job 可选 | defaults / JSON / env / job-local | CI / candidate | job 启动读取 | internal | 不可写 fail-fast | jobs |
+| `jobs.artifact_root` | `PathRef` | `<artifacts.root>/<run_id>` | job 可选 | defaults / JSON / env / job-local | CI / candidate | job 启动读取 | internal | 不可写、缺 run id 或含项目名重复层级 fail-fast | jobs |
 | `jobs.report_root` | `PathRef` | `./reports` | job 可选 | defaults / JSON / env / job-local | CI / candidate | job 启动读取 | internal | 不可写 fail-fast | jobs / reports |
 | `jobs.require_run_id` | `bool` | `true` | runtime 必需 | defaults / JSON / env | CI / candidate | job 启动读取 | public | false fail-fast;缺 run id fail-fast | operations jobs |
 
@@ -211,7 +211,7 @@
 ```json
 {
   "artifacts": {
-    "root": "./artifacts/sdk",
+    "root": "./artifacts/test",
     "report_root": "./reports"
   }
 }
@@ -219,7 +219,7 @@
 
 | 配置项 | 类型 | 示例值 | 作用 | 约束 / 校验 | 失败策略 |
 |---|---|---|---|---|---|
-| `artifacts.root` | `PathRef` | `./artifacts/sdk` | 保存 package / evidence 原始产物 | 不含项目名重复层级 | 不可写 fail-fast |
+| `artifacts.root` | `PathRef` | `./artifacts/test` | 保存原始机器证据 base root;实际 run 目录为 `<artifacts.root>/<run_id>` | 不含项目名重复层级;不得写 `./artifacts/sdk`;不得直接写 base root | 不可写或缺 run id fail-fast |
 | `artifacts.report_root` | `PathRef` | `./reports` | 保存 reviewed human-readable reports | 不写 `reports/<project>` | 不可写 fail-fast |
 
 #### outbox 配置 demo
@@ -260,7 +260,7 @@
 {
   "language_packages": {
     "enabled_languages": ["rust", "python", "typescript"],
-    "output_root": "./artifacts/sdk/packages"
+    "output_root": "./artifacts/test/example-run-id/candidate/packages"
   }
 }
 ```
@@ -268,7 +268,7 @@
 | 配置项 | 类型 | 示例值 | 作用 | 约束 / 校验 | 失败策略 |
 |---|---|---|---|---|---|
 | `language_packages.enabled_languages` | `LanguageTarget[]` | `["rust","python","typescript"]` | 定义 P0 package candidate 语言目标 | P0 三语言必须覆盖 | 缺失或不支持 fail-fast |
-| `language_packages.output_root` | `PathRef` | `./artifacts/sdk/packages` | 保存语言包输出 | 不等于 public registry publish | 不可写 fail-fast |
+| `language_packages.output_root` | `PathRef` | `./artifacts/test/example-run-id/candidate/packages` | 保存语言包输出 | 必须位于当前 run 的 artifact root 下;不等于 public registry publish | 不可写或未绑定 run id fail-fast |
 
 #### policies 配置 demo
 
@@ -311,7 +311,7 @@
 ```json
 {
   "jobs": {
-    "artifact_root": "./artifacts/sdk",
+    "artifact_root": "./artifacts/test/example-run-id",
     "report_root": "./reports",
     "require_run_id": true
   }
@@ -320,13 +320,13 @@
 
 | 配置项 | 类型 | 示例值 | 作用 | 约束 / 校验 | 失败策略 |
 |---|---|---|---|---|---|
-| `jobs.artifact_root` | `PathRef` | `./artifacts/sdk` | job 默认 artifact root | job-local 参数只影响本次 run | 不可写 fail-fast |
+| `jobs.artifact_root` | `PathRef` | `./artifacts/test/example-run-id` | job 默认 artifact root;未显式设置时由 `<artifacts.root>/<run_id>` 派生 | job-local 参数只影响本次 run;必须包含当前 run id;不得含项目名重复层级 | 不可写或缺 run id fail-fast |
 | `jobs.report_root` | `PathRef` | `./reports` | job 默认 report root | 不写 `reports/<project>` | 不可写 fail-fast |
 | `jobs.require_run_id` | `bool` | `true` | 强制 operations job 带 run id | 不得关闭 | false 或缺 run id fail-fast |
 
 ### 7.3 完整配置 demo
 
-以下示例是 JSONC 文档示例。实际运行配置文件必须删除注释并保持严格 JSON。
+以下示例是 JSONC 文档示例,使用 `example-run-id` 表示一次具体运行。实际运行配置文件必须删除注释并保持严格 JSON,并把 `example-run-id` 替换为当前 `run_id`。
 
 ```jsonc
 {
@@ -353,8 +353,8 @@
     "validation_profile": "local_process"
   },
   "artifacts": {
-    // 原始产物和人工可读报告根目录;不额外带项目名层级。
-    "root": "./artifacts/sdk",
+    // 原始机器证据 base root;实际 run 目录是 artifacts/test/<run_id>。
+    "root": "./artifacts/test",
     "report_root": "./reports"
   },
   "outbox": {
@@ -367,7 +367,7 @@
   },
   "language_packages": {
     "enabled_languages": ["rust", "python", "typescript"],
-    "output_root": "./artifacts/sdk/packages"
+    "output_root": "./artifacts/test/example-run-id/candidate/packages"
   },
   "policies": {
     // 安全下限不得关闭或降级。
@@ -381,7 +381,7 @@
     "default_profile": "local-dev"
   },
   "jobs": {
-    "artifact_root": "./artifacts/sdk",
+    "artifact_root": "./artifacts/test/example-run-id",
     "report_root": "./reports",
     "require_run_id": true
   }
@@ -393,6 +393,7 @@
 - 该示例覆盖当前 P0 字段级配置项。
 - 模块级 demo 是严格 JSON;本完整示例因包含注释,只能作为 JSONC 文档示例。
 - 本示例不包含 `sdk` 项目前缀、remote config、admin override、public registry token、raw secret 或 `profile` root 配置组。
+- 所有正式 artifact 必须写入 `artifacts/test/<run_id>`;report 必须写入 `reports/runs/<run_id>` 或 `reports/acceptance`;不得使用 `./artifacts/sdk`、`artifacts/test/<project>/<run_id>`、`reports/<project>` 或正式 `latest`。
 - 如果未来进入系统级聚合配置,再由聚合层映射为 `sdk.<module>.<setting>`。
 
 ### 7.4 暂不列为正式 P0 配置项的控制面

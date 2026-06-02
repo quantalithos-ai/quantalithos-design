@@ -155,7 +155,7 @@ Step 8 已把 45 个协议全部标记为需要处理流。本步逐一展开:
 | 处理流 | 对应协议 | 入口函数 | 主要事务 | 状态变化 | 测试切口 |
 |---|---|---|---|---|---|
 | `CreateConversationSpaceFlow` | `CreateConversationSpace` | `handle_create_conversation_space(CreateConversationSpaceRequest request)` | 单写事务 | space / scope / truth 初始成立 | create success、missing actor、duplicate key、outbox rollback |
-| `CloseConversationSpaceFlow` | `CloseConversationSpace` | `handle_close_conversation_space(CloseConversationSpaceRequest request)` | 单写事务 | space lifecycle / truth state | close success、already closed、not found、outbox rollback |
+| `CloseConversationSpaceFlow` | `CloseConversationSpace` | `handle_close_conversation_space(CloseConversationSpaceRequest request)` | 单写事务 | space lifecycle / scope change | close success、already closed、not found、outbox rollback |
 | `UpdateParticipantScopeFlow` | `UpdateParticipantScope` | `handle_update_participant_scope(UpdateParticipantScopeRequest request)` | 单写事务 | participant scope / scope change | update success、invalid participant、duplicate key、version conflict |
 | `UpdateVisibilityScopeFlow` | `UpdateVisibilityScope` | `handle_update_visibility_scope(UpdateVisibilityScopeRequest request)` | 单写事务 | visibility scope / projection stale | update success、not visible rule、projection stale、outbox rollback |
 | `AppendConversationFactFlow` | `AppendConversationFact` | `handle_append_conversation_fact(AppendConversationFactRequest request)` | 单写事务 | fact appended / trace context / outbox | append success、policy reject、duplicate receipt、forbidden payload |
@@ -220,9 +220,9 @@ Step 8 已把 45 个协议全部标记为需要处理流。本步逐一展开:
   | call handle_create_conversation_space(CreateConversationSpaceRequest request)
   v
 [ConversationSpaceCommandService]
-  | validate command envelope and idempotency key
+  | validate command envelope and CommandMetadata.request.idempotency_key
   | tx begin
-  | call IdempotencyRepository.reserve(IdempotencyKey key, IdempotencyOperation operation, UnitOfWorkHandle uow)
+  | call IdempotencyRepository.reserve(IdempotencyKey key, IdempotencyOperation operation, RequestDigest request_digest, UnitOfWorkHandle uow)
   | call ConversationSpace::create_*_space(...)
   | call ParticipantScope::from_initial_participants(...)
   | call VisibilityScope::from_participant_scope(...)
@@ -239,16 +239,18 @@ Step 8 已把 45 个协议全部标记为需要处理流。本步逐一展开:
 
 ```rust
 // [CreateConversationSpaceRequest.validate()]
-// 校验 actor、metadata、idempotency_key、owner_ref、space_kind 和 initial_participants。
+// 校验 actor、metadata.request.idempotency_key、owner_ref、space_kind 和 initial_participants。
 request.validate()?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
 
 // [UnitOfWork.begin()]
 // 开启创建 space 的写事务。
 let uow = unit_of_work.begin().await?;
 
-// [IdempotencyRepository.reserve(IdempotencyKey key, IdempotencyOperation operation, UnitOfWorkHandle uow)]
+// [IdempotencyRepository.reserve(IdempotencyKey key, IdempotencyOperation operation, RequestDigest request_digest, UnitOfWorkHandle uow)]
 // 预留命令幂等键。
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::CreateConversationSpace, uow.clone()).await?;
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::CreateConversationSpace, request_digest.clone(), uow.clone()).await?;
 
 // [ConversationSpace::create_project_space(ConversationOwnerRef owner_ref, ActorRef actor)]
 // 根据 space_kind 调用 project / personal / system 对应工厂。
@@ -266,12 +268,23 @@ let visibility = VisibilityScope::from_participant_scope(&participant, request.d
 // 建立本仓 truth 初始状态。
 let truth = ConversationTruthState::open_for_space(space.space_id, request.actor.actor_ref);
 
-// [ScopeMutationBundle::created(ConversationSpace space, ParticipantScope participant, VisibilityScope visibility, ConversationTruthState truth)]
-// 聚合创建结果和初始 scope change。
-let bundle = ScopeMutationBundle::created(space, participant, visibility, truth);
+// [ScopeChangeRecord::from_initial_space_creation(&ConversationSpace space, ActorRef actor, ScopeChangeReason reason)]
+// create-space 初始 history 使用 ScopeKind::Space;reason_ref 来自 request.reason_ref。
+let initial_scope_change = ScopeChangeRecord::from_initial_space_creation(
+    &space,
+    request.actor.actor_ref,
+    ScopeChangeReason {
+        reason_ref: request.reason_ref,
+        reason_kind: ScopeChangeReasonKind::InitialCreate,
+    },
+)?;
+
+// [ScopeMutationBundle::created(ConversationSpace space, ParticipantScope participant, VisibilityScope visibility, ConversationTruthState truth, ScopeChangeRecord scope_change)]
+// 聚合创建结果和显式初始 scope change。
+let bundle = ScopeMutationBundle::created(space, participant, visibility, truth, initial_scope_change);
 
 // [ConversationOutboxRecord::from_scope_change(ScopeChangeRecord change)]
-// 入队 space changed outbox。
+// 初始 scope_change.scope_kind = Space,因此入队 SpaceChanged outbox。
 let outbox = ConversationOutboxRecord::from_scope_change(bundle.scope_change.clone())?;
 
 // [SpaceScopeRepository.save_scope_bundle(ScopeMutationBundle bundle, UnitOfWorkHandle uow)]
@@ -313,7 +326,7 @@ unit_of_work.commit(uow).await?;
   | call handle_close_conversation_space(CloseConversationSpaceRequest request)
   v
 [ConversationSpaceCommandService]
-  | validate actor, reason, idempotency
+  | validate actor, close_reason, idempotency
   | tx begin
   | reserve idempotency
   | call SpaceScopeRepository.get_space_for_update(...)
@@ -330,23 +343,25 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 // [CloseConversationSpaceRequest.validate()]
-// 校验 space_id、actor、reason 和 idempotency_key。
+// 校验 space_id、actor、close_reason 和 metadata.request.idempotency_key。
 request.validate()?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
 
 // [UnitOfWork.begin()]
 // 开启关闭 space 的写事务。
 let uow = unit_of_work.begin().await?;
 
-// [IdempotencyRepository.reserve(IdempotencyKey key, IdempotencyOperation operation, UnitOfWorkHandle uow)]
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::CloseConversationSpace, uow.clone()).await?;
+// [IdempotencyRepository.reserve(IdempotencyKey key, IdempotencyOperation operation, RequestDigest request_digest, UnitOfWorkHandle uow)]
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::CloseConversationSpace, request_digest.clone(), uow.clone()).await?;
 
 // [SpaceScopeRepository.get_space_for_update(ConversationSpaceId space_id, UnitOfWorkHandle uow)]
 // 锁定 space。
 let mut space = space_scope_repo.get_space_for_update(request.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
 
 // [ConversationSpace.close(ActorRef actor, SpaceCloseReason reason)]
-// 校验生命周期并进入 Closed。
-let scope_change = space.close(request.actor.actor_ref, request.reason)?;
+// 校验生命周期并按 close_mode 进入 ReadOnly / Closed / Archived。
+let scope_change = space.close(request.actor.actor_ref, request.close_reason)?;
 
 // [ConversationOutboxRecord::from_scope_change(ScopeChangeRecord change)]
 // 关闭事件必须来自已应用的 scope change。
@@ -365,7 +380,7 @@ unit_of_work.commit(uow).await?;
 |---|---|
 | 事务边界 | 锁定 space 后修改 lifecycle,保存 scope change 和 outbox 同事务提交 |
 | 回滚错误 | space not found、already archived、domain transition invalid、outbox failure |
-| 状态副作用 | `ConversationSpaceLifecycleState::Closed`;truth 不再接受新 fact |
+| 状态副作用 | 只持久化 `ConversationSpace.lifecycle_state` 的 ReadOnly / Closed / Archived 变化;PH-02 不在本 flow 持久化 `ConversationTruthState`、`ParticipantScopeState` 或 `VisibilityScopeState`;append 阻断由 space lifecycle 口径检查 |
 | 事件副作用 | `ConversationSpaceChangedEvent` |
 | 测试切口 | close active space、close missing space、close archived rejected、duplicate close idempotent |
 
@@ -387,11 +402,11 @@ unit_of_work.commit(uow).await?;
   | call handle_update_participant_scope(UpdateParticipantScopeRequest request)
   v
 [ParticipantScopeCommandService]
-  | validate participant delta
+  | validate participant add/remove set
   | tx begin
   | reserve idempotency
   | load participant scope
-  | call ParticipantScope.add_participant(...) or remove_participant(...)
+  | call ParticipantScope.apply_participant_update(...)
   v
 [Repository + Outbox]
   | save scope bundle
@@ -404,23 +419,26 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 // [UpdateParticipantScopeRequest.validate()]
-// 校验 space_id、participant_delta、actor 和 idempotency_key。
+// 校验 space_id、add_participants、remove_participants、change_reason、actor 和 metadata.request.idempotency_key。
 request.validate()?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
 
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::UpdateParticipantScope, uow.clone()).await?;
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::UpdateParticipantScope, request_digest.clone(), uow.clone()).await?;
 
 // [SpaceScopeRepository.get_participant_scope(ConversationSpaceId space_id)]
 // 读取当前参与范围。
 let mut scope = space_scope_repo.get_participant_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
 
-// [ParticipantScope.add_participant(ConversationParticipantRef participant, ActorRef actor)]
-// 或调用 remove_participant,由 delta 类型决定。
-let scope_change = if request.delta.is_add() {
-    scope.add_participant(request.delta.participant_ref, request.actor.actor_ref)?
-} else {
-    scope.remove_participant(request.delta.participant_ref, request.actor.actor_ref)?
-};
+// [ParticipantScope.apply_participant_update(Vec<ConversationParticipantRef> add_participants, Vec<ConversationParticipantRef> remove_participants, ActorRef actor, ScopeChangeReason reason)]
+// 一次命令可包含多个 add/remove,但必须合成为一个 scope change,scope version 递增一次。
+let scope_change = scope.apply_participant_update(
+    request.add_participants,
+    request.remove_participants,
+    request.actor.actor_ref,
+    request.change_reason,
+)?;
 
 // [ConversationOutboxRecord::from_scope_change(ScopeChangeRecord change)]
 let outbox = ConversationOutboxRecord::from_scope_change(scope_change.clone())?;
@@ -436,9 +454,9 @@ unit_of_work.commit(uow).await?;
 
 | 项 | 内容 |
 |---|---|
-| 事务边界 | participant scope 变更、scope change、outbox 和幂等 complete 同事务 |
-| 回滚错误 | participant invalid、scope closed、duplicate delta conflict、repository failure |
-| 状态副作用 | participant scope version 递增;必要时 previous change superseded |
+| 事务边界 | participant scope 批量变更、单个 scope change、outbox 和幂等 complete 同事务 |
+| 回滚错误 | participant invalid、scope closed、duplicate actor、same actor add/remove conflict、repository failure |
+| 状态副作用 | participant scope version 对一次命令递增一次;必要时 previous change superseded |
 | 事件副作用 | `ConversationScopeChangedEvent` |
 | 测试切口 | add participant、remove participant、scope closed rejected、duplicate idempotent |
 
@@ -478,11 +496,13 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 // [UpdateVisibilityScopeRequest.validate()]
-// 校验 visibility_rules、space_id、actor 和 idempotency_key。
+// 校验 visibility_rules、space_id、actor 和 metadata.request.idempotency_key。
 request.validate()?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
 
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::UpdateVisibilityScope, uow.clone()).await?;
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::UpdateVisibilityScope, request_digest.clone(), uow.clone()).await?;
 
 // [SpaceScopeRepository.get_visibility_scope(ConversationSpaceId space_id)]
 let mut visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
@@ -537,6 +557,7 @@ unit_of_work.commit(uow).await?;
   | reserve idempotency
   | load space, participant scope, visibility scope
   | call FactAppendPolicy.assert_append_allowed(...)
+  | call FactAppendPolicy.assert_fact_kind_allowed(...)
   | call ConversationFact::from_append_input(...)
   | call FactAppendReceipt::accepted(...)
   | call ConversationTraceContext::from_fact_append(...)
@@ -553,16 +574,23 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 // [AppendConversationFactRequest.validate()]
-// 校验 space_id、source、payload_ref、actor、metadata 和 idempotency_key。
+// 校验 space_id、source、payload_ref、actor、metadata 和 metadata.request.idempotency_key。
 request.validate()?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
 
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::AppendConversationFact, uow.clone()).await?;
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::AppendConversationFact, request_digest.clone(), uow.clone()).await?;
 
 // [SpaceScopeRepository.get_space_for_update(ConversationSpaceId space_id, UnitOfWorkHandle uow)]
 let space = space_scope_repo.get_space_for_update(request.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
 let participant = space_scope_repo.get_participant_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
 let visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
+if let Some(requested_visibility_scope_id) = request.visibility_scope_id.clone() {
+    if requested_visibility_scope_id != visibility.visibility_scope_id {
+        return Err(ApplicationError::NotVisible);
+    }
+}
 
 // [FactSourceRef::from_actor(ActorRef actor)]
 // 根据 actor / runtime / bridge / system 来源创建可追溯 source ref。
@@ -571,12 +599,13 @@ let source = FactSourceRef::from_actor(request.actor.actor_ref);
 // [FactAppendPolicy::for_space(&ConversationSpace space, &VisibilityScope visibility)]
 let policy = FactAppendPolicy::for_space(&space, &visibility);
 policy.assert_append_allowed(&space, &participant, &visibility)?;
+policy.assert_fact_kind_allowed(request.fact_kind)?;
 
-// [ConversationFact::from_append_input(&ConversationSpace space, FactSourceRef source, &VisibilityScope visibility, ConversationFactPayloadRef payload_ref)]
-let fact = ConversationFact::from_append_input(&space, source, &visibility, request.payload_ref)?;
+// [ConversationFact::from_append_input(&ConversationSpace space, ConversationFactKind fact_kind, FactSourceRef source, &VisibilityScope visibility, ConversationFactPayloadRef payload_ref)]
+let fact = ConversationFact::from_append_input(&space, request.fact_kind, source, &visibility, request.payload_ref)?;
 
 // [FactAppendReceipt::accepted(&ConversationFact fact, IdempotencyKey key, Timestamp recorded_at)]
-let receipt = FactAppendReceipt::accepted(&fact, request.idempotency_key, clock.now());
+let receipt = FactAppendReceipt::accepted(&fact, key.clone(), clock.now());
 
 // [ConversationTraceContext::from_fact_append(&ConversationFact fact, &FactAppendReceipt receipt)]
 let trace = ConversationTraceContext::from_fact_append(&fact, &receipt)?;
@@ -637,17 +666,24 @@ unit_of_work.commit(uow).await?;
 // [RetractConversationFactRequest.validate()]
 request.validate()?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::RetractConversationFact, uow.clone()).await?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::RetractConversationFact, request_digest.clone(), uow.clone()).await?;
 
 // [ConversationFactRepository.get_fact_for_update(ConversationFactId fact_id, UnitOfWorkHandle uow)]
 let mut fact = fact_repo.get_fact_for_update(request.fact_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
+if let Some(requested_visibility_scope_id) = request.visibility_scope_id.clone() {
+    if requested_visibility_scope_id != fact.visibility_scope_id {
+        return Err(ApplicationError::NotVisible);
+    }
+}
 
 // [ConversationFact.retract(ActorRef actor, FactRetractionReason reason)]
 fact.retract(request.actor.actor_ref, request.reason)?;
 
 // [FactAppendReceipt::retracted(&ConversationFact fact, IdempotencyKey key, Timestamp recorded_at)]
 // 撤回也必须保留 receipt 和 trace。
-let receipt = FactAppendReceipt::retracted(&fact, request.idempotency_key, clock.now());
+let receipt = FactAppendReceipt::retracted(&fact, key.clone(), clock.now());
 let trace = ConversationTraceContext::from_fact_append(&fact, &receipt)?;
 let outbox = ConversationOutboxRecord::from_fact_retraction(fact.clone(), receipt.clone())?;
 
@@ -707,10 +743,17 @@ unit_of_work.commit(uow).await?;
 // [ManifestExternalFactRequest.validate()]
 request.validate()?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::ManifestExternalFact, uow.clone()).await?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::ManifestExternalFact, request_digest.clone(), uow.clone()).await?;
 
 let space = space_scope_repo.get_space_for_update(request.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
 let visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
+if let Some(requested_visibility_scope_id) = request.visibility_scope_id.clone() {
+    if requested_visibility_scope_id != visibility.visibility_scope_id {
+        return Err(ApplicationError::NotVisible);
+    }
+}
 
 // [ManifestationPolicy::default_policy()]
 let policy = ManifestationPolicy::default_policy();
@@ -731,7 +774,7 @@ let outbox = ConversationOutboxRecord::from_manifestation(manifestation.clone())
 
 external_ref_repo.upsert_snapshot(snapshot, uow.clone()).await?;
 manifestation_repo.insert_manifestation(manifestation, uow.clone()).await?;
-fact_repo.append_fact(fact, FactAppendReceipt::accepted(&fact, request.idempotency_key, clock.now()), uow.clone()).await?;
+fact_repo.append_fact(fact, FactAppendReceipt::accepted(&fact, key.clone(), clock.now()), uow.clone()).await?;
 trace_repo.save_trace_context(trace, uow.clone()).await?;
 outbox_repo.enqueue(outbox, uow.clone()).await?;
 idempotency.complete(reservation, result_ref, uow.clone()).await?;
@@ -786,7 +829,9 @@ unit_of_work.commit(uow).await?;
 // [CreateReviewAnchorRequest.validate()]
 request.validate()?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::CreateReviewAnchor, uow.clone()).await?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::CreateReviewAnchor, request_digest.clone(), uow.clone()).await?;
 
 // [ReviewAnchor::for_fact(&ConversationFact fact, ActorRef actor, ReviewReasonRef reason_ref)]
 // 根据 target_kind 选择 fact、manifestation 或 scope change 工厂。
@@ -854,7 +899,9 @@ unit_of_work.commit(uow).await?;
 ```rust
 request.validate()?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::RequestTraceHandoff, uow.clone()).await?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::RequestTraceHandoff, request_digest.clone(), uow.clone()).await?;
 
 // [TraceRepository.get_trace_context(ConversationTraceContextId trace_context_id)]
 let trace_context = trace_repo.get_trace_context(request.trace_context_id).await?.ok_or(ApplicationError::NotFound)?;
@@ -920,7 +967,9 @@ unit_of_work.commit(uow).await?;
 ```rust
 request.validate()?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(request.idempotency_key, IdempotencyOperation::RequestArchiveHandoff, uow.clone()).await?;
+let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
+let request_digest = RequestDigest::from_command(&request)?;
+let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::RequestArchiveHandoff, request_digest.clone(), uow.clone()).await?;
 
 let trace_context = trace_repo.get_trace_context(request.trace_context_id).await?.ok_or(ApplicationError::NotFound)?;
 let space = space_scope_repo.get_space_for_update(request.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
@@ -1584,8 +1633,9 @@ Ok(view)
 ```rust
 // [InboundEventEnvelope.validate()]
 event.validate()?;
+let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeWorkContextChanged, uow.clone()).await?;
+let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeWorkContextChanged, request_digest.clone(), uow.clone()).await?;
 
 // [ExternalFactRef::from_work_fact(WorkFactRef work_fact_ref, ExternalSourceVersionRef version_ref)]
 let external_ref = ExternalFactRef::from_work_fact(event.payload.work_context_ref, event.payload.source_version_ref)?;
@@ -1651,8 +1701,9 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 event.validate()?;
+let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeGovernanceFactCommitted, uow.clone()).await?;
+let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeGovernanceFactCommitted, request_digest.clone(), uow.clone()).await?;
 
 // [ExternalFactRef::from_governance_decision(GovernanceDecisionRef decision_ref, ExternalSourceVersionRef version_ref)]
 let external_ref = ExternalFactRef::from_governance_decision(event.payload.governance_fact_ref, event.payload.source_version_ref)?;
@@ -1719,8 +1770,9 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 event.validate()?;
+let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeArtifactFactCommitted, uow.clone()).await?;
+let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeArtifactFactCommitted, request_digest.clone(), uow.clone()).await?;
 
 // [ExternalFactRef::from_artifact_version(ArtifactVersionRef artifact_version_ref)]
 let external_ref = ExternalFactRef::from_artifact_version(event.payload.artifact_fact_ref)?;
@@ -1783,8 +1835,9 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 event.validate()?;
+let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeRuntimeResultCommitted, uow.clone()).await?;
+let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeRuntimeResultCommitted, request_digest.clone(), uow.clone()).await?;
 
 let space = space_scope_repo.get_space_for_update(event.payload.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
 let participant = space_scope_repo.get_participant_scope(event.payload.space_id).await?.ok_or(ApplicationError::NotFound)?;
@@ -1794,8 +1847,13 @@ let visibility = space_scope_repo.get_visibility_scope(event.payload.space_id).a
 let source = FactSourceRef::from_runtime_result(event.payload.runtime_result_ref, event.payload.system_actor_ref.into())?;
 source.assert_result_only()?;
 
-FactAppendPolicy::for_space(&space, &visibility).assert_append_allowed(&space, &participant, &visibility)?;
-let fact = ConversationFact::from_append_input(&space, source, &visibility, event.payload.result_payload_ref)?;
+let policy = FactAppendPolicy::for_space(&space, &visibility);
+policy.assert_append_allowed(&space, &participant, &visibility)?;
+policy.assert_fact_kind_allowed(event.payload.fact_kind)?;
+if event.payload.fact_kind != ConversationFactKind::RuntimeResult {
+    return Err(ProtocolError::InvalidEnvelope.into());
+}
+let fact = ConversationFact::from_append_input(&space, event.payload.fact_kind, source, &visibility, event.payload.result_payload_ref)?;
 let receipt = FactAppendReceipt::accepted(&fact, event.idempotency_key, clock.now());
 let trace = ConversationTraceContext::from_fact_append(&fact, &receipt)?;
 let outbox = ConversationOutboxRecord::from_fact_append(fact.clone(), receipt.clone())?;
@@ -1852,16 +1910,24 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 event.validate()?;
+let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeBridgeMappedFactReceived, uow.clone()).await?;
+let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeBridgeMappedFactReceived, request_digest.clone(), uow.clone()).await?;
 
 if event.payload.target_mode == BridgeTargetMode::AppendFact {
     let space = space_scope_repo.get_space_for_update(event.payload.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
+    let participant = space_scope_repo.get_participant_scope(event.payload.space_id).await?.ok_or(ApplicationError::NotFound)?;
     let visibility = space_scope_repo.get_visibility_scope(event.payload.space_id).await?.ok_or(ApplicationError::NotFound)?;
 
     // [FactSourceRef::from_bridge_mapping(BridgeSourceRef source_ref, ActorRef actor)]
     let source = FactSourceRef::from_bridge_mapping(event.payload.bridge_fact_ref.into(), event.payload.actor_ref)?;
-    let fact = ConversationFact::from_append_input(&space, source, &visibility, event.payload.mapped_payload_ref)?;
+    let policy = FactAppendPolicy::for_space(&space, &visibility);
+    policy.assert_append_allowed(&space, &participant, &visibility)?;
+    policy.assert_fact_kind_allowed(event.payload.fact_kind)?;
+    if event.payload.fact_kind != ConversationFactKind::BridgeMapped {
+        return Err(ProtocolError::InvalidEnvelope.into());
+    }
+    let fact = ConversationFact::from_append_input(&space, event.payload.fact_kind, source, &visibility, event.payload.mapped_payload_ref)?;
     let receipt = FactAppendReceipt::accepted(&fact, event.idempotency_key, clock.now());
     fact_repo.append_fact(fact.clone(), receipt.clone(), uow.clone()).await?;
     outbox_repo.enqueue(ConversationOutboxRecord::from_fact_append(fact, receipt)?, uow.clone()).await?;
@@ -1923,8 +1989,9 @@ unit_of_work.commit(uow).await?;
 
 ```rust
 event.validate()?;
+let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
-let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeIdentityActorChanged, uow.clone()).await?;
+let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeIdentityActorChanged, request_digest.clone(), uow.clone()).await?;
 
 // [ActorResolverPort.resolve_actor(ActorRef actor, TraceContextRef trace_ref)]
 let actor_snapshot = actor_resolver.resolve_actor(event.payload.actor_ref, event.trace_ref).await?;

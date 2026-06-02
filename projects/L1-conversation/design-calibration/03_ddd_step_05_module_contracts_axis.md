@@ -105,7 +105,7 @@ Step 4 已确认 workspace 多 crate 架构和文件布局。
 | application service | `application` | Step 9 逐接口定义函数级处理流 |
 | port trait / repository trait / UnitOfWork trait | `application` | Step 7 定义 trait / port 契约 |
 | repository implementation / memory store / adapter | `infra` | Step 7 / Step 11 定义 adapter 和持久化契约 |
-| RuntimeConfig / ConfigLoader / RuntimeBuilder | `infra` | Step 14 定义配置引用与外部依赖绑定 |
+| ConversationRuntimeConfig / ConfigLoader / RuntimeBuilder | `infra` | Step 14 定义配置引用与外部依赖绑定 |
 | command / query handler | `api` | Step 8 / Step 9 定义协议和处理流 |
 | event consumer / outbox worker / projection worker | `worker` | Step 8 / Step 9 定义 consumer 和 worker flow |
 | operation job binary | `jobs` | Step 8 / Step 9 定义 job 协议和执行流 |

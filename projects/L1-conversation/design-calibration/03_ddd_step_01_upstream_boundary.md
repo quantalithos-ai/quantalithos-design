@@ -78,7 +78,7 @@
 | 关键处理流 | 是 | 函数级调用链、repository / port 调用、unit of work、outbox 同事务、异步 job 边界和失败分支 |
 | 状态定义与状态流转 | 是 | 状态 enum、variant 注释、允许 / 禁止迁移矩阵、guard 函数和测试断言 |
 | 异常与边界场景 | 是 | error enum、协议错误映射、rejected / deferred / quarantined / stale / failed / suppressed marker 和恢复口径 |
-| 配置影响轮廓 | 是 | RuntimeConfig、ConfigLoader、ConfigValidator、AdapterConfig、StoreConfig、JobConfig 和 runtime builder 注入 |
+| 配置影响轮廓 | 是 | ConversationRuntimeConfig、ConfigLoader、ConfigValidator、AdapterConfig、StoreConfig、JobConfig 和 runtime builder 注入 |
 
 ### 3.4 哪些内容仍停留在概要设计轮廓,进入详细设计前必须补清？
 

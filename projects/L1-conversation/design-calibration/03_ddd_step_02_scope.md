@@ -171,7 +171,7 @@ Step 1 已确认详细设计直接承接 00 / 01 / 02,旧版 03 只作为问题�
 | 函数级处理流 | 逐接口说明对象.函数(Type 参数名) 调用、事务、幂等、audit、event 和失败分支 |
 | 状态机 | 状态枚举、允许迁移、禁止迁移、状态守卫、非法迁移错误和状态测试 |
 | 持久化与一致性 | repository、unit of work、transaction ordering、outbox、projection、reference、handoff 一致性 |
-| 配置实现契约 | RuntimeConfig、ConfigLoader、ConfigValidator、builder 注入和禁止配置化校验 |
+| 配置实现契约 | ConversationRuntimeConfig、ConfigLoader、ConfigValidator、builder 注入和禁止配置化校验 |
 | 可观测性与测试切口 | audit、trace、metric、log、report evidence、contract test 和 negative test |
 
 ### 7.3 必须覆盖的模块范围

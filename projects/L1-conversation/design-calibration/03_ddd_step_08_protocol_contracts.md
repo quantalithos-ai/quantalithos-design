@@ -99,7 +99,7 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 
 | 协议类别 | 幂等要求 | 审计要求 |
 |---|---|---|
-| Command API | 必须显式携带 `IdempotencyKey` | 写 command audit、domain audit 和 outbox |
+| Command API | 必须通过 `CommandMetadata.request.idempotency_key` 携带幂等键 | 写 command audit、domain audit 和 outbox |
 | Query API | 不要求写幂等,但可携带 `RequestId` | 写只读访问 audit 按配置 / policy 决定 |
 | Inbound Event Consumer | 必须用 event id + source ref + idempotency key | 写 consumer audit 和 stale / quarantine marker |
 | Outbound Event | event id 必须来自 outbox / id generator | 写 publish evidence |
@@ -209,11 +209,11 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 {
   "command": {},
   "actor": "ActorContext",
-  "metadata": "CommandMetadata",
-  "idempotency_key": "IdempotencyKey",
-  "trace_ref": "TraceContextRef"
+  "metadata": "CommandMetadata"
 }
 ```
+
+Command envelope 的 `metadata` 使用 `core-contracts::CommandMetadata`。Command 幂等键权威字段是 `metadata.request.idempotency_key`;所有同步写 Command 必须要求该字段为 `Some(IdempotencyKey)`。Command trace 权威字段是 `metadata.request.trace_id`。本仓 envelope 不再定义顶层 `idempotency_key` 或 `trace_ref`,否则会与 core metadata 形成双真相。
 
 #### Query envelope
 
@@ -221,11 +221,11 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 {
   "query": {},
   "consumer": "ConsumerContext",
-  "metadata": "QueryMetadata",
-  "page": "PageRequest",
-  "consistency": "ReadConsistency"
+  "metadata": "QueryMetadata"
 }
 ```
+
+Query envelope 的 `metadata` 使用 `core-contracts::QueryMetadata`。分页与一致性偏好来自 `metadata.page` 和 `metadata.consistency`;本仓 envelope 不再定义顶层 `page` 或 `consistency`。
 
 #### Inbound event envelope
 
@@ -269,6 +269,76 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 }
 ```
 
+#### Context / metadata / visibility DTO 归属
+
+| 类型 | 正式归属 | 最小 schema / 口径 | 不得混同 |
+|---|---|---|---|
+| `CommandMetadata` | `core-contracts` re-export | `request: RequestMetadata`、`reason: Option<ChangeReason>`、`external_ref: Option<ExternalReferenceRef>` | 不在 conversation command 顶层重复 idempotency / trace |
+| `QueryMetadata` | `core-contracts` re-export | `request: RequestMetadata`、`page: Option<PageRequest>`、`consistency: QueryConsistency` | 不在 query envelope 顶层重复 page / consistency |
+| `ActorContext` / `ActorRef` | `core-contracts` re-export | core actor context / actor ref | 不复制 identity truth |
+| `TraceContextRef` | `conversation-contracts` alias / wrapper over core `TraceId` | 只保存 `TraceId` | 不创建第二 trace truth |
+| `SystemActorRef` | `conversation-contracts` wrapper over core `ActorRef` | `actor_ref: ActorRef`,且 `actor_ref.actor_kind == ActorKind::System` | 不接受 human / AI actor 伪装系统 actor |
+| `ConsumerContext` | `conversation-contracts` | `consumer_ref: ConsumerRef`、`actor_ref: Option<ActorRef>`、`visibility_scope_ref: Option<VisibilityScopeId>`、`purpose_ref: Option<ExternalReferenceRef>` | 不承载 request id、trace、page 或 consistency |
+| `ConversationOwnerRef` | `conversation-contracts/src/refs.rs` | `owner_kind: ConversationOwnerKind`、`external_ref: ExternalReferenceRef` | 不保存 owner lifecycle 或 owner body |
+| `ConversationParticipantRef` | `conversation-contracts/src/refs.rs` | `actor_ref: ActorRef`、`participant_role: ConversationParticipantRole` | 不复制 identity member truth |
+| `ConversationParticipantRole` | `conversation-contracts/src/refs.rs` | `Owner | Maintainer | Member | Observer` | conversation-local role,不是全局 RBAC |
+| `ConsumerRef` | `conversation-contracts/src/refs.rs` | `consumer_kind: ConsumerKind`、`external_ref: ExternalReferenceRef`、`actor_ref: Option<ActorRef>` | consumer != actor,除非 actor_ref 明确存在 |
+| `VisibilityLevel` | `conversation-contracts/src/visibility.rs` | `Private < Participants < Project < Workspace < Public` | 分类值,不是 lifecycle state |
+| `VisibilityRuleSet` | `conversation-contracts/src/visibility.rs` | `maximum_visibility: VisibilityLevel`、read / append / manifestation / review rule set | 不放在 domain crate 中让 contracts 反向依赖 domain |
+| `CommandReasonRef` | `conversation-contracts/src/refs.rs` | `reason_code: CommandReasonCode`、`supporting_ref: Option<ExternalReferenceRef>` | 不重复 request id、trace、idempotency |
+| `ScopeChangeReason` | `conversation-contracts/src/refs.rs` | `reason_ref: CommandReasonRef`、`reason_kind: ScopeChangeReasonKind` | 不保存正文说明 |
+| `SpaceCloseReason` | `conversation-contracts/src/refs.rs` | `reason_ref: CommandReasonRef`、`close_mode: SpaceCloseMode` | close mode 与 request.close_mode 必须一致 |
+| `RestrictionReason` | `conversation-contracts/src/refs.rs` | `reason_ref: CommandReasonRef`、`restriction_kind: RestrictionKind` | 不保存正文说明或外部 source body |
+| `VisibilityRestrictionReason` | `conversation-contracts/src/refs.rs` | `reason_ref: CommandReasonRef`、`restriction_kind: VisibilityRestrictionKind` | 不保存正文说明或外部 source body |
+| `ScopeSnapshotRef` | `conversation-contracts/src/refs.rs` | `scope_kind: ScopeKind`、`space_id`、可选 participant / visibility scope id、`scope_version` | 不嵌入完整 scope body |
+| `SpaceCloseMode` | `conversation-contracts/src/refs.rs` | `ReadOnly | Closed | Archived` | `Archived` 必须携带 archive intent |
+
+上述值对象字段级 schema 以 `03_ddd_step_06_object_contracts.md` §7.2.1 为准。协议层不得用裸字符串占位替代这些类型。
+
+#### Command result DTO
+
+```json
+{
+  "CommandReceipt": {
+    "request_id": "RequestId",
+    "idempotency_key": "IdempotencyKey",
+    "command_kind": "ConversationCommandKind",
+    "outcome": "accepted | duplicate",
+    "completed_at": "Timestamp"
+  },
+  "ConversationSpaceCommandResult": {
+    "space_id": "ConversationSpaceId",
+    "scope_change_ref": "Option<ScopeChangeRecordRef>",
+    "outbox_record_ref": "Option<ConversationOutboxRecordId>",
+    "projection_state_ref": "Option<ConversationProjectionStateId>",
+    "result_ref": "CommandResultRef",
+    "receipt": "CommandReceipt"
+  },
+  "ParticipantScopeCommandResult": {
+    "space_id": "ConversationSpaceId",
+    "participant_scope_id": "ParticipantScopeId",
+    "scope_change_ref": "ScopeChangeRecordRef",
+    "outbox_record_ref": "Option<ConversationOutboxRecordId>",
+    "projection_state_ref": "Option<ConversationProjectionStateId>",
+    "result_ref": "CommandResultRef",
+    "receipt": "CommandReceipt"
+  },
+  "VisibilityScopeCommandResult": {
+    "space_id": "ConversationSpaceId",
+    "visibility_scope_id": "VisibilityScopeId",
+    "scope_change_ref": "ScopeChangeRecordRef",
+    "outbox_record_ref": "Option<ConversationOutboxRecordId>",
+    "projection_state_ref": "Option<ConversationProjectionStateId>",
+    "result_ref": "CommandResultRef",
+    "receipt": "CommandReceipt"
+  }
+}
+```
+
+`CommandResultRef`、`CommandReceipt` 和 `ConversationCommandKind` 属于 contracts DTO / ref。application service 必须在 request validate 后、reserve 前按规范化 command 内容计算 `RequestDigest`,并调用 `IdempotencyRepository.reserve(key, operation, request_digest, uow)`。application service 可以将 `CommandResultRef` 的值映射为本地 `IdempotencyResultRef`,但 `contracts` crate 不得依赖 `application/idempotency.rs`。
+
+Duplicate command 只能在同 key 同 request digest 时返回既有 `result_ref` 和原 refs,且 `receipt.outcome = duplicate`。缺失 `metadata.request.idempotency_key` 或同 key 不同 digest 时返回 `ProtocolError::MissingRequiredField` / `ApplicationError::Conflict`,不得返回 command result。
+
 ### 7.3 Command API 协议契约
 
 #### 7.3.1 `CreateConversationSpace`
@@ -292,16 +362,26 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
-| `space_kind` | `ConversationSpaceKind` | `ConversationSpace.space_kind` | request | reject |
-| `owner_ref` | `ConversationOwnerRef` | `ConversationSpace.owner_ref` | request | reject |
-| `initial_participants` | `Vec<ConversationParticipantRef>` | `ParticipantScope.participants` | request | reject empty unless system space |
-| `default_visibility` | `VisibilityLevel` | `VisibilityScope.default_visibility` | request | derive project default |
+| `space_kind` | `ConversationSpaceKind` | `ConversationSpace.space_kind` | request | reject unknown kind;reject inconsistent `space_kind` / `owner_ref.owner_kind` pair |
+| `owner_ref` | `ConversationOwnerRef` | `ConversationSpace.owner_ref` | request;schema 见 Step 6 §7.2.1 | reject missing `owner_kind` or `external_ref` |
+| `initial_participants` | `Vec<ConversationParticipantRef>` | `ParticipantScope.participants` | request;schema 见 Step 6 §7.2.1 | reject empty unless system space;reject duplicate actor |
+| `default_visibility` | `VisibilityLevel` | `VisibilityScope.default_visibility` | request;ordered enum | derive project default;reject unknown level |
 | `actor` | `ActorContext` | `ConversationSpace.created_by` | command envelope | reject |
-| `idempotency_key` | `IdempotencyKey` | idempotency record | command envelope | reject |
+| `metadata.request.idempotency_key` | `IdempotencyKey` | idempotency record | `CommandMetadata.request` | reject |
+| `reason_ref` | `CommandReasonRef` | initial `ScopeChangeReason.reason_ref` | request;schema 见 Step 6 §7.2.1 | reject missing `reason_code` |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
 | `CreateConversationSpaceRequest` | `ConversationSpace`、`ParticipantScope`、`VisibilityScope`、`ScopeChangeRecord` | 是 | ids / versions / timestamps 来自 `IdGeneratorPort` / `ClockPort` | `owner_ref` != actor;participant scope != visibility scope | reject or derive default visibility |
+
+Create-space 初始 `ScopeChangeRecord` 的正式口径:
+
+- `changed_by` 来自 `request.actor.actor_ref`。
+- `change_reason` 为 `ScopeChangeReason { reason_ref: request.reason_ref, reason_kind: ScopeChangeReasonKind::InitialCreate }`。
+- `scope_kind = ScopeKind::Space`。
+- `previous_scope_ref` 使用 `ScopeSnapshotRef { scope_kind: Space, space_id, participant_scope_id: None, visibility_scope_id: None, scope_version: None }`,表示预创建占位,不代表已有持久化 space。
+- `new_scope_ref` 使用同一 `space_id`、两个 scope id 为 `None`;PH-02 下 `scope_version = None`。
+- `ConversationOutboxRecord::from_scope_change(...)` 必须生成 `ConversationOutboxEventKind::SpaceChanged`,对应 `ConversationSpaceChangedEvent`。
 
 #### 7.3.2 `CloseConversationSpace`
 
@@ -324,9 +404,9 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `space_id` | `ConversationSpaceId` | lookup key | route / request | reject |
-| `close_mode` | `SpaceCloseMode` | `ConversationSpace.lifecycle_state` | request | derive `closed` |
-| `close_reason` | `SpaceCloseReason` | `ScopeChangeRecord.change_reason` | request | reject |
-| `archive_intent_ref` | `Option<ArchiveIntentRef>` | archive state evidence | request | optional unless mode archived |
+| `close_mode` | `SpaceCloseMode` | `ConversationSpace.lifecycle_state` | request;`ReadOnly | Closed | Archived` | derive `closed`;reject unknown mode |
+| `close_reason` | `SpaceCloseReason` | `ScopeChangeRecord.change_reason` | request;`close_reason.close_mode` must equal request `close_mode` | reject |
+| `archive_intent_ref` | `Option<ArchiveIntentRef>` | archive state evidence | request | required when mode archived |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
@@ -355,13 +435,21 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 |---|---|---|---|---|
 | `space_id` | `ConversationSpaceId` | `ParticipantScope.space_id` | route / request | reject |
 | `expected_scope_version` | `ScopeVersion` | concurrency guard | request | reject conflict-prone update |
-| `add_participants` | `Vec<ConversationParticipantRef>` | `ParticipantScope.participants` | request | empty allowed if remove non-empty |
-| `remove_participants` | `Vec<ConversationParticipantRef>` | `ParticipantScope.participants` | request | empty allowed if add non-empty |
-| `change_reason` | `ScopeChangeReason` | `ScopeChangeRecord.change_reason` | request | reject |
+| `add_participants` | `Vec<ConversationParticipantRef>` | `ParticipantScope.participants` | request;schema 见 Step 6 §7.2.1 | empty allowed if remove non-empty;reject duplicate actor |
+| `remove_participants` | `Vec<ConversationParticipantRef>` | `ParticipantScope.participants` | request;match by `actor_ref` | empty allowed if add non-empty |
+| `change_reason` | `ScopeChangeReason` | `ScopeChangeRecord.change_reason` | request;`ParticipantAdded | ParticipantRemoved | PolicyRestriction | Recovery` | reject |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
 | `UpdateParticipantScopeRequest` | `ParticipantScope`、`ScopeChangeRecord` | 是 | previous / new snapshot refs from repository / id generator | participant scope != identity membership truth | reject no-op unless reason permits audit-only |
+
+`UpdateParticipantScopeRequest` 保留 `add_participants[] + remove_participants[]` 批量 DTO 口径。一次命令允许同时 add 和 remove 多个 participant,但必须满足:
+
+- `add_participants` 与 `remove_participants` 合并后至少一项非空。
+- 同一 `actor_ref` 不得在同一命令中同时出现于 add 和 remove。
+- add 列表内部和 remove 列表内部不得有重复 `actor_ref`。
+- application service 必须将一次命令合成为一个 `ScopeChangeRecord`,并通过 `ScopeMutationBundle::participant_changed(...)` 原子保存。
+- scope version 对一次命令只递增一次;不得按 participant 项数生成多个版本或多个 `ScopeChangeRecord`。
 
 #### 7.3.4 `UpdateVisibilityScope`
 
@@ -386,8 +474,8 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 |---|---|---|---|---|
 | `space_id` | `ConversationSpaceId` | `VisibilityScope.space_id` | route / request | reject |
 | `expected_scope_version` | `ScopeVersion` | concurrency guard | request | reject |
-| `visibility_rules` | `VisibilityRuleSet` | `VisibilityScope.visibility_rules` | request | reject |
-| `change_reason` | `ScopeChangeReason` | `ScopeChangeRecord.change_reason` | request | reject |
+| `visibility_rules` | `VisibilityRuleSet` from `conversation-contracts/src/visibility.rs` | `VisibilityScope.visibility_rules` | request;schema 见 Step 6 §7.2.1 | reject missing rule sets,invalid target fields,body-bearing inline rules,or sealed expansion |
+| `change_reason` | `ScopeChangeReason` | `ScopeChangeRecord.change_reason` | request;`VisibilityNarrowed | VisibilitySealed | PolicyRestriction | Recovery` | reject |
 | `invalidate_existing_cursors` | `bool` | cursor invalidation intent | request | default true |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
@@ -408,9 +496,9 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
   "space_id": "ConversationSpaceId",
   "fact_kind": "ConversationFactKind",
   "source_ref": "FactSourceRef",
-  "visibility_scope_id": "VisibilityScopeId",
+  "visibility_scope_id": "Option<VisibilityScopeId>",
   "payload_ref": "ConversationFactPayloadRef",
-  "payload_digest": "PayloadDigest"
+  "payload_digest": "Option<PayloadDigest>"
 }
 ```
 
@@ -419,9 +507,9 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 | `space_id` | `ConversationSpaceId` | `ConversationFact.space_id` | route / request | reject |
 | `fact_kind` | `ConversationFactKind` | `ConversationFact.fact_kind` | request | reject |
 | `source_ref` | `FactSourceRef` | `ConversationFact.source_ref` | request or consumer derived | reject |
-| `visibility_scope_id` | `VisibilityScopeId` | `ConversationFact.visibility_scope_id` | request or default scope | derive default if absent |
+| `visibility_scope_id` | `Option<VisibilityScopeId>` | `ConversationFact.visibility_scope_id` | request guard or default/current space scope | derive default if absent; `ApplicationError::NotVisible` if provided value mismatches current space visibility scope |
 | `payload_ref` | `ConversationFactPayloadRef` | `ConversationFact.payload_ref` | request | reject |
-| `payload_digest` | `PayloadDigest` | audit / idempotency evidence | request | reject if payload_ref requires digest |
+| `payload_digest` | `Option<PayloadDigest>` | audit / idempotency evidence | request | required / optional / forbidden follows `ConversationFactPayloadRef.digest_requirement` |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
@@ -441,7 +529,7 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
   "space_id": "ConversationSpaceId",
   "fact_id": "ConversationFactId",
   "retraction_reason": "FactRetractionReason",
-  "visibility_scope_id": "VisibilityScopeId"
+  "visibility_scope_id": "Option<VisibilityScopeId>"
 }
 ```
 
@@ -450,7 +538,7 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 | `space_id` | `ConversationSpaceId` | lookup guard | route / request | reject |
 | `fact_id` | `ConversationFactId` | `ConversationFact.fact_id` | route / request | reject |
 | `retraction_reason` | `FactRetractionReason` | fact state transition reason | request | reject |
-| `visibility_scope_id` | `VisibilityScopeId` | visibility guard | request or fact | derive from fact |
+| `visibility_scope_id` | `Option<VisibilityScopeId>` | visibility guard | request guard or fact | derive from fact if absent; `ApplicationError::NotVisible` if provided value mismatches fact visibility scope |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
@@ -470,7 +558,7 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
   "space_id": "ConversationSpaceId",
   "external_fact_ref": "ExternalFactRef",
   "source_version_ref": "ExternalSourceVersionRef",
-  "visibility_scope_id": "VisibilityScopeId",
+  "visibility_scope_id": "Option<VisibilityScopeId>",
   "snapshot_ref": "ExternalFactSnapshotRef",
   "manifestation_reason": "ManifestationReason"
 }
@@ -481,7 +569,7 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 | `space_id` | `ConversationSpaceId` | `CrossDomainManifestation.space_id` | route / request | reject |
 | `external_fact_ref` | `ExternalFactRef` | `CrossDomainManifestation.external_fact_ref` | request or consumer derived | reject |
 | `source_version_ref` | `ExternalSourceVersionRef` | `CrossDomainManifestation.source_version_ref` | request / resolver | derive from resolver or unresolved |
-| `visibility_scope_id` | `VisibilityScopeId` | `CrossDomainManifestation.visibility_scope_id` | request / default | derive default |
+| `visibility_scope_id` | `Option<VisibilityScopeId>` | `CrossDomainManifestation.visibility_scope_id` | request guard or default/current space scope | derive default if absent; `ApplicationError::NotVisible` if provided value mismatches current space visibility scope |
 | `snapshot_ref` | `Option<ExternalFactSnapshotRef>` | `CrossDomainManifestation.snapshot_ref` | request / resolver | allow unresolved if policy permits |
 | `manifestation_reason` | `ManifestationReason` | audit / trace reason | request | reject |
 
@@ -589,14 +677,13 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 ```json
 {
   "space_id": "ConversationSpaceId",
-  "consumer_ref": "ConsumerRef",
-  "consistency": "ReadConsistency"
+  "consumer_ref": "ConsumerRef"
 }
 ```
 
 | 输入契约 | 读取对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `GetConversationReadModelRequest` | `ConversationReadModel`、`VisibilityScope`、`ExternalReferenceProjection` | 是 | consumer from query envelope if omitted | consumer_ref != actor_ref unless explicitly same | reject missing space or consumer |
+| `GetConversationReadModelRequest` | `ConversationReadModel`、`VisibilityScope`、`ExternalReferenceProjection` | 是 | consumer from query envelope if omitted;consistency from `QueryMetadata.consistency` | consumer_ref != actor_ref unless explicitly same | reject missing space or consumer |
 
 #### 7.4.2 `ListConversationFacts`
 
@@ -611,14 +698,13 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 {
   "space_id": "ConversationSpaceId",
   "consumer_ref": "ConsumerRef",
-  "page": "PageRequest",
   "include_retracted": false
 }
 ```
 
 | 输入契约 | 读取对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `ListConversationFactsRequest` | `ConversationFact` refs、`ConversationReadModel` | 是 | page default from config | include_retracted != bypass visibility | reject missing consumer |
+| `ListConversationFactsRequest` | `ConversationFact` refs、`ConversationReadModel` | 是 | page from `QueryMetadata.page` or config default | include_retracted != bypass visibility | reject missing consumer |
 
 #### 7.4.3 `GetConversationFact`
 
@@ -696,14 +782,13 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 {
   "space_id": "ConversationSpaceId",
   "consumer_ref": "ConsumerRef",
-  "query_text": "SearchQueryText",
-  "page": "PageRequest"
+  "query_text": "SearchQueryText"
 }
 ```
 
 | 输入契约 | 读取对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `SearchConversationHistoryRequest` | `SearchIndexProjection`、`ConversationReadModel` | 是 | page default from config | search result != truth | stale projection marker |
+| `SearchConversationHistoryRequest` | `SearchIndexProjection`、`ConversationReadModel` | 是 | page from `QueryMetadata.page` or config default | search result != truth | stale projection marker |
 
 #### 7.4.7 `GetCrossDomainManifestation`
 
@@ -925,6 +1010,7 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
   "event_source_ref": "EventSourceRef",
   "idempotency_key": "IdempotencyKey",
   "space_id": "ConversationSpaceId",
+  "fact_kind": "ConversationFactKind",
   "runtime_result_ref": "RuntimeResultRef",
   "result_payload_ref": "ConversationFactPayloadRef",
   "source_version_ref": "ExternalSourceVersionRef",
@@ -935,13 +1021,14 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `space_id` | `ConversationSpaceId` | `ConversationFact.space_id` | 来源事件 | quarantine |
-| `runtime_result_ref` | `RuntimeResultRef` | `FactSourceRef.source_object_ref` | 来源事件 | quarantine |
+| `fact_kind` | `ConversationFactKind` | `ConversationFact.fact_kind` | 来源事件;must be `RuntimeResult` | reject if not `RuntimeResult` |
+| `runtime_result_ref` | `RuntimeResultRef` | `FactSourceRef.runtime_result_ref` | 来源事件 | quarantine |
 | `result_payload_ref` | `ConversationFactPayloadRef` | `ConversationFact.payload_ref` | 来源事件 | reject if forbidden body |
 | `system_actor_ref` | `SystemActorRef` | system actor for policy | 来源事件或 config | delayed marker |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `RuntimeResultCommittedEvent` | `FactSourceRef`、`ConversationFact`、`FactAppendReceipt`、`ConversationTraceContext` | 是 | participant / visibility from repository | runtime result != reasoning process | quarantine / reject |
+| `RuntimeResultCommittedEvent` | `FactSourceRef`、`ConversationFact`、`FactAppendReceipt`、`ConversationTraceContext` | 是 | `fact_kind` from event and must equal `RuntimeResult`;`FactSourceRef::from_runtime_result(RuntimeResultRef result_ref, ActorRef actor)`; participant / visibility from repository | runtime result ref != reasoning process; result payload ref != payload body | quarantine / reject |
 
 #### 7.5.5 `ConsumeBridgeMappedFactReceived`
 
@@ -959,6 +1046,7 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
   "event_source_ref": "EventSourceRef",
   "idempotency_key": "IdempotencyKey",
   "space_id": "ConversationSpaceId",
+  "fact_kind": "ConversationFactKind",
   "bridge_fact_ref": "ExternalSourceObjectRef",
   "mapped_payload_ref": "ConversationFactPayloadRef",
   "source_version_ref": "ExternalSourceVersionRef",
@@ -969,13 +1057,14 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `space_id` | `ConversationSpaceId` | `ConversationFact.space_id` 或 `CrossDomainManifestation.space_id` | 来源事件 / routing rule | quarantine |
-| `bridge_fact_ref` | `ExternalSourceObjectRef` | `FactSourceRef.source_object_ref` 或 `ExternalFactRef.source_object_ref` | 来源事件 | quarantine |
+| `fact_kind` | `ConversationFactKind` | `ConversationFact.fact_kind` | bridge mapping metadata;must be `BridgeMapped` when target_mode is `AppendFact` | reject if target append and kind mismatch |
+| `bridge_fact_ref` | `ExternalSourceObjectRef` | `BridgeSourceRef.bridge_fact_ref` then `FactSourceRef.bridge_source_ref` 或 `ExternalFactRef.source_object_ref` | 来源事件 | quarantine |
 | `mapped_payload_ref` | `ConversationFactPayloadRef` | `ConversationFact.payload_ref` | bridge adapter | reject if forbidden body |
 | `source_digest` | `ExternalSourceDigest` | `ExternalFactRef.source_digest` | 来源事件 | quarantine |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `BridgeMappedFactReceivedEvent` | `FactSourceRef`、`ConversationFact` 或 `ExternalFactRef`、`CrossDomainManifestation` | 是 | target mode from bridge mapping metadata | bridge payload ref != external platform body | quarantine / reject |
+| `BridgeMappedFactReceivedEvent` | `FactSourceRef`、`ConversationFact` 或 `ExternalFactRef`、`CrossDomainManifestation` | 是 | target mode and `fact_kind` from bridge mapping metadata;append target must use `BridgeMapped` | bridge payload ref != external platform body | quarantine / reject |
 
 #### 7.5.6 `ConsumeIdentityActorChanged`
 
@@ -1532,7 +1621,7 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 
 | 协议类别 | 主要错误 | 映射规则 | 对外响应 / 记录 |
 |---|---|---|---|
-| Command API | `ProtocolError::MissingRequiredField` | 缺少 schema 必填字段、actor、metadata 或 idempotency key | 4xx / command audit |
+| Command API | `ProtocolError::MissingRequiredField` | 缺少 schema 必填字段、actor、metadata 或 `metadata.request.idempotency_key` | 4xx / command audit |
 | Command API | `ApplicationError::Conflict` | 幂等冲突、版本冲突、状态已变化 | 409 / idempotency conflict |
 | Command API | `DomainError` | space、scope、visibility、manifestation、handoff 规则不满足 | 4xx / domain audit |
 | Command API | `RepositoryError` | 写入 truth、outbox、trace 或 projection 失败 | 5xx / retryable marker |
@@ -1550,16 +1639,16 @@ Step 7 已确认协议处理时可用的 repository / resolver / publisher / han
 
 | 协议 / Job / Event | 幂等键 | 幂等窗口 | 审计 / 证据 | 重复请求处理 |
 |---|---|---|---|---|
-| `CreateConversationSpace` | command `IdempotencyKey` | command retention window | command audit + outbox ref | 返回已创建 space result |
-| `CloseConversationSpace` | command `IdempotencyKey` | command retention window | command audit + scope change ref | 返回已有 lifecycle result |
-| `UpdateParticipantScope` | command `IdempotencyKey` | command retention window | command audit + scope change ref | 返回已有 participant result |
-| `UpdateVisibilityScope` | command `IdempotencyKey` | command retention window | command audit + scope change ref | 返回已有 visibility result |
-| `AppendConversationFact` | command `IdempotencyKey` | command retention window | command audit + append receipt | 返回 duplicate receipt |
-| `RetractConversationFact` | command `IdempotencyKey` | command retention window | command audit + trace ref | 返回已有 retraction result |
-| `ManifestExternalFact` | command `IdempotencyKey` | command retention window | command audit + manifestation ref | 返回已有 manifestation result |
-| `CreateReviewAnchor` | command `IdempotencyKey` | command retention window | command audit + review anchor ref | 返回已有 anchor result |
-| `RequestTraceHandoff` | command `IdempotencyKey` | handoff retention window | command audit + handoff ref | 返回已有 handoff intent |
-| `RequestArchiveHandoff` | command `IdempotencyKey` | archive retention window | command audit + archive handoff ref | 返回已有 archive intent |
+| `CreateConversationSpace` | `CommandMetadata.request.idempotency_key` | command retention window | command audit + outbox ref | 返回已创建 space result |
+| `CloseConversationSpace` | `CommandMetadata.request.idempotency_key` | command retention window | command audit + scope change ref | 返回已有 lifecycle result |
+| `UpdateParticipantScope` | `CommandMetadata.request.idempotency_key` | command retention window | command audit + scope change ref | 返回已有 participant result |
+| `UpdateVisibilityScope` | `CommandMetadata.request.idempotency_key` | command retention window | command audit + scope change ref | 返回已有 visibility result |
+| `AppendConversationFact` | `CommandMetadata.request.idempotency_key` | command retention window | command audit + append receipt | 返回 duplicate receipt |
+| `RetractConversationFact` | `CommandMetadata.request.idempotency_key` | command retention window | command audit + trace ref | 返回已有 retraction result |
+| `ManifestExternalFact` | `CommandMetadata.request.idempotency_key` | command retention window | command audit + manifestation ref | 返回已有 manifestation result |
+| `CreateReviewAnchor` | `CommandMetadata.request.idempotency_key` | command retention window | command audit + review anchor ref | 返回已有 anchor result |
+| `RequestTraceHandoff` | `CommandMetadata.request.idempotency_key` | handoff retention window | command audit + handoff ref | 返回已有 handoff intent |
+| `RequestArchiveHandoff` | `CommandMetadata.request.idempotency_key` | archive retention window | command audit + archive handoff ref | 返回已有 archive intent |
 | Query APIs | request id optional | read audit policy | read audit if enabled | no write; may return cached read marker |
 | Inbound consumers | event id + source ref + `IdempotencyKey` | consumer retention window | consumer audit + quarantine / accepted marker | skip already consumed event |
 | Outbound events | outbox record id + event id | outbox retention window | publish evidence | do not publish duplicate |

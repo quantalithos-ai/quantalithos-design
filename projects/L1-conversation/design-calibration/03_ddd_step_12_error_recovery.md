@@ -161,7 +161,7 @@ publish / handoff 失败不得回滚 truth。
 
 | 场景 | 检测位置 | 处理方式 | 是否写审计 / 事件 |
 |---|---|---|---|
-| command 缺 idempotency key | protocol validation | reject request | command audit |
+| command metadata 缺 `request.idempotency_key` | protocol validation | reject request | command audit |
 | idempotency duplicate | `IdempotencyRepository.reserve(...)` | 返回已完成 result 或 skip | idempotency evidence |
 | idempotency conflict | `IdempotencyRepository.mark_conflict(...)` | 409 conflict | conflict evidence |
 | space / fact / trace missing | application service | return not found | read / command audit |

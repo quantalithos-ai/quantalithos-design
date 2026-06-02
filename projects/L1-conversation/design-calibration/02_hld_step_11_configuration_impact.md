@@ -11,7 +11,7 @@
 
 在主要组成部分、对象、接口、处理流、状态机和异常边界已收稳的前提下,识别 `L1-conversation` 哪些概要层结构会受到配置影响,哪些边界禁止配置化,以及哪些配置实现契约需要交给 `03-详细设计.md` 继续展开。
 
-本步只写概要设计层配置影响轮廓。本步不写配置项清单、默认值、JSON 示例、环境变量名、密钥名称、`RuntimeConfig` 字段全集、`ConfigError` 枚举全集、adapter constructor 完整参数或配置加载实现。
+本步只写概要设计层配置影响轮廓。本步不写配置项清单、默认值、JSON 示例、环境变量名、密钥名称、`ConversationRuntimeConfig` 字段全集、`ConfigError` 枚举全集、adapter constructor 完整参数或配置加载实现。
 
 ---
 
@@ -71,7 +71,7 @@ Domain Model、Domain Policy、状态机对象和核心 Application Service 只�
 
 `03-详细设计.md` 需要继续定义:
 
-- `RuntimeConfig` / `ConversationRuntimeConfig` 的边界和分层,但字段全集留到配置设计。
+- `ConversationRuntimeConfig` 的边界和分层,但字段全集留到配置设计。
 - `ConfigLoader`、`ConfigValidator`、`ConfigError` 的骨架和注入方式。
 - inbound adapters、external ports、repositories、projection stores、outbox publisher、handoff ports、operations jobs 的 `AdapterConfig` / `JobConfig` 方向。
 - runtime builder 如何把配置解析结果注入 application services,并保证 domain object / policy 不直接读配置。

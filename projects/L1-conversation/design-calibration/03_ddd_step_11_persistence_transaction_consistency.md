@@ -218,7 +218,7 @@ Repository 函数沿用 Step 7:
 | `ConversationOutboxRepository.enqueue(outbox, uow)` | 写待发布 outbox | 必须与 truth 写入同事务 | `Version` | `RepositoryError` |
 | `ConversationOutboxRepository.get_for_update(outbox_record_id, uow)` | 锁定 outbox | publish state 推进前必须调用 | `Option<ConversationOutboxRecord>` | `RepositoryError` |
 | `ConversationOutboxRepository.save_state(outbox, uow)` | 保存 publication state | 外部 publish 后短事务 | `Version` | `RepositoryError` |
-| `IdempotencyRepository.reserve(key, operation, uow)` | 预留幂等键 | 与业务写入同事务开始阶段 | `IdempotencyReservation` | `IdempotencyError` |
+| `IdempotencyRepository.reserve(key, operation, request_digest, uow)` | 预留幂等键 | 与业务写入同事务开始阶段;`request_digest` 为 validate 后计算的规范化输入摘要 | `IdempotencyReservation` | `IdempotencyError` |
 | `IdempotencyRepository.complete(reservation, result_ref, uow)` | 完成幂等记录 | 与业务写入同事务结束阶段 | `()` | `IdempotencyError` |
 
 ### 6.4 事务边界表

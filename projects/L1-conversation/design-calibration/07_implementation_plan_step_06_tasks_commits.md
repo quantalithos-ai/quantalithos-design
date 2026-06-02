@@ -104,7 +104,7 @@
 |---|---:|---|---|---|---|
 | IMPL-01-01 | 1 | 创建目标仓和 Rust workspace skeleton | `03` §4、Step 3 | `/home/aris/Projects/quantalithos-conversation`、root `Cargo.toml`、`crates/*` | workspace 可执行 `cargo check` |
 | IMPL-01-02 | 2 | 接入 `core-contracts` path dependency | `03` §3 / §4 | Cargo path dependency | compile 能解析 `core_contracts` |
-| IMPL-01-03 | 3 | 创建基础 JSON config、runtime builder skeleton 和 fixture root | `04` §3~§9 | config fixtures、`RuntimeConfig` skeleton | config smoke skeleton 可运行 |
+| IMPL-01-03 | 3 | 创建基础 JSON config、runtime builder skeleton 和 fixture root | `04` §3~§9 | config fixtures、`ConversationRuntimeConfig` skeleton | config smoke skeleton 可运行 |
 | IMPL-01-04 | 4 | 创建 gate / report / check scripts 与 evidence root | `03` §15、`05` §13 | `scripts/*`、`artifacts/test/<run_id>`、`reports/` | scripts 支持 required args |
 
 #### 代码实现批次

@@ -2,7 +2,7 @@
 
 > 本文件是 `projects/L1-conversation/04-配置设计.md` 的 Step 9 中间产物。
 > 本步定义配置如何加载、解析、校验、装配和生效。
-> 本步不新增公开 Rust loader API,不新增 `RuntimeConfig` 字段,不改变 `03-详细设计.md` 的 runtime builder、adapter、trait、error 或函数流契约。
+> 本步不新增公开 Rust loader API,不新增 `ConversationRuntimeConfig` 字段,不改变 `03-详细设计.md` 的 runtime builder、adapter、trait、error 或函数流契约。
 
 ## 1. Step 状态
 
@@ -217,7 +217,7 @@ entry local args
 说明:
 
 ```text
-本步没有新增 `RuntimeConfig` 字段、adapter constructor 参数、trait 方法、错误枚举或函数流。
+本步没有新增 `ConversationRuntimeConfig` 字段、adapter constructor 参数、trait 方法、错误枚举或函数流。
 如果后续需要公开 loader API 或新增 reload / hot update 机制,必须回到 `03-详细设计.md` 重新校准。
 ```
 

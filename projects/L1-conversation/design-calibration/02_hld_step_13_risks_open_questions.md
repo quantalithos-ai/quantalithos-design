@@ -96,7 +96,7 @@
 |---|---|---|
 | 来源仓 resolver / event / snapshot 的字段级契约是否已与相邻仓完全一致 | `ExternalFactRef`、`ExternalFactSnapshot`、来源 event consumer、reference refresh job | 当前按 reference / snapshot 抽象推进;详细设计逐字段核对,发现冲突回退 Step 6 / Step 7 |
 | projection / search / cursor 的具体技术产品是否在详细设计阶段确定 | `ConversationProjectionState`、`SearchIndexProjection`、`ChangeCursorProjection`、query fallback | 当前保持产品中立;详细设计只定义 port / adapter / store contract,产品选择不得进入概要主语 |
-| `04-配置说明` 是否为 `L1-conversation` 独立成文,以及哪些运行形态需要配置 | Step 11 配置影响、RuntimeConfig、AdapterConfig、JobConfig | 当前按“需要独立配置说明”挂起;如判断某运行形态无需配置,仍需产出配置说明并声明不需要配置 |
+| `04-配置说明` 是否为 `L1-conversation` 独立成文,以及哪些运行形态需要配置 | Step 11 配置影响、ConversationRuntimeConfig、AdapterConfig、JobConfig | 当前按“需要独立配置说明”挂起;如判断某运行形态无需配置,仍需产出配置说明并声明不需要配置 |
 | consistency validation 是否永远只诊断,还是未来允许受控修复命令 | `ValidateConversationConsistency`、diagnostic marker、truth / projection 对账 | 当前只诊断不修复;任何自动修复或修复命令都必须回退概要设计新增接口和状态口径 |
 | trace / archive handoff payload 的脱敏材料边界是否需要更细粒度分类 | `TraceHandoffRecord`、`ArchiveHandoffRecord`、`TraceRetentionPolicy`、handoff ports | 当前只允许引用和脱敏摘要;详细设计可细分 payload ref 类型,不得允许 forbidden body |
 | AI member / human actor / system actor 展示快照是否由 identity resolver 统一供给 | `ParticipantScope`、`FactSourceRef`、`ExternalReferenceProjection`、identity event consumer | 当前只保存 actor / participant 引用和展示 snapshot marker;详细设计需与 `L1-identity` 契约核对 |

@@ -73,8 +73,8 @@ Operations Job
 
 | 接口类别 | metadata 口径 |
 |---|---|
-| Command API | 必须携带 `ActorContext`、`CommandMetadata` 和 `IdempotencyKey`;系统触发入口可使用 `SystemActorRef` 作为 actor 来源 |
-| Query API | 必须携带 `ActorContext` 或 `ConsumerContext`;可按需携带 `QueryMetadata`、分页和一致性要求 |
+| Command API | 必须携带 `ActorContext` 和 core `CommandMetadata`;幂等键来自 `CommandMetadata.request.idempotency_key`;系统触发入口可使用 `SystemActorRef` 作为 actor 来源 |
+| Query API | 必须携带 `ActorContext` 或 `ConsumerContext`;分页和一致性要求来自 core `QueryMetadata` |
 | Inbound Event Consumer | 必须携带来源事件、`EventEnvelopeRef`、`EventId`、`EventSourceRef` 和消费幂等键 |
 | Outbound Event | 来自已提交 outbox record,必须能回指 committed truth ref 和 visibility / redaction 判断 |
 | Operations Job | 必须携带 `JobMetadata`、`JobRunId`、范围输入和触发来源;不得伪装成用户 command |
@@ -85,16 +85,16 @@ Operations Job
 
 | API | 输入骨架 | 输出骨架 | 主要处理 | 写入结果 |
 |---|---|---|---|---|
-| `CreateConversationSpace` | `CreateConversationSpaceCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `ConversationSpaceCommandResult` | 建立对话空间、初始参与范围、初始可见范围和 truth state | `ConversationSpace`、`ParticipantScope`、`VisibilityScope`、`ConversationTruthState`、`ScopeChangeRecord`、`ConversationOutboxRecord` |
-| `CloseConversationSpace` | `CloseConversationSpaceCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `ConversationSpaceCommandResult` | 校验空间状态和 actor 权限,关闭或转只读 | `ConversationSpace` lifecycle、`ConversationTruthState`、`ScopeChangeRecord`、`ConversationOutboxRecord` |
-| `UpdateParticipantScope` | `UpdateParticipantScopeCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `ParticipantScopeCommandResult` | 变更对话参与范围并记录变化依据 | `ParticipantScope`、`ScopeChangeRecord`、`ConversationOutboxRecord` |
-| `UpdateVisibilityScope` | `UpdateVisibilityScopeCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `VisibilityScopeCommandResult` | 变更可见范围并使受影响读取视图或游标失效 | `VisibilityScope`、`ScopeChangeRecord`、`ConversationChangeCursor` state、`ConversationOutboxRecord` |
-| `AppendConversationFact` | `AppendConversationFactCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `FactAppendReceipt` | 校验 space、participant、visibility、source 和 append policy 后追加事实 | `ConversationFact`、`FactAppendReceipt`、`ConversationTraceContext`、`ConversationOutboxRecord` |
-| `RetractConversationFact` | `RetractConversationFactCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `FactAppendReceipt` | 按可见范围和策略撤回事实,保留追溯依据 | `ConversationFact` state、`ConversationTraceContext`、`ConversationOutboxRecord` |
-| `ManifestExternalFact` | `ManifestExternalFactCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `ManifestExternalFactResult` | 校验外部引用、快照、可见范围和显化策略后形成显化记录 | `CrossDomainManifestation`、`ExternalFactSnapshot`、`ConversationFact`、`ConversationTraceContext`、`ConversationOutboxRecord` |
-| `CreateReviewAnchor` | `CreateReviewAnchorCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `ReviewAnchorCommandResult` | 为事实、显化、scope change 或 handoff 创建复盘定位点 | `ReviewAnchor`、`ConversationTraceContext`、`ConversationOutboxRecord` |
-| `RequestTraceHandoff` | `RequestTraceHandoffCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `TraceHandoffCommandResult` | 为追溯上下文创建 observability 交接意图 | `TraceHandoffRecord`、`ConversationOutboxRecord` |
-| `RequestArchiveHandoff` | `RequestArchiveHandoffCommand`、`ActorContext`、`CommandMetadata`、`IdempotencyKey` | `ArchiveHandoffCommandResult` | 为对话空间或追溯上下文创建 archive 交接意图 | `ArchiveHandoffRecord`、`ConversationOutboxRecord` |
+| `CreateConversationSpace` | `CreateConversationSpaceCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `ConversationSpaceCommandResult` | 建立对话空间、初始参与范围、初始可见范围和 truth state | `ConversationSpace`、`ParticipantScope`、`VisibilityScope`、`ConversationTruthState`、`ScopeChangeRecord`、`ConversationOutboxRecord` |
+| `CloseConversationSpace` | `CloseConversationSpaceCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `ConversationSpaceCommandResult` | 校验空间状态和 actor 权限,关闭或转只读 | `ConversationSpace` lifecycle、`ConversationTruthState`、`ScopeChangeRecord`、`ConversationOutboxRecord` |
+| `UpdateParticipantScope` | `UpdateParticipantScopeCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `ParticipantScopeCommandResult` | 变更对话参与范围并记录变化依据 | `ParticipantScope`、`ScopeChangeRecord`、`ConversationOutboxRecord` |
+| `UpdateVisibilityScope` | `UpdateVisibilityScopeCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `VisibilityScopeCommandResult` | 变更可见范围并使受影响读取视图或游标失效 | `VisibilityScope`、`ScopeChangeRecord`、`ConversationChangeCursor` state、`ConversationOutboxRecord` |
+| `AppendConversationFact` | `AppendConversationFactCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `FactAppendReceipt` | 校验 space、participant、visibility、source 和 append policy 后追加事实 | `ConversationFact`、`FactAppendReceipt`、`ConversationTraceContext`、`ConversationOutboxRecord` |
+| `RetractConversationFact` | `RetractConversationFactCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `FactAppendReceipt` | 按可见范围和策略撤回事实,保留追溯依据 | `ConversationFact` state、`ConversationTraceContext`、`ConversationOutboxRecord` |
+| `ManifestExternalFact` | `ManifestExternalFactCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `ManifestExternalFactResult` | 校验外部引用、快照、可见范围和显化策略后形成显化记录 | `CrossDomainManifestation`、`ExternalFactSnapshot`、`ConversationFact`、`ConversationTraceContext`、`ConversationOutboxRecord` |
+| `CreateReviewAnchor` | `CreateReviewAnchorCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `ReviewAnchorCommandResult` | 为事实、显化、scope change 或 handoff 创建复盘定位点 | `ReviewAnchor`、`ConversationTraceContext`、`ConversationOutboxRecord` |
+| `RequestTraceHandoff` | `RequestTraceHandoffCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `TraceHandoffCommandResult` | 为追溯上下文创建 observability 交接意图 | `TraceHandoffRecord`、`ConversationOutboxRecord` |
+| `RequestArchiveHandoff` | `RequestArchiveHandoffCommand`、`ActorContext`、`CommandMetadata.request.idempotency_key` | `ArchiveHandoffCommandResult` | 为对话空间或追溯上下文创建 archive 交接意图 | `ArchiveHandoffRecord`、`ConversationOutboxRecord` |
 
 Command 边界说明:
 
@@ -258,7 +258,7 @@ Operations 边界说明:
 ## 15. 进入下一步条件
 
 - 已明确 Command / Query / Inbound Event Consumer / Outbound Event / Operations Job 五类接口。
-- Command 输入骨架已显式携带 `ActorContext`、`CommandMetadata` 和 `IdempotencyKey`。
+- Command 输入骨架已显式携带 `ActorContext` 和 `CommandMetadata`,幂等键从 `CommandMetadata.request.idempotency_key` 读取。
 - Query 输入骨架已显式携带 `ActorContext` 或 `ConsumerContext`。
 - Event Consumer 输入骨架已显式携带 event、envelope、event id、source ref 和幂等键。
 - 已明确每类接口的读写性质、边界和本地结果。

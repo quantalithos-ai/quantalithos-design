@@ -69,7 +69,7 @@
 5. 04 明确配置来源、优先级、冲突处理、环境矩阵、配置项、密钥边界、加载校验、生效和失败策略。
 6. 04 为 05-测试方案、06-验收标准、07-实施计划和后续部署运维手册提供配置矩阵与门禁输入。
 7. 04 不写部署命令、不写完整运维手册、不重新定义 Rust struct / enum / trait / function。
-8. 如果 04 发现必须改变 RuntimeConfig、ConfigLoader、ConfigValidator、runtime builder、adapter constructor、trait、error 或函数流,必须先回写 03-详细设计.md。
+8. 如果 04 发现必须改变 ConversationRuntimeConfig、ConfigLoader、ConfigValidator、runtime builder、adapter constructor、trait、error 或函数流,必须先回写 03-详细设计.md。
 ```
 
 ---

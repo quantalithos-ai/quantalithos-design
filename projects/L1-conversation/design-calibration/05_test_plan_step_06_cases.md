@@ -107,8 +107,8 @@ Command 写流必须注入 outbox enqueue failure 或 repository failure,断言 
 
 | 用例 ID | 场景 | 优先级 | 前置条件 | 输入 / 操作 | 预期结果 | 断言点 | 自动化候选 |
 |---|---|---|---|---|---|---|---|
-| TC-CONV-SPACE-001 | 创建对话空间主线 | P0-blocking | actor、owner、participant refs 有效 | `CreateConversationSpace` with `CommandMetadata` + `IdempotencyKey` | 创建 space / scope / visibility,写 `ConversationSpaceChangedEvent` outbox | `ConversationTruthState::Open`; `ConversationSpaceLifecycleState::Active`; `VisibilityScopeState::Open`; outbox `Pending` | CI service + API |
-| TC-CONV-SPACE-002 | 创建缺少幂等键拒绝 | P0-blocking | 无 | `CreateConversationSpace` missing `idempotency_key` | 请求拒绝,不写 truth / outbox | `ProtocolError::MissingRequiredField`; no `ConversationSpace` | CI contract |
+| TC-CONV-SPACE-001 | 创建对话空间主线 | P0-blocking | actor、owner、participant refs 有效 | `CreateConversationSpace` with `CommandMetadata.request.idempotency_key = Some(...)` | 创建 space / scope / visibility,写 `ConversationSpaceChangedEvent` outbox | `ConversationTruthState::Open`; `ConversationSpaceLifecycleState::Active`; `VisibilityScopeState::Open`; outbox `Pending` | CI service + API |
+| TC-CONV-SPACE-002 | 创建缺少幂等键拒绝 | P0-blocking | 无 | `CreateConversationSpace` with `CommandMetadata.request.idempotency_key = None` | 请求拒绝,不写 truth / outbox | `ProtocolError::MissingRequiredField`; no `ConversationSpace` | CI contract |
 | TC-CONV-SPACE-003 | 关闭后再次打开拒绝 | P0-blocking | space 已 `Closed` | 触发 `Closed -> Open` 或 append reopen | 非法状态转换拒绝 | `DomainError::InvalidStateTransition`; no outbox | CI domain |
 | TC-CONV-SCOPE-001 | visibility 收紧并标记派生陈旧 | P0-blocking | space active,read model fresh | `UpdateVisibilityScope` narrow visibility | visibility 更新,read model / cursor stale,scope changed outbox | `VisibilityScopeState::Restricted`; `ProjectionFreshnessState::Stale`; `ConversationScopeChangedEvent` | CI service |
 | TC-CONV-SCOPE-002 | sealed visibility 扩张拒绝 | P0-blocking | visibility `Sealed` | `UpdateVisibilityScope` expand visibility | 拒绝,不改变 read model | `DomainError::InvalidStateTransition`; visibility expansion denied evidence 待 Step 13 | CI domain + service |

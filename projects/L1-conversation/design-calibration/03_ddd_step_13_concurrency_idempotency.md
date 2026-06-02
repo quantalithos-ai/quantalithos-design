@@ -62,7 +62,7 @@ write-like flow:
 
 | 来源 | 使用位置 | 说明 |
 |---|---|---|
-| request `IdempotencyKey` | 10 个 Command API | 必须在 command envelope 中显式携带 |
+| `CommandMetadata.request.idempotency_key` | 10 个 Command API | 必须为 `Some(IdempotencyKey)`;command envelope 不再携带顶层 key |
 | query `RequestId` | 11 个 Query API | 只用于读取审计或 read marker,不作为写幂等 |
 | event id + source ref + `IdempotencyKey` | 6 个 Inbound Consumer | event id 负责 broker replay 去重,source ref 防止跨来源误判 |
 | outbox record id + event id | 8 个 Outbound Event | event id 必须稳定来自 outbox / id generator |
@@ -82,6 +82,8 @@ write-like flow:
 | 不同 job run 扫到同一 pending 目标 | 按 record lock / state transition 处理,已完成目标 skip |
 
 本仓不采用“覆盖”作为重复请求处理方式。Conversation truth、scope、fact、handoff 和 projection state 的重复写入必须通过状态转换、sequence 前进或明确的新 command 表达。
+
+`request digest` 由 application service 在 validate 后、调用 `IdempotencyRepository.reserve(key, operation, request_digest, uow)` 前按规范化 command / event / job 输入计算;不得包含 `request_id`、`requested_at`、`trace_context` 等 volatile metadata。同一 key 的 duplicate / conflict 判断必须以 `operation + request_digest` 为准。
 
 ### 3.5 并发冲突如何测试？
 
@@ -120,7 +122,7 @@ write-like flow:
 
 | 场景 | 冲突资源 | 控制方式 | 失败错误 | 测试切口 |
 |---|---|---|---|---|
-| 同一 `CreateConversationSpace` command 重试 | `IdempotencyRecord`、`ConversationSpaceId`、初始 scope bundle | 先 reserve command key;同 key 同 digest 返回已创建 result | `IdempotencyError::Conflict` / `RepositoryError` | duplicate create returns previous result;different body same key conflicts |
+| 同一 `CreateConversationSpace` command 重试 | `IdempotencyRecord`、`ConversationSpaceId`、初始 scope bundle | 先计算 request digest,再 reserve command key + operation + digest;同 key 同 digest 返回已创建 result | `IdempotencyError::Conflict` / `RepositoryError` | duplicate create returns previous result;different body same key conflicts |
 | close space 与 append fact 并发 | `ConversationSpace.truth_state`、fact append policy | `get_space_for_update`;close 后 append 必须重新检查 state | `ApplicationError::Conflict` / `DomainError::InvalidStateTransition` | close while append;append after closed rejected |
 | participant scope 与 visibility scope 并发更新 | `ParticipantScope`、`VisibilityScope`、`ScopeChangeRecord` | scope bundle 同事务保存;版本冲突返回 conflict | `RepositoryError` / `ApplicationError::Conflict` | concurrent participant and visibility updates |
 | visibility scope 更新与 read model rebuild 并发 | `VisibilityScope`、`ConversationProjectionState`、`ConversationReadModel` | visibility command stale projection;rebuild 读取最新 scope 后 upsert | `RepositoryError` / stale marker | visibility update marks projection stale;rebuild refreshes |
@@ -145,16 +147,16 @@ write-like flow:
 
 | 接口 / Job / Event | 幂等键 | 幂等窗口 | 重复请求处理 |
 |---|---|---|---|
-| `CreateConversationSpace` | command `IdempotencyKey` | command retention window | 返回已创建 space result |
-| `CloseConversationSpace` | command `IdempotencyKey` | command retention window | 返回已有 lifecycle result |
-| `UpdateParticipantScope` | command `IdempotencyKey` | command retention window | 返回已有 participant result |
-| `UpdateVisibilityScope` | command `IdempotencyKey` | command retention window | 返回已有 visibility result |
-| `AppendConversationFact` | command `IdempotencyKey` | command retention window | 返回 duplicate receipt |
-| `RetractConversationFact` | command `IdempotencyKey` | command retention window | 返回已有 retraction result |
-| `ManifestExternalFact` | command `IdempotencyKey` | command retention window | 返回已有 manifestation result |
-| `CreateReviewAnchor` | command `IdempotencyKey` | command retention window | 返回已有 anchor result |
-| `RequestTraceHandoff` | command `IdempotencyKey` | handoff retention window | 返回已有 handoff intent |
-| `RequestArchiveHandoff` | command `IdempotencyKey` | archive retention window | 返回已有 archive intent |
+| `CreateConversationSpace` | `CommandMetadata.request.idempotency_key` | command retention window | 返回已创建 space result |
+| `CloseConversationSpace` | `CommandMetadata.request.idempotency_key` | command retention window | 返回已有 lifecycle result |
+| `UpdateParticipantScope` | `CommandMetadata.request.idempotency_key` | command retention window | 返回已有 participant result |
+| `UpdateVisibilityScope` | `CommandMetadata.request.idempotency_key` | command retention window | 返回已有 visibility result |
+| `AppendConversationFact` | `CommandMetadata.request.idempotency_key` | command retention window | 返回 duplicate receipt |
+| `RetractConversationFact` | `CommandMetadata.request.idempotency_key` | command retention window | 返回已有 retraction result |
+| `ManifestExternalFact` | `CommandMetadata.request.idempotency_key` | command retention window | 返回已有 manifestation result |
+| `CreateReviewAnchor` | `CommandMetadata.request.idempotency_key` | command retention window | 返回已有 anchor result |
+| `RequestTraceHandoff` | `CommandMetadata.request.idempotency_key` | handoff retention window | 返回已有 handoff intent |
+| `RequestArchiveHandoff` | `CommandMetadata.request.idempotency_key` | archive retention window | 返回已有 archive intent |
 | Query APIs | optional request id | read audit policy | 不写状态;重复读取返回当前 authorized view 或 cached read marker |
 | `ConsumeWorkContextChanged` | event id + source ref + `IdempotencyKey` | consumer retention window | skip already consumed event |
 | `ConsumeGovernanceFactCommitted` | event id + source ref + `IdempotencyKey` | consumer retention window | skip already consumed event |

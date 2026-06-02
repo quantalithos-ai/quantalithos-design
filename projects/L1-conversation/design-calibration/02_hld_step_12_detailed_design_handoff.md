@@ -64,7 +64,7 @@
 - Application service 编排、事务边界、unit of work、repository 调用、outbox 写入、并发控制和幂等记录。
 - Projection、reference refresh、search、cursor、outbox publish、handoff 和 consistency validation 的实现契约。
 - 异常类型、错误码、retry / failed / suppressed / stale / unresolved marker 的实现口径。
-- 配置实现契约:RuntimeConfig、ConfigLoader、ConfigValidator、AdapterConfig、JobConfig、ConfigError、runtime builder 注入关系。
+- 配置实现契约:ConversationRuntimeConfig、ConfigLoader、ConfigValidator、AdapterConfig、JobConfig、ConfigError、runtime builder 注入关系。
 - 测试矩阵、fixture、状态迁移断言、异常断言、契约测试和验收 evidence 口径。
 
 ### 3.4 如果详细设计发现主语需要变更，应回退到哪里修正？
@@ -141,7 +141,7 @@
 | Operations job 处理流 | outbox publish、read/search rebuild、cursor maintenance、reference refresh、handoff、validation、cleanup 实现 |
 | 15 组状态机 | enum 定义、状态转换函数、允许 / 禁止迁移 guard、状态传播和测试矩阵 |
 | 异常与边界场景表 | error type、error mapping、rejected / deferred / quarantined / stale / failed / suppressed marker 和测试断言 |
-| 配置影响轮廓 | RuntimeConfig、ConfigLoader、ConfigValidator、AdapterConfig、JobConfig、ConfigError、runtime builder 注入 |
+| 配置影响轮廓 | ConversationRuntimeConfig、ConfigLoader、ConfigValidator、AdapterConfig、JobConfig、ConfigError、runtime builder 注入 |
 | 禁止配置化边界 | validator / runtime builder / policy guard 中的不可配置化检查和配置错误处理 |
 
 ---
@@ -209,7 +209,7 @@
 | 需要改变处理流主干或事务内外边界 | Step 8 | 在 service 编排中暗改写路径或后台边界 |
 | 需要新增状态、删除状态或改变迁移方向 | Step 9 | 在 enum / state function 中自行扩展状态机 |
 | 需要改变异常对状态或处理流的影响 | Step 10 | 在 error handling 中自行把异常改成成功 / retry / ignore |
-| 需要让配置影响新的边界或放开禁配红线 | Step 11 | 在 RuntimeConfig 中加入绕过边界的开关 |
+| 需要让配置影响新的边界或放开禁配红线 | Step 11 | 在 ConversationRuntimeConfig 中加入绕过边界的开关 |
 | 需要新增尚未讨论的跨仓依赖 | Step 1 / Step 3 / 架构设计 | 在详细设计中直接引入新编译依赖或新 truth owner |
 
 ---
@@ -221,7 +221,7 @@
 | 概要设计到详细设计输入不显式 | 详细设计可能重新发明对象、接口或状态 | 用承接清单表固定已收稳输入 |
 | 详细设计职责容易过宽 | 可能把配置、测试、实施或新方案讨论混入详细设计 | 明确详细设计只继续展开字段、协议、函数、事务、异常和测试契约 |
 | 主语变更缺少回退规则 | 详细设计可能暗改概要结论 | 单列回退规则表 |
-| 配置影响可能被遗漏 | 详细设计可能临时补 RuntimeConfig 字段 | 将 Step 11 配置影响纳入承接清单 |
+| 配置影响可能被遗漏 | 详细设计可能临时补 ConversationRuntimeConfig 字段 | 将 Step 11 配置影响纳入承接清单 |
 | 未闭环内容可能被当作已收稳 | 风险和待确认项被伪装成设计输入 | 明确未闭环内容进入 Step 13 |
 
 ---

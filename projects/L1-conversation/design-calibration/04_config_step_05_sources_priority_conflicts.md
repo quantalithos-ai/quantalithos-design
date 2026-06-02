@@ -208,7 +208,7 @@ ordinary config values
 说明:
 
 ```text
-本步没有新增 `RuntimeConfig` 字段、`ConfigError` 枚举值或 adapter constructor 参数。
+本步没有新增 `ConversationRuntimeConfig` 字段、`ConfigError` 枚举值或 adapter constructor 参数。
 Step 9 会继续展开配置加载、校验和生效机制;如届时发现错误模型不足,再进入详细设计回写清单。
 ```
 

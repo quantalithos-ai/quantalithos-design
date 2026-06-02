@@ -189,7 +189,7 @@ P0 默认不支持核心配置热更新。凡是会改变 runtime graph、store�
 说明:
 
 ```text
-本步没有新增 `RuntimeConfig` 字段、`ConfigError` 枚举值、adapter constructor 参数或 trait。
+本步没有新增 `ConversationRuntimeConfig` 字段、`ConfigError` 枚举值、adapter constructor 参数或 trait。
 Step 7 如需把某个禁止边界落为显式配置校验项,必须检查 `03` 是否已有可表达的错误模型。
 ```
 

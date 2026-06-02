@@ -268,6 +268,25 @@ pub trait SpaceScopeRepository {
 | `save_scope_bundle(bundle: ScopeMutationBundle, uow: UnitOfWorkHandle)` | 原子保存 space / scope / change | `bundle` 为 scope 变更集合 | `Version` | `RepositoryError` |
 | `list_spaces(scope: ConversationSpaceScope, page: PageRequest)` | 按运维 scope 分页列出 space | `scope` 为目标范围;`page` 为分页 | `Page<ConversationSpace>` | `RepositoryError` |
 
+`ScopeMutationBundle` 最小结构和构造约束:
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `space` | `Option<ConversationSpace>` | space 创建或生命周期变化时必须携带 |
+| `participant_scope` | `Option<ParticipantScope>` | 创建或参与范围变化时必须携带 |
+| `visibility_scope` | `Option<VisibilityScope>` | 创建或可见范围变化时必须携带 |
+| `truth_state` | `Option<ConversationTruthState>` | 创建 conversation truth 初始状态时必须携带 |
+| `scope_change` | `ScopeChangeRecord` | 每个 bundle 必须且只能携带一个已应用的 scope change |
+
+| 构造函数 | 必须包含 | 必须为空 | 输出约束 |
+|---|---|---|---|
+| `created(space, participant, visibility, truth, scope_change)` | `space`、`participant_scope`、`visibility_scope`、`truth_state`、初始 `scope_change` | 无 | 用于创建 space 的初始原子保存;`scope_change` 必须由 application service 显式构造,且 `scope_kind = Space`、`change_reason.reason_kind = InitialCreate` |
+| `space_changed(space, scope_change)` | `space`、`scope_change` | `participant_scope`、`visibility_scope`、`truth_state` | 用于 close / archive / owner metadata 等 space 变化;PH-02 close flow 只持久化 `ConversationSpace.lifecycle_state` 与 scope change,不得在本 bundle 写 truth / participant / visibility state |
+| `participant_changed(scope, scope_change)` | `participant_scope`、`scope_change` | `space`、`visibility_scope`、`truth_state` | 只保存参与范围变化;批量 add/remove 命令必须合成为一个 `ScopeChangeRecord`,scope version 只递增一次 |
+| `visibility_changed(visibility, scope_change)` | `visibility_scope`、`scope_change` | `space`、`participant_scope`、`truth_state` | 只保存可见范围变化;projection stale marker 不在 bundle 内 |
+
+`ScopeMutationBundle` 不承载 read model、projection state、outbox record 或 publish evidence。projection stale marker 必须通过 `ProjectionRepository` 保存,outbox 必须通过 `ConversationOutboxRepository` enqueue。
+
 #### 7.3.2 `ConversationFactRepository`
 
 ```rust
@@ -708,6 +727,7 @@ pub trait IdempotencyRepository {
         &self,
         key: IdempotencyKey,
         operation: IdempotencyOperation,
+        request_digest: RequestDigest,
         uow: UnitOfWorkHandle,
     ) -> Result<IdempotencyReservation, IdempotencyError>;
 
@@ -737,10 +757,28 @@ pub trait IdempotencyRepository {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 错误类型 |
 |---|---|---|---|---|
-| `reserve(key: IdempotencyKey, operation: IdempotencyOperation, uow: UnitOfWorkHandle)` | 预留幂等键 | key、operation、事务句柄 | `IdempotencyReservation` | `IdempotencyError` |
+| `reserve(key: IdempotencyKey, operation: IdempotencyOperation, request_digest: RequestDigest, uow: UnitOfWorkHandle)` | 预留幂等键 | key、operation、规范化请求摘要、事务句柄 | `IdempotencyReservation` | `IdempotencyError` |
 | `complete(reservation: IdempotencyReservation, result_ref: IdempotencyResultRef, uow: UnitOfWorkHandle)` | 标记完成 | reservation、结果引用、事务句柄 | `()` | `IdempotencyError` |
 | `mark_conflict(key: IdempotencyKey, conflict: IdempotencyConflict, uow: UnitOfWorkHandle)` | 标记冲突 | key、冲突信息、事务句柄 | `()` | `IdempotencyError` |
 | `find(key: IdempotencyKey)` | 只读查询幂等记录 | key | `Option<IdempotencyRecord>` | `IdempotencyError` |
+
+幂等最小数据契约:
+
+| 类型 | 最小字段 | 约束 |
+|---|---|---|
+| `RequestDigest` | `algorithm_version: DigestAlgorithmVersion`、`digest_value: String` | application service 在 validate 后按规范化 command / event / job 输入计算;不得包含 `request_id`、`requested_at`、`trace_context` 等 volatile metadata |
+| `IdempotencyRecord` | `key`、`operation`、`request_digest`、`status: Reserved, Completed, Conflicted`、`result_ref: Option<IdempotencyResultRef>`、`reserved_at`、`completed_at: Option<Timestamp>`、`conflict_reason: Option<IdempotencyConflictReason>` | `key + operation + request_digest` 是 duplicate 判断真相源;同 key 不同 operation 或 digest 必须 conflict |
+| `IdempotencyReservation` | `reservation_kind: ReservedNew, DuplicateCompleted, InProgress, ConflictDetected`、`record: IdempotencyRecord`、`conflict: Option<IdempotencyConflict>` | duplicate 只能返回已 completed 且 digest 相同的 record;in-progress 不得生成新业务事实;conflict detected 分支必须调用 `mark_conflict(...)` 后返回 conflict |
+| `IdempotencyConflict` | `key`、`existing_operation`、`observed_operation`、`existing_request_digest`、`observed_request_digest`、`conflict_reason`、`detected_at` | `mark_conflict(...)` 的正式输入 |
+| `ApplicationResultRef` | `result_kind: Command, Consumer, Job`、`result_id: String` | application 本地结果回指;command 结果可由 contracts `CommandResultRef` 映射 |
+| `IdempotencyResultRef` | `operation: IdempotencyOperation`、`application_result_ref: ApplicationResultRef` | `complete(...)` 保存的幂等结果引用 |
+
+`reserve(...)` 的比较规则:
+
+- 未命中记录时创建 `ReservedNew`。
+- 命中同 key、同 operation、同 request digest 且 completed 的记录时返回 `DuplicateCompleted`,application service 必须返回既有 result / receipt,不得重新写 scope、truth 或 outbox。
+- 命中同 key、同 operation、同 request digest 但尚未 completed 的记录时返回 `InProgress` 或对应 idempotency error,不得生成新业务事实。
+- 命中同 key 但 operation 或 request digest 不同的记录时返回 `ConflictDetected` reservation,application service 必须调用 `mark_conflict(...)` 后返回 conflict。
 
 #### 7.4.3 `ClockPort` 与 `IdGeneratorPort`
 

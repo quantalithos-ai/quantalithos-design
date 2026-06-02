@@ -60,7 +60,7 @@ L1-conversation 需要独立配置设计。
 
 | 详细设计输入 | 配置设计承接方式 |
 |---|---|
-| `infra/config.rs` | 继续展开 `RuntimeConfig`、配置项、默认值、校验和失败策略 |
+| `infra/config.rs` | 继续展开 `ConversationRuntimeConfig`、配置项、默认值、校验和失败策略 |
 | `infra/runtime_builder.rs` | 说明配置如何装配 repository、resolver、publisher、handoff、clock、id generator |
 | `storage.truth_store`、`storage.projection_store`、`storage.snapshot_store`、`storage.outbox_store`、`storage.idempotency_store` | 定义 store config、默认 in-memory、durable adapter 后续接入规则 |
 | `api.command_intake`、`api.query_intake` | 定义入口 profile、metadata / auth adapter、error mapping 装配 |

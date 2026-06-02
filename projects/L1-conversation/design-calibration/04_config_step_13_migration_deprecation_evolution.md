@@ -25,7 +25,7 @@
 ```text
 本轮是 L1-conversation 首版正式配置设计,当前无已发布旧配置需要迁移。
 Step 7 定义的 12 个顶层模块和字段级配置项作为 v1 active 配置契约。
-未来新增、重命名或移除配置项时,不得只改 04;如果影响 RuntimeConfig、runtime builder、adapter constructor、trait、error、DTO、job receipt 或 event,必须先回写 03。
+未来新增、重命名或移除配置项时,不得只改 04;如果影响 ConversationRuntimeConfig、runtime builder、adapter constructor、trait、error、DTO、job receipt 或 event,必须先回写 03。
 ```
 
 ## 3. SOP 问题回答

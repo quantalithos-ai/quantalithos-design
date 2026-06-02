@@ -231,7 +231,7 @@ Conversation truth / space / scope / fact / manifestation / trace / projection /
 | 持久化 / 事务 / 一致性 | Step 11;正式 §10 | 实现 repository、UnitOfWork、唯一约束、version、projection、publisher 语义 |
 | 错误模型 / 恢复 | Step 12;正式 §11 | 实现错误 enum、协议映射、retryable / non-retryable / manual action |
 | 并发 / 幂等 / 重入 | Step 13;正式 §12 | 实现 idempotency anchor、request digest、version conflict、job item 去重 |
-| 配置 / 外部依赖 | Step 14;正式 §13 | 实现 `RuntimeConfig`、config loader、runtime builder、adapter binding |
+| 配置 / 外部依赖 | Step 14;正式 §13 | 实现 `ConversationRuntimeConfig`、config loader、runtime builder、adapter binding |
 | 可观测性 / 审计 | Step 15;正式 §14 | 实现 log、metric、audit / evidence、trace ref、redaction 和 forbidden body 检查 |
 | 测试切口 | Step 16;正式 §15 | 将最小测试切口映射到实现阶段门禁,完整展开交给 `05-测试方案.md` |
 

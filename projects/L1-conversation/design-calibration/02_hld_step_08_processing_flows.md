@@ -101,7 +101,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
 <Command Intake>
   - validate ActorContext actor_context
   - validate CommandMetadata command_metadata
-  - reserve IdempotencyKey idempotency_key
+  - require command_metadata.request.idempotency_key
+  - reserve IdempotencyKey from command_metadata.request.idempotency_key
   │
   ▼
 <Application Service>
@@ -229,7 +230,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate CreateConversationSpaceCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <ConversationSpaceCommandService>
@@ -249,6 +251,7 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   │
   ▼
 <ConversationSpaceCommandResult>
+  - return fields defined in Step 8 Command result DTO
 ```
 
 关键设计点：
@@ -264,7 +267,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate CloseConversationSpaceCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <ConversationSpaceCommandService>
@@ -283,6 +287,7 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   │
   ▼
 <ConversationSpaceCommandResult>
+  - return fields defined in Step 8 Command result DTO
 ```
 
 关键设计点：
@@ -298,7 +303,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate UpdateParticipantScopeCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <ParticipantScopeCommandService>
@@ -318,6 +324,7 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   │
   ▼
 <ParticipantScopeCommandResult>
+  - return fields defined in Step 8 Command result DTO
 ```
 
 关键设计点：
@@ -333,7 +340,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate UpdateVisibilityScopeCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <VisibilityScopeCommandService>
@@ -353,6 +361,7 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   │
   ▼
 <VisibilityScopeCommandResult>
+  - return fields defined in Step 8 Command result DTO
 ```
 
 关键设计点：
@@ -368,7 +377,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate AppendConversationFactCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <ConversationFactAppendService>
@@ -403,7 +413,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate RetractConversationFactCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <ConversationFactAppendService>
@@ -437,7 +448,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate ManifestExternalFactCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <ConversationManifestationService>
@@ -472,7 +484,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate CreateReviewAnchorCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <ConversationTraceReviewService>
@@ -506,7 +519,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate RequestTraceHandoffCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <ConversationTraceReviewService>
@@ -540,7 +554,8 @@ Operations Job 从 job input 和 job metadata 进入,只能读取已持久化 tr
   ▼
 <Command Intake>
   - validate RequestArchiveHandoffCommand command
-  - reserve IdempotencyKey idempotency_key
+  - require CommandMetadata.request.idempotency_key
+  - reserve IdempotencyKey from CommandMetadata.request.idempotency_key
   │
   ▼
 <ConversationTraceReviewService>

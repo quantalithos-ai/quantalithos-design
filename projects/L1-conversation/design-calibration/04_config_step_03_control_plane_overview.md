@@ -2,7 +2,7 @@
 
 > 本文件是 `projects/L1-conversation/04-配置设计.md` 的 Step 3 中间产物。
 > 本步建立配置来源链、配置进入 Conversation runtime 的装配入口、模块读取边界和配置控制面总表。
-> 本步不新增 `RuntimeConfig` 字段,不定义 JSON demo,不改变 `03-详细设计.md` 的代码契约。
+> 本步不新增 `ConversationRuntimeConfig` 字段,不定义 JSON demo,不改变 `03-详细设计.md` 的代码契约。
 
 ## 1. Step 状态
 
@@ -188,7 +188,7 @@ api / worker / jobs entry
 说明:
 
 ```text
-本步只建立控制面视图。若 Step 7 需要新增 `RuntimeConfig` 字段或 Step 9 需要新增 `ConfigError` 枚举值,必须在对应 Step 记录 03 回写。
+本步只建立控制面视图。若 Step 7 需要新增 `ConversationRuntimeConfig` 字段或 Step 9 需要新增 `ConfigError` 枚举值,必须在对应 Step 记录 03 回写。
 ```
 
 ## 9. 回填草稿

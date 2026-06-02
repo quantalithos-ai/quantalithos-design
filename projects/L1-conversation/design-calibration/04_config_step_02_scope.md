@@ -211,7 +211,7 @@ P0 必须定义能让 Conversation truth center 默认可验证路径跑通的�
 |---|---|---|---|---|
 | 确认 P0 配置聚焦默认可验证路径,production DB / MQ / endpoint / KMS 字段全集后移 | 否 | 无代码契约变化 | 无 | 无回写 |
 | P0 配置聚焦默认可验证路径,production DB / MQ / endpoint / KMS 字段全集后移 | 否 | 与 `03` §13 / §17 的配置后续工作和风险口径一致 | 无 | 无回写 |
-| 本步不新增 RuntimeConfig 字段、不改变 adapter trait、不新增 ConfigError 枚举值 | 否 | 无代码契约变化 | 无 | 无回写 |
+| 本步不新增 ConversationRuntimeConfig 字段、不改变 adapter trait、不新增 ConfigError 枚举值 | 否 | 无代码契约变化 | 无 | 无回写 |
 
 说明:
 

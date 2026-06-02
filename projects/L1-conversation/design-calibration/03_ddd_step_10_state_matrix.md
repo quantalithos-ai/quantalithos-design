@@ -82,8 +82,8 @@
 | 触发来源 | 触发函数 / 处理流 | 影响状态机 |
 |---|---|---|
 | Command | `CreateConversationSpaceFlow` | truth open、space active、scope active / open |
-| Command | `CloseConversationSpaceFlow` | truth read-only / closed、space closed、trace retention handoff pending |
-| Command | `UpdateParticipantScopeFlow` | participant active / restricted / closed、scope change applied / superseded |
+| Command | `CloseConversationSpaceFlow` | space read-only / closed / archived、scope change applied、trace retention handoff pending |
+| Command | `UpdateParticipantScopeFlow` | participant active / restricted、scope change applied / superseded |
 | Command | `UpdateVisibilityScopeFlow` | visibility open / restricted / sealed、projection stale、cursor invalidated |
 | Command / Consumer | `AppendConversationFactFlow`、`ConsumeRuntimeResultCommittedFlow`、`ConsumeBridgeMappedFactReceivedFlow` | fact accepted / restricted / quarantined、receipt accepted / rejected / duplicate |
 | Command | `RetractConversationFactFlow` | fact retracted、projection stale |
@@ -144,7 +144,7 @@
 
 | 状态机 | 主对象 | 状态字段 | 初始状态 | 终态 | 主要触发函数 |
 |---|---|---|---|---|---|
-| Conversation truth | truth policy / aggregate root | `ConversationTruthState` | `Open` | `Closed` | `CreateConversationSpaceFlow`、`CloseConversationSpaceFlow`、handoff request |
+| Conversation truth | truth policy / aggregate root | `ConversationTruthState` | `Open` | `Closed` | `CreateConversationSpaceFlow`、handoff request、policy recovery / restriction |
 | Space lifecycle | `ConversationSpace` | `lifecycle_state` | `Active` | `Archived` | `ConversationSpace::close(...)`、`ConversationSpace::archive(...)` |
 | Participant scope | `ParticipantScope` | `scope_state` | `Active` | `Closed` | `add_participant(...)`、`remove_participant(...)`、restriction policy |
 | Visibility scope | `VisibilityScope` | `scope_state` | `Open` | `Sealed` | `UpdateVisibilityScopeFlow`、visibility restriction |
@@ -232,13 +232,13 @@
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | 初始 | `Open` | `ConversationTruthState::open_for_space(ConversationSpaceId space_id, ActorRef actor)` | `CreateConversationSpaceFlow` 通过 owner、participant、visibility 校验 | 创建 space / scope / visibility truth 和 outbox | `DomainError::InvalidInitialState` |
-| `Open` | `ReadOnly` | `CloseConversationSpaceFlow` | actor 可关闭 space,且无必须先提交的 append command | 写 `ScopeChangeRecord`,enqueue space changed outbox | `DomainError::InvalidStateTransition` |
+| `Open` | `ReadOnly` | handoff request while space remains readable / policy restriction | actor 可发起只读或交接策略成立 | 写 handoff / policy evidence,projection stale | `DomainError::InvalidStateTransition` |
 | `Open` | `Restricted` | `ConversationTruthState::restricted(RestrictionReason reason)` | 可见性、来源或边界策略判定受限 | query 输出 restricted marker,projection stale | `DomainError::BoundaryViolation` |
 | `Restricted` | `Open` | policy recovery flow | restriction reason 已解除且有审计依据 | 写 recovery evidence,projection stale | `DomainError::InvalidStateTransition` |
 | `ReadOnly` | `HandoffPending` | `RequestTraceHandoffFlow` / `RequestArchiveHandoffFlow` | trace context / archive scope 可交接 | 保存 handoff intent 和 outbox | `DomainError::InvalidStateTransition` |
 | `Open` | `HandoffPending` | handoff request while space remains readable | handoff 不要求先关闭写入 | 保存 handoff intent 和 outbox | `DomainError::InvalidStateTransition` |
 | `HandoffPending` | `Closed` | handoff completion evidence | 必须发布或交接完成 / 被运维确认 | 关闭 truth,保留 trace refs | `DomainError::InvalidStateTransition` |
-| `Open` / `ReadOnly` / `Restricted` | `Closed` | `CloseConversationSpaceFlow` | close policy 允许直接关闭 | 保存 close scope change 和 outbox | `DomainError::InvalidStateTransition` |
+| `Open` / `ReadOnly` / `Restricted` | `Closed` | handoff completion evidence / policy close confirmation | 必须发布、交接完成或被运维确认 | 关闭 truth,保留 trace refs | `DomainError::InvalidStateTransition` |
 
 #### 状态集合表: `ConversationSpaceLifecycleState`
 
@@ -352,11 +352,11 @@ ScopeChangeState:
 | `ParticipantScopeState` | 初始 | `Active` | `ParticipantScope::from_initial_participants(ConversationSpaceId space_id, Vec<ConversationParticipantRef> participants)` | space 创建成功,participants 可解析 | 创建初始 participant scope | `DomainError::InvalidInitialState` |
 | `ParticipantScopeState` | `Active` | `Restricted` | `ParticipantScope::restricted_from_scope(ParticipantScope scope, RestrictionReason reason)` | policy 判定参与范围受限 | projection stale,cursor invalidated or stale | `DomainError::InvalidStateTransition` |
 | `ParticipantScopeState` | `Restricted` | `Active` | policy recovery flow | restriction reason 已解除 | 写 recovery evidence,projection stale | `DomainError::InvalidStateTransition` |
-| `ParticipantScopeState` | `Active` / `Restricted` | `Closed` | `CloseConversationSpaceFlow` | space close 成立 | scope 不再参与新 append | `DomainError::InvalidStateTransition` |
+| `ParticipantScopeState` | `Active` / `Restricted` | `Closed` | explicit participant scope close / archive maintenance flow | scope close 已被正式请求或归档维护成立 | scope 不再参与新 append | `DomainError::InvalidStateTransition` |
 | `VisibilityScopeState` | 初始 | `Open` | `VisibilityScope::from_participant_scope(&ParticipantScope scope, VisibilityLevel default_visibility)` | participant scope active | 创建默认 visibility scope | `DomainError::InvalidInitialState` |
 | `VisibilityScopeState` | `Open` | `Restricted` | `UpdateVisibilityScopeFlow` / policy restriction | visibility rules 需要收紧 | read model / cursor / reference projection stale | `DomainError::InvalidStateTransition` |
 | `VisibilityScopeState` | `Restricted` | `Open` | policy recovery flow | restriction reason 已解除 | projection stale | `DomainError::InvalidStateTransition` |
-| `VisibilityScopeState` | `Open` / `Restricted` | `Sealed` | `UpdateVisibilityScopeFlow` / close flow | 不允许继续扩张可见性 | cursor invalidated,read model stale | `DomainError::InvalidStateTransition` |
+| `VisibilityScopeState` | `Open` / `Restricted` | `Sealed` | `UpdateVisibilityScopeFlow` / explicit visibility seal maintenance flow | 不允许继续扩张可见性 | cursor invalidated,read model stale | `DomainError::InvalidStateTransition` |
 | `ScopeChangeState` | 初始 | `Applied` | `ScopeChangeRecord::from_*_change(...)` | scope command 成功 | enqueue scope / space changed outbox | `DomainError::InvalidInitialState` |
 | `ScopeChangeState` | 初始 | `Rejected` | scope command reject path | policy / validation 拒绝 | 写 rejected audit,不改当前 scope truth | `DomainError::InvalidInitialState` |
 | `ScopeChangeState` | `Applied` | `Superseded` | `ScopeChangeRecord::mark_superseded(ScopeChangeRecordId successor_id)` | successor 已提交 | 旧记录保留历史 | `DomainError::InvalidStateTransition` |
@@ -880,6 +880,10 @@ ConversationChangeCursorState:
 | `ConversationOutboxEventKind` | 表达 outbox event 路由类别,不会随生命周期变化 | 必须与 `ConversationTruthRefKind` 匹配,不匹配时 publish flow 返回错误 |
 | `ConversationTruthRefKind` | 表达 truth ref 类型分类,不是对象生命周期 | 必须用于 outbox publish 校验,不得指向派生 projection |
 | `ConversationSpaceKind` / `ConversationFactKind` 等分类值 | 表达对象类别,不是状态流转 | 只能影响策略选择,不能当作生命周期 |
+| `ConversationParticipantRole` | 表达 conversation-local participant capability,不是全局 RBAC 生命周期 | `Owner` / `Maintainer` / `Member` 可作为 append 候选,`Observer` 只读;仍必须经过 visibility / truth policy |
+| `VisibilityLevel` | 表达默认可见性宽度,不是 `VisibilityScopeState` | 正式顺序为 `Private < Participants < Project < Workspace < Public`;`narrow_to` 只能降低或保持 `maximum_visibility`,sealed 后扩张必须拒绝 |
+| `SpaceCloseMode` | 表达 close command 的目标生命周期,不是独立状态机 | `ReadOnly -> ConversationSpaceLifecycleState::ReadOnly`;`Closed -> Closed`;`Archived -> Archived`,且 archived 必须携带 archive intent |
+| `ScopeChangeReasonKind` / `RestrictionKind` / `VisibilityRestrictionKind` | 表达审计原因分类,不是状态迁移来源本身 | 必须和触发函数匹配;例如 visibility 扩张拒绝写 `VisibilityRestrictionKind::Sealed`,不得改变 current scope truth |
 
 ## 7. 回填草稿
 

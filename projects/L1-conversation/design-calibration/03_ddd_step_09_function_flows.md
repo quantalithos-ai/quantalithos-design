@@ -164,16 +164,16 @@ Step 8 已把 45 个协议全部标记为需要处理流。本步逐一展开:
 | `CreateReviewAnchorFlow` | `CreateReviewAnchor` | `handle_create_review_anchor(CreateReviewAnchorRequest request)` | 单写事务 | review anchor / trace context / outbox | anchor success、target missing、visibility reject、outbox rollback |
 | `RequestTraceHandoffFlow` | `RequestTraceHandoff` | `handle_request_trace_handoff(RequestTraceHandoffRequest request)` | 单写事务 | trace handoff pending / outbox | handoff requested、trace missing、retention reject、duplicate |
 | `RequestArchiveHandoffFlow` | `RequestArchiveHandoff` | `handle_request_archive_handoff(RequestArchiveHandoffRequest request)` | 单写事务 | archive handoff pending / outbox | archive requested、scope invalid、policy reject、duplicate |
-| `GetConversationReadModelFlow` | `GetConversationReadModel` | `handle_get_conversation_read_model(GetConversationReadModelRequest request)` | 只读 | 无 | authorized read、not visible、stale marker |
-| `ListConversationFactsFlow` | `ListConversationFacts` | `handle_list_conversation_facts(ListConversationFactsRequest request)` | 只读 | 无 | page success、visibility filter、invalid page |
+| `GetConversationReadModelFlow` | `GetConversationReadModel` | `handle_get_conversation_read_model(GetConversationReadModelRequest request, ConsumerContext consumer_context, QueryMetadata metadata)` | 只读 | 无 | authorized read、not visible、stale marker |
+| `ListConversationFactsFlow` | `ListConversationFacts` | `handle_list_conversation_facts(ListConversationFactsRequest request, ConsumerContext consumer_context, QueryMetadata metadata)` | 只读 | 无 | page success、visibility filter、invalid page |
 | `GetConversationFactFlow` | `GetConversationFact` | `handle_get_conversation_fact(GetConversationFactRequest request)` | 只读 | 无 | found visible、not visible、not found |
 | `GetConversationChangeCursorFlow` | `GetConversationChangeCursor` | `handle_get_conversation_change_cursor(GetConversationChangeCursorRequest request)` | 只读 | 无 | cursor found、cursor missing、stale projection |
 | `PollConversationChangesFlow` | `PollConversationChanges` | `handle_poll_conversation_changes(PollConversationChangesRequest request)` | 只读 | 无 | changes visible、empty page、cursor invalid |
-| `SearchConversationHistoryFlow` | `SearchConversationHistory` | `handle_search_conversation_history(SearchConversationHistoryRequest request)` | 只读 | 无 | search success、stale index、visibility filter |
+| `SearchConversationHistoryFlow` | `SearchConversationHistory` | `handle_search_conversation_history(SearchConversationHistoryRequest request, ConsumerContext consumer_context, QueryMetadata metadata)` | 只读 | 无 | search success、stale index、visibility filter |
 | `GetCrossDomainManifestationFlow` | `GetCrossDomainManifestation` | `handle_get_cross_domain_manifestation(GetCrossDomainManifestationRequest request)` | 只读 | 无 | visible manifestation、unresolved marker、not visible |
 | `GetConversationTraceContextFlow` | `GetConversationTraceContext` | `handle_get_conversation_trace_context(GetConversationTraceContextRequest request)` | 只读 | 无 | trace visible、retention expired、not authorized |
 | `GetReviewAnchorFlow` | `GetReviewAnchor` | `handle_get_review_anchor(GetReviewAnchorRequest request)` | 只读 | 无 | anchor visible、target hidden、not found |
-| `GetConversationProjectionStateFlow` | `GetConversationProjectionState` | `handle_get_conversation_projection_state(GetConversationProjectionStateRequest request)` | 只读 | 无 | fresh、stale、failed projection |
+| `GetConversationProjectionStateFlow` | `GetConversationProjectionState` | `handle_get_conversation_projection_state(GetConversationProjectionStateRequest request, ActorContext actor, QueryMetadata metadata)` | 只读 | 无 | fresh、stale、failed projection |
 | `GetExternalReferenceProjectionFlow` | `GetExternalReferenceProjection` | `handle_get_external_reference_projection(GetExternalReferenceProjectionRequest request)` | 只读 | 无 | projection visible、unresolved refs、empty |
 | `ConsumeWorkContextChangedFlow` | `ConsumeWorkContextChanged` | `consume_work_context_changed(InboundEventEnvelope<WorkContextChangedEvent> event)` | consumer 写事务 | reference projection stale / updated | valid event、duplicate、quarantine |
 | `ConsumeGovernanceFactCommittedFlow` | `ConsumeGovernanceFactCommitted` | `consume_governance_fact_committed(InboundEventEnvelope<GovernanceFactCommittedEvent> event)` | consumer 写事务 | manifestation candidate / snapshot / outbox | manifest candidate、unresolved、duplicate |
@@ -263,6 +263,7 @@ let participant = ParticipantScope::from_initial_participants(space.space_id, re
 // [VisibilityScope::from_participant_scope(&ParticipantScope scope, VisibilityLevel default_visibility)]
 // 从参与范围生成默认可见范围。
 let visibility = VisibilityScope::from_participant_scope(&participant, request.default_visibility)?;
+let initial_visibility_scope_id = visibility.visibility_scope_id.clone();
 
 // [ConversationTruthState::open_for_space(ConversationSpaceId space_id, ActorRef actor)]
 // 建立本仓 truth 初始状态。
@@ -283,9 +284,11 @@ let initial_scope_change = ScopeChangeRecord::from_initial_space_creation(
 // 聚合创建结果和显式初始 scope change。
 let bundle = ScopeMutationBundle::created(space, participant, visibility, truth, initial_scope_change);
 
-// [ConversationOutboxRecord::from_scope_change(ScopeChangeRecord change)]
-// 初始 scope_change.scope_kind = Space,因此入队 SpaceChanged outbox。
-let outbox = ConversationOutboxRecord::from_scope_change(bundle.scope_change.clone())?;
+let committed_at = clock.now();
+
+// [ConversationOutboxRecord::from_scope_change(ScopeChangeRecord change, VisibilityScopeId visibility_scope_id, Timestamp committed_at)]
+// 初始 scope_change.scope_kind = Space,因此入队 SpaceChanged outbox;cursor metadata 使用默认 visibility scope 和 committed_at。
+let outbox = ConversationOutboxRecord::from_scope_change(bundle.scope_change.clone(), initial_visibility_scope_id, committed_at)?;
 
 // [SpaceScopeRepository.save_scope_bundle(ScopeMutationBundle bundle, UnitOfWorkHandle uow)]
 // 保存 space、scope、truth 和初始变化记录。
@@ -363,9 +366,11 @@ let mut space = space_scope_repo.get_space_for_update(request.space_id, uow.clon
 // 校验生命周期并按 close_mode 进入 ReadOnly / Closed / Archived。
 let scope_change = space.close(request.actor.actor_ref, request.close_reason)?;
 
-// [ConversationOutboxRecord::from_scope_change(ScopeChangeRecord change)]
-// 关闭事件必须来自已应用的 scope change。
-let outbox = ConversationOutboxRecord::from_scope_change(scope_change.clone())?;
+let committed_at = clock.now();
+
+// [ConversationOutboxRecord::from_scope_change(ScopeChangeRecord change, VisibilityScopeId visibility_scope_id, Timestamp committed_at)]
+// 关闭事件必须来自已应用的 scope change;cursor metadata 使用当前 space 的默认 visibility scope 和 committed_at。
+let outbox = ConversationOutboxRecord::from_scope_change(scope_change.clone(), space.default_visibility_scope_id, committed_at)?;
 
 // [SpaceScopeRepository.save_scope_bundle(ScopeMutationBundle bundle, UnitOfWorkHandle uow)]
 space_scope_repo.save_scope_bundle(ScopeMutationBundle::space_changed(space, scope_change), uow.clone()).await?;
@@ -440,8 +445,11 @@ let scope_change = scope.apply_participant_update(
     request.change_reason,
 )?;
 
-// [ConversationOutboxRecord::from_scope_change(ScopeChangeRecord change)]
-let outbox = ConversationOutboxRecord::from_scope_change(scope_change.clone())?;
+let visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
+let committed_at = clock.now();
+
+// [ConversationOutboxRecord::from_scope_change(ScopeChangeRecord change, VisibilityScopeId visibility_scope_id, Timestamp committed_at)]
+let outbox = ConversationOutboxRecord::from_scope_change(scope_change.clone(), visibility.visibility_scope_id, committed_at)?;
 
 // [SpaceScopeRepository.save_scope_bundle(ScopeMutationBundle bundle, UnitOfWorkHandle uow)]
 space_scope_repo.save_scope_bundle(ScopeMutationBundle::participant_changed(scope, scope_change), uow.clone()).await?;
@@ -511,12 +519,13 @@ let mut visibility = space_scope_repo.get_visibility_scope(request.space_id).awa
 // 可见范围更新必须由 domain 判断是否允许扩张或只允许收窄。
 let scope_change = visibility.narrow_to(request.visibility_rules, request.actor.actor_ref)?;
 
-// [ConversationProjectionState::initial(ConversationProjectionKind kind, ConversationSourcePosition source_position)]
+// [ConversationProjectionState::initial(ConversationSpaceId space_id, ConversationProjectionKind kind, ConversationSourcePosition source_position)]
 // 若已有 projection state 则 mark_stale;若不存在则创建 stale 初始状态。
 let mut state = projection_state_for(request.space_id, ConversationProjectionKind::ReadModel).await?;
 state.mark_stale(ProjectionStaleReason::VisibilityScopeChanged)?;
 
-let outbox = ConversationOutboxRecord::from_scope_change(scope_change.clone())?;
+let committed_at = clock.now();
+let outbox = ConversationOutboxRecord::from_scope_change(scope_change.clone(), visibility.visibility_scope_id, committed_at)?;
 space_scope_repo.save_scope_bundle(ScopeMutationBundle::visibility_changed(visibility, scope_change), uow.clone()).await?;
 projection_repo.save_projection_state(state, uow.clone()).await?;
 outbox_repo.enqueue(outbox, uow.clone()).await?;
@@ -604,12 +613,14 @@ policy.assert_fact_kind_allowed(request.fact_kind)?;
 // [ConversationFact::from_append_input(&ConversationSpace space, ConversationFactKind fact_kind, FactSourceRef source, &VisibilityScope visibility, ConversationFactPayloadRef payload_ref)]
 let fact = ConversationFact::from_append_input(&space, request.fact_kind, source, &visibility, request.payload_ref)?;
 
+let committed_at = clock.now();
+
 // [FactAppendReceipt::accepted(&ConversationFact fact, IdempotencyKey key, Timestamp recorded_at)]
-let receipt = FactAppendReceipt::accepted(&fact, key.clone(), clock.now());
+let receipt = FactAppendReceipt::accepted(&fact, key.clone(), committed_at);
 
 // [ConversationTraceContext::from_fact_append(&ConversationFact fact, &FactAppendReceipt receipt)]
 let trace = ConversationTraceContext::from_fact_append(&fact, &receipt)?;
-let outbox = ConversationOutboxRecord::from_fact_append(fact.clone(), receipt.clone())?;
+let outbox = ConversationOutboxRecord::from_fact_append(fact.clone(), receipt.clone(), committed_at)?;
 
 fact_repo.append_fact(fact, receipt.clone(), uow.clone()).await?;
 trace_repo.save_trace_context(trace, uow.clone()).await?;
@@ -624,7 +635,7 @@ unit_of_work.commit(uow).await?;
 |---|---|
 | 事务边界 | fact、receipt、trace context、outbox、幂等 complete 同事务 |
 | 回滚错误 | forbidden payload、space cannot accept fact、participant missing、visibility reject、outbox failure |
-| 状态副作用 | `ConversationFactState::Committed`;trace context created;projection 后续 stale |
+| 状态副作用 | `ConversationFactState::Accepted`;trace context created;projection 后续 stale |
 | 事件副作用 | `ConversationFactAppendedEvent`、`ConversationChangeAvailableEvent` |
 | 测试切口 | append actor fact、policy rejected receipt、duplicate returns duplicate receipt、forbidden body rejected |
 
@@ -681,11 +692,13 @@ if let Some(requested_visibility_scope_id) = request.visibility_scope_id.clone()
 // [ConversationFact.retract(ActorRef actor, FactRetractionReason reason)]
 fact.retract(request.actor.actor_ref, request.reason)?;
 
+let committed_at = clock.now();
+
 // [FactAppendReceipt::retracted(&ConversationFact fact, IdempotencyKey key, Timestamp recorded_at)]
 // 撤回也必须保留 receipt 和 trace。
-let receipt = FactAppendReceipt::retracted(&fact, key.clone(), clock.now());
+let receipt = FactAppendReceipt::retracted(&fact, key.clone(), committed_at);
 let trace = ConversationTraceContext::from_fact_append(&fact, &receipt)?;
-let outbox = ConversationOutboxRecord::from_fact_retraction(fact.clone(), receipt.clone())?;
+let outbox = ConversationOutboxRecord::from_fact_retraction(fact.clone(), receipt.clone(), committed_at)?;
 
 fact_repo.save_fact_state(fact, uow.clone()).await?;
 trace_repo.save_trace_context(trace, uow.clone()).await?;
@@ -770,7 +783,8 @@ let manifestation = CrossDomainManifestation::from_snapshot(request.external_fac
 // [ConversationFact::from_manifestation(CrossDomainManifestation manifestation, &VisibilityScope visibility)]
 let fact = ConversationFact::from_manifestation(manifestation.clone(), &visibility)?;
 let trace = ConversationTraceContext::from_manifestation(&manifestation)?;
-let outbox = ConversationOutboxRecord::from_manifestation(manifestation.clone())?;
+let committed_at = clock.now();
+let outbox = ConversationOutboxRecord::from_manifestation(manifestation.clone(), Some(fact.clone()), committed_at)?;
 
 external_ref_repo.upsert_snapshot(snapshot, uow.clone()).await?;
 manifestation_repo.insert_manifestation(manifestation, uow.clone()).await?;
@@ -846,7 +860,9 @@ VisibilityPolicy::default_policy().assert_review_allowed(&anchor, request.actor.
 
 // [TraceRepository.save_review_anchor(ReviewAnchor review_anchor, UnitOfWorkHandle uow)]
 trace_repo.save_review_anchor(anchor.clone(), uow.clone()).await?;
-let outbox = ConversationOutboxRecord::from_review_anchor(anchor.clone())?;
+let visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
+let committed_at = clock.now();
+let outbox = ConversationOutboxRecord::from_review_anchor(anchor.clone(), visibility.visibility_scope_id, committed_at)?;
 outbox_repo.enqueue(outbox, uow.clone()).await?;
 idempotency.complete(reservation, anchor.result_ref(), uow.clone()).await?;
 unit_of_work.commit(uow).await?;
@@ -912,7 +928,9 @@ policy.assert_retention_allowed(&trace_context)?;
 
 // [TraceHandoffRecord::from_trace_context(&ConversationTraceContext trace_context, ObservabilityDestinationRef destination_ref)]
 let handoff = TraceHandoffRecord::from_trace_context(&trace_context, request.destination_ref)?;
-let outbox = ConversationOutboxRecord::from_trace_handoff(handoff.clone())?;
+let visibility = space_scope_repo.get_visibility_scope(trace_context.space_id).await?.ok_or(ApplicationError::NotFound)?;
+let committed_at = clock.now();
+let outbox = ConversationOutboxRecord::from_trace_handoff(handoff.clone(), trace_context.space_id, visibility.visibility_scope_id, committed_at)?;
 
 trace_repo.save_trace_handoff(handoff.clone(), uow.clone()).await?;
 outbox_repo.enqueue(outbox, uow.clone()).await?;
@@ -980,7 +998,9 @@ let archive_scope = policy.choose_archive_scope(&space, &trace_context);
 
 // [ArchiveHandoffRecord::from_trace_context(&ConversationTraceContext trace_context, ArchiveScope archive_scope, TraceRetentionPolicyRef retention_policy_ref)]
 let handoff = ArchiveHandoffRecord::from_trace_context(&trace_context, archive_scope, request.retention_policy_ref)?;
-let outbox = ConversationOutboxRecord::from_archive_handoff(handoff.clone())?;
+let visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
+let committed_at = clock.now();
+let outbox = ConversationOutboxRecord::from_archive_handoff(handoff.clone(), visibility.visibility_scope_id, committed_at)?;
 
 trace_repo.save_archive_handoff(handoff.clone(), uow.clone()).await?;
 outbox_repo.enqueue(outbox, uow.clone()).await?;
@@ -1007,15 +1027,15 @@ unit_of_work.commit(uow).await?;
 | 项 | 内容 |
 |---|---|
 | 对应协议 | `GetConversationReadModel` |
-| 入口函数 | `handle_get_conversation_read_model(GetConversationReadModelRequest request) -> Result<ConversationReadModelView, ApiError>` |
-| Application service | `AuthorizedConversationQueryService.get_read_model(...)` |
+| 入口函数 | `handle_get_conversation_read_model(GetConversationReadModelRequest request, ConsumerContext consumer_context, QueryMetadata metadata) -> Result<ConversationReadModelView, ApiError>` |
+| Application service | `AuthorizedConversationQueryService.get_read_model(request, consumer_context, metadata)` |
 | 读取对象 | `ConversationReadModel`、`VisibilityScope`、`ConversationProjectionState` |
 
 ##### 函数级调用图
 
 ```text
 [api::query_handlers]
-  | call handle_get_conversation_read_model(GetConversationReadModelRequest request)
+  | call handle_get_conversation_read_model(GetConversationReadModelRequest request, ConsumerContext consumer_context, QueryMetadata metadata)
   v
 [AuthorizedConversationQueryService]
   | validate query metadata and consumer
@@ -1033,18 +1053,24 @@ unit_of_work.commit(uow).await?;
 // [GetConversationReadModelRequest.validate()]
 request.validate()?;
 
+// [ConsumerContext.resolve_consumer(GetConversationReadModelRequest request)]
+let consumer_ref = request.resolve_consumer(consumer_context)?;
+
 // [ProjectionRepository.get_read_model(ConversationSpaceId space_id, ConsumerRef consumer)]
-let read_model = projection_repo.get_read_model(request.space_id, request.consumer_ref).await?;
+let read_model = projection_repo.get_read_model(request.space_id, consumer_ref).await?;
+
+// ProjectionRepository returns domain::ConversationReadModel, not contracts::ConversationReadModelView.
+// If the row is missing, the service constructs an internal empty read model before DTO mapping.
 
 // [SpaceScopeRepository.get_visibility_scope(ConversationSpaceId space_id)]
 let visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
 
 // [VisibilityPolicy.filter_read_model(ConversationReadModel read_model, ConsumerRef consumer)]
-let authorized = VisibilityPolicy::default_policy().filter_read_model(read_model.unwrap_or_else(|| ConversationReadModel::empty_for_consumer(request.space_id, request.consumer_ref)), request.consumer_ref)?;
+let authorized = VisibilityPolicy::default_policy().filter_read_model(read_model.unwrap_or_else(|| ConversationReadModel::empty_for_consumer(request.space_id, consumer_ref)), consumer_ref)?;
 
 // [ProjectionRepository.get_projection_state(ConversationSpaceId space_id, ConversationProjectionKind kind)]
 let state = projection_repo.get_projection_state(request.space_id, ConversationProjectionKind::ReadModel).await?;
-Ok(ConversationReadModelView::from_authorized(authorized, state, visibility))
+Ok(ConversationReadModelView::from_authorized(authorized, state, visibility, request.space_id, consumer_ref))
 ```
 
 ##### 事务、错误、状态与测试
@@ -1064,15 +1090,15 @@ Ok(ConversationReadModelView::from_authorized(authorized, state, visibility))
 | 项 | 内容 |
 |---|---|
 | 对应协议 | `ListConversationFacts` |
-| 入口函数 | `handle_list_conversation_facts(ListConversationFactsRequest request) -> Result<ConversationFactPage, ApiError>` |
-| Application service | `AuthorizedConversationQueryService.list_facts(...)` |
+| 入口函数 | `handle_list_conversation_facts(ListConversationFactsRequest request, ConsumerContext consumer_context, QueryMetadata metadata) -> Result<ConversationFactPage, ApiError>` |
+| Application service | `AuthorizedConversationQueryService.list_facts(request, consumer_context, metadata)` |
 | 读取对象 | `ConversationFactRepository` fact refs、`VisibilityScope`、`VisibilityPolicy` |
 
 ##### 函数级调用图
 
 ```text
 [api::query_handlers]
-  | call handle_list_conversation_facts(ListConversationFactsRequest request)
+  | call handle_list_conversation_facts(ListConversationFactsRequest request, ConsumerContext consumer_context, QueryMetadata metadata)
   v
 [AuthorizedConversationQueryService]
   | validate page and consumer
@@ -1089,8 +1115,14 @@ Ok(ConversationReadModelView::from_authorized(authorized, state, visibility))
 ```rust
 request.validate()?;
 
+// [ConsumerContext.resolve_consumer(ListConversationFactsRequest request)]
+let consumer_ref = request.resolve_consumer(consumer_context)?;
+
+// [QueryMetadata.page_or_default()]
+let page = metadata.page.clone().unwrap_or_else(default_fact_page_request);
+
 // [ConversationFactRepository.list_fact_refs(ConversationSpaceId space_id, PageRequest page)]
-let refs = fact_repo.list_fact_refs(request.space_id, request.page).await?;
+let refs = fact_repo.list_fact_refs(request.space_id, page).await?;
 
 // [SpaceScopeRepository.get_visibility_scope(ConversationSpaceId space_id)]
 let visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
@@ -1100,11 +1132,13 @@ let mut visible = Vec::new();
 for fact_ref in refs.items {
     // [ConversationFactRepository.get_fact(ConversationFactId fact_id)]
     let fact = fact_repo.get_fact(fact_ref.fact_id).await?.ok_or(ApplicationError::NotFound)?;
-    if policy.assert_can_read(request.consumer_ref, &fact, &visibility).is_ok() {
-        visible.push(ConversationFactView::from_fact_ref(fact));
+    if policy.assert_can_read(consumer_ref, &fact, &visibility).is_ok() {
+        visible.push(ConversationFactView::from_fact(fact, request.include_retracted)?);
     }
 }
-Ok(ConversationFactPage::from_visible(visible, refs.page_info))
+let state = projection_repo.get_projection_state(request.space_id, ConversationProjectionKind::ReadModel).await?;
+// refs.page_info is application::ports::PageInfo; map it to the public page fields.
+Ok(ConversationFactPage::from_visible(request.space_id, consumer_ref, visible, refs.page_info, state))
 ```
 
 ##### 事务、错误、状态与测试
@@ -1205,12 +1239,14 @@ request.validate()?;
 // [ProjectionRepository.get_change_cursor(ConversationSpaceId space_id, ConsumerRef consumer)]
 let cursor = projection_repo.get_change_cursor(request.space_id, request.consumer_ref).await?;
 
+let initial_sequence = request.from_sequence.unwrap_or(ConversationFactSequence(0));
+
 // [ConversationChangeCursor::start_from(ConversationSpaceId space_id, ConsumerRef consumer, ConversationFactSequence sequence)]
-let cursor = cursor.unwrap_or_else(|| ConversationChangeCursor::start_from(request.space_id, request.consumer_ref, request.from_sequence));
+let cursor = cursor.unwrap_or_else(|| ConversationChangeCursor::start_from(request.space_id, request.consumer_ref, initial_sequence));
 
 // [ProjectionRepository.get_projection_state(ConversationSpaceId space_id, ConversationProjectionKind kind)]
 let state = projection_repo.get_projection_state(request.space_id, ConversationProjectionKind::ChangeCursor).await?;
-Ok(ConversationChangeCursorView::from_cursor(cursor, state))
+Ok(ConversationChangeCursorView::from_cursor(cursor, ConversationProjectionStateView::from_state_or_empty(request.space_id, ConversationProjectionKind::ChangeCursor, state)))
 ```
 
 ##### 事务、错误、状态与测试
@@ -1232,7 +1268,7 @@ Ok(ConversationChangeCursorView::from_cursor(cursor, state))
 | 对应协议 | `PollConversationChanges` |
 | 入口函数 | `handle_poll_conversation_changes(PollConversationChangesRequest request) -> Result<ConversationChangePage, ApiError>` |
 | Application service | `AuthorizedConversationQueryService.poll_changes(...)` |
-| 读取对象 | `ConversationChangeCursor`、`ConversationOutboxRecord`、`VisibilityScope` |
+| 读取对象 | `ConversationChangeCursor`、`ChangeCursorProjection`、`ConversationChangeCursorEntry`、`VisibilityScope` |
 
 ##### 函数级调用图
 
@@ -1243,7 +1279,7 @@ Ok(ConversationChangeCursorView::from_cursor(cursor, state))
 [AuthorizedConversationQueryService]
   | validate cursor, page, consumer
   | load cursor and visibility scope
-  | read visible outbox / fact refs after cursor
+  | read persisted change cursor projection entries after cursor
   | filter by visibility
   v
 [Result Builder]
@@ -1265,7 +1301,13 @@ let visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.
 // P0 用 change cursor projection 提供变化引用,不返回完整 payload。
 let changes = projection_repo.list_change_entries_after(request.space_id, cursor.last_outbox_sequence, request.limit).await?;
 let visible = filter_visible_changes(changes, &visibility, request.consumer_ref)?;
-Ok(ConversationChangePage::from_visible(visible, cursor))
+let state = projection_repo.get_projection_state(request.space_id, ConversationProjectionKind::ChangeCursor).await?;
+Ok(ConversationChangePage::from_visible(
+    visible,
+    cursor,
+    ConversationProjectionStateView::from_state_or_empty(request.space_id, ConversationProjectionKind::ChangeCursor, state),
+    request.limit,
+))
 ```
 
 ##### 事务、错误、状态与测试
@@ -1285,15 +1327,15 @@ Ok(ConversationChangePage::from_visible(visible, cursor))
 | 项 | 内容 |
 |---|---|
 | 对应协议 | `SearchConversationHistory` |
-| 入口函数 | `handle_search_conversation_history(SearchConversationHistoryRequest request) -> Result<ConversationSearchResultPage, ApiError>` |
-| Application service | `AuthorizedConversationQueryService.search_history(...)` |
+| 入口函数 | `handle_search_conversation_history(SearchConversationHistoryRequest request, ConsumerContext consumer_context, QueryMetadata metadata) -> Result<ConversationSearchResultPage, ApiError>` |
+| Application service | `AuthorizedConversationQueryService.search_history(request, consumer_context, metadata)` |
 | 读取对象 | `SearchIndexProjection`、`ConversationReadModel`、`VisibilityScope` |
 
 ##### 函数级调用图
 
 ```text
 [api::query_handlers]
-  | call handle_search_conversation_history(SearchConversationHistoryRequest request)
+  | call handle_search_conversation_history(SearchConversationHistoryRequest request, ConsumerContext consumer_context, QueryMetadata metadata)
   v
 [AuthorizedConversationQueryService]
   | validate query text and page
@@ -1310,17 +1352,27 @@ Ok(ConversationChangePage::from_visible(visible, cursor))
 ```rust
 request.validate()?;
 
+let consumer_ref = request.resolve_consumer(consumer_context)?;
+let page = metadata.page.clone().unwrap_or_else(default_search_page_request);
+
 // [ProjectionRepository.get_search_projection(ConversationSpaceId space_id)]
 let search_projection = projection_repo.get_search_projection(request.space_id).await?;
 
 // [ProjectionRepository.get_read_model(ConversationSpaceId space_id, ConsumerRef consumer)]
-let read_model = projection_repo.get_read_model(request.space_id, request.consumer_ref).await?;
+let read_model = projection_repo.get_read_model(request.space_id, consumer_ref).await?;
 
 // [DerivedViewPolicy.choose_degraded_read(&ConversationProjectionState projection_state)]
 // stale / failed 搜索投影必须返回显式 marker,不得伪装 fresh。
-let results = search_index.search(search_projection, request.query_text, request.page).await?;
-let authorized = authorize_search_hits(results, read_model, request.consumer_ref)?;
-Ok(ConversationSearchResultPage::from_authorized(authorized))
+let results = search_index.search(search_projection, request.query_text, page).await?;
+let authorized = authorize_search_hits(results, read_model, consumer_ref)?;
+let state = projection_repo.get_projection_state(request.space_id, ConversationProjectionKind::Search).await?;
+Ok(ConversationSearchResultPage::from_authorized(
+    request.space_id,
+    consumer_ref,
+    request.query_text,
+    authorized,
+    ConversationProjectionStateView::from_state_or_empty(request.space_id, ConversationProjectionKind::Search, state),
+))
 ```
 
 ##### 事务、错误、状态与测试
@@ -1502,15 +1554,15 @@ Ok(ReviewAnchorView::from_anchor(anchor))
 | 项 | 内容 |
 |---|---|
 | 对应协议 | `GetConversationProjectionState` |
-| 入口函数 | `handle_get_conversation_projection_state(GetConversationProjectionStateRequest request) -> Result<ConversationProjectionStateView, ApiError>` |
-| Application service | `ConversationDerivedMaintenanceService.get_projection_state(...)` |
+| 入口函数 | `handle_get_conversation_projection_state(GetConversationProjectionStateRequest request, ActorContext actor, QueryMetadata metadata) -> Result<ConversationProjectionStateView, ApiError>` |
+| Application service | `ConversationDerivedMaintenanceService.get_projection_state(request, actor, metadata)` |
 | 读取对象 | `ConversationProjectionState` |
 
 ##### 函数级调用图
 
 ```text
 [api::query_handlers]
-  | call handle_get_conversation_projection_state(GetConversationProjectionStateRequest request)
+  | call handle_get_conversation_projection_state(GetConversationProjectionStateRequest request, ActorContext actor, QueryMetadata metadata)
   v
 [ConversationDerivedMaintenanceService]
   | validate projection kind and actor
@@ -1716,7 +1768,8 @@ let snapshot = external_resolver.load_safe_snapshot(external_ref.clone(), visibi
 
 // [CrossDomainManifestation::from_snapshot(ExternalFactRef external_fact_ref, ExternalFactSnapshot snapshot, &VisibilityScope visibility)]
 let manifestation = CrossDomainManifestation::from_snapshot(external_ref, snapshot.clone(), &visibility)?;
-let outbox = ConversationOutboxRecord::from_manifestation(manifestation.clone())?;
+let committed_at = clock.now();
+let outbox = ConversationOutboxRecord::from_manifestation(manifestation.clone(), None, committed_at)?;
 
 external_ref_repo.upsert_snapshot(snapshot, uow.clone()).await?;
 manifestation_repo.insert_manifestation(manifestation, uow.clone()).await?;
@@ -1854,9 +1907,10 @@ if event.payload.fact_kind != ConversationFactKind::RuntimeResult {
     return Err(ProtocolError::InvalidEnvelope.into());
 }
 let fact = ConversationFact::from_append_input(&space, event.payload.fact_kind, source, &visibility, event.payload.result_payload_ref)?;
-let receipt = FactAppendReceipt::accepted(&fact, event.idempotency_key, clock.now());
+let committed_at = clock.now();
+let receipt = FactAppendReceipt::accepted(&fact, event.idempotency_key, committed_at);
 let trace = ConversationTraceContext::from_fact_append(&fact, &receipt)?;
-let outbox = ConversationOutboxRecord::from_fact_append(fact.clone(), receipt.clone())?;
+let outbox = ConversationOutboxRecord::from_fact_append(fact.clone(), receipt.clone(), committed_at)?;
 
 fact_repo.append_fact(fact, receipt, uow.clone()).await?;
 trace_repo.save_trace_context(trace, uow.clone()).await?;
@@ -1928,9 +1982,10 @@ if event.payload.target_mode == BridgeTargetMode::AppendFact {
         return Err(ProtocolError::InvalidEnvelope.into());
     }
     let fact = ConversationFact::from_append_input(&space, event.payload.fact_kind, source, &visibility, event.payload.mapped_payload_ref)?;
-    let receipt = FactAppendReceipt::accepted(&fact, event.idempotency_key, clock.now());
+    let committed_at = clock.now();
+    let receipt = FactAppendReceipt::accepted(&fact, event.idempotency_key, committed_at);
     fact_repo.append_fact(fact.clone(), receipt.clone(), uow.clone()).await?;
-    outbox_repo.enqueue(ConversationOutboxRecord::from_fact_append(fact, receipt)?, uow.clone()).await?;
+    outbox_repo.enqueue(ConversationOutboxRecord::from_fact_append(fact, receipt, committed_at)?, uow.clone()).await?;
 } else {
     // [ExternalFactRef::from_bridge_event(BridgeEventRef bridge_event_ref)]
     let external_ref = ExternalFactRef::from_bridge_event(event.payload.bridge_fact_ref.into())?;
@@ -1938,7 +1993,8 @@ if event.payload.target_mode == BridgeTargetMode::AppendFact {
     let visibility = space_scope_repo.get_visibility_scope(event.payload.space_id).await?.ok_or(ApplicationError::NotFound)?;
     let manifestation = CrossDomainManifestation::from_external_fact(&space, external_ref, &visibility)?;
     manifestation_repo.insert_manifestation(manifestation.clone(), uow.clone()).await?;
-    outbox_repo.enqueue(ConversationOutboxRecord::from_manifestation(manifestation)?, uow.clone()).await?;
+    let committed_at = clock.now();
+    outbox_repo.enqueue(ConversationOutboxRecord::from_manifestation(manifestation, None, committed_at)?, uow.clone()).await?;
 }
 
 idempotency.complete(reservation, event.result_ref(), uow.clone()).await?;
@@ -2697,7 +2753,7 @@ Ok(receipt.completed(clock.now()))
   | call run_maintain_conversation_change_cursors(MaintainConversationChangeCursorsJob job)
   v
 [ConversationDerivedMaintenanceService]
-  | list committed outbox records after position
+  | list committed outbox records with cursor metadata after position
   | call ChangeCursorProjection::from_change_log(...)
   | advance consumer cursors when allowed
   v

@@ -339,6 +339,70 @@ Query envelope 的 `metadata` 使用 `core-contracts::QueryMetadata`。分页与
 
 Duplicate command 只能在同 key 同 request digest 时返回既有 `result_ref` 和原 refs,且 `receipt.outcome = duplicate`。缺失 `metadata.request.idempotency_key` 或同 key 不同 digest 时返回 `ProtocolError::MissingRequiredField` / `ApplicationError::Conflict`,不得返回 command result。
 
+#### 7.2.1 `ManifestExternalFactResult`
+
+`ManifestExternalFactResult` 是 `ManifestExternalFact` 的正式 command result DTO,归属 `crates/contracts/src/commands.rs`。它不得由 application service 临时替换成 `FactAppendReceipt`、`CrossDomainManifestation` 或裸 id tuple。
+
+```rust
+/// Result returned after manifesting an external fact into a conversation space.
+pub struct ManifestExternalFactResult {
+    /// Manifestation record created or reused by the command.
+    pub manifestation_id: CrossDomainManifestationId,
+    /// Space where the external fact was manifested.
+    pub space_id: ConversationSpaceId,
+    /// External fact reference that was manifested.
+    pub external_fact_ref: ExternalFactRef,
+    /// Safe snapshot reference used by this manifestation when available.
+    pub snapshot_ref: Option<ExternalFactSnapshotRef>,
+    /// Local conversation fact created from the manifestation when available.
+    pub manifested_fact_id: Option<ConversationFactId>,
+    /// Visibility scope applied to the manifestation.
+    pub visibility_scope_id: VisibilityScopeId,
+    /// Current manifestation state.
+    pub manifestation_state: ManifestationState,
+    /// Outbox record written for the manifestation when a local change was committed.
+    pub outbox_record_ref: Option<ConversationOutboxRecordId>,
+    /// Trace context created for the command.
+    pub trace_context_id: ConversationTraceContextId,
+    /// Stable command result reference for idempotency duplicates.
+    pub result_ref: CommandResultRef,
+    /// Shared command receipt.
+    pub receipt: CommandReceipt,
+}
+```
+
+```json
+{
+  "manifestation_id": "CrossDomainManifestationId",
+  "space_id": "ConversationSpaceId",
+  "external_fact_ref": "ExternalFactRef",
+  "snapshot_ref": "Option<ExternalFactSnapshotRef>",
+  "manifested_fact_id": "Option<ConversationFactId>",
+  "visibility_scope_id": "VisibilityScopeId",
+  "manifestation_state": "ManifestationState",
+  "outbox_record_ref": "Option<ConversationOutboxRecordId>",
+  "trace_context_id": "ConversationTraceContextId",
+  "result_ref": "CommandResultRef",
+  "receipt": "CommandReceipt"
+}
+```
+
+| 字段 | 类型 | 字段来源 | 可空 / 缺失口径 |
+|---|---|---|---|
+| `manifestation_id` | `CrossDomainManifestationId` | `CrossDomainManifestation.manifestation_id` | 必填 |
+| `space_id` | `ConversationSpaceId` | request / manifestation | 必填 |
+| `external_fact_ref` | `ExternalFactRef` | request / resolver result | 必填 |
+| `snapshot_ref` | `Option<ExternalFactSnapshotRef>` | `ExternalFactSnapshot.snapshot_id` or unresolved path | unresolved 可为空 |
+| `manifested_fact_id` | `Option<ConversationFactId>` | `ConversationFact.fact_id` when local fact committed | unresolved path 可为空 |
+| `visibility_scope_id` | `VisibilityScopeId` | resolved visibility scope | 必填 |
+| `manifestation_state` | `ManifestationState` | `CrossDomainManifestation.manifestation_state` | 必填 |
+| `outbox_record_ref` | `Option<ConversationOutboxRecordId>` | `ConversationOutboxRecord.outbox_id` | duplicate / unresolved no-write path 可返回既有值或空 |
+| `trace_context_id` | `ConversationTraceContextId` | `ConversationTraceContext.trace_context_id` | 必填 |
+| `result_ref` | `CommandResultRef` | command result builder / idempotency result | 必填 |
+| `receipt` | `CommandReceipt` | command receipt builder | 必填 |
+
+Duplicate `ManifestExternalFact` 必须在 same key + same digest 时返回已保存的 `ManifestExternalFactResult`,其中 `receipt.outcome = duplicate`,且不得重新解析外部来源、重建 snapshot、重写 manifestation、fact、trace 或 outbox。Unresolved path 若 policy 允许写 unresolved manifestation,`manifestation_state = Unresolved`,`snapshot_ref = None`,`manifested_fact_id = None`;若 policy 不允许 unresolved manifestation,返回 `ApplicationError::ExternalReferenceUnresolved`,不返回 result DTO。
+
 ### 7.3 Command API 协议契约
 
 #### 7.3.1 `CreateConversationSpace`
@@ -665,11 +729,326 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 
 ### 7.4 Query API 协议契约
 
+#### 7.4.0 Query request / view DTO 字段级 schema
+
+HLD `02_hld_step_07_api_interface_skeleton.md` 中的 `*Query` 是语义入口名;本 DDD Step 8 的正式 Rust DTO 名统一为 `*Request`。实现侧必须落 `GetConversationReadModelRequest`、`ListConversationFactsRequest` 和 `GetConversationProjectionStateRequest`,不得同时新增一套 `*Query` struct。
+
+Query API 的公共 envelope 为 `QueryEnvelope { query, consumer: ConsumerContext, metadata: QueryMetadata }`。下列 request DTO 只保存 query body 字段;`consumer_ref` 可以在 request body 中显式给出,也可以由 envelope `ConsumerContext.consumer_ref` 派生。分页与一致性只能来自 core `QueryMetadata.page` / `QueryMetadata.consistency`,不得在 query body 中另设 `page`、`page_token` 或 `consistency` 顶层字段。`PollConversationChangesRequest.limit` 是 cursor poll 的最大返回条数,不承载 page token 或 consistency;它必须使用 `PageLimit`,不得使用 job `BatchSize`。
+
+落码归属:
+
+- `GetConversationReadModelRequest`、`ListConversationFactsRequest`、`GetConversationChangeCursorRequest`、`PollConversationChangesRequest`、`SearchConversationHistoryRequest`、`GetConversationProjectionStateRequest` 属于 `contracts/queries.rs`。
+- `ConversationReadModelView`、`ConversationFactView`、`ConversationFactPage`、`ConversationChangeCursorView`、`ConversationChangePage`、`ConversationSearchResultPage`、`ConversationProjectionStateView` 属于 `contracts/views.rs`。
+- 这些 DTO 只能依赖 `contracts/refs.rs`、`contracts/visibility.rs` 和 core `QueryMetadata` / `PageToken` 等公共类型,不得依赖 `domain` crate。
+- `ConversationFactView.fact_state` 使用 `contracts/refs.rs::ConversationFactState`;domain `ConversationFact` 复用同一个 shared enum,不得让 `contracts/views.rs` 依赖 domain-local enum。
+- `PollConversationChangesRequest.limit` 使用 `PageLimit`;`BatchSize` 只用于 job / outbox publish / rebuild batch,不得用于 public query request。
+
+```rust
+/// Request body for GetConversationReadModel.
+pub struct GetConversationReadModelRequest {
+    /// Space to read.
+    pub space_id: ConversationSpaceId,
+    /// Optional consumer override; absent means use QueryEnvelope.consumer.consumer_ref.
+    pub consumer_ref: Option<ConsumerRef>,
+}
+
+/// Request body for ListConversationFacts.
+pub struct ListConversationFactsRequest {
+    /// Space to list facts from.
+    pub space_id: ConversationSpaceId,
+    /// Optional consumer override; absent means use QueryEnvelope.consumer.consumer_ref.
+    pub consumer_ref: Option<ConsumerRef>,
+    /// Whether formally retracted facts may appear as retracted markers.
+    pub include_retracted: bool,
+}
+
+/// Request body for GetConversationChangeCursor.
+pub struct GetConversationChangeCursorRequest {
+    /// Space whose cursor is requested.
+    pub space_id: ConversationSpaceId,
+    /// Consumer that owns the cursor.
+    pub consumer_ref: ConsumerRef,
+    /// Optional cursor id; absent means derive by space and consumer.
+    pub cursor_id: Option<ConversationChangeCursorId>,
+    /// Initial fact sequence used only when no cursor exists.
+    pub from_sequence: Option<ConversationFactSequence>,
+}
+
+/// Request body for PollConversationChanges.
+pub struct PollConversationChangesRequest {
+    /// Space whose changes are polled.
+    pub space_id: ConversationSpaceId,
+    /// Consumer that owns the cursor.
+    pub consumer_ref: ConsumerRef,
+    /// Cursor to resume from.
+    pub cursor_id: ConversationChangeCursorId,
+    /// Maximum change entries to return.
+    pub limit: PageLimit,
+}
+
+/// Request body for SearchConversationHistory.
+pub struct SearchConversationHistoryRequest {
+    /// Space whose history is searched.
+    pub space_id: ConversationSpaceId,
+    /// Consumer used for result authorization.
+    pub consumer_ref: Option<ConsumerRef>,
+    /// Search text accepted by the query boundary.
+    pub query_text: SearchQueryText,
+}
+
+/// Request body for GetConversationProjectionState.
+pub struct GetConversationProjectionStateRequest {
+    /// Space whose projection state is requested.
+    pub space_id: ConversationSpaceId,
+    /// Projection kind to inspect.
+    pub projection_kind: ConversationProjectionKind,
+}
+```
+
+| DTO | 字段 | 类型 | 来源 | 缺失 / 非法处理 |
+|---|---|---|---|---|
+| `GetConversationReadModelRequest` | `space_id` | `ConversationSpaceId` | route / request body | 缺失返回 `ProtocolError::MissingRequiredField` |
+| `GetConversationReadModelRequest` | `consumer_ref` | `Option<ConsumerRef>` | request body 或 envelope consumer | 两者都缺失返回 `ProtocolError::MissingRequiredField`;两者都存在但不一致返回 `ApplicationError::NotVisible` |
+| `ListConversationFactsRequest` | `space_id` | `ConversationSpaceId` | route / request body | 缺失返回 `ProtocolError::MissingRequiredField` |
+| `ListConversationFactsRequest` | `consumer_ref` | `Option<ConsumerRef>` | request body 或 envelope consumer | 两者都缺失返回 `ProtocolError::MissingRequiredField`;两者都存在但不一致返回 `ApplicationError::NotVisible` |
+| `ListConversationFactsRequest` | `include_retracted` | `bool` | request body | 缺省为 `false`;不得绕过 visibility |
+| `GetConversationChangeCursorRequest` | `space_id` | `ConversationSpaceId` | route / request body | 缺失返回 `ProtocolError::MissingRequiredField` |
+| `GetConversationChangeCursorRequest` | `consumer_ref` | `ConsumerRef` | request body | 缺失返回 `ProtocolError::MissingRequiredField` |
+| `GetConversationChangeCursorRequest` | `cursor_id` | `Option<ConversationChangeCursorId>` | request body | 缺省时按 `space_id + consumer_ref` 稳定派生;若存在但不匹配派生 cursor owner,返回 `ApplicationError::NotVisible` |
+| `GetConversationChangeCursorRequest` | `from_sequence` | `Option<ConversationFactSequence>` | request body | 只在 cursor row 缺失时用于初始 cursor;缺省为 `ConversationFactSequence(0)` |
+| `PollConversationChangesRequest` | `space_id` | `ConversationSpaceId` | route / request body | 缺失返回 `ProtocolError::MissingRequiredField` |
+| `PollConversationChangesRequest` | `consumer_ref` | `ConsumerRef` | request body | 缺失返回 `ProtocolError::MissingRequiredField` |
+| `PollConversationChangesRequest` | `cursor_id` | `ConversationChangeCursorId` | request body | 缺失返回 `ProtocolError::MissingRequiredField`;必须与 repository cursor owner 一致 |
+| `PollConversationChangesRequest` | `limit` | `PageLimit` | request body 或 query default | 缺省使用 config default `PageLimit`;不得使用 `BatchSize` |
+| `SearchConversationHistoryRequest` | `space_id` | `ConversationSpaceId` | route / request body | 缺失返回 `ProtocolError::MissingRequiredField` |
+| `SearchConversationHistoryRequest` | `consumer_ref` | `Option<ConsumerRef>` | request body 或 envelope consumer | 两者都缺失返回 `ProtocolError::MissingRequiredField`;两者都存在但不一致返回 `ApplicationError::NotVisible` |
+| `SearchConversationHistoryRequest` | `query_text` | `SearchQueryText` | request body | 缺失、trim 后为空或超出 `SearchQueryText` 上限返回 `ProtocolError::InvalidQuery` |
+| `GetConversationProjectionStateRequest` | `space_id` | `ConversationSpaceId` | route / request body | 缺失返回 `ProtocolError::MissingRequiredField` |
+| `GetConversationProjectionStateRequest` | `projection_kind` | `ConversationProjectionKind` | request body | 缺失或未知返回 `ProtocolError::InvalidQuery` |
+
+```rust
+/// DTO returned by GetConversationReadModel after visibility filtering.
+pub struct ConversationReadModelView {
+    /// Stable authorized read model id.
+    pub read_model_id: ConversationReadModelId,
+    /// Space represented by the view.
+    pub space_id: ConversationSpaceId,
+    /// Consumer used for visibility filtering.
+    pub consumer_ref: ConsumerRef,
+    /// Visible fact refs only.
+    pub visible_fact_refs: Vec<ConversationFactRef>,
+    /// Visible manifestation refs only.
+    pub visible_manifestation_refs: Vec<CrossDomainManifestationRef>,
+    /// Optional cursor ref for incremental reads.
+    pub cursor_ref: Option<ConversationChangeCursorRef>,
+    /// Projection freshness and failure marker.
+    pub projection_state: ConversationProjectionStateView,
+    /// Whether no visible fact or manifestation refs are present.
+    pub is_empty: bool,
+}
+
+/// DTO returned for a single visible fact.
+pub struct ConversationFactView {
+    /// Stable fact id.
+    pub fact_id: ConversationFactId,
+    /// Space that owns the fact.
+    pub space_id: ConversationSpaceId,
+    /// Fact category.
+    pub fact_kind: ConversationFactKind,
+    /// Traceable source ref; never source body.
+    pub source_ref: FactSourceRef,
+    /// Visibility scope that was checked before returning the view.
+    pub visibility_scope_id: VisibilityScopeId,
+    /// Payload reference; never payload body.
+    pub payload_ref: ConversationFactPayloadRef,
+    /// Append sequence within the space.
+    pub append_sequence: ConversationFactSequence,
+    /// Current fact state.
+    pub fact_state: ConversationFactState,
+    /// True when the view is only a retracted marker.
+    pub is_retracted_marker: bool,
+}
+
+/// Paged visible facts result.
+pub struct ConversationFactPage {
+    /// Space listed by this page.
+    pub space_id: ConversationSpaceId,
+    /// Consumer used for visibility filtering.
+    pub consumer_ref: ConsumerRef,
+    /// Visible fact views in page order.
+    pub items: Vec<ConversationFactView>,
+    /// Next core page token if more items exist.
+    pub next_page_token: Option<PageToken>,
+    /// Whether the repository returned more visible or hidden candidates.
+    pub has_more: bool,
+    /// Projection freshness and failure marker for the read path.
+    pub projection_state: ConversationProjectionStateView,
+    /// True when `items` is empty after visibility filtering.
+    pub is_empty: bool,
+}
+
+/// DTO returned by GetConversationChangeCursor.
+pub struct ConversationChangeCursorView {
+    /// Stable cursor reference.
+    pub cursor_ref: ConversationChangeCursorRef,
+    /// Current cursor state.
+    pub cursor_state: ConversationChangeCursorState,
+    /// Last consumed fact sequence.
+    pub last_fact_sequence: ConversationFactSequence,
+    /// Last consumed outbox sequence.
+    pub last_outbox_sequence: ConversationOutboxSequence,
+    /// Projection freshness and failure marker for the change cursor projection.
+    pub projection_state: ConversationProjectionStateView,
+    /// True when the cursor was synthesized because no committed cursor row exists.
+    pub is_initial: bool,
+}
+
+/// Paged change entries result.
+pub struct ConversationChangePage {
+    /// Stable cursor reference used to produce the page.
+    pub cursor_ref: ConversationChangeCursorRef,
+    /// Visible change entries in outbox order.
+    pub changes: Vec<ConversationChangeCursorEntry>,
+    /// Next outbox sequence a caller can use after this page.
+    pub next_outbox_sequence: ConversationOutboxSequence,
+    /// Next fact sequence covered by the visible entries.
+    pub next_fact_sequence: ConversationFactSequence,
+    /// Whether more change entries may exist after this page.
+    pub has_more: bool,
+    /// Projection freshness and failure marker for the change cursor projection.
+    pub projection_state: ConversationProjectionStateView,
+    /// True when `changes` is empty after visibility filtering.
+    pub is_empty: bool,
+}
+
+/// Paged search result for authorized conversation history.
+pub struct ConversationSearchResultPage {
+    /// Space searched by the query.
+    pub space_id: ConversationSpaceId,
+    /// Consumer used for result authorization.
+    pub consumer_ref: ConsumerRef,
+    /// Query text accepted by the query boundary.
+    pub query_text: SearchQueryText,
+    /// Authorized fact refs returned by search.
+    pub fact_refs: Vec<ConversationFactRef>,
+    /// Authorized manifestation refs returned by search.
+    pub manifestation_refs: Vec<CrossDomainManifestationRef>,
+    /// Next core page token if the search adapter can continue.
+    pub next_page_token: Option<PageToken>,
+    /// Whether more search hits may exist after this page.
+    pub has_more: bool,
+    /// Projection freshness and failure marker for the search projection.
+    pub projection_state: ConversationProjectionStateView,
+    /// True when no authorized hits remain after filtering.
+    pub is_empty: bool,
+}
+
+/// Query-visible projection freshness and failure marker.
+pub struct ConversationProjectionStateView {
+    /// Projection state id when a committed state exists.
+    pub projection_state_id: Option<ConversationProjectionStateId>,
+    /// Space represented by the projection state.
+    pub space_id: ConversationSpaceId,
+    /// Projection kind represented by the state.
+    pub projection_kind: ConversationProjectionKind,
+    /// Freshness state; missing state is exposed as Stale.
+    pub freshness_state: ProjectionFreshnessState,
+    /// Source position covered by the projection, when known.
+    pub source_position: Option<ConversationSourcePosition>,
+    /// Last rebuild ref, if any.
+    pub last_rebuild_ref: Option<ProjectionRebuildRef>,
+    /// Last error ref, if any.
+    pub last_error_ref: Option<ProjectionErrorRef>,
+    /// True when no committed projection state row exists.
+    pub is_empty_state: bool,
+    /// True when reads are degraded because state is Stale, Failed, Rebuilding, Disabled, or empty.
+    pub is_degraded: bool,
+}
+```
+
+| View DTO | 字段 | 类型 | 来源 / 构造规则 | 约束 |
+|---|---|---|---|---|
+| `ConversationReadModelView` | `read_model_id` | `ConversationReadModelId` | `ConversationReadModel.read_model_id` or `ConversationReadModelId::for_consumer(space_id, consumer_ref)` | 空 view 也必须稳定 |
+| `ConversationReadModelView` | `space_id` | `ConversationSpaceId` | request / read model | 必须一致 |
+| `ConversationReadModelView` | `consumer_ref` | `ConsumerRef` | resolved consumer | 必须完成可见性裁剪 |
+| `ConversationReadModelView` | `visible_fact_refs` | `Vec<ConversationFactRef>` | authorized read model | 不含不可见 fact |
+| `ConversationReadModelView` | `visible_manifestation_refs` | `Vec<CrossDomainManifestationRef>` | authorized read model | 不含不可见 manifestation |
+| `ConversationReadModelView` | `cursor_ref` | `Option<ConversationChangeCursorRef>` | authorized read model cursor | 只输出 ref,不推进 cursor |
+| `ConversationReadModelView` | `projection_state` | `ConversationProjectionStateView` | `ConversationProjectionStateView::from_state_or_empty(...)` | stale / failed / empty 不得隐藏 |
+| `ConversationReadModelView` | `is_empty` | `bool` | `visible_fact_refs.is_empty() && visible_manifestation_refs.is_empty()` | not visible 被过滤后可为 true |
+| `ConversationFactView` | `fact_id` | `ConversationFactId` | `ConversationFact.fact_id` | 必填 |
+| `ConversationFactView` | `space_id` | `ConversationSpaceId` | `ConversationFact.space_id` | 必须匹配 query space |
+| `ConversationFactView` | `fact_kind` | `ConversationFactKind` | `ConversationFact.fact_kind` | 不映射 UI message type |
+| `ConversationFactView` | `source_ref` | `FactSourceRef` | `ConversationFact.source_ref` | 不含 source body |
+| `ConversationFactView` | `visibility_scope_id` | `VisibilityScopeId` | `ConversationFact.visibility_scope_id` | 必须已通过 visibility guard |
+| `ConversationFactView` | `payload_ref` | `ConversationFactPayloadRef` | `ConversationFact.payload_ref` | 不含 payload body |
+| `ConversationFactView` | `append_sequence` | `ConversationFactSequence` | `ConversationFact.append_sequence` | 只读 |
+| `ConversationFactView` | `fact_state` | `ConversationFactState` | `ConversationFact.fact_state` | `Retracted` 仅在 `include_retracted = true` 时可返回 marker |
+| `ConversationFactView` | `is_retracted_marker` | `bool` | `fact_state == Retracted` | marker 不恢复正文 |
+| `ConversationFactPage` | `items` | `Vec<ConversationFactView>` | visibility-filtered facts | 不含不可见 facts |
+| `ConversationFactPage` | `next_page_token` | `Option<PageToken>` | `PageInfo.next_page_token` from `application::ports::Page<ConversationFactRef>` | 使用 core-contracts `PageToken`;`PageInfo` schema 见 Step 7 §7.3.0 |
+| `ConversationFactPage` | `has_more` | `bool` | `PageInfo.has_more` from `application::ports::Page<ConversationFactRef>` | 隐藏项被过滤后仍可为 true |
+| `ConversationFactPage` | `projection_state` | `ConversationProjectionStateView` | read model projection state | stale / failed / empty 不得隐藏 |
+| `ConversationFactPage` | `is_empty` | `bool` | `items.is_empty()` | 空页不表示 space 不存在 |
+| `ConversationChangeCursorView` | `cursor_ref` | `ConversationChangeCursorRef` | `ConversationChangeCursorRef::from_cursor(cursor)` | 必须包含 `cursor_id`、`space_id`、`consumer_ref` |
+| `ConversationChangeCursorView` | `cursor_state` | `ConversationChangeCursorState` | cursor | expired / invalidated 必须显式暴露 |
+| `ConversationChangeCursorView` | `last_fact_sequence` | `ConversationFactSequence` | cursor | initial cursor 缺省为 `ConversationFactSequence(0)` 或 request `from_sequence` |
+| `ConversationChangeCursorView` | `last_outbox_sequence` | `ConversationOutboxSequence` | cursor | initial cursor 使用 `ConversationOutboxSequence(0)` |
+| `ConversationChangeCursorView` | `projection_state` | `ConversationProjectionStateView` | change cursor projection state | stale / failed / empty 不得隐藏 |
+| `ConversationChangeCursorView` | `is_initial` | `bool` | cursor row 是否缺失 | initial view 不写 cursor row |
+| `ConversationChangePage` | `cursor_ref` | `ConversationChangeCursorRef` | loaded cursor | 必须匹配 request cursor owner |
+| `ConversationChangePage` | `changes` | `Vec<ConversationChangeCursorEntry>` | visibility-filtered change entries | 不含 payload body;不含不可见 entries |
+| `ConversationChangePage` | `next_outbox_sequence` | `ConversationOutboxSequence` | `max(changes.outbox_sequence)` 或 cursor 原值 | 空页保持 cursor 原 outbox sequence |
+| `ConversationChangePage` | `next_fact_sequence` | `ConversationFactSequence` | `max(changes.fact_sequence)` 或 cursor 原值 | 空页保持 cursor 原 fact sequence |
+| `ConversationChangePage` | `has_more` | `bool` | repository page / `limit` has-more probe | P0 若 repository 返回 `limit` 条可置 true;后续可用 PageInfo 收敛 |
+| `ConversationChangePage` | `projection_state` | `ConversationProjectionStateView` | change cursor projection state | stale / failed / empty 不得隐藏 |
+| `ConversationChangePage` | `is_empty` | `bool` | `changes.is_empty()` | 空页不表示 cursor 缺失 |
+| `ConversationSearchResultPage` | `space_id` | `ConversationSpaceId` | request | 必填 |
+| `ConversationSearchResultPage` | `consumer_ref` | `ConsumerRef` | resolved consumer | 必须完成授权过滤 |
+| `ConversationSearchResultPage` | `query_text` | `SearchQueryText` | request | 不回显 payload body |
+| `ConversationSearchResultPage` | `fact_refs` | `Vec<ConversationFactRef>` | authorized search hits | 不含不可见 facts |
+| `ConversationSearchResultPage` | `manifestation_refs` | `Vec<CrossDomainManifestationRef>` | authorized search hits | 不含不可见 manifestations |
+| `ConversationSearchResultPage` | `next_page_token` | `Option<PageToken>` | search adapter / `QueryMetadata.page` result | 无下一页时为 `None` |
+| `ConversationSearchResultPage` | `has_more` | `bool` | search adapter result | 不由 `fact_refs.is_empty()` 推导 |
+| `ConversationSearchResultPage` | `projection_state` | `ConversationProjectionStateView` | search projection state | stale / failed / empty 不得隐藏 |
+| `ConversationSearchResultPage` | `is_empty` | `bool` | `fact_refs.is_empty() && manifestation_refs.is_empty()` | 空页不表示 index 不存在 |
+| `ConversationProjectionStateView` | `projection_state_id` | `Option<ConversationProjectionStateId>` | state row | empty marker 时为 `None` |
+| `ConversationProjectionStateView` | `space_id` | `ConversationSpaceId` | request | 必填 |
+| `ConversationProjectionStateView` | `projection_kind` | `ConversationProjectionKind` | request / state | 必须一致 |
+| `ConversationProjectionStateView` | `freshness_state` | `ProjectionFreshnessState` | state row;missing state -> `Stale` | 不得把 missing state 标成 `Fresh` |
+| `ConversationProjectionStateView` | `source_position` | `Option<ConversationSourcePosition>` | state row | missing state 时为 `None` |
+| `ConversationProjectionStateView` | `last_rebuild_ref` | `Option<ProjectionRebuildRef>` | state row | 可为空 |
+| `ConversationProjectionStateView` | `last_error_ref` | `Option<ProjectionErrorRef>` | state row | failed 时应保留 |
+| `ConversationProjectionStateView` | `is_empty_state` | `bool` | state row 是否缺失 | 缺失不触发 rebuild |
+| `ConversationProjectionStateView` | `is_degraded` | `bool` | `freshness_state != Fresh || is_empty_state` | query 只暴露 marker |
+
+Read model / view 转换边界:
+
+- `ConversationReadModel` 属于 `domain/projection.rs`,由 `ProjectionRepository.get_read_model(...)` 读取,并在 `VisibilityPolicy.filter_read_model(...)` 后进入 query response 构造。
+- `ConversationReadModelView` 属于 `contracts/views.rs`,只表示 public query response DTO。
+- `ConversationReadModelView::from_authorized(...)` 的输入必须是已授权的 `ConversationReadModel` 加 `ConversationProjectionState` / `ConversationProjectionStateView` 相关信息;不得让 repository 直接返回 `ConversationReadModelView`。
+- read model row 缺失时,service 使用 `ConversationReadModel::empty_for_consumer(space_id, consumer_ref)` 形成内部空 read model,再映射为 `ConversationReadModelView::empty_for_consumer(...)` 或等价 public empty view。
+- `ConversationChangeCursorView::from_cursor(...)` 的输入必须是 `domain/cursor.rs::ConversationChangeCursor` 加 `ConversationProjectionStateView`;repository 不得直接返回 `ConversationChangeCursorView`。
+- `ConversationChangePage::from_visible(...)` 的输入必须是已完成 visibility 过滤的 `Vec<ConversationChangeCursorEntry>`、当前 cursor 和 change cursor projection state;不得包含 full fact payload 或 outbox payload body。
+- `ConversationSearchResultPage::from_authorized(...)` 的输入必须是已授权 search hits、resolved consumer、search projection state 和 page metadata;不得让 search adapter 直接返回 public response DTO。
+
+Query error / empty surface 口径:
+
+- `GetConversationReadModel` 读取到 space / visibility scope 缺失时返回 `ApplicationError::NotFound`。
+- `GetConversationReadModel` 中目标 consumer 无可见 facts 或 read model 缺失时返回 `ConversationReadModelView::empty_for_consumer(...)`,不写 projection。
+- `GetConversationFact` 对单个不可见 fact 返回 `ApplicationError::NotVisible`,不得返回 empty fact。
+- `ListConversationFacts` 对不可见 facts 做过滤;若过滤后为空,返回 `ConversationFactPage { items: [], is_empty: true, ... }`。
+- `GetConversationChangeCursor` 找不到 cursor row 时返回 initial `ConversationChangeCursorView { is_initial: true, ... }`;不得写入 cursor row。
+- `PollConversationChanges` 找不到 cursor row 返回 `ApplicationError::NotFound`;cursor expired / invalidated 返回对应 marker 或 `ApplicationError::InvalidCursor`,不得静默从零开始。
+- `SearchConversationHistory` 无命中或命中过滤后为空时返回 `ConversationSearchResultPage { fact_refs: [], manifestation_refs: [], is_empty: true, ... }`。
+- `GetConversationProjectionState` 找不到 state row 时返回 `ConversationProjectionStateView::empty_stale(space_id, projection_kind)`,不得返回 `Fresh`。
+- Query 读取 stale / failed / rebuilding / disabled projection 时只暴露 `ConversationProjectionStateView`,不得在 query flow 中触发 rebuild 或修改 state。
+
 #### 7.4.1 `GetConversationReadModel`
 
 | 项 | 内容 |
 |---|---|
-| 函数签名 | `handle_get_conversation_read_model(GetConversationReadModelRequest request) -> Result<ConversationReadModelView, ApiError>` |
+| 函数签名 | `handle_get_conversation_read_model(GetConversationReadModelRequest request, ConsumerContext consumer_context, QueryMetadata metadata) -> Result<ConversationReadModelView, ApiError>` |
 | HTTP / RPC / Event 名称 | `GET /conversation/spaces/{space_id}/read-model` |
 | 调用方 | SDK / Chat / Workspace / Runtime |
 | 处理方 | `ConversationQueryHandler` -> `AuthorizedConversationQueryService` |
@@ -689,7 +1068,7 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 
 | 项 | 内容 |
 |---|---|
-| 函数签名 | `handle_list_conversation_facts(ListConversationFactsRequest request) -> Result<ConversationFactPage, ApiError>` |
+| 函数签名 | `handle_list_conversation_facts(ListConversationFactsRequest request, ConsumerContext consumer_context, QueryMetadata metadata) -> Result<ConversationFactPage, ApiError>` |
 | HTTP / RPC / Event 名称 | `GET /conversation/spaces/{space_id}/facts` |
 | 调用方 | SDK / Chat / Workspace |
 | 处理方 | `ConversationQueryHandler` -> `AuthorizedConversationQueryService` |
@@ -739,13 +1118,14 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 {
   "space_id": "ConversationSpaceId",
   "consumer_ref": "ConsumerRef",
-  "cursor_id": "ConversationChangeCursorId"
+  "cursor_id": "Option<ConversationChangeCursorId>",
+  "from_sequence": "Option<ConversationFactSequence>"
 }
 ```
 
 | 输入契约 | 读取对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `GetConversationChangeCursorRequest` | `ConversationChangeCursor`、`VisibilityScope`、`ConversationProjectionState` | 是 | cursor may be derived from space + consumer | cursor_id != fact sequence | create empty cursor view or reject by policy |
+| `GetConversationChangeCursorRequest` | `ConversationChangeCursor`、`VisibilityScope`、`ConversationProjectionState` | 是 | cursor may be derived from space + consumer;`from_sequence` default is `ConversationFactSequence(0)` | cursor_id != fact sequence;from_sequence != outbox sequence | create initial cursor view or reject by policy |
 
 #### 7.4.5 `PollConversationChanges`
 
@@ -761,19 +1141,19 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
   "space_id": "ConversationSpaceId",
   "consumer_ref": "ConsumerRef",
   "cursor_id": "ConversationChangeCursorId",
-  "limit": "BatchSize"
+  "limit": "PageLimit"
 }
 ```
 
 | 输入契约 | 读取对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `PollConversationChangesRequest` | `ChangeCursorProjection`、`ConversationOutboxRecord`、`VisibilityScope` | 是 | limit default from config | change event != full fact payload | stale / expired cursor marker |
+| `PollConversationChangesRequest` | `ChangeCursorProjection`、`ConversationOutboxRecord`、`VisibilityScope` | 是 | `PageLimit` default from config | change event != full fact payload;PageLimit != BatchSize | stale / expired cursor marker |
 
 #### 7.4.6 `SearchConversationHistory`
 
 | 项 | 内容 |
 |---|---|
-| 函数签名 | `handle_search_conversation_history(SearchConversationHistoryRequest request) -> Result<ConversationSearchResultPage, ApiError>` |
+| 函数签名 | `handle_search_conversation_history(SearchConversationHistoryRequest request, ConsumerContext consumer_context, QueryMetadata metadata) -> Result<ConversationSearchResultPage, ApiError>` |
 | HTTP / RPC / Event 名称 | `GET /conversation/spaces/{space_id}/search` |
 | 调用方 | SDK / Chat / Workspace |
 | 处理方 | `ConversationQueryHandler` -> `AuthorizedConversationQueryService` |
@@ -854,7 +1234,7 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 
 | 项 | 内容 |
 |---|---|
-| 函数签名 | `handle_get_conversation_projection_state(GetConversationProjectionStateRequest request) -> Result<ConversationProjectionStateView, ApiError>` |
+| 函数签名 | `handle_get_conversation_projection_state(GetConversationProjectionStateRequest request, ActorContext actor, QueryMetadata metadata) -> Result<ConversationProjectionStateView, ApiError>` |
 | HTTP / RPC / Event 名称 | `GET /conversation/spaces/{space_id}/projection-state` |
 | 调用方 | operator / SDK / reports |
 | 处理方 | `ConversationQueryHandler` -> `ConversationDerivedMaintenanceService` |

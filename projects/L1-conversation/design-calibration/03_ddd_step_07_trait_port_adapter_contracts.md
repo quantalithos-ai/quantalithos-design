@@ -213,6 +213,43 @@ infra adapters
 
 ### 7.3 `application` 模块:repository port 契约
 
+#### 7.3.0 `Page<T>` / `PageInfo` repository helper
+
+`Page<T>` 和 `PageInfo` 是 application repository port 的返回包装,归属 `crates/application/src/ports.rs`。它们不是 public contracts DTO,不得序列化到 query response;query response 必须把 `PageInfo` 显式映射成 contracts view 中的 `next_page_token` 和 `has_more` 字段。
+
+`PageRequest` 与 `PageToken` 复用 `core-contracts` 的正式类型。conversation 不重新定义请求分页类型。
+
+```rust
+/// Repository page result used by application ports.
+pub struct Page<T> {
+    /// Items returned for the requested page.
+    pub items: Vec<T>,
+    /// Cursor and flags for the next repository read.
+    pub page_info: PageInfo,
+}
+
+/// Repository page metadata derived from core PageRequest and store result.
+pub struct PageInfo {
+    /// Token to request the next page.
+    pub next_page_token: Option<PageToken>,
+    /// Whether more rows exist after this page.
+    pub has_more: bool,
+}
+```
+
+| 类型 | 字段 | 类型 | 来源 | 约束 |
+|---|---|---|---|---|
+| `Page<T>` | `items` | `Vec<T>` | repository read result | 按 repository 函数约定排序;不得包含未授权过滤后的 public DTO |
+| `Page<T>` | `page_info` | `PageInfo` | repository cursor state | 必填 |
+| `PageInfo` | `next_page_token` | `Option<PageToken>` | core `PageToken` from store cursor | 无下一页时为 `None` |
+| `PageInfo` | `has_more` | `bool` | store has-more probe 或 cursor 判断 | 简单 cursor store 可用 `next_page_token.is_some()`;若 visibility 过滤使当前 `items` 为空但后续候选仍存在,可为 `true` |
+
+使用约束:
+
+- repository port 返回的 `Page<T>` 只表达 committed truth / projection row 的分页读取结果,不承载 query envelope、consistency 或 consumer context。
+- application query service 对 `Page<ConversationFactRef>` 做 visibility 过滤后,必须用 `refs.page_info.next_page_token` 和 `refs.page_info.has_more` 构造 `ConversationFactPage`。
+- job / rebuild 使用 `Page<T>` 时不得把 `PageInfo` 写入 domain truth;它只用于继续读取下一批。
+
 #### 7.3.1 `SpaceScopeRepository`
 
 ```rust
@@ -595,6 +632,13 @@ pub trait ProjectionRepository {
 | `upsert_change_cursor_projection(projection: ChangeCursorProjection, uow: UnitOfWorkHandle)` | 保存变化游标投影 | projection、事务句柄 | `Version` | `RepositoryError` |
 | `list_read_models(space_id: ConversationSpaceId, page: PageRequest)` | 分页列出读取视图 | space、分页 | `Page<ConversationReadModel>` | `RepositoryError` |
 
+`ProjectionRepository` 类型边界:
+
+- `get_read_model(...)` 和 `list_read_models(...)` 的返回类型必须是 `domain/projection.rs::ConversationReadModel`。
+- `ConversationReadModelView` 属于 `contracts/views.rs`,只允许由 application query service 或 API handler 从授权后的 `ConversationReadModel` 构造。
+- 即使当前 implementation step 尚未落 `domain::ConversationReadModel`,也不得把 `ProjectionRepository` 返回类型临时改成 `ConversationReadModelView`;应先补 domain read model 对象,再实现 repository / service。
+- 这样保留 `VisibilityPolicy.filter_read_model(ConversationReadModel, ConsumerRef)`、rebuild job 和 public query DTO 之间的三层边界,避免 repository adapter 直接生成 public response。
+
 #### 7.3.6 `ExternalReferenceRepository`
 
 ```rust
@@ -662,6 +706,7 @@ pub trait ConversationOutboxRepository {
     ) -> Result<Vec<ConversationOutboxRecord>, RepositoryError>;
 
     /// Lists committed outbox records after a source position for cursor rebuild.
+    /// Returned records must include committed_at and cursor metadata fields.
     async fn list_committed_since(
         &self,
         space_id: ConversationSpaceId,
@@ -689,9 +734,15 @@ pub trait ConversationOutboxRepository {
 |---|---|---|---|---|
 | `enqueue(outbox: ConversationOutboxRecord, uow: UnitOfWorkHandle)` | 入队 outbox | outbox、事务句柄 | `Version` | `RepositoryError` |
 | `list_pending(limit: BatchSize)` | 列出待发布记录 | batch size | `Vec<ConversationOutboxRecord>` | `RepositoryError` |
-| `list_committed_since(space_id: ConversationSpaceId, after: ConversationOutboxSequence, limit: PageLimit)` | 读取指定 outbox 位置后的已提交变化 | space、outbox 位置、数量限制 | `Vec<ConversationOutboxRecord>` | `RepositoryError` |
+| `list_committed_since(space_id: ConversationSpaceId, after: ConversationOutboxSequence, limit: PageLimit)` | 读取指定 outbox 位置后的已提交变化 | space、outbox 位置、数量限制 | `Vec<ConversationOutboxRecord>` | `RepositoryError`;返回 record 必须保留 `committed_at`、`visibility_scope_id`、`fact_sequence`、`fact_ref`、`manifestation_ref` |
 | `get_for_update(outbox_record_id: ConversationOutboxRecordId, uow: UnitOfWorkHandle)` | 写事务读取 outbox | record id、事务句柄 | `Option<ConversationOutboxRecord>` | `RepositoryError` |
 | `save_state(outbox: ConversationOutboxRecord, uow: UnitOfWorkHandle)` | 保存状态推进 | outbox、事务句柄 | `Version` | `RepositoryError` |
+
+`ConversationOutboxRepository` 的 committed read 口径:
+
+- `enqueue(...)` 接收的 `ConversationOutboxRecord` 必须已经由 application service / domain factory 填好 `committed_at` 与 change cursor metadata;repository 不得在 `list_committed_since(...)` 时临时生成这些字段。
+- `list_pending(...)` 和 `list_committed_since(...)` 返回的是同一正式 `ConversationOutboxRecord` schema,不得为发布路径或 cursor rebuild 裁剪成不同 DTO。
+- `list_committed_since(...)` 必须按 `outbox_sequence` 单调升序返回;`after` 是 exclusive lower bound。
 
 ### 7.4 `application` 模块:technical port 契约
 
@@ -873,6 +924,8 @@ pub trait ExternalFactResolverPort {
 | `resolve_external_fact(external_fact_ref: ExternalFactRef, trace_ref: TraceContextRef)` | 解析外部事实元信息 | external ref 与 trace | `ExternalFactResolution` | `ResolverError` |
 | `load_safe_snapshot(external_fact_ref: ExternalFactRef, visibility: VisibilityScope)` | 加载安全快照 | external ref 与 visibility | `ExternalFactSnapshot` | `ResolverError` |
 | `verify_digest(external_fact_ref: ExternalFactRef, digest: ExternalSourceDigest)` | 校验 digest | external ref 与摘要 | `DigestVerification` | `ResolverError` |
+
+`ExternalFactResolution` 和 `DigestVerification` 的正式 schema 见 Step 6 §7.7.0。Port 实现必须只返回 external ref、safe display summary ref、digest、version 和 resolution marker,不得返回 source body、raw upstream response、secret、token 或外部仓私有 DTO。Digest mismatch 必须返回 `DigestVerificationState::Mismatched` 或 `ResolverError`,不得由 adapter 自动刷新 Conversation truth。
 
 #### 7.5.3 `ConversationOutboxPublisherPort`
 

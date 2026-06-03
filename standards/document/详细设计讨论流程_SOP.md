@@ -18,6 +18,8 @@
 | v0.5 | 2026-05-29 | 目录与代码文件组织讨论规则 | 在 Step 4 补充目录组织规范输入、目录 / package / crate / binary 映射表和命名检查约束 |
 | v0.6 | 2026-05-30 | 跨文档闭环复核门禁 | 增加字段闭环、DTO 构造闭环、状态闭环、命名一致性和 phase boundary 复核要求及正反例 |
 | v0.7 | 2026-06-03 | 设计真相源可落码性讨论门禁 | 将跨文档闭环复核统一纳入 `设计真相源闭环与可落码性标准.md`，补充 metadata/idempotency、projection rebuild 和 artifact materialization 复核 |
+| v0.8 | 2026-06-03 | Query view 可落码性讨论门禁 | 在 Step 8 / Step 17 增加 query response view、page、projection marker 和 read-model identity 闭环检查 |
+| v0.9 | 2026-06-03 | Query view 传递类型闭环门禁 | 在 Step 7 / Step 8 增加 view 字段引用类型归属和 repository page helper schema 检查 |
 
 ---
 
@@ -837,6 +839,7 @@ pub trait RepositoryName {
 - 每个协议的独立小节
 - 函数签名 / 路由表
 - 请求 / 响应 / event schema
+- Query response view / page / marker schema
 - 字段来源与目标对象映射表
 - DTO / Event / Job 到 Domain 对象构造闭环表
 - 错误映射
@@ -853,8 +856,14 @@ pub trait RepositoryName {
 6. 目标对象的必填字段是否全部能从输入、派生、查表或系统生成中获得？
 7. 哪些字段名相近但语义不同，不得混同？
 8. 字段缺失时是 reject、derive、lookup、retry、dead-letter 还是暂停处理？
-9. 每个协议失败时映射成什么错误？
-10. 哪些协议需要幂等键或审计记录？
+9. Query 的 response view、page、projection marker 是否有字段级 schema？
+10. Query 的 empty、not visible、stale、failed、rebuilding、disabled、missing state 对外 surface 是什么？
+11. Query response 中 read model / projection / cursor 的 id/ref 如何生成，repository key 是什么？
+12. Query response 字段引用的 enum / ref 是否归属到 contracts shared,或是否写明 domain 到 view 的正式映射？
+13. Query / repository 使用的 page helper 是否有 schema、归属和 public page DTO 映射？
+14. HLD `*Query`、DDD `*Request`、Rust DTO 名称是否存在收敛映射？
+15. 每个协议失败时映射成什么错误？
+16. 哪些协议需要幂等键或审计记录？
 ```
 
 #### 期望产出
@@ -883,6 +892,9 @@ pub trait RepositoryName {
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
+
+| Query | Response DTO / View | 字段 | 类型 | 字段来源 | empty / not visible / degraded 口径 |
+|---|---|---|---|---|---|
 ````
 
 #### 回填位置
@@ -898,6 +910,11 @@ pub trait RepositoryName {
 - 事件必须写事件名、发布方、订阅方、schema 和版本策略。
 - Job 必须写触发方式、输入、输出和幂等要求。
 - 不得定义无法构造目标 Domain 对象的 DTO；如果字段需要派生，必须写清派生来源和缺失处理。
+- Query 不能只写返回类型名、projection 名或 builder 名；response view / page / marker 必须有字段级 schema。
+- Query response 中暴露的 read model / projection / cursor id/ref 必须定义 contracts 落点、repository key 和稳定派生规则。
+- Query response 字段引用的 enum / ref / value object 必须能从 contracts shared 类型或显式映射中获得,不得直接依赖 domain-only 类型。
+- Repository page helper 如 `Page<T>` / `PageInfo` 必须在 Step 7 定义 schema 和归属,Step 8 必须说明如何映射到 public page DTO。
+- Query 的分页、consistency、consumer / actor context 必须明确来自 query body 还是 metadata / envelope，不得双承载。
 - 引用类字段必须区分 contract ref、envelope ref、record ref、payload ref 等语义，不得用相近名称互相代替。
 
 #### 进入下一步的条件
@@ -1451,11 +1468,12 @@ let tx = unit_of_work.begin().await?;
 3. 提交规范、git config 用户、Rust 编码规范和注释规范是否已经列入前置阅读？
 4. 每个 Domain 必填字段是否能回指 DTO、event、派生规则、查表规则或系统生成规则？
 5. 每个 Command / Event / Job 是否能构造目标对象，或明确缺失处理？
-6. 状态枚举、状态图、测试切口、验收口径是否使用同一套正式状态名？
-7. 当前 phase / commit boundary 是否误用了后续 phase 才定义的对象、结果或证据？
-8. 哪些字段、状态、函数、用例或证据仍有旧名、口语名或别名漂移？
-9. 哪些内容仍待确认，不能进入实施？
-10. 实施计划应该如何引用本文，而不是重复本文？
+6. 每个 Query 的 response view / page / marker、read model / projection / cursor id/ref 是否已经闭合？
+7. 状态枚举、状态图、测试切口、验收口径是否使用同一套正式状态名？
+8. 当前 phase / commit boundary 是否误用了后续 phase 才定义的对象、结果或证据？
+9. 哪些字段、状态、函数、用例或证据仍有旧名、口语名或别名漂移？
+10. 哪些内容仍待确认，不能进入实施？
+11. 实施计划应该如何引用本文，而不是重复本文？
 ```
 
 #### 期望产出
@@ -1479,7 +1497,7 @@ let tx = unit_of_work.begin().await?;
 
 - 必须包含提交规范、git config 用户、Rust 编码规范、注释规范。
 - 必须完成 `设计文档讨论中间产物规范.md` 5.10 中定义的跨文档一致性复核。
-- 未通过字段闭环、状态闭环或 phase boundary 复核的内容不得交给实施者自行取舍。
+- 未通过字段闭环、query response 闭环、状态闭环或 phase boundary 复核的内容不得交给实施者自行取舍。
 - 不写开发排期。
 - 不写任务拆分。
 

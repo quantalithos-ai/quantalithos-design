@@ -76,12 +76,12 @@ Step 5 已确认所有领域对象归属 domain 模块。
 | `ParticipantScopeState` | `ParticipantScope` | 是 |
 | `VisibilityScopeState` | `VisibilityScope` | 是 |
 | `ScopeChangeState` | `ScopeChangeRecord` | 是 |
-| `ConversationFactState` | `ConversationFact` | 是 |
+| `ConversationFactState` | contracts shared enum;`ConversationFact` 直接复用 | 是 |
 | `FactAppendResult` | `FactAppendReceipt` | 是 |
 | `ManifestationState` | `CrossDomainManifestation` | 是 |
 | `ReferenceResolutionState` | `ReferenceResolutionState` / snapshot / projection | 是 |
 | `ProjectionFreshnessState` | `ConversationProjectionState` | 是 |
-| `ConversationChangeCursorState` | `ConversationChangeCursor` | 是 |
+| `ConversationChangeCursorState` | contracts shared enum;`ConversationChangeCursor` 和 query view 直接复用 | 是 |
 | `ConversationOutboxPublicationState` | `ConversationOutboxRecord` | 是 |
 | `TraceRetentionState` | `ConversationTraceContext` | 是 |
 | `TraceHandoffState` | `TraceHandoffRecord` | 是 |
@@ -524,6 +524,259 @@ pub struct ScopeSnapshotRef {
 - `ScopeChangeRecord.previous_scope_ref` 和 `new_scope_ref` 必须使用同一个 `scope_kind` 和同一个 `space_id`。
 - create-space 初始 `ScopeChangeRecord` 的正式口径为 `scope_kind = Space`。`previous_scope_ref` 使用同一 `space_id`、两个 scope id 为 `None`、`scope_version = None`,表示预创建占位,不代表已有持久化 space;`new_scope_ref` 使用同一 `space_id`、两个 scope id 为 `None`,PH-02 下 `scope_version = None`。
 
+### 7.2.2 PH-04 authorized query / projection 共享值对象正式 schema
+
+本小节补齐 PH-04 `query DTO / read model / projection freshness` boundary 直接落码所需的共享值对象。实现侧不得把下列类型实现为空 struct、裸字符串别名或另一个未记录字段集。
+
+归属口径:
+
+- `ConversationReadModelId` 和 `ConversationChangeCursorRef` 属于 `conversation-contracts/src/refs.rs`。
+- `SearchIndexProjectionId`、`ChangeCursorProjectionId`、`ConversationChangeCursorEntryId`、`SearchQueryText` 和 `PageLimit` 属于 `conversation-contracts/src/refs.rs`。
+- `ConversationChangeCursorEntry` 属于 `conversation-contracts/src/views.rs` 的 shared projection DTO;`domain/projection.rs::ChangeCursorProjection` 直接复用该类型,不得另建 domain-only mirror struct。
+- `ConversationFactState` 属于 `conversation-contracts/src/refs.rs`,与 `ProjectionFreshnessState` 同为 public view / event 可见共享 enum;`domain/fact.rs::ConversationFact` 必须直接复用该 enum,不得在 domain 内另建同名 enum 或 mirror enum。
+- `ConversationChangeCursorState` 属于 `conversation-contracts/src/refs.rs`,与 `ProjectionFreshnessState` 同为 public query view 可见共享 enum;`domain/cursor.rs::ConversationChangeCursor` 必须直接复用该 enum。
+- `ConversationOutboxEventKind` 属于 `conversation-contracts/src/refs.rs`,供 domain outbox、change cursor entry 和 outbound event DTO 共享;不得在 domain / contracts 分别复制。
+- `ConversationReadModelId` 是 projection identity,不是 truth id;不得写入 command result、outbox truth payload 或 upstream source ref。
+- `ConversationChangeCursorRef` 是 query / read model 对游标的轻量引用,不替代 `ConversationChangeCursor` 对象本身。
+- `SearchQueryText` 只表示已进入 query boundary 的搜索文本,不保存搜索结果、payload body 或 external body。
+
+```rust
+/// Lightweight reference to a conversation fact without carrying payload body.
+pub struct ConversationFactRef {
+    /// Stable fact id.
+    pub fact_id: ConversationFactId,
+    /// Space that owns the fact.
+    pub space_id: ConversationSpaceId,
+    /// Append sequence used for ordering.
+    pub append_sequence: ConversationFactSequence,
+}
+
+/// Lightweight reference to a cross-domain manifestation.
+pub struct CrossDomainManifestationRef {
+    /// Stable manifestation id.
+    pub manifestation_id: CrossDomainManifestationId,
+    /// Space that owns the manifestation record.
+    pub space_id: ConversationSpaceId,
+}
+
+/// Stable id for a change cursor.
+pub struct ConversationChangeCursorId(pub String);
+
+/// Monotonic fact sequence scoped to a conversation space.
+pub struct ConversationFactSequence(pub u64);
+
+/// Monotonic outbox or change sequence scoped to a conversation space.
+pub struct ConversationOutboxSequence(pub u64);
+
+/// Describes lifecycle state for a conversation fact.
+pub enum ConversationFactState {
+    /// The fact was accepted and can be read under visibility scope.
+    Accepted,
+    /// The fact exists but requires stricter visibility filtering.
+    VisibilityRestricted,
+    /// The fact was formally retracted but remains traceable.
+    Retracted,
+    /// The fact is isolated because source, safety, or boundary checks failed.
+    Quarantined,
+}
+
+/// Stable id for an authorized read model projection.
+pub struct ConversationReadModelId(pub String);
+
+/// Stable id for a derived search index projection.
+pub struct SearchIndexProjectionId(pub String);
+
+/// Stable id for a derived change cursor projection.
+pub struct ChangeCursorProjectionId(pub String);
+
+/// Lightweight reference to a change cursor owned by a consumer in a space.
+pub struct ConversationChangeCursorRef {
+    /// Stable cursor id.
+    pub cursor_id: ConversationChangeCursorId,
+    /// Space that owns the cursor.
+    pub space_id: ConversationSpaceId,
+    /// Consumer that owns the cursor.
+    pub consumer_ref: ConsumerRef,
+}
+
+/// Stable id for one entry in the change cursor projection.
+pub struct ConversationChangeCursorEntryId(pub String);
+
+/// Query text accepted by SearchConversationHistory.
+pub struct SearchQueryText(pub String);
+
+/// Maximum number of records returned by query or repository page reads.
+pub struct PageLimit(pub u32);
+
+/// Query-visible change entry derived from committed outbox records.
+pub struct ConversationChangeCursorEntry {
+    /// Stable entry id derived from space and outbox sequence.
+    pub entry_id: ConversationChangeCursorEntryId,
+    /// Space that owns the change.
+    pub space_id: ConversationSpaceId,
+    /// Outbox sequence used for cursor resume.
+    pub outbox_sequence: ConversationOutboxSequence,
+    /// Fact sequence when the change points at a fact.
+    pub fact_sequence: Option<ConversationFactSequence>,
+    /// Fact ref when the change is fact-scoped.
+    pub fact_ref: Option<ConversationFactRef>,
+    /// Manifestation ref when the change is manifestation-scoped.
+    pub manifestation_ref: Option<CrossDomainManifestationRef>,
+    /// Event kind represented by the change.
+    pub event_kind: ConversationOutboxEventKind,
+    /// Visibility scope checked before returning the entry.
+    pub visibility_scope_id: VisibilityScopeId,
+    /// Committed time copied from ConversationOutboxRecord.committed_at.
+    pub occurred_at: Timestamp,
+}
+
+/// Stable id for a projection freshness state.
+pub struct ConversationProjectionStateId(pub String);
+
+/// Projection kind visible to query and operations.
+pub enum ConversationProjectionKind {
+    /// Authorized read model projection.
+    ReadModel,
+    /// Search index projection.
+    Search,
+    /// Change cursor projection.
+    ChangeCursor,
+    /// External reference projection.
+    ExternalReference,
+}
+
+/// Describes projection freshness and rebuild lifecycle.
+pub enum ProjectionFreshnessState {
+    /// Projection is aligned with the source position.
+    Fresh,
+    /// Projection lags behind committed truth.
+    Stale,
+    /// Projection is currently being rebuilt.
+    Rebuilding,
+    /// Projection rebuild failed and reads must degrade or expose failure.
+    Failed,
+    /// Projection is disabled and must not be used for reads.
+    Disabled,
+}
+
+/// Source position covered by a derived projection.
+pub struct ConversationSourcePosition {
+    /// Last committed fact sequence covered by the projection.
+    pub last_fact_sequence: ConversationFactSequence,
+    /// Last committed outbox sequence covered by the projection.
+    pub last_outbox_sequence: ConversationOutboxSequence,
+}
+
+/// Reference to a projection rebuild attempt.
+pub struct ProjectionRebuildRef {
+    /// Stable rebuild id.
+    pub rebuild_id: ProjectionRebuildId,
+    /// Job run that started the rebuild.
+    pub job_run_id: JobRunId,
+    /// Projection kind being rebuilt.
+    pub projection_kind: ConversationProjectionKind,
+    /// Timestamp when rebuild began.
+    pub started_at: Timestamp,
+}
+
+/// Stable projection rebuild id.
+pub struct ProjectionRebuildId(pub String);
+
+/// Reference to the latest projection failure diagnostic.
+pub struct ProjectionErrorRef {
+    /// Stable projection error id.
+    pub projection_error_id: ProjectionErrorId,
+    /// Machine-readable error code.
+    pub error_code: ProjectionErrorCode,
+    /// Optional external diagnostic or report ref.
+    pub diagnostic_ref: Option<ExternalReferenceRef>,
+}
+
+/// Stable projection error id.
+pub struct ProjectionErrorId(pub String);
+
+/// Machine-readable projection failure code.
+pub struct ProjectionErrorCode(pub String);
+
+/// Reason for marking a projection stale.
+pub enum ProjectionStaleReason {
+    /// A fact was appended.
+    FactAppended,
+    /// A fact was retracted.
+    FactRetracted,
+    /// Visibility scope changed.
+    VisibilityScopeChanged,
+    /// Actor or participant data changed.
+    ActorChanged,
+    /// External source changed.
+    ExternalSourceChanged,
+    /// Outbox or change sequence has a gap.
+    OutboxGap,
+    /// Operator or maintenance code invalidated the projection.
+    ManualInvalidation,
+}
+
+/// Reason for disabling a projection.
+pub struct ProjectionDisableReason {
+    /// Shared command or configuration reason.
+    pub reason_ref: CommandReasonRef,
+}
+
+/// Reason for marking a change cursor stale.
+pub enum CursorStaleReason {
+    /// Outbox sequence has a gap.
+    OutboxGap,
+    /// Projection lag prevents reliable resume.
+    ProjectionLag,
+    /// Source truth changed outside the cursor window.
+    SourceChanged,
+    /// Visibility or participant scope changed.
+    VisibilityChanged,
+}
+```
+
+| 类型 | 字段 / 派生口径 | 约束 |
+|---|---|---|
+| `ConversationFactRef` | `fact_id`、`space_id`、`append_sequence` | 不包含 payload body;`append_sequence` 只用于排序和 cursor |
+| `CrossDomainManifestationRef` | `manifestation_id`、`space_id` | 不包含 external source body 或 snapshot body |
+| `ConversationChangeCursorId` | opaque string | 由 `space_id + consumer_ref` 稳定派生 |
+| `ConversationFactSequence` | `u64` newtype | 同一 space 内单调递增;初始零值使用 `ConversationFactSequence(0)` |
+| `ConversationOutboxSequence` | `u64` newtype | 同一 space 内单调递增;初始零值使用 `ConversationOutboxSequence(0)` |
+| `ConversationFactState` | `Accepted`、`VisibilityRestricted`、`Retracted`、`Quarantined` | contracts / domain / event / query view 共享;不得复制第二套 enum |
+| `ConversationReadModelId` | 由 `space_id + consumer_ref` 稳定派生,编码为实现可比较的 opaque string | 同一 `space_id` 与同一 `consumer_ref` 必须得到同一 id;不得使用随机 id |
+| `SearchIndexProjectionId` | 由 repository key `space_id` 稳定派生 | 同一 space 的 search projection 必须得到同一 id;不得随机生成 |
+| `ChangeCursorProjectionId` | 由 repository key `space_id` 稳定派生 | 同一 space 的 change cursor projection 必须得到同一 id;不得随机生成 |
+| `ConversationChangeCursorRef` | `cursor_id`、`space_id`、`consumer_ref` | 三个字段必须与目标 `ConversationChangeCursor` 一致 |
+| `ConversationChangeCursorEntryId` | 由 `space_id + outbox_sequence` 稳定派生 | 同一 committed outbox record 只能生成一个 entry id |
+| `SearchQueryText` | transparent string newtype | `trim()` 后不得为空;不保存 payload body;长度上限若未由配置覆盖,P0 默认 256 UTF-8 bytes |
+| `PageLimit` | `u32` newtype | 用于 query page / repository page 读取数量上限;必须 `> 0`;不得与 job `BatchSize` 混用 |
+| `ConversationChangeCursorEntry` | `entry_id`、`space_id`、`outbox_sequence`、`fact_sequence`、`fact_ref`、`manifestation_ref`、`event_kind`、`visibility_scope_id`、`occurred_at` | 只引用变化,不保存 fact payload、manifestation body 或 outbox payload body |
+| `ConversationProjectionStateId` | 由 repository key `space_id + projection_kind` 稳定派生 | 同一 space / projection kind 必须得到同一 id;不得随机生成 |
+| `ConversationProjectionKind` | `ReadModel`、`Search`、`ChangeCursor`、`ExternalReference` | 不等于具体 repository / adapter 名称 |
+| `ProjectionFreshnessState` | `Fresh`、`Stale`、`Rebuilding`、`Failed`、`Disabled` | contracts view 和 domain projection 共享;stale / failed 不得隐藏 |
+| `ConversationSourcePosition` | `last_fact_sequence`、`last_outbox_sequence` | 两个 sequence 都只能前进;缺省空位用零值表达 |
+| `ProjectionRebuildRef` | `rebuild_id`、`job_run_id`、`projection_kind`、`started_at` | 只引用 rebuild attempt,不保存 job report body |
+| `ProjectionErrorRef` | `projection_error_id`、`error_code`、`diagnostic_ref` | failed marker 必须保留;不保存错误日志正文 |
+| `ProjectionStaleReason` | enum | 只作为状态变化原因,不反写真相 |
+| `ProjectionDisableReason` | `reason_ref` | 禁用 projection 不等于删除 truth |
+| `CursorStaleReason` | enum | cursor stale 不等于 fact stale |
+
+稳定派生规则:
+
+- `ConversationReadModelId::for_consumer(space_id, consumer_ref)` 是正式生成口径;实现可使用 canonical serialization + digest / slug,但输出必须 deterministic。
+- `SearchIndexProjectionId::for_space(space_id)` 是正式生成口径;repository key 只使用 `space_id`。
+- `ChangeCursorProjectionId::for_space(space_id)` 是正式生成口径;repository key 只使用 `space_id`。
+- `PageLimit::from_query_or_default(limit, config_default, config_max)` 是 public query 的正式限制口径;缺省使用 config default,超过 config max 返回 `ProtocolError::InvalidQuery` 或按协议明确截断。P0 采用 reject,不得静默改用 job `BatchSize`。
+- `ConversationChangeCursorId` 在 `ConversationChangeCursor::start_from(...)` 中按 `space_id + consumer_ref` 稳定派生;若未来需要多 cursor,必须先新增 cursor purpose / stream key 字段再扩展派生口径。
+- `ConversationChangeCursorRef::from_cursor(cursor)` 必须复制 `cursor.cursor_id`、`cursor.space_id` 和 `cursor.consumer_ref`,不得只保存 `cursor_id`。
+- `ConversationChangeCursorEntryId::from_outbox(space_id, outbox_sequence)` 是正式生成口径;不得从数组下标、分页 token 或随机数生成。
+- `ConversationChangeCursorEntry::from_outbox(outbox)` 必须复制 `outbox.space_id`、`outbox.outbox_sequence`、`outbox.event_kind`、`outbox.fact_sequence`、`outbox.fact_ref`、`outbox.manifestation_ref`、`outbox.visibility_scope_id` 和 `outbox.committed_at`;`occurred_at = outbox.committed_at`。`from_outbox(...)` 不得读取 wall clock,不得从 payload body、fact repository 或 manifestation repository 反查字段。
+- `ConversationOutboxRecord` 是 change cursor rebuild 的 committed truth log;任何进入 `ConversationOutboxRepository.list_committed_since(...)` 返回值的 record 必须已经持久化 `committed_at` 与 cursor entry 构造字段。若 outbox 不指向 fact,`fact_sequence` 和 `fact_ref` 必须为 `None`;若 outbox 不指向 manifestation,`manifestation_ref` 必须为 `None`。
+- `ConversationProjectionStateId::for_projection(space_id, projection_kind)` 是正式生成口径;`ConversationProjectionState.space_id` 必须与 repository key 和 query view 的 `space_id` 一致。
+- `ConversationFactRef::from_fact(fact)` 必须复制 `fact_id`、`space_id` 和 `append_sequence`,不得复制 `payload_ref`。
+- `CrossDomainManifestationRef::from_manifestation(manifestation)` 必须复制 `manifestation_id` 和 `space_id`,不得复制 `external_fact_ref`、`snapshot_ref` 或 source body。
+- `ConversationSourcePosition::zero()` 使用 `ConversationFactSequence(0)` 和 `ConversationOutboxSequence(0)`,用于 empty / initial projection marker。
+
 ### 7.3 `domain/truth.rs` 对象实现契约
 
 #### 7.3.1 `ConversationTruthState`
@@ -628,6 +881,16 @@ pub struct ConversationOutboxRecord {
     pub event_kind: ConversationOutboxEventKind,
     /// Redacted payload reference used by publishers.
     pub payload_ref: ConversationOutboxPayloadRef,
+    /// Fact sequence used by change cursor entries when the outbox points at a fact.
+    pub fact_sequence: Option<ConversationFactSequence>,
+    /// Fact ref used by change cursor entries when the outbox points at a fact.
+    pub fact_ref: Option<ConversationFactRef>,
+    /// Manifestation ref used by change cursor entries when the outbox points at a manifestation.
+    pub manifestation_ref: Option<CrossDomainManifestationRef>,
+    /// Visibility scope used by cursor filtering and lightweight change notifications.
+    pub visibility_scope_id: VisibilityScopeId,
+    /// Timestamp assigned when the truth and outbox record are committed in one unit of work.
+    pub committed_at: Timestamp,
     /// Publication lifecycle state.
     pub publication_state: ConversationOutboxPublicationState,
     /// Retry evidence for failed publication attempts.
@@ -730,6 +993,11 @@ pub enum ConversationOutboxPublicationState {
 | `truth_ref` | `ConversationTruthRef` | 指向已提交事实、scope change、显化、review anchor 或 handoff truth | 不得指向派生视图 |
 | `event_kind` | `ConversationOutboxEventKind` | 传播事件类别 | 必须和 `truth_ref` 一致 |
 | `payload_ref` | `ConversationOutboxPayloadRef` | 脱敏 payload 引用 | 不含 forbidden body |
+| `fact_sequence` | `Option<ConversationFactSequence>` | change cursor 的 fact 位置 | fact append / retract / manifestation-derived fact 时取对应 fact sequence;非 fact 变化必须为 `None` |
+| `fact_ref` | `Option<ConversationFactRef>` | change cursor 的 fact 引用 | fact append / retract / manifestation-derived fact 时取 `ConversationFactRef::from_fact(fact)`;非 fact 变化必须为 `None` |
+| `manifestation_ref` | `Option<CrossDomainManifestationRef>` | change cursor 的 manifestation 引用 | manifestation 变化取 `CrossDomainManifestationRef::from_manifestation(manifestation)`;非 manifestation 变化必须为 `None` |
+| `visibility_scope_id` | `VisibilityScopeId` | cursor 过滤与 lightweight change event 的可见范围 | 必须来自已提交 truth 或 scope snapshot;不得在 projection rebuild 时推导 |
+| `committed_at` | `Timestamp` | truth 与 outbox 同事务提交时间 | application service 在写事务内用 `ClockPort.now()` 取得并传入 outbox 工厂;projection rebuild 不得重新生成 |
 | `publication_state` | `ConversationOutboxPublicationState` | 发布状态 | 只能由 outbox worker / job 推进 |
 | `retry_marker` | `Option<OutboxRetryMarker>` | 发布失败后的重试证据 | 成功或 suppressed 后必须为空 |
 
@@ -748,20 +1016,24 @@ pub enum ConversationOutboxPublicationState {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `ConversationOutboxRecord::from_fact_append(fact: ConversationFact, receipt: FactAppendReceipt) -> Result<Self, DomainError>` | 从事实追加形成 outbox | fact 和 receipt | `Result<Self, DomainError>` | `AppendConversationFact` |
-| `ConversationOutboxRecord::from_fact_retraction(fact: ConversationFact, receipt: FactAppendReceipt) -> Result<Self, DomainError>` | 从事实撤回形成 outbox | fact 和撤回回执 | `Result<Self, DomainError>` | `RetractConversationFact` |
-| `ConversationOutboxRecord::from_manifestation(manifestation: CrossDomainManifestation) -> Result<Self, DomainError>` | 从显化形成 outbox | 显化记录 | `Result<Self, DomainError>` | `ManifestExternalFact` |
-| `ConversationOutboxRecord::from_scope_change(change: ScopeChangeRecord) -> Result<Self, DomainError>` | 从 scope change 形成 outbox | 范围变化记录 | `Result<Self, DomainError>` | scope 更新 |
-| `ConversationOutboxRecord::from_review_anchor(anchor: ReviewAnchor) -> Result<Self, DomainError>` | 从复盘锚点形成 change available outbox | 复盘锚点 | `Result<Self, DomainError>` | `CreateReviewAnchor` |
-| `ConversationOutboxRecord::from_trace_handoff(handoff: TraceHandoffRecord) -> Result<Self, DomainError>` | 从 trace handoff intent 形成 outbox | trace handoff 记录 | `Result<Self, DomainError>` | `RequestTraceHandoff` |
-| `ConversationOutboxRecord::from_archive_handoff(handoff: ArchiveHandoffRecord) -> Result<Self, DomainError>` | 从 archive handoff intent 形成 outbox | archive handoff 记录 | `Result<Self, DomainError>` | `RequestArchiveHandoff` |
+| `ConversationOutboxRecord::from_fact_append(fact: ConversationFact, receipt: FactAppendReceipt, committed_at: Timestamp) -> Result<Self, DomainError>` | 从事实追加形成 outbox | fact、receipt、提交时间 | `Result<Self, DomainError>` | `AppendConversationFact` |
+| `ConversationOutboxRecord::from_fact_retraction(fact: ConversationFact, receipt: FactAppendReceipt, committed_at: Timestamp) -> Result<Self, DomainError>` | 从事实撤回形成 outbox | fact、撤回回执、提交时间 | `Result<Self, DomainError>` | `RetractConversationFact` |
+| `ConversationOutboxRecord::from_manifestation(manifestation: CrossDomainManifestation, manifested_fact: Option<ConversationFact>, committed_at: Timestamp) -> Result<Self, DomainError>` | 从显化形成 outbox | 显化记录、可选本仓 fact、提交时间 | `Result<Self, DomainError>` | `ManifestExternalFact` |
+| `ConversationOutboxRecord::from_scope_change(change: ScopeChangeRecord, visibility_scope_id: VisibilityScopeId, committed_at: Timestamp) -> Result<Self, DomainError>` | 从 scope change 形成 outbox | 范围变化记录、该变化适用的 visibility scope、提交时间 | `Result<Self, DomainError>` | scope 更新 |
+| `ConversationOutboxRecord::from_review_anchor(anchor: ReviewAnchor, visibility_scope_id: VisibilityScopeId, committed_at: Timestamp) -> Result<Self, DomainError>` | 从复盘锚点形成 change available outbox | 复盘锚点、可见范围、提交时间 | `Result<Self, DomainError>` | `CreateReviewAnchor` |
+| `ConversationOutboxRecord::from_trace_handoff(handoff: TraceHandoffRecord, space_id: ConversationSpaceId, visibility_scope_id: VisibilityScopeId, committed_at: Timestamp) -> Result<Self, DomainError>` | 从 trace handoff intent 形成 outbox | trace handoff、space、可见范围、提交时间 | `Result<Self, DomainError>` | `RequestTraceHandoff` |
+| `ConversationOutboxRecord::from_archive_handoff(handoff: ArchiveHandoffRecord, visibility_scope_id: VisibilityScopeId, committed_at: Timestamp) -> Result<Self, DomainError>` | 从 archive handoff intent 形成 outbox | archive handoff、可见范围、提交时间 | `Result<Self, DomainError>` | `RequestArchiveHandoff` |
 
 不变量与禁止事项:
 
 - outbox 不能决定 truth 是否成立。
-- `ConversationOutboxRecord::from_scope_change(...)` 必须按 `change.scope_kind` 映射 event kind:`ScopeKind::Space` -> `ConversationOutboxEventKind::SpaceChanged`;`ScopeKind::Participant` / `ScopeKind::Visibility` -> `ConversationOutboxEventKind::ScopeChanged`。
+- `ConversationOutboxRecord::from_fact_append(...)` 和 `from_fact_retraction(...)` 必须设置 `fact_sequence = Some(fact.append_sequence)`、`fact_ref = Some(ConversationFactRef::from_fact(&fact))`、`visibility_scope_id = fact.visibility_scope_id`、`manifestation_ref = None`、`committed_at = committed_at`。
+- `ConversationOutboxRecord::from_manifestation(...)` 必须设置 `manifestation_ref = Some(CrossDomainManifestationRef::from_manifestation(&manifestation))`、`visibility_scope_id = manifestation.visibility_scope_id`、`committed_at = committed_at`;若 `manifested_fact = Some(fact)`,则同时设置 `fact_sequence` 和 `fact_ref`,否则二者为 `None`。
+- `ConversationOutboxRecord::from_scope_change(...)` 必须按 `change.scope_kind` 映射 event kind:`ScopeKind::Space` -> `ConversationOutboxEventKind::SpaceChanged`;`ScopeKind::Participant` / `ScopeKind::Visibility` -> `ConversationOutboxEventKind::ScopeChanged`。scope change outbox 的 `fact_sequence`、`fact_ref`、`manifestation_ref` 必须为 `None`,`visibility_scope_id` 来自 application service 读取到的当前可见范围或该次 visibility scope change 的目标 scope。
+- `ConversationOutboxRecord::from_review_anchor(...)`、`from_trace_handoff(...)` 和 `from_archive_handoff(...)` 的 `fact_sequence`、`fact_ref`、`manifestation_ref` 默认必须为 `None`,除非对应 truth object 明确携带 fact / manifestation target ref;P0 不从 review target、trace body 或 archive scope 反查 fact。
 - outbox payload 不能包含外部正文。
 - 发布失败不得回滚核心 truth。
+- `committed_at` 只在 command / consumer / job 写路径创建 outbox 时由 `ClockPort.now()` 确定并随 outbox 持久化。`ChangeCursorProjection::from_change_log(...)`、`ConversationChangeCursorEntry::from_outbox(...)`、query service 和 repository list 方法不得重新取时间。
 
 ### 7.4 `domain/space.rs` 与 `domain/scope.rs` 对象实现契约
 
@@ -1403,19 +1675,7 @@ pub struct ConversationFact {
 }
 ```
 
-```rust
-/// Describes lifecycle state for a conversation fact.
-pub enum ConversationFactState {
-    /// The fact was accepted and can be read under visibility scope.
-    Accepted,
-    /// The fact exists but requires stricter visibility filtering.
-    VisibilityRestricted,
-    /// The fact was formally retracted but remains traceable.
-    Retracted,
-    /// The fact is isolated because source, safety, or boundary checks failed.
-    Quarantined,
-}
-```
+`ConversationFactState` 的正式 enum 定义归属 `contracts/refs.rs`,见 §7.2.2。`domain/fact.rs` 中的 `ConversationFact` 直接引用该共享 enum;实现侧不得在 domain 复制第二套同名 enum。
 
 | 变体 | Rustdoc 注释 | 作用 | 允许来源 | 允许去向 |
 |---|---|---|---|---|
@@ -1638,12 +1898,12 @@ pub struct ConversationReadModel {
 
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
-| `read_model_id` | `ConversationReadModelId` | 标识读取视图 | 系统生成 |
+| `read_model_id` | `ConversationReadModelId` | 标识读取视图 | 按 `space_id + consumer_ref` 稳定派生 |
 | `space_id` | `ConversationSpaceId` | 所属空间 | 必须匹配 facts / manifestations |
 | `consumer_ref` | `ConsumerRef` | 读取方 | 已授权后写入 |
 | `visible_fact_refs` | `Vec<ConversationFactRef>` | 可见事实引用 | 不含不可见事实 |
 | `visible_manifestation_refs` | `Vec<CrossDomainManifestationRef>` | 可见显化引用 | 不含不可见显化 |
-| `cursor_ref` | `Option<ConversationChangeCursorRef>` | 增量游标引用 | 可为空 |
+| `cursor_ref` | `Option<ConversationChangeCursorRef>` | 增量游标引用 | 可为空;存在时必须匹配同一 `space_id` / `consumer_ref` |
 | `projection_state` | `ConversationProjectionState` | freshness / rebuild 状态 | stale 必须显式暴露 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
@@ -1663,6 +1923,7 @@ pub struct ConversationReadModel {
 - read model 是派生对象,不能反写真相。
 - read model 必须完成可见性裁剪后才能输出。
 - stale / failed 状态不得隐藏。
+- `ConversationReadModel` 是 `domain/projection.rs` 内部派生对象。`contracts/views.rs::ConversationReadModelView` 只能由 query service / handler 在输出边界构造,不得替代本对象进入 `ProjectionRepository`、`VisibilityPolicy` 或 rebuild job。
 
 #### 7.6.2 `ConversationChangeCursor`
 
@@ -1707,7 +1968,7 @@ pub enum ConversationChangeCursorState {
 
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
-| `cursor_id` | `ConversationChangeCursorId` | 标识游标 | 系统生成 |
+| `cursor_id` | `ConversationChangeCursorId` | 标识游标 | 按 `space_id + consumer_ref` 稳定派生 |
 | `space_id` | `ConversationSpaceId` | 所属空间 | 必须匹配 read model |
 | `consumer_ref` | `ConsumerRef` | 游标拥有者 | 不得跨 consumer 复用 |
 | `last_fact_sequence` | `ConversationFactSequence` | 已消费事实位置 | 递增 |
@@ -1723,7 +1984,7 @@ pub enum ConversationChangeCursorState {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `ConversationChangeCursor::start_from(space_id: ConversationSpaceId, consumer: ConsumerRef, sequence: ConversationFactSequence) -> Self` | 从指定事实位置创建游标 | space、consumer、sequence | `Self` | 初始增量读 |
+| `ConversationChangeCursor::start_from(space_id: ConversationSpaceId, consumer: ConsumerRef, sequence: ConversationFactSequence) -> Self` | 从指定事实位置创建游标 | space、consumer、sequence | `Self` | 初始增量读;`cursor_id` 按 `space_id + consumer` 稳定派生 |
 | `ConversationChangeCursor::from_read_model(read_model: &ConversationReadModel) -> Result<Self, DomainError>` | 从读取视图创建游标 | read model | `Result<Self, DomainError>` | query path |
 
 不变量与禁止事项:
@@ -1733,6 +1994,179 @@ pub enum ConversationChangeCursorState {
 - 游标不绑定 SSE / WebSocket / AG-UI 等具体传输协议。
 
 ### 7.7 `domain/manifestation.rs` 对象实现契约
+
+#### 7.7.0 manifestation / external reference 共享值对象
+
+本节补齐 PH-05 `manifestation / external reference / resolver` boundary 直接落码所需的共享值对象。实现侧必须直接按本节 schema 落 `crates/contracts/src/refs.rs`、`crates/contracts/src/views.rs`、`crates/domain/src/manifestation.rs` 和 `crates/domain/src/reference.rs`;不得把下列类型实现为空 struct、裸字符串 alias 或自行推导 enum。
+
+归属口径:
+
+- `ExternalSourceSystem`、`ExternalFactKind`、`DisplaySummaryRef`、`ManifestationReason`、`ManifestationRevokeReason`、`ReferenceResolutionReason` 属于 `conversation-contracts/src/refs.rs` 或同层 shared value module。
+- `ExternalFactResolution`、`DigestVerification` 属于 `conversation-contracts/src/refs.rs` 中的 resolver-facing safe DTO,由 `ExternalFactResolverPort` 返回,不得包含来源正文。
+- `domain/manifestation.rs` 和 `domain/reference.rs` 只能消费这些 shared value object,不得复制第二份 schema。
+
+```rust
+/// Identifies the upstream truth center that owns an external fact.
+pub enum ExternalSourceSystem {
+    /// The external fact is owned by L1-work.
+    Work,
+    /// The external fact is owned by L1-governance.
+    Governance,
+    /// The external fact is owned by L1-artifact.
+    Artifact,
+    /// The external fact is owned by L2-runtime.
+    Runtime,
+    /// The external fact is owned by L6-bridges.
+    Bridge,
+    /// The external fact is owned by L1-identity.
+    Identity,
+}
+
+/// Classifies the referenced external fact without copying source truth.
+pub enum ExternalFactKind {
+    /// Work context or formal work fact.
+    WorkContext,
+    /// Governance decision or review fact.
+    GovernanceDecision,
+    /// Artifact evidence or artifact version fact.
+    ArtifactEvidence,
+    /// Runtime result committed as an external fact.
+    RuntimeResult,
+    /// Bridge mapped fact received from an external platform.
+    BridgeMappedFact,
+    /// Identity actor or participant snapshot fact.
+    IdentityActorSnapshot,
+}
+
+/// Safe display summary pointer for an external fact.
+pub struct DisplaySummaryRef {
+    /// Stable summary reference id.
+    pub summary_ref_id: DisplaySummaryRefId,
+    /// Source system that generated the display summary.
+    pub source_system: ExternalSourceSystem,
+    /// External object represented by this summary.
+    pub source_object_ref: ExternalSourceObjectRef,
+    /// Source version represented by this summary.
+    pub source_version_ref: ExternalSourceVersionRef,
+    /// Digest of the safe summary material.
+    pub summary_digest: ExternalSourceDigest,
+}
+
+/// Reason attached when manifesting an external fact into a conversation space.
+pub struct ManifestationReason {
+    /// Stable reason reference.
+    pub reason_ref: CommandReasonRef,
+    /// Machine-readable reason kind.
+    pub reason_kind: ManifestationReasonKind,
+}
+
+/// Classifies why an external fact is manifested.
+pub enum ManifestationReasonKind {
+    /// Manifestation requested directly by a trusted command.
+    ManualRequest,
+    /// Manifestation created from an upstream committed event.
+    SourceEvent,
+    /// Manifestation created while rebuilding an external reference projection.
+    ProjectionRebuild,
+    /// Manifestation created for review or trace handoff.
+    ReviewTrace,
+}
+
+/// Reason attached when revoking an existing manifestation.
+pub struct ManifestationRevokeReason {
+    /// Stable reason reference.
+    pub reason_ref: CommandReasonRef,
+    /// Machine-readable revoke reason kind.
+    pub reason_kind: ManifestationRevokeReasonKind,
+}
+
+/// Classifies why a manifestation is revoked.
+pub enum ManifestationRevokeReasonKind {
+    /// Source owner marked the referenced fact unavailable.
+    SourceUnavailable,
+    /// Visibility policy no longer permits this manifestation.
+    VisibilityRevoked,
+    /// Operator explicitly revoked the manifestation.
+    OperatorRevoked,
+    /// Digest or source version integrity check failed.
+    IntegrityFailed,
+}
+
+/// Reason attached to an external reference resolution state.
+pub struct ReferenceResolutionReason {
+    /// Stable reason reference.
+    pub reason_ref: CommandReasonRef,
+    /// Machine-readable resolution reason kind.
+    pub reason_kind: ReferenceResolutionReasonKind,
+}
+
+/// Classifies why external reference resolution is pending, unresolved, stale, or failed.
+pub enum ReferenceResolutionReasonKind {
+    /// Resolution is waiting for an upstream snapshot or event.
+    PendingSource,
+    /// The referenced source object was not found.
+    SourceNotFound,
+    /// The referenced source object is not visible to this conversation scope.
+    SourceNotVisible,
+    /// Resolver returned a temporary failure or timeout.
+    ResolverUnavailable,
+    /// Digest verification failed.
+    DigestMismatch,
+    /// Source version changed and the snapshot is stale.
+    SourceVersionChanged,
+}
+
+/// Safe resolver result for an external fact reference.
+pub struct ExternalFactResolution {
+    /// Resolved external fact reference.
+    pub external_fact_ref: ExternalFactRef,
+    /// Current source version observed by the resolver.
+    pub source_version_ref: ExternalSourceVersionRef,
+    /// Current source digest observed by the resolver.
+    pub source_digest: ExternalSourceDigest,
+    /// Resolution state after lookup.
+    pub resolution_state: ReferenceResolutionState,
+    /// Safe display summary when one is available.
+    pub display_summary_ref: Option<DisplaySummaryRef>,
+    /// Reason for pending, unresolved, stale, or failed resolution.
+    pub resolution_reason: Option<ReferenceResolutionReason>,
+}
+
+/// Result of checking whether a known external digest still matches the source.
+pub struct DigestVerification {
+    /// External fact reference that was verified.
+    pub external_fact_ref: ExternalFactRef,
+    /// Digest supplied by Conversation.
+    pub expected_digest: ExternalSourceDigest,
+    /// Digest currently observed at the source, if available.
+    pub actual_digest: Option<ExternalSourceDigest>,
+    /// Verification outcome.
+    pub verification_state: DigestVerificationState,
+    /// Reason when verification fails or cannot complete.
+    pub resolution_reason: Option<ReferenceResolutionReason>,
+}
+
+/// Outcome of external digest verification.
+pub enum DigestVerificationState {
+    /// The expected digest matches the source.
+    Matched,
+    /// The source digest differs from the expected digest.
+    Mismatched,
+    /// The resolver could not read the source digest.
+    Unavailable,
+}
+```
+
+| 类型 | 字段闭环 | 禁止事项 |
+|---|---|---|
+| `ExternalSourceSystem` | event consumer config、resolver config、`ExternalFactRef.source_system` | 不写自由字符串或 repository URL |
+| `ExternalFactKind` | inbound event type、manifest command、resolver result | 不混同 fact kind 与 source lifecycle |
+| `DisplaySummaryRef` | resolver safe snapshot output | 不保存 display summary body |
+| `ManifestationReason` | command `manifestation_reason` 或 consumer / rebuild 派生 reason | 不作为 authorization decision |
+| `ManifestationRevokeReason` | revoke domain method / future revoke flow | 不删除 manifestation history |
+| `ReferenceResolutionReason` | resolver failure、pending marker、stale marker | 不保存 resolver error body |
+| `ExternalFactResolution` | `ExternalFactResolverPort.resolve_external_fact(...)` | 不包含 source body、raw response 或 secret |
+| `DigestVerification` | `ExternalFactResolverPort.verify_digest(...)` | 不把 mismatch 自动改写成 matched |
 
 #### 7.7.1 `CrossDomainManifestation`
 
@@ -2296,6 +2730,8 @@ pub struct TraceRetentionPolicy {
 pub struct ConversationProjectionState {
     /// Stable projection state id.
     pub projection_state_id: ConversationProjectionStateId,
+    /// Space represented by this projection state.
+    pub space_id: ConversationSpaceId,
     /// Projection kind represented by this state.
     pub projection_kind: ConversationProjectionKind,
     /// Source position covered by this projection.
@@ -2309,21 +2745,7 @@ pub struct ConversationProjectionState {
 }
 ```
 
-```rust
-/// Describes projection freshness and rebuild lifecycle.
-pub enum ProjectionFreshnessState {
-    /// Projection is aligned with the source position.
-    Fresh,
-    /// Projection lags behind committed truth.
-    Stale,
-    /// Projection is currently being rebuilt.
-    Rebuilding,
-    /// Projection rebuild failed and reads must degrade or expose failure.
-    Failed,
-    /// Projection is disabled and must not be used for reads.
-    Disabled,
-}
-```
+`ProjectionFreshnessState` 的正式 enum 定义归属 `contracts/refs.rs`,见 §7.2.2;`domain/projection.rs` 的 `ConversationProjectionState` 直接使用该共享 enum,不得复制第二份状态类型。
 
 | 变体 | Rustdoc 注释 | 作用 | 允许来源 | 允许去向 |
 |---|---|---|---|---|
@@ -2335,7 +2757,8 @@ pub enum ProjectionFreshnessState {
 
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
-| `projection_state_id` | `ConversationProjectionStateId` | 标识派生状态 | 系统生成 |
+| `projection_state_id` | `ConversationProjectionStateId` | 标识派生状态 | 按 `space_id + projection_kind` 稳定派生 |
+| `space_id` | `ConversationSpaceId` | 所属空间 | 必须匹配 repository key |
 | `projection_kind` | `ConversationProjectionKind` | read model / search / cursor / reference projection | 不混同具体 store |
 | `source_position` | `ConversationSourcePosition` | 覆盖 truth 位置 | 只能前进 |
 | `freshness_state` | `ProjectionFreshnessState` | freshness 状态 | stale / failed 必须暴露 |
@@ -2351,8 +2774,8 @@ pub enum ProjectionFreshnessState {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `ConversationProjectionState::initial(kind: ConversationProjectionKind, source_position: ConversationSourcePosition) -> Self` | 创建初始状态 | kind 与 source position | `Self` | projection 初始化 |
-| `ConversationProjectionState::disabled(kind: ConversationProjectionKind, reason: ProjectionDisableReason) -> Self` | 创建禁用状态 | kind 与 reason | `Self` | 不启用某派生 |
+| `ConversationProjectionState::initial(space_id: ConversationSpaceId, kind: ConversationProjectionKind, source_position: ConversationSourcePosition) -> Self` | 创建初始状态 | space、kind 与 source position | `Self` | projection 初始化;id 稳定派生 |
+| `ConversationProjectionState::disabled(space_id: ConversationSpaceId, kind: ConversationProjectionKind, reason: ProjectionDisableReason) -> Self` | 创建禁用状态 | space、kind 与 reason | `Self` | 不启用某派生;id 稳定派生 |
 
 不变量与禁止事项:
 
@@ -2435,14 +2858,14 @@ pub struct ChangeCursorProjection {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `update_from_outbox(&mut self, outbox: &ConversationOutboxRecord) -> Result<(), DomainError>` | 从 outbox 更新投影 | outbox record | `Result<(), DomainError>` | 不发布事件 |
+| `update_from_outbox(&mut self, outbox: &ConversationOutboxRecord) -> Result<(), DomainError>` | 从 outbox 更新投影 | outbox record | `Result<(), DomainError>` | 调用 `ConversationChangeCursorEntry::from_outbox(outbox)`,不发布事件 |
 | `mark_stale(&mut self, reason: ProjectionStaleReason) -> Result<(), DomainError>` | 标记 stale | reason | `Result<(), DomainError>` | 不改 truth |
 | `cursor_for(&self, consumer: ConsumerRef) -> Option<ConversationChangeCursorRef>` | 定位 consumer cursor | consumer | `Option<ConversationChangeCursorRef>` | 只读 |
 | `covers_sequence(&self, sequence: ConversationFactSequence) -> bool` | 判断覆盖事实序列 | sequence | `bool` | 只读 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `ChangeCursorProjection::from_change_log(space_id: ConversationSpaceId, outbox_records: Vec<ConversationOutboxRecord>) -> Result<Self, DomainError>` | 从 outbox 日志创建投影 | space 和 outbox records | `Result<Self, DomainError>` | rebuild cursor projection |
+| `ChangeCursorProjection::from_change_log(space_id: ConversationSpaceId, outbox_records: Vec<ConversationOutboxRecord>) -> Result<Self, DomainError>` | 从 outbox 日志创建投影 | space 和带 cursor metadata 的 outbox records | `Result<Self, DomainError>` | rebuild cursor projection |
 | `ChangeCursorProjection::empty_for_space(space_id: ConversationSpaceId) -> Self` | 创建空投影 | space id | `Self` | 初始化 |
 
 不变量与禁止事项:
@@ -2450,6 +2873,8 @@ pub struct ChangeCursorProjection {
 - 变化投影不能生成业务事实。
 - 投影过期必须暴露 stale。
 - 不绑定具体订阅协议。
+- `ChangeCursorProjection::from_change_log(...)` 只能消费 `ConversationOutboxRepository.list_committed_since(...)` 返回的 committed outbox records。每条 record 必须已含 `committed_at`、`visibility_scope_id`、`fact_sequence`、`fact_ref` 和 `manifestation_ref`;projection rebuild 不得从 outbox payload、fact repository、manifestation repository 或 wall clock 补字段。
+- `ChangeCursorProjection.source_position.last_outbox_sequence` 必须取已处理 entries 的最大 `outbox_sequence`;`last_fact_sequence` 必须取已处理 entries 中最大 `fact_sequence`,若没有 fact entry 则保持 `ConversationFactSequence(0)`。
 
 #### 7.9.4 `DerivedViewPolicy`
 
@@ -2619,7 +3044,7 @@ pub struct ExternalReferenceProjection {
 |---|---|---|---|
 | Rust 片段中的 rustdoc 使用中文还是英文 | A. 中文;B. 英文;C. 正式文档中文、实现片段英文 | 推荐 C | design 正文保留中文说明,实现仓源码和可转写 rustdoc 必须英文 |
 | 是否把 `ReferenceResolutionState` 放在 `manifestation.rs` | A. 放 manifestation;B. 放 reference;C. 放 projection | 推荐 B | 它同时服务 snapshot 和 external reference projection,主语是 reference resolution |
-| 是否把 `ConversationReadModel` 放到 `contracts` | A. 放 contracts;B. 放 domain;C. 双层 view | 推荐 C 后续 Step 8 细化 | domain 需要内部 read model 对象,对外 view DTO 由 contracts 定义 |
+| 是否把 `ConversationReadModel` 放到 `contracts` | A. 放 contracts;B. 放 domain;C. 双层 view | 已确认 C | `domain/projection.rs::ConversationReadModel` 是 repository / policy / job 使用的内部派生对象;`contracts/views.rs::ConversationReadModelView` 是 public query DTO,不得互相替代 |
 | 是否提前定义 repository 对象 | A. 本 Step 定义;B. Step 7 / Step 11 定义 | 推荐 B | repository 是 port / persistence 契约,不属于 domain object 本步主轴 |
 
 ---

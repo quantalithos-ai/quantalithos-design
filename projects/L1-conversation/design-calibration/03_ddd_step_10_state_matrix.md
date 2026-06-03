@@ -619,8 +619,8 @@ ConversationChangeCursorState:
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| 初始 | `Fresh` | `ConversationProjectionState::initial(ConversationProjectionKind kind, ConversationSourcePosition source_position)` | 初始 projection 覆盖当前位置 | 可供 query 使用 | `DomainError::InvalidInitialState` |
-| 初始 | `Disabled` | `ConversationProjectionState::disabled(ConversationProjectionKind kind, ProjectionDisableReason reason)` | 配置或能力声明不启用该 projection | query 使用 fallback / unsupported marker | `DomainError::InvalidInitialState` |
+| 初始 | `Fresh` | `ConversationProjectionState::initial(ConversationSpaceId space_id, ConversationProjectionKind kind, ConversationSourcePosition source_position)` | 初始 projection 覆盖当前位置 | 可供 query 使用 | `DomainError::InvalidInitialState` |
+| 初始 | `Disabled` | `ConversationProjectionState::disabled(ConversationSpaceId space_id, ConversationProjectionKind kind, ProjectionDisableReason reason)` | 配置或能力声明不启用该 projection | query 使用 fallback / unsupported marker | `DomainError::InvalidInitialState` |
 | `Fresh` / `Failed` | `Stale` | `ConversationProjectionState::mark_stale(ProjectionStaleReason reason)` | truth / source / actor / visibility 变化 | 保存 projection state,可发布 projection state changed | `DomainError::InvalidStateTransition` |
 | `Fresh` / `Stale` / `Failed` | `Rebuilding` | `ConversationProjectionState::begin_rebuild(ProjectionRebuildRef rebuild_ref)` | rebuild job 输入合法,projection 未 disabled | 保存 rebuilding state | `DomainError::InvalidStateTransition` |
 | `Rebuilding` | `Fresh` | `ConversationProjectionState::complete_rebuild(ConversationSourcePosition source_position)` | source position 只能前进,重建成功 | upsert read model / search / cursor projection,save fresh state | `DomainError::SourcePositionRegression` |

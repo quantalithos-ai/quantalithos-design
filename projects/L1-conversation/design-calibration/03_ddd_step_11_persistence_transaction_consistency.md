@@ -188,6 +188,8 @@ Repository 函数沿用 Step 7:
 
 ### 6.3 Repository 函数表
 
+`Page<T>` / `PageInfo` 的正式 schema 和归属见 `03_ddd_step_07_trait_port_adapter_contracts.md` §7.3.0。`PageRequest` / `PageToken` 复用 core-contracts;下表中的 repository page 返回值不得被当成 public contracts DTO 直接序列化。
+
 | 函数签名 | 作用 | 锁 / 事务要求 | 返回 | 错误 |
 |---|---|---|---|---|
 | `SpaceScopeRepository.get_space(space_id)` | 只读读取 space | 无写锁 | `Option<ConversationSpace>` | `RepositoryError` |

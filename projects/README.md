@@ -336,6 +336,9 @@ projects/L3-method-library/design-calibration/03_ddd_calibration_flow.md
 - [ ] 若已进入交付阶段,完整阅读 04-配置设计 / 05-测试方案 / 06-验收标准
 - [ ] 完整阅读对应语言编码规范(`standards/coding/{rust,python,typescript}.md`)
 - [ ] Rust 实现仓完整阅读 `standards/document/子项目目录与代码文件组织规范.md`
+- [ ] 实现 agent 开工前必须读取项目 `07-实施计划.md` 的 `Agent 启动与永久记忆种子` 表;项目永久记忆只能从该表机械生成,不得由 agent 自由总结
+- [ ] 永久记忆中的语言、框架、目录和提交规范路径必须来自 `07-实施计划.md` 阅读清单;不得把 Rust 或任何单一语言写成所有项目默认
+- [ ] 永久记忆不得复制详细设计字段 schema、状态矩阵、DTO 表或业务规则正文;冲突时以正式 `00`~`07` 文档为准并刷新记忆
 - [ ] 实现代码全英文,源码标识符、普通注释、rustdoc 和测试名不使用中文
 - [ ] 本 design 文档仓 Commit 遵循项目格式:type 英文,主题正文中文,固定 Co-Authored-By;其他实现仓 Commit message 使用英文
 
@@ -511,6 +514,7 @@ N{x} 开发中:
 - 本 design 文档仓 Commit 信息格式:type 英文,主题正文中文
 - 其他实现仓的代码 Commit message 使用英文;若目标仓有更严格规范,取更严格者
 - Co-Authored-By 固定为 `Co-Authored-By: Codex <noreply@openai.com>`
+- 实现 agent 的项目永久记忆只允许从 `07-实施计划.md` 的种子表生成;不得把历史提交、当前对话或详细设计正文自由总结成永久规则
 
 ### 8.3 评审频率
 

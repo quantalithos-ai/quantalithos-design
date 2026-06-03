@@ -17,6 +17,7 @@
 | v0.4 | 2026-05-29 | 本地多仓依赖讨论规则 | 在 Step 3 / Step 4 / Step 14 补充 `/home/aris/Projects` sibling repo、编译期 path dependency 和中期 private git tag / rev 的讨论输入输出 |
 | v0.5 | 2026-05-29 | 目录与代码文件组织讨论规则 | 在 Step 4 补充目录组织规范输入、目录 / package / crate / binary 映射表和命名检查约束 |
 | v0.6 | 2026-05-30 | 跨文档闭环复核门禁 | 增加字段闭环、DTO 构造闭环、状态闭环、命名一致性和 phase boundary 复核要求及正反例 |
+| v0.7 | 2026-06-03 | 设计真相源可落码性讨论门禁 | 将跨文档闭环复核统一纳入 `设计真相源闭环与可落码性标准.md`，补充 metadata/idempotency、projection rebuild 和 artifact materialization 复核 |
 
 ---
 
@@ -192,6 +193,8 @@ Step 9 逐接口处理流按 Command、Query、Job 分批写入。
 
 详细设计讨论必须在收口前完成跨文档一致性复核。该复核不是最后格式检查，而是确认实现者不需要自行猜字段、猜状态、猜函数或猜 phase 边界。
 
+本节复核必须同时执行 `standards/document/设计真相源闭环与可落码性标准.md`。该标准负责定义统一判断口径，本 SOP 负责规定在详细设计讨论中何时检查、如何回填和何时暂停。
+
 必须复核：
 
 ```text
@@ -201,6 +204,17 @@ Step 6 对象契约
   -> Step 10 状态机
   -> Step 16 测试切口
   -> Step 17 实施承接清单
+```
+
+并额外复核：
+
+```text
+metadata authority
+idempotency key / request digest / result_ref / UoW
+ref / reason / result / receipt schema
+validation truth source / repository / port
+projection rebuild truth source
+artifact materialization / evidence path
 ```
 
 正确示例：
@@ -225,6 +239,8 @@ Step 17 把后续 phase 才实现的对象放进当前 phase 门禁。
 - 单个章节可能看起来完整，但组合后无法 1:1 实现。
 - 实现者会被迫自行补设字段、选择状态名或调整 phase scope。
 - 测试和验收会继续引用旧口径，导致实现后仍无法通过审查。
+
+如果上述任一复核项未通过，不得把问题留给实现 agent。必须先回写正式设计真相源，或在风险与待确认事项中明确标为阻塞并停止进入实施计划。
 
 ---
 

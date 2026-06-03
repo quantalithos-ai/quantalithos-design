@@ -12,6 +12,7 @@
 | 版本 | 日期 | 讨论主题 | 修订内容 |
 |---|---|---|---|
 | v0.10 | 2026-05-30 | 编码前设计闭环复核讨论规则 | 在 Step 1 / 6 / 10 / 12 / 13 补充字段、DTO、状态、证据和 phase boundary 开工前复核要求 |
+| v0.11 | 2026-06-03 | 可落码性开工门禁统一 | 将开工前设计闭环复核统一引用 `设计真相源闭环与可落码性标准.md`，补充 ref identity、validation truth、metadata/idempotency、projection rebuild 和 artifact materialization 讨论项 |
 | v0.9 | 2026-05-29 | 测试证据、报告生成与脚本目录讨论规则 | 在 Step 3 / 7 / 11 / 12 补充 scripts、artifacts/test/<run_id>、reports/runs/<run_id> 和 reports/acceptance 的输入输出 |
 | v0.8 | 2026-05-29 | 代码仓目录与命名前置讨论规则 | 在 Step 3 补充实现仓目录、workspace member、Cargo package、Rust crate 和 binary 命名检查 |
 | v0.7 | 2026-05-29 | 本地多仓依赖实施讨论规则 | 在 Step 3 / Step 8 补充 `/home/aris/Projects` sibling repo、编译期 path dependency、依赖检查和不可用时处理的输入输出 |
@@ -178,6 +179,8 @@ Step 6 单独拆分阶段任务和提交边界。
 
 实施计划不是让实现者替设计文档补缺口。每个 phase / commit boundary 开工前，必须确认字段、DTO、状态、测试、验收和 phase boundary 已经闭环。
 
+本节必须按 `standards/document/设计真相源闭环与可落码性标准.md` 执行。该标准是开工前可落码性门禁的统一判断口径；本 SOP 只规定这些门禁如何进入实施计划讨论、阶段拆分和暂停规则。
+
 正确示例：
 
 ```text
@@ -186,6 +189,8 @@ commit-04-b 开工门禁:
   - core_event_ref 与 core_event_envelope_ref 已在详细设计中区分。
   - 本阶段不依赖 PH-05 feedback result。
   - 测试和验收使用详细设计正式状态名。
+  - metadata / idempotency / outbox id 的来源已闭合。
+  - 当前阶段涉及的 projection 和 artifact 均有 truth source 或 materialization 口径。
 ```
 
 错误示例：
@@ -201,6 +206,8 @@ commit-04-b 开工门禁:
 - 实现者被迫自行做设计取舍。
 - phase boundary 失效，提交边界不可审查。
 - 代码、测试和验收会继续沿用不同真相源。
+
+如果 `设计真相源闭环与可落码性标准.md` §九的任一适用项未通过，实施计划必须把该项标为 blocker，并要求先回写设计真相源；不得把“实现时再确认”作为开工门禁通过条件。
 
 ---
 
@@ -685,6 +692,11 @@ git config user.email
 | 字段闭环 | <Domain 必填字段来源> | 暂停并回报设计缺口 |
 | DTO 构造闭环 | <输入契约能否构造目标对象> | 暂停并回报设计缺口 |
 | 状态闭环 | <状态名是否一致> | 回写设计后继续 |
+| ref identity 闭环 | <lookup ref 是否有正式类型和 key> | 暂停并回报设计缺口 |
+| validation truth 闭环 | <校验是否有 truth source / port> | 暂停并回报设计缺口 |
+| metadata / idempotency 闭环 | <metadata authority、digest、result_ref、UoW 是否闭合> | 暂停并回报设计缺口 |
+| projection rebuild 闭环 | <projection 是否有 committed truth / replay source> | 调整 rebuild set 或回写设计 |
+| artifact materialization 闭环 | <runner 是否能解析 artifact location> | 暂停并回报设计缺口 |
 | phase boundary | <是否依赖后续 phase> | 调整阶段或回写设计 |
 
 #### 提交粒度判断

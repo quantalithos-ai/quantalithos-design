@@ -1445,7 +1445,7 @@ pub struct BodyExclusionRuleSet {
 
 归属口径:
 
-- `VisibilityMarker`、`VisibilityMarkerKind`、`PublishedEventRef`、`RetryCount`、`RetryLimit`、`RetryReason`、`RetryReasonKind`、`OutboxRetryMarker`、`OutboxFailureReason` 和 `OutboxFailureReasonKind` 属于 `conversation-contracts/src/refs.rs` 或同层 contracts value module。
+- `ConversationTruthRef`、`ConversationTruthObjectRef`、`ConversationTruthRefKind`、`RetractionReasonRef`、`VisibilityMarker`、`VisibilityMarkerKind`、`PublishedEventRef`、`RetryCount`、`RetryLimit`、`RetryReason`、`RetryReasonKind`、`OutboxRetryMarker`、`OutboxFailureReason` 和 `OutboxFailureReasonKind` 属于 `conversation-contracts/src/refs.rs` 或同层 contracts value module。
 - `ConversationOutboxRecord` 属于 `domain/outbox.rs`,但其 `retry_marker`、`retry_count()`、`mark_retry(...)` 和 `mark_failed(...)` 必须消费上述 contracts value object,不得在 domain 内复制第二套 retry / failure enum。
 - `PublishError` 属于 `application/ports.rs` publisher adapter error,正式 variant 和 `is_retryable()` 口径见 Step 7 §7.5.3.0;`RetryReason::from_publish_error(...)` 和 `OutboxFailureReason::from_publish_error(...)` 必须按该表映射。
 - 这些类型只保存 ref、marker、safe diagnostic、时间、计数和 reason code,不得保存 event body、broker response body、payload body、source body、secret 或 token。
@@ -1583,6 +1583,115 @@ pub struct OutboxFailureReason {
 - `PublishedEventRef` 只证明 publisher boundary 接受了 event,不证明 conversation truth 成立;truth 成立只由 outbox 所指 committed truth 决定。
 - `RetryCount` 与 `RetryLimit` 只能比较计数,不得与 job `BatchSize`、page limit 或 rate limit 混用。
 - retryable `PublishError` 只能进入 `mark_retry(...)` 或 retry exhausted -> `mark_failed(...)` 分支;permanent `PublishError` 不得进入 retry 分支。
+
+### 7.2.5 PH-07 operations job scope / profile / report 共享值对象正式 schema
+
+本小节补齐 PH-07 `projection rebuild / search rebuild / cursor maintenance / snapshot refresh / consistency validation / cursor cleanup` boundary 直接落码所需的 public job 输入传递类型。实现侧不得把下列类型临时实现成裸 `String`、空 struct、application-local placeholder 或 repository-local filter。
+
+归属口径:
+
+- `ConversationSpaceScope`、`ConsumerScope`、`SearchIndexProfileRef`、`ConsistencyValidationProfileRef` 和 `ReportOutputRef` 属于 `conversation-contracts/src/refs.rs` 或同层 contracts value module。
+- `RetentionDuration` 已在 §7.2.3 定义为 conversation contracts 本地秒级正整数 newtype;`RefreshExternalReferenceSnapshotsJob.max_snapshot_age` 必须使用 `RetentionDuration`,不得引用当前 core baseline 不存在的 `Duration`,也不得新增第二套通用 duration。
+- 这些类型只保存 scope filter、profile ref、report output ref、safe diagnostic 和 configured ref,不得保存 search query body、report body、filesystem absolute secret path、adapter config、credential、raw payload、source body、secret 或 token。
+
+```rust
+/// Operational filter over conversation spaces.
+pub struct ConversationSpaceScope {
+    /// Optional explicit spaces. Empty means all eligible spaces.
+    pub space_ids: Vec<ConversationSpaceId>,
+    /// Optional owner filter used by operator-scoped rebuilds.
+    pub owner_ref: Option<ConversationOwnerRef>,
+    /// Whether archived spaces are included.
+    pub include_archived: bool,
+    /// Whether read-only spaces are included.
+    pub include_read_only: bool,
+}
+
+/// Operational filter over consumers / cursors within one or more spaces.
+pub struct ConsumerScope {
+    /// Optional explicit consumers. Empty means configured consumers for the space.
+    pub consumer_refs: Vec<ConsumerRef>,
+    /// Optional single consumer kind filter.
+    pub consumer_kind: Option<ConsumerKind>,
+    /// Whether stale cursors / read models are included.
+    pub include_stale: bool,
+    /// Whether disabled consumers are included.
+    pub include_disabled: bool,
+}
+
+/// Reference to a configured search index profile.
+pub struct SearchIndexProfileRef {
+    /// Stable profile key from validated job / projection config.
+    pub profile_ref: ExternalReferenceRef,
+    /// Search index schema version expected by the rebuild job.
+    pub schema_version: String,
+    /// Optional safe diagnostic marker for selected profile.
+    pub diagnostic_ref: Option<DiagnosticRef>,
+}
+
+/// Reference to a configured consistency validation profile.
+pub struct ConsistencyValidationProfileRef {
+    /// Stable profile key from validated job config.
+    pub profile_ref: ExternalReferenceRef,
+    /// Validation mode.
+    pub validation_mode: ConsistencyValidationMode,
+    /// Whether suggested repairs may be emitted as refs in the report.
+    pub include_suggested_repair_refs: bool,
+}
+
+/// Validation strictness for consistency jobs.
+pub enum ConsistencyValidationMode {
+    /// Check only committed truth and derived projection consistency.
+    Standard,
+    /// Also check external reference projection and cursor diagnostics.
+    Extended,
+    /// Only emit report diagnostics without failing the job on item-level issues.
+    ReportOnly,
+}
+
+/// Safe report output reference selected by validated job config.
+pub struct ReportOutputRef {
+    /// Stable report output location ref; not a raw filesystem or object-store secret.
+    pub output_ref: ExternalReferenceRef,
+    /// Report format expected by the job.
+    pub format: ReportOutputFormat,
+    /// Run-scoped report path or artifact ref.
+    pub run_scoped_ref: ExternalReferenceRef,
+}
+
+/// Supported consistency report formats.
+pub enum ReportOutputFormat {
+    /// Markdown report for human review.
+    Markdown,
+    /// JSON report for evidence index ingestion.
+    Json,
+    /// JSON Lines report for large item-level diagnostics.
+    JsonLines,
+}
+```
+
+构造与校验规则:
+
+| 类型 / 函数 | 正式口径 |
+|---|---|
+| `ConversationSpaceScope::all_active()` | `space_ids = []`、`owner_ref = None`、`include_archived = false`、`include_read_only = true`;列出所有 eligible active / read-only spaces |
+| `ConversationSpaceScope::single(space_id)` | `space_ids = vec![space_id]`;只用于 operator 明确指定单 space 的 job |
+| `ConversationSpaceScope::validate()` | `space_ids` 去重;`space_ids` 和 `owner_ref` 可同时存在,表示 owner 内指定 spaces;非法 id / owner ref 返回 `JobError::InvalidInput` |
+| `ConsumerScope::all_configured()` | `consumer_refs = []`、`consumer_kind = None`、`include_stale = true`、`include_disabled = false`;由 job config / repository consumer index 展开 |
+| `ConsumerScope::expand_for_space(space_id)` | 若 `consumer_refs` 非空,只返回属于 `space_id` 的 consumer;若为空,从已验证 job config 或 `ProjectionRepository` / consumer index 获取该 space 的 configured consumers;无 configured consumer 时返回空集合而非 error |
+| `ConsumerScope::validate()` | consumer refs 去重;`consumer_kind` 仅作过滤,不得把 consumer kind 当 actor kind 或 participant role |
+| `SearchIndexProfileRef::validate(config)` | `profile_ref` 必须存在于已验证 search index profile config;`schema_version` 必须与 rebuild runner 支持版本匹配 |
+| `ConsistencyValidationProfileRef::validate(config)` | `profile_ref` 必须存在于已验证 consistency validation profile config;`ReportOnly` 不得自动修复 truth |
+| `ReportOutputRef::validate(run_id, report_config)` | `run_scoped_ref` 必须位于 `reports/runs/<run_id>` 或 configured safe report root;不得使用 `latest`、绝对 secret path、credential、raw URL 或 object-store secret |
+
+Repository / job 过滤规则:
+
+- `SpaceScopeRepository.list_spaces(scope, page)` 必须按 `ConversationSpaceScope.space_ids`、`owner_ref`、`include_read_only` 和 `include_archived` 过滤。空 `space_ids` 表示 all eligible spaces,不表示 skip job。`include_archived = false` 时不得返回 `ConversationSpaceLifecycleState::Archived`。
+- `ProjectionRepository.list_expired_change_cursors(scope, expired_before, page)` 必须按 `ConsumerScope.consumer_refs` / `consumer_kind` / disabled marker 过滤,并且只返回 `expired_before` 之前的 cursor;不得删除 fact truth 或 outbox truth。
+- `ExternalReferenceRepository.list_reference_projections(scope, page)` 必须按 `ConversationSpaceScope` 过滤 projection 所属 space;不得从 external source body、snapshot body 或 resolver response 反推 space。
+- `RebuildConversationReadModelsJob.consumer_scope` 与 `MaintainConversationChangeCursorsJob.cursor_scope` 均使用 `ConsumerScope::expand_for_space(space_id)`。若 expansion 为空,job 记录 skipped consumer count,不得 fallback 到所有 participants 或 actor list。
+- `ValidateConversationConsistencyJob.report_output_ref` 只选择 report 输出位置;consistency validation job 只生成 report / diagnostic marker / suggested repair refs,不得自动修复 truth、projection、outbox、snapshot 或 cursor。
+- `SearchIndexProfileRef`、`ConsistencyValidationProfileRef` 和 `ReportOutputRef` 是 configured refs,不是配置正文。它们不得携带 analyzer body、validation rule body、filesystem credential、bucket URL secret、raw report body 或 adapter config。
 
 ### 7.3 `domain/truth.rs` 对象实现契约
 
@@ -1739,6 +1848,19 @@ pub enum ConversationOutboxEventKind {
 | `ArchiveHandoffRequested` | `An archive handoff was requested.` | 传播 archive handoff intent | `ArchiveHandoffRecord` |
 
 ```rust
+/// Stable safe reference token for a committed conversation truth object.
+pub struct ConversationTruthObjectRef(pub String);
+
+/// Reference to one committed conversation truth object used by outbox records and outbound envelopes.
+pub struct ConversationTruthRef {
+    /// Truth object family.
+    pub truth_kind: ConversationTruthRefKind,
+    /// Stable safe reference for the committed truth object.
+    pub truth_object_ref: ConversationTruthObjectRef,
+    /// Conversation space that owns the truth.
+    pub space_id: ConversationSpaceId,
+}
+
 /// Describes the domain object kind referenced by a conversation outbox record.
 pub enum ConversationTruthRefKind {
     /// Reference points to a conversation space.
@@ -1767,6 +1889,37 @@ pub enum ConversationTruthRefKind {
 | `ReviewAnchor` | `Reference points to a review anchor.` | review anchor truth 引用 |
 | `TraceHandoff` | `Reference points to a trace handoff record.` | trace handoff truth 引用 |
 | `ArchiveHandoff` | `Reference points to an archive handoff record.` | archive handoff truth 引用 |
+
+| 字段 | 类型 | 作用 | 约束 |
+|---|---|---|---|
+| `truth_kind` | `ConversationTruthRefKind` | 标识 truth 家族 | 必须和 `truth_object_ref` 指向的对象家族一致 |
+| `truth_object_ref` | `ConversationTruthObjectRef` | 指向已提交 truth 的稳定安全引用 | canonical token 格式为 `conversation-truth:<truth-kind>:<stable-id>`;不得指向 projection、read model、search index、cursor view 或 payload body |
+| `space_id` | `ConversationSpaceId` | truth 所属 space | 必须和被引用对象的 owning space 一致 |
+
+| `truth_kind` | `truth_object_ref` stable-id 来源 | `space_id` 来源 |
+|---|---|---|
+| `ConversationSpace` | `space.space_id` 的稳定 ref | `space.space_id` |
+| `ScopeChange` | `change.scope_change_id` 的稳定 ref | `change.space_id` |
+| `ConversationFact` | `ConversationFactRef::from_fact(fact)` 的稳定 ref | `fact.space_id` |
+| `CrossDomainManifestation` | `CrossDomainManifestationRef::from_manifestation(manifestation)` 的稳定 ref | `manifestation.space_id` |
+| `ReviewAnchor` | `ReviewAnchorRef { review_anchor_id, space_id }` 的稳定 ref | `anchor.space_id` |
+| `TraceHandoff` | `handoff.trace_handoff_id` 的稳定 ref | outbox 工厂传入的 owning `space_id` |
+| `ArchiveHandoff` | `handoff.archive_handoff_id` 的稳定 ref | `handoff.space_id` |
+
+`ConversationTruthObjectRef` 只能由 `ConversationTruthRef::from_*` 构造器生成,实现侧不得直接用裸字符串拼接。`<truth-kind>` 使用 `ConversationTruthRefKind` 的 snake_case 名称:`conversation_space`、`scope_change`、`conversation_fact`、`cross_domain_manifestation`、`review_anchor`、`trace_handoff`、`archive_handoff`。`<stable-id>` 只取对应 id / public ref 的稳定标识,不得拼入 payload ref、source body、display text、trace body、broker response 或外部原文。
+
+| 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
+|---|---|---|---|---|
+| `ConversationTruthRef::from_space(space: &ConversationSpace) -> Self` | 从 space truth 构造引用 | 已提交 space | `Self` | `truth_kind = ConversationSpace` |
+| `ConversationTruthRef::from_scope_change(change: &ScopeChangeRecord) -> Self` | 从 scope change 构造引用 | 已提交 scope change | `Self` | `truth_kind = ScopeChange` |
+| `ConversationTruthRef::from_fact(fact: &ConversationFact) -> Self` | 从 fact 构造引用 | 已提交 fact | `Self` | `truth_object_ref` 来自 `ConversationFactRef::from_fact(fact)` 的稳定 ref |
+| `ConversationTruthRef::from_manifestation(manifestation: &CrossDomainManifestation) -> Self` | 从 manifestation 构造引用 | 已提交 manifestation | `Self` | `truth_object_ref` 来自 `CrossDomainManifestationRef::from_manifestation(manifestation)` 的稳定 ref |
+| `ConversationTruthRef::from_review_anchor(anchor: &ReviewAnchor) -> Self` | 从 review anchor 构造引用 | 已提交 review anchor | `Self` | `truth_object_ref` 来自 `ReviewAnchorRef { review_anchor_id: anchor.review_anchor_id, space_id: anchor.space_id }` 的稳定 ref |
+| `ConversationTruthRef::from_trace_handoff(handoff: &TraceHandoffRecord, space_id: ConversationSpaceId) -> Self` | 从 trace handoff 构造引用 | 已提交 handoff 和 owning space | `Self` | 不从 trace payload 反查 space |
+| `ConversationTruthRef::from_archive_handoff(handoff: &ArchiveHandoffRecord) -> Self` | 从 archive handoff 构造引用 | 已提交 archive handoff | `Self` | 使用 `handoff.space_id` |
+| `kind(&self) -> ConversationTruthRefKind` | 返回 truth kind | 无 | `ConversationTruthRefKind` | 只读 |
+| `assert_kind_matches_object_ref(&self) -> Result<(), DomainError>` | 校验 kind / stable ref 家族一致 | 无 | `Result<(), DomainError>` | 不访问 repository |
+| `assert_not_derived_view(&self) -> Result<(), DomainError>` | 禁止派生对象进入 truth ref | 无 | `Result<(), DomainError>` | projection/read model/search/cursor 均拒绝 |
 
 ```rust
 /// Describes publication state for a committed conversation outbox record.
@@ -2336,6 +2489,14 @@ pub struct FactRetractionReason {
     pub reason_ref: CommandReasonRef,
 }
 
+/// Public reason reference exposed by fact retracted outbound events.
+pub struct RetractionReasonRef {
+    /// Retraction category copied from the committed fact retraction reason.
+    pub reason_kind: FactRetractionReasonKind,
+    /// Safe command or external reason reference.
+    pub reason_ref: CommandReasonRef,
+}
+
 /// Retraction categories.
 pub enum FactRetractionReasonKind {
     /// Actor explicitly requested retraction.
@@ -2384,7 +2545,10 @@ pub enum FactAppendRejectionReason {
 | 类型 | 字段 / 变体口径 | 使用位置 |
 |---|---|---|
 | `FactRetractionReason` | struct,包含 `reason_kind` 和 `reason_ref` | `RetractConversationFactRequest`、`ConversationFact::retract(...)` |
+| `RetractionReasonRef` | struct,包含 `reason_kind` 和 `reason_ref`;由 `RetractionReasonRef::from_fact_retraction_reason(reason: &FactRetractionReason)` 构造 | `ConversationFactRetractedEvent.retraction_reason_ref`、publish contract tests |
 | `FactAppendRejectionReason` | enum,只表达拒绝分类,不保存输入正文 | `FactAppendReceipt::rejected(...)`、TC-CONV-FACT-* |
+
+`RetractionReasonRef` 归属 `conversation-contracts/src/refs.rs` 或同层 contracts value module。它是 outbound event 可见的 ref-only reason surface,不得携带被撤回 payload、正文说明、上游 raw reason body、request id、trace 或 idempotency。`ConversationFactRetractedEvent.retraction_reason_ref` 必须从已提交 `ConversationFact.retraction_reason: FactRetractionReason` 映射生成;如果 fact 没有 retraction reason,不得生成 retracted event。
 
 ```rust
 /// Allowed fact kinds for append policy.

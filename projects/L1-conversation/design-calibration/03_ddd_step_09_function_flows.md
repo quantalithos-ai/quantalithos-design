@@ -2346,6 +2346,8 @@ Ok(published_ref)
 | 事件副作用 | 发布 `conversation.fact.retracted` |
 | 测试切口 | retraction reason ref、payload absent、trace context ref、publish retry |
 
+`ConversationFactRetractedEvent::from_outbox(&outbox)` 必须使用 `outbox.truth_ref: ConversationTruthRef` 定位已提交 `ConversationFact`,并将 `fact.retraction_reason: FactRetractionReason` 映射为 `RetractionReasonRef::from_fact_retraction_reason(...)`。publish flow 不得从 `ConversationOutboxPayloadRef`、deleted payload、raw command body 或外部 source body 构造撤回原因。
+
 #### 7.5.5 `CrossDomainManifestationChangedPublishFlow`
 
 ##### 入口与目标

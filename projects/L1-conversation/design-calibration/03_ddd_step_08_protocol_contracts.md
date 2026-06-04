@@ -328,6 +328,13 @@ pub struct ConsumerReceipt {
 }
 ```
 
+| 字段 | 类型 | 字段来源 | schema 定义 | 缺失时行为 |
+|---|---|---|---|---|
+| `committed_truth_ref` | `ConversationTruthRef` | `ConversationOutboxRecord.truth_ref` | Step 6 §7.2.4,归属 `conversation-contracts/src/refs.rs` | 不生成 outbound event |
+| `visibility_marker` | `VisibilityMarker` | outbox visibility scope / scope snapshot / publish suppression marker | Step 6 §7.2.4,归属 `conversation-contracts/src/refs.rs` | 不生成 outbound event 或进入 suppressed marker |
+
+`committed_truth_ref` 必须是同一 `ConversationTruthRef` shared type,不得在 `contracts/events.rs` 或 `domain/outbox.rs` 复制 domain-only mirror。它只能指向已提交 conversation truth object,不得指向 read model、projection state、search index、change cursor view、payload body 或外部 source body。
+
 #### Job envelope
 
 ```json
@@ -497,8 +504,11 @@ pub enum JobError {
 | `TraceHandoffState` / `ArchiveHandoffState` | `conversation-contracts/src/refs.rs` shared enum | command result / outbound event / domain handoff record 共享 | 不创建 domain-only mirror enum |
 | `RetentionDuration` / `RetentionWindow` / `TraceRetentionRuleSet` / `TraceHandoffRuleSet` / `TraceRedactionRuleSet` / `BodyExclusionRuleSet` | `conversation-contracts/src/refs.rs` 或同层 value module | trace retention / handoff / redaction / forbidden body 纯数据 rule set;完整 schema 见 Step 6 §7.2.3;`RetentionDuration` 是本地秒级正整数 newtype | 不引用当前 core baseline 不存在的 `Duration`,也不放在 domain crate 中让 contracts 反向依赖 domain |
 | `JobMetadata` / `JobRunReceipt` / `JobRunStatus` / `ConversationJobKind` / `JobTriggerKind` / `JobError` | `conversation-contracts/src/jobs.rs` | operations job metadata、receipt 和 public job error DTO;完整 schema 见本节 `Job shared DTO / receipt / error schema` | 不假设 core 已有同名 schema,不放在 application-local 类型中 |
+| `ConversationTruthRef` / `ConversationTruthObjectRef` / `ConversationTruthRefKind` | `conversation-contracts/src/refs.rs` | outbox truth ref 与 outbound envelope `committed_truth_ref`;完整 schema 见 Step 6 §7.2.4 | 不创建 domain-only mirror;不得指向 derived view |
+| `RetractionReasonRef` | `conversation-contracts/src/refs.rs` | fact retracted event 公开撤回原因 ref;完整 schema 见 Step 6 §7.2.4 | 不暴露 deleted payload、正文说明或 raw reason body |
+| `ConversationSpaceScope` / `ConsumerScope` / `SearchIndexProfileRef` / `ConsistencyValidationProfileRef` / `ReportOutputRef` | `conversation-contracts/src/refs.rs` 或同层 value module | operations job scope、configured profile 和 report output refs;完整 schema 见 Step 6 §7.2.5 | 不写裸字符串、空 struct、repository-local filter、report body、adapter config 或 secret |
 
-上述值对象字段级 schema 以 `03_ddd_step_06_object_contracts.md` §7.2.1 / §7.2.2 / §7.2.3 为准。协议层不得用裸字符串占位替代这些类型。
+上述值对象字段级 schema 以 `03_ddd_step_06_object_contracts.md` §7.2.1 / §7.2.2 / §7.2.3 / §7.2.4 / §7.2.5 为准。协议层不得用裸字符串占位替代这些类型。
 
 公开协议 surface 的传递类型归属规则:
 
@@ -1989,6 +1999,12 @@ Bridge append path uses `actor_ref` as a trusted integration source actor. The a
 |---|---|---|---|---|---|
 | `ConversationFactRetractedEvent` | `ConversationFact`、`ConversationTraceContext`、`ConversationOutboxRecord` | 是 | trace context from fact trace repository | retraction reason != deleted payload | 不生成 event |
 
+| 字段 | 类型 | 字段来源 | schema 定义 | 缺失时行为 |
+|---|---|---|---|---|
+| `retraction_reason_ref` | `RetractionReasonRef` | `RetractionReasonRef::from_fact_retraction_reason(&fact.retraction_reason)` | Step 6 §7.2.4,归属 `conversation-contracts/src/refs.rs` | 不生成 event |
+
+`retraction_reason_ref` 只暴露 `reason_kind` 和 safe `CommandReasonRef`。它不得携带被撤回 payload、原始 reason body、request id、trace 或 idempotency。
+
 版本策略:v1 下游必须停止把目标 fact 当作 fresh readable fact,但不得删除审计引用。
 
 #### 7.6.5 `CrossDomainManifestationChangedEvent`
@@ -2269,7 +2285,7 @@ Bridge append path uses `actor_ref` as a trusted integration source actor. The a
   "idempotency_key": "IdempotencyKey",
   "space_scope": "ConversationSpaceScope",
   "source_system_filter": "ExternalSourceSystem",
-  "max_snapshot_age": "Duration",
+  "max_snapshot_age": "RetentionDuration",
   "trace_ref": "TraceContextRef"
 }
 ```
@@ -2279,6 +2295,8 @@ Bridge append path uses `actor_ref` as a trusted integration source actor. The a
 | `RefreshExternalReferenceSnapshotsJob` | `ExternalFactSnapshot`、`ReferenceResolutionState`、`ExternalReferenceProjection` | 是 | refs from external reference repository | snapshot ref != source body | unresolved marker / failed job receipt |
 
 输出:`JobRunReceipt` 必须包含 refreshed snapshot count、unresolved refs 和 digest mismatch refs。
+
+`max_snapshot_age` 使用 Step 6 §7.2.3 定义的 conversation-local `RetentionDuration { seconds: u64 }`;当前 core baseline 不提供 `Duration`,实现侧不得新增伪 core duration 或第二套通用 duration。
 
 #### 7.7.6 `DeliverTraceHandoff`
 

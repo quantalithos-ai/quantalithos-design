@@ -305,6 +305,8 @@ pub trait SpaceScopeRepository {
 | `save_scope_bundle(bundle: ScopeMutationBundle, uow: UnitOfWorkHandle)` | 原子保存 space / scope / change | `bundle` 为 scope 变更集合 | `Version` | `RepositoryError` |
 | `list_spaces(scope: ConversationSpaceScope, page: PageRequest)` | 按运维 scope 分页列出 space | `scope` 为目标范围;`page` 为分页 | `Page<ConversationSpace>` | `RepositoryError` |
 
+`ConversationSpaceScope` 的字段级 schema、默认空 scope 语义和 list 过滤规则见 Step 6 §7.2.5;repository adapter 不得把 scope 实现成裸字符串、空 struct 或 adapter-local filter。
+
 `ScopeMutationBundle` 最小结构和构造约束:
 
 | 字段 | 类型 | 说明 |
@@ -640,6 +642,8 @@ pub trait ProjectionRepository {
 | `upsert_change_cursor_projection(projection: ChangeCursorProjection, uow: UnitOfWorkHandle)` | 保存变化游标投影 | projection、事务句柄 | `Version` | `RepositoryError` |
 | `list_read_models(space_id: ConversationSpaceId, page: PageRequest)` | 分页列出读取视图 | space、分页 | `Page<ConversationReadModel>` | `RepositoryError` |
 
+`ConsumerScope` 的字段级 schema、默认空 scope 语义和 `expand_for_space(...)` 口径见 Step 6 §7.2.5;`list_expired_change_cursors(...)` 不得把 consumer scope 扩展为 participant list 或 actor list。
+
 `ProjectionRepository` 类型边界:
 
 - `get_read_model(...)` 和 `list_read_models(...)` 的返回类型必须是 `domain/projection.rs::ConversationReadModel`。
@@ -694,6 +698,8 @@ pub trait ExternalReferenceRepository {
 | `upsert_reference_projection(projection: ExternalReferenceProjection, uow: UnitOfWorkHandle)` | 保存引用投影 | projection、事务句柄 | `Version` | `RepositoryError` |
 | `get_reference_projection(space_id: ConversationSpaceId)` | 读取引用投影 | space id | `Option<ExternalReferenceProjection>` | `RepositoryError` |
 | `list_reference_projections(scope: ConversationSpaceScope, page: PageRequest)` | 按 space scope 列出引用投影 | scope、分页参数 | `Page<ExternalReferenceProjection>` | `RepositoryError` |
+
+`list_reference_projections(...)` 使用 Step 6 §7.2.5 的 `ConversationSpaceScope` 过滤 projection 所属 space;不得从 external source body、snapshot body 或 resolver response 反推 space。
 
 #### 7.3.7 `ConversationOutboxRepository`
 

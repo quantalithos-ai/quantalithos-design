@@ -20,6 +20,7 @@
 | v0.7 | 2026-06-03 | 设计真相源可落码性讨论门禁 | 将跨文档闭环复核统一纳入 `设计真相源闭环与可落码性标准.md`，补充 metadata/idempotency、projection rebuild 和 artifact materialization 复核 |
 | v0.8 | 2026-06-03 | Query view 可落码性讨论门禁 | 在 Step 8 / Step 17 增加 query response view、page、projection marker 和 read-model identity 闭环检查 |
 | v0.9 | 2026-06-03 | Query view 传递类型闭环门禁 | 在 Step 7 / Step 8 增加 view 字段引用类型归属和 repository page helper schema 检查 |
+| v0.10 | 2026-06-04 | Public protocol 传递类型闭环门禁 | 在 Step 8 增加 command result、event envelope / receipt、outbound payload 和 job I/O 的二级公开类型 schema 检查 |
 
 ---
 
@@ -862,8 +863,10 @@ pub trait RepositoryName {
 12. Query response 字段引用的 enum / ref 是否归属到 contracts shared,或是否写明 domain 到 view 的正式映射？
 13. Query / repository 使用的 page helper 是否有 schema、归属和 public page DTO 映射？
 14. HLD `*Query`、DDD `*Request`、Rust DTO 名称是否存在收敛映射？
-15. 每个协议失败时映射成什么错误？
-16. 哪些协议需要幂等键或审计记录？
+15. Command result、event payload、consumer envelope / receipt、job report 中引用的 enum / ref / helper 是否都有 schema 和归属？
+16. Inbound consumer 的 envelope、receipt、duplicate、quarantine、delayed、no-op marker 是否有字段级 schema？
+17. 每个协议失败时映射成什么错误？
+18. 哪些协议需要幂等键或审计记录？
 ```
 
 #### 期望产出
@@ -914,6 +917,8 @@ pub trait RepositoryName {
 - Query response 中暴露的 read model / projection / cursor id/ref 必须定义 contracts 落点、repository key 和稳定派生规则。
 - Query response 字段引用的 enum / ref / value object 必须能从 contracts shared 类型或显式映射中获得,不得直接依赖 domain-only 类型。
 - Repository page helper 如 `Page<T>` / `PageInfo` 必须在 Step 7 定义 schema 和归属,Step 8 必须说明如何映射到 public page DTO。
+- Command result、inbound event envelope / payload、consumer receipt、outbound event payload、job input / output / report 中引用的 enum / ref / helper / receipt 必须定义 schema 和归属,不得只在字段类型中出现名称。
+- Inbound consumer public DTO 必须定义公共 `InboundEventEnvelope<T>`、`ConsumerReceipt`、outcome / disposition enum、quarantine marker、duplicate / delayed 返回字段和缺失 envelope 字段的处理规则。
 - Query 的分页、consistency、consumer / actor context 必须明确来自 query body 还是 metadata / envelope，不得双承载。
 - 引用类字段必须区分 contract ref、envelope ref、record ref、payload ref 等语义，不得用相近名称互相代替。
 

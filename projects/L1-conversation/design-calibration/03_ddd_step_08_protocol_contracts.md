@@ -229,17 +229,89 @@ Query envelope 的 `metadata` 使用 `core-contracts::QueryMetadata`。分页与
 
 #### Inbound event envelope
 
-```json
-{
-  "event_id": "EventId",
-  "event_envelope_ref": "EventEnvelopeRef",
-  "event_source_ref": "EventSourceRef",
-  "idempotency_key": "IdempotencyKey",
-  "occurred_at": "Timestamp",
-  "trace_ref": "TraceContextRef",
-  "payload": {}
+`InboundEventEnvelope<T>` 归属 `conversation-contracts/src/events.rs`,是所有 inbound consumer 的正式公共 DTO。具体 payload 类型仍由各 consumer 小节定义。
+
+```rust
+/// Generic inbound event envelope owned by conversation contracts.
+pub struct InboundEventEnvelope<T> {
+    /// Source event id used for deduplication.
+    pub event_id: EventId,
+    /// Reference to the original source envelope, not the payload body.
+    pub event_envelope_ref: EventEnvelopeRef,
+    /// Stable source system/object pointer for routing and deduplication.
+    pub event_source_ref: EventSourceRef,
+    /// Idempotency key supplied by the event bridge or derived from event id + source ref.
+    pub idempotency_key: IdempotencyKey,
+    /// Event occurrence time from the source envelope.
+    pub occurred_at: Timestamp,
+    /// Trace reference propagated from the source envelope.
+    pub trace_ref: TraceContextRef,
+    /// Typed event payload.
+    pub payload: T,
 }
 ```
+
+| 字段 | 类型 | 字段来源 | 缺失处理 |
+|---|---|---|---|
+| `event_id` | `EventId` | source envelope | quarantine, no truth write |
+| `event_envelope_ref` | `EventEnvelopeRef` | source envelope metadata | quarantine, no truth write |
+| `event_source_ref` | `EventSourceRef` | source system + source object | quarantine, no truth write |
+| `idempotency_key` | `IdempotencyKey` | source envelope or deterministic bridge derivation | quarantine, no truth write |
+| `occurred_at` | `Timestamp` | source envelope timestamp | quarantine, no truth write |
+| `trace_ref` | `TraceContextRef` | source envelope trace id | quarantine with generated diagnostic trace only if source trace absent |
+| `payload` | `T` | typed source event payload | payload validation decides quarantine / delayed / reject |
+
+`event_envelope_ref` 不得等同于 `event_id`、`ConversationOutboxRecordId` 或 source payload ref。consumer dedup digest 包含 operation、`event_id`、`event_source_ref`、schema version 和 payload digest,排除 transport retry counter。
+
+#### Inbound consumer receipt
+
+`ConsumerReceipt` 归属 `conversation-contracts/src/events.rs`,是所有 inbound consumer 的正式返回 DTO。它不得由 application service 临时替换成 bool、裸 result id 或 source-specific receipt。
+
+```rust
+/// Outcome category returned by inbound event consumers.
+pub enum ConsumerReceiptOutcome {
+    /// The event changed local state or markers.
+    Accepted,
+    /// The event was already processed with the same digest.
+    Duplicate,
+    /// The event was rejected into quarantine because its envelope or payload is not safe to process.
+    Quarantined,
+    /// The event was valid but cannot be fully applied until a required reference resolves.
+    Delayed,
+    /// The event caused no local change.
+    NoOp,
+}
+
+/// Receipt returned by inbound event consumers.
+pub struct ConsumerReceipt {
+    /// Source event id from the inbound event envelope.
+    pub event_id: EventId,
+    /// Source envelope reference for audit and dead-letter replay.
+    pub event_envelope_ref: EventEnvelopeRef,
+    /// Source system and object reference that produced the event.
+    pub event_source_ref: EventSourceRef,
+    /// Deduplication key used by the consumer.
+    pub idempotency_key: IdempotencyKey,
+    /// Consumer outcome.
+    pub outcome: ConsumerReceiptOutcome,
+    /// Application result reference when the consumer produced a durable local result.
+    pub result_ref: Option<CommandResultRef>,
+    /// Quarantine marker written for invalid envelope or unsafe payload.
+    pub quarantine_ref: Option<QuarantineRecordRef>,
+    /// Projection or reference state marker changed by the consumer.
+    pub projection_state_ref: Option<ConversationProjectionStateId>,
+    /// Trace context used for logs and audit.
+    pub trace_ref: TraceContextRef,
+}
+```
+
+| outcome | 必填字段 | 业务写入规则 |
+|---|---|---|
+| `Accepted` | `result_ref` or `projection_state_ref` 至少一个 | 可以写 local snapshot / manifestation / fact / projection marker / outbox |
+| `Duplicate` | 原 `event_id`、`event_source_ref`、`idempotency_key`、`result_ref` if stored | 不重放 domain transition |
+| `Quarantined` | `quarantine_ref` | 不写 business truth;可写 quarantine marker / safe diagnostic |
+| `Delayed` | `projection_state_ref` or unresolved marker ref | 不补造外部 truth;等待 reference refresh |
+| `NoOp` | envelope refs and trace | 不写 business truth |
 
 #### Outbound event envelope
 
@@ -277,6 +349,15 @@ Query envelope 的 `metadata` 使用 `core-contracts::QueryMetadata`。分页与
 | `QueryMetadata` | `core-contracts` re-export | `request: RequestMetadata`、`page: Option<PageRequest>`、`consistency: QueryConsistency` | 不在 query envelope 顶层重复 page / consistency |
 | `ActorContext` / `ActorRef` | `core-contracts` re-export | core actor context / actor ref | 不复制 identity truth |
 | `TraceContextRef` | `conversation-contracts` alias / wrapper over core `TraceId` | 只保存 `TraceId` | 不创建第二 trace truth |
+| `ManifestationState` | `contracts/refs.rs` shared enum | command result / outbound event / domain manifestation 共享 | 不创建 domain-only mirror enum |
+| `ReferenceResolutionState` | `contracts/refs.rs` shared enum | inbound consumer / reference projection / refresh job 共享 | 不创建 domain-only mirror enum |
+| `BridgeTargetMode` | `contracts/refs.rs` shared enum | bridge inbound payload / consumer flow 分支选择共享 | 不从 fact kind 或 routing rule 隐式推导 |
+| `InboundEventEnvelope<T>` | `contracts/events.rs` generic DTO | inbound consumer 公共 envelope | 不依赖 domain crate |
+| `ConsumerReceipt` | `contracts/events.rs` DTO | inbound consumer 返回 receipt | duplicate / quarantine / delayed 都有正式字段 |
+| `EventId` / `EventEnvelopeRef` / `EventSourceRef` | `contracts/refs.rs` newtype | inbound source envelope / receipt / source event ref | event id != envelope ref != outbox record ref |
+| `ManifestationPolicyRef` | `contracts/refs.rs` value object | source consumer 选择显化策略 | 只引用 policy,不携带策略正文 |
+| `PolicyId` / `DiagnosticRef` | `contracts/refs.rs` newtype | policy lookup / quarantine safe diagnostic | 不携带 policy body、raw payload 或 secret |
+| `VisibilityImpact` | `contracts/refs.rs` enum | identity actor changed 等事件的 projection stale 策略 | unknown 必须 conservative stale |
 | `SystemActorRef` | `conversation-contracts` wrapper over core `ActorRef` | `actor_ref: ActorRef`,且 `actor_ref.actor_kind == ActorKind::System` | 不接受 human / AI actor 伪装系统 actor |
 | `ConsumerContext` | `conversation-contracts` | `consumer_ref: ConsumerRef`、`actor_ref: Option<ActorRef>`、`visibility_scope_ref: Option<VisibilityScopeId>`、`purpose_ref: Option<ExternalReferenceRef>` | 不承载 request id、trace、page 或 consistency |
 | `ConversationOwnerRef` | `conversation-contracts/src/refs.rs` | `owner_kind: ConversationOwnerKind`、`external_ref: ExternalReferenceRef` | 不保存 owner lifecycle 或 owner body |
@@ -293,7 +374,16 @@ Query envelope 的 `metadata` 使用 `core-contracts::QueryMetadata`。分页与
 | `ScopeSnapshotRef` | `conversation-contracts/src/refs.rs` | `scope_kind: ScopeKind`、`space_id`、可选 participant / visibility scope id、`scope_version` | 不嵌入完整 scope body |
 | `SpaceCloseMode` | `conversation-contracts/src/refs.rs` | `ReadOnly | Closed | Archived` | `Archived` 必须携带 archive intent |
 
-上述值对象字段级 schema 以 `03_ddd_step_06_object_contracts.md` §7.2.1 为准。协议层不得用裸字符串占位替代这些类型。
+上述值对象字段级 schema 以 `03_ddd_step_06_object_contracts.md` §7.2.1 / §7.2.2 为准。协议层不得用裸字符串占位替代这些类型。
+
+公开协议 surface 的传递类型归属规则:
+
+- Command result、Query view / page、Inbound Event envelope / payload / receipt、Outbound Event payload、Operations Job input / output / report 中出现的 enum / ref / helper / receipt 必须归属 `conversation-contracts` 或 `core-contracts`,或写明 domain 到 public DTO 的正式映射;不得让 public contracts 直接依赖 domain-only 类型。
+- `ManifestExternalFactResult.manifestation_state`、`CrossDomainManifestationChangedEvent.manifestation_state` 统一使用 `contracts/refs.rs::ManifestationState`。
+- external reference projection、refresh job、inbound source consumer 中公开的 resolution state 统一使用 `contracts/refs.rs::ReferenceResolutionState`。
+- `BridgeMappedFactReceivedEvent.target_mode` 统一使用 `contracts/refs.rs::BridgeTargetMode`;`ConsumeBridgeMappedFactReceivedFlow` 只能按该字段选择 append fact 或 manifest external fact 分支。
+- `InboundEventEnvelope<T>` 和 `ConsumerReceipt` 是 PH-05 consumer Step 1 public DTO;contract tests 必须覆盖 envelope 必填字段、accepted、duplicate、quarantined、delayed 和 no-op receipt surface。
+- 各 inbound consumer 的 payload JSON 示例只表达 payload 字段;`event_id`、`event_envelope_ref`、`event_source_ref`、`idempotency_key`、`occurred_at` 和 `trace_ref` 只能出现在 `InboundEventEnvelope<T>`。
 
 #### Command result DTO
 
@@ -1274,6 +1364,8 @@ Query error / empty surface 口径:
 
 ### 7.5 Inbound Event Consumer 协议契约
 
+本节所有函数签名均使用 `InboundEventEnvelope<T>` 承载 source envelope metadata。下列 JSON 示例只描述 `payload` 字段,不得把 `event_id`、`event_envelope_ref`、`event_source_ref`、`idempotency_key`、`occurred_at` 或 `trace_ref` 复制进 payload struct。consumer 的 duplicate / quarantine / delayed / no-op 返回面统一使用 §6.3 `ConsumerReceipt`。
+
 #### 7.5.1 `ConsumeWorkContextChanged`
 
 | 项 | 内容 |
@@ -1285,10 +1377,6 @@ Query error / empty surface 口径:
 
 ```json
 {
-  "event_id": "EventId",
-  "event_envelope_ref": "EventEnvelopeRef",
-  "event_source_ref": "EventSourceRef",
-  "idempotency_key": "IdempotencyKey",
   "work_context_ref": "ExternalSourceObjectRef",
   "source_version_ref": "ExternalSourceVersionRef",
   "source_digest": "ExternalSourceDigest",
@@ -1318,10 +1406,6 @@ Query error / empty surface 口径:
 
 ```json
 {
-  "event_id": "EventId",
-  "event_envelope_ref": "EventEnvelopeRef",
-  "event_source_ref": "EventSourceRef",
-  "idempotency_key": "IdempotencyKey",
   "governance_fact_ref": "ExternalSourceObjectRef",
   "source_version_ref": "ExternalSourceVersionRef",
   "source_digest": "ExternalSourceDigest",
@@ -1352,10 +1436,6 @@ Query error / empty surface 口径:
 
 ```json
 {
-  "event_id": "EventId",
-  "event_envelope_ref": "EventEnvelopeRef",
-  "event_source_ref": "EventSourceRef",
-  "idempotency_key": "IdempotencyKey",
   "artifact_fact_ref": "ExternalSourceObjectRef",
   "artifact_version_ref": "ExternalSourceVersionRef",
   "artifact_digest": "ExternalSourceDigest",
@@ -1385,14 +1465,11 @@ Query error / empty surface 口径:
 
 ```json
 {
-  "event_id": "EventId",
-  "event_envelope_ref": "EventEnvelopeRef",
-  "event_source_ref": "EventSourceRef",
-  "idempotency_key": "IdempotencyKey",
   "space_id": "ConversationSpaceId",
   "fact_kind": "ConversationFactKind",
   "runtime_result_ref": "RuntimeResultRef",
   "result_payload_ref": "ConversationFactPayloadRef",
+  "payload_digest": "Option<PayloadDigest>",
   "source_version_ref": "ExternalSourceVersionRef",
   "system_actor_ref": "SystemActorRef"
 }
@@ -1404,11 +1481,12 @@ Query error / empty surface 口径:
 | `fact_kind` | `ConversationFactKind` | `ConversationFact.fact_kind` | 来源事件;must be `RuntimeResult` | reject if not `RuntimeResult` |
 | `runtime_result_ref` | `RuntimeResultRef` | `FactSourceRef.runtime_result_ref` | 来源事件 | quarantine |
 | `result_payload_ref` | `ConversationFactPayloadRef` | `ConversationFact.payload_ref` | 来源事件 | reject if forbidden body |
+| `payload_digest` | `Option<PayloadDigest>` | append digest evidence / idempotency digest input | 来源事件 | required / optional / forbidden follows `result_payload_ref.digest_requirement`;missing required or mismatch -> quarantine |
 | `system_actor_ref` | `SystemActorRef` | system actor for policy | 来源事件或 config | delayed marker |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `RuntimeResultCommittedEvent` | `FactSourceRef`、`ConversationFact`、`FactAppendReceipt`、`ConversationTraceContext` | 是 | `fact_kind` from event and must equal `RuntimeResult`;`FactSourceRef::from_runtime_result(RuntimeResultRef result_ref, ActorRef actor)`; participant / visibility from repository | runtime result ref != reasoning process; result payload ref != payload body | quarantine / reject |
+| `RuntimeResultCommittedEvent` | `FactSourceRef`、`ConversationFact`、`FactAppendReceipt`、`ConversationTraceContext` | 是 | `fact_kind` from event and must equal `RuntimeResult`;`FactSourceRef::from_runtime_result(RuntimeResultRef result_ref, ActorRef actor)`; participant / visibility from repository;`payload_digest` follows `result_payload_ref.digest_requirement` | runtime result ref != reasoning process; result payload ref != payload body;payload digest != payload body | quarantine / reject |
 
 #### 7.5.5 `ConsumeBridgeMappedFactReceived`
 
@@ -1421,30 +1499,32 @@ Query error / empty surface 口径:
 
 ```json
 {
-  "event_id": "EventId",
-  "event_envelope_ref": "EventEnvelopeRef",
-  "event_source_ref": "EventSourceRef",
-  "idempotency_key": "IdempotencyKey",
   "space_id": "ConversationSpaceId",
+  "target_mode": "BridgeTargetMode",
   "fact_kind": "ConversationFactKind",
   "bridge_fact_ref": "ExternalSourceObjectRef",
   "mapped_payload_ref": "ConversationFactPayloadRef",
+  "payload_digest": "Option<PayloadDigest>",
   "source_version_ref": "ExternalSourceVersionRef",
-  "source_digest": "ExternalSourceDigest"
+  "source_digest": "ExternalSourceDigest",
+  "actor_ref": "ActorRef"
 }
 ```
 
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `space_id` | `ConversationSpaceId` | `ConversationFact.space_id` 或 `CrossDomainManifestation.space_id` | 来源事件 / routing rule | quarantine |
+| `target_mode` | `BridgeTargetMode` | flow branch | bridge mapping metadata | quarantine |
 | `fact_kind` | `ConversationFactKind` | `ConversationFact.fact_kind` | bridge mapping metadata;must be `BridgeMapped` when target_mode is `AppendFact` | reject if target append and kind mismatch |
 | `bridge_fact_ref` | `ExternalSourceObjectRef` | `BridgeSourceRef.bridge_fact_ref` then `FactSourceRef.bridge_source_ref` 或 `ExternalFactRef.source_object_ref` | 来源事件 | quarantine |
 | `mapped_payload_ref` | `ConversationFactPayloadRef` | `ConversationFact.payload_ref` | bridge adapter | reject if forbidden body |
+| `payload_digest` | `Option<PayloadDigest>` | append digest evidence / idempotency digest input | bridge adapter | required / optional / forbidden follows `mapped_payload_ref.digest_requirement`;missing required or mismatch -> quarantine |
 | `source_digest` | `ExternalSourceDigest` | `ExternalFactRef.source_digest` | 来源事件 | quarantine |
+| `actor_ref` | `ActorRef` | `FactSourceRef.actor_ref` / audit actor | bridge mapping metadata 或 source actor resolver | quarantine |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `BridgeMappedFactReceivedEvent` | `FactSourceRef`、`ConversationFact` 或 `ExternalFactRef`、`CrossDomainManifestation` | 是 | target mode and `fact_kind` from bridge mapping metadata;append target must use `BridgeMapped` | bridge payload ref != external platform body | quarantine / reject |
+| `BridgeMappedFactReceivedEvent` | `FactSourceRef`、`ConversationFact` 或 `ExternalFactRef`、`CrossDomainManifestation` | 是 | `target_mode` and `fact_kind` from bridge mapping metadata;append target must use `BridgeMapped`;`actor_ref` from bridge mapping metadata or source actor resolver;append path `payload_digest` follows `mapped_payload_ref.digest_requirement` | bridge payload ref != external platform body;target mode != fact kind;payload digest != bridge platform body | quarantine / reject |
 
 #### 7.5.6 `ConsumeIdentityActorChanged`
 
@@ -1457,10 +1537,6 @@ Query error / empty surface 口径:
 
 ```json
 {
-  "event_id": "EventId",
-  "event_envelope_ref": "EventEnvelopeRef",
-  "event_source_ref": "EventSourceRef",
-  "idempotency_key": "IdempotencyKey",
   "actor_ref": "ActorRef",
   "actor_version_ref": "ExternalSourceVersionRef",
   "affected_space_refs": ["ConversationSpaceId"],

@@ -1870,7 +1870,7 @@ unit_of_work.commit(uow).await?;
   | call consume_runtime_result_committed(InboundEventEnvelope<RuntimeResultCommittedEvent> event)
   v
 [ConversationFactAppendService]
-  | validate runtime result ref and payload ref
+  | validate runtime result ref, payload ref and payload digest
   | tx begin
   | reserve event idempotency
   | load space, participant scope, visibility scope
@@ -1906,6 +1906,9 @@ policy.assert_fact_kind_allowed(event.payload.fact_kind)?;
 if event.payload.fact_kind != ConversationFactKind::RuntimeResult {
     return Err(ProtocolError::InvalidEnvelope.into());
 }
+event.payload
+    .result_payload_ref
+    .validate_payload_digest(event.payload.payload_digest.as_ref())?;
 let fact = ConversationFact::from_append_input(&space, event.payload.fact_kind, source, &visibility, event.payload.result_payload_ref)?;
 let committed_at = clock.now();
 let receipt = FactAppendReceipt::accepted(&fact, event.idempotency_key, committed_at);
@@ -1924,10 +1927,10 @@ unit_of_work.commit(uow).await?;
 | 项 | 内容 |
 |---|---|
 | 事务边界 | fact、receipt、trace、outbox、幂等 complete 同事务 |
-| 错误映射 | reasoning body present -> reject/quarantine;space missing -> retry/quarantine;policy reject -> rejected receipt |
+| 错误映射 | reasoning body present -> reject/quarantine;missing required payload digest / digest mismatch -> quarantine;space missing -> retry/quarantine;policy reject -> rejected receipt |
 | 状态副作用 | fact committed;trace created |
 | 事件副作用 | `ConversationFactAppendedEvent` |
-| 测试切口 | runtime result fact、reasoning body rejected、duplicate skipped、policy reject |
+| 测试切口 | runtime result fact、missing required digest quarantined、digest mismatch quarantined、reasoning body rejected、duplicate skipped、policy reject |
 
 #### 7.4.5 `ConsumeBridgeMappedFactReceivedFlow`
 
@@ -1947,7 +1950,7 @@ unit_of_work.commit(uow).await?;
   | call consume_bridge_mapped_fact_received(InboundEventEnvelope<BridgeMappedFactReceivedEvent> event)
   v
 [ConversationFactAppendService]
-  | validate bridge mapping metadata
+  | validate bridge mapping metadata, payload ref and payload digest
   | tx begin
   | reserve event idempotency
   | choose append or manifestation mode
@@ -1968,7 +1971,8 @@ let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
 let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeBridgeMappedFactReceived, request_digest.clone(), uow.clone()).await?;
 
-if event.payload.target_mode == BridgeTargetMode::AppendFact {
+match event.payload.target_mode {
+  BridgeTargetMode::AppendFact => {
     let space = space_scope_repo.get_space_for_update(event.payload.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
     let participant = space_scope_repo.get_participant_scope(event.payload.space_id).await?.ok_or(ApplicationError::NotFound)?;
     let visibility = space_scope_repo.get_visibility_scope(event.payload.space_id).await?.ok_or(ApplicationError::NotFound)?;
@@ -1981,12 +1985,16 @@ if event.payload.target_mode == BridgeTargetMode::AppendFact {
     if event.payload.fact_kind != ConversationFactKind::BridgeMapped {
         return Err(ProtocolError::InvalidEnvelope.into());
     }
+    event.payload
+        .mapped_payload_ref
+        .validate_payload_digest(event.payload.payload_digest.as_ref())?;
     let fact = ConversationFact::from_append_input(&space, event.payload.fact_kind, source, &visibility, event.payload.mapped_payload_ref)?;
     let committed_at = clock.now();
     let receipt = FactAppendReceipt::accepted(&fact, event.idempotency_key, committed_at);
     fact_repo.append_fact(fact.clone(), receipt.clone(), uow.clone()).await?;
     outbox_repo.enqueue(ConversationOutboxRecord::from_fact_append(fact, receipt, committed_at)?, uow.clone()).await?;
-} else {
+  }
+  BridgeTargetMode::ManifestExternalFact => {
     // [ExternalFactRef::from_bridge_event(BridgeEventRef bridge_event_ref)]
     let external_ref = ExternalFactRef::from_bridge_event(event.payload.bridge_fact_ref.into())?;
     let space = space_scope_repo.get_space_for_update(event.payload.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
@@ -1995,6 +2003,7 @@ if event.payload.target_mode == BridgeTargetMode::AppendFact {
     manifestation_repo.insert_manifestation(manifestation.clone(), uow.clone()).await?;
     let committed_at = clock.now();
     outbox_repo.enqueue(ConversationOutboxRecord::from_manifestation(manifestation, None, committed_at)?, uow.clone()).await?;
+  }
 }
 
 idempotency.complete(reservation, event.result_ref(), uow.clone()).await?;
@@ -2006,10 +2015,10 @@ unit_of_work.commit(uow).await?;
 | 项 | 内容 |
 |---|---|
 | 事务边界 | append / manifestation 分支各自与 outbox、幂等 complete 同事务 |
-| 错误映射 | invalid mapping -> quarantine;platform body present -> reject;target space missing -> quarantine |
+| 错误映射 | invalid mapping -> quarantine;missing required payload digest / digest mismatch -> quarantine;platform body present -> reject;target space missing -> quarantine |
 | 状态副作用 | fact committed 或 manifestation manifested / unresolved |
 | 事件副作用 | fact appended 或 manifestation changed outbox |
-| 测试切口 | append mode、manifest mode、platform body rejected、duplicate skipped |
+| 测试切口 | append mode、manifest mode、missing required digest quarantined、digest mismatch quarantined、platform body rejected、duplicate skipped |
 
 #### 7.4.6 `ConsumeIdentityActorChangedFlow`
 

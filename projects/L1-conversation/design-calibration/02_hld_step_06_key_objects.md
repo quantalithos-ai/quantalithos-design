@@ -997,6 +997,8 @@
 | `snapshot_rules` | `ManifestationSnapshotRuleSet` | 约束显化是否必须携带安全快照 |
 | `ownership_rules` | `ManifestationOwnershipRuleSet` | 防止显化转移来源仓 truth |
 
+> 字段级 schema、默认值和 digest mismatch 口径以 `03_ddd_step_06_object_contracts.md` §7.7.0 为准;本节只保留概要层字段骨架。
+
 #### 10.4.3 成员函数骨架
 
 | 成员函数 | 作用 |
@@ -1038,6 +1040,8 @@
 | `freshness_rules` | `ReferenceFreshnessRuleSet` | 约束 snapshot / projection 新鲜度 |
 | `digest_rules` | `ReferenceDigestRuleSet` | 约束来源摘要对齐 |
 | `degraded_view_rules` | `DegradedViewRuleSet` | 约束不可解析时的降级展示 |
+
+> 字段级 schema、默认值和 `DegradedViewDecision` 口径以 `03_ddd_step_06_object_contracts.md` §7.7.0 为准;本节只保留概要层字段骨架。
 
 #### 10.5.3 成员函数骨架
 
@@ -1551,7 +1555,7 @@
 | `fresh(ExternalSourceVersionRef version_ref)` | 从已解析来源版本形成 fresh 状态 |
 | `stale(ExternalSourceVersionRef latest_version_ref)` | 从来源版本变化形成 stale 状态 |
 | `unresolved(ReferenceResolutionReason reason)` | 从解析失败形成 unresolved 状态 |
-| `invalid(ReferenceValidationReason reason)` | 从引用校验失败形成 invalid 状态 |
+| `invalid(ReferenceResolutionReason reason)` | 从引用校验失败形成 invalid 状态 |
 
 #### 13.1.5 禁止事项
 
@@ -1576,11 +1580,13 @@
 | 字段 | 类型 | 作用 |
 |---|---|---|
 | `external_reference_projection_id` | `ExternalReferenceProjectionId` | 标识外部引用投影 |
-| `external_fact_ref` | `ExternalFactRef` | 指向来源仓正式事实 |
-| `snapshot_ref` | `ExternalFactSnapshotRef` | 指向当前可展示快照 |
+| `space_id` | `ConversationSpaceId` | 标识投影所属 conversation space |
+| `external_fact_refs` | `Vec<ExternalFactRef>` | 指向来源仓正式事实集合 |
+| `snapshot_refs` | `Vec<ExternalFactSnapshotRef>` | 指向当前可展示快照集合 |
 | `resolution_state` | `ReferenceResolutionState` | 表达引用解析状态 |
-| `display_marker` | `ExternalDisplayMarker` | 表达正常、降级、不可见或不可解析显示 |
-| `projection_state` | `ConversationProjectionState` | 表达本地投影 freshness / rebuild 状态 |
+| `degraded_display_ref` | `Option<DegradedDisplayRef>` | 表达降级、不可见或不可解析显示材料 |
+
+> `ExternalReferenceProjectionId`、`DegradedDisplayRef` 和 `DisplayFragmentRef` 的字段级 schema 以 `03_ddd_step_06_object_contracts.md` §7.7.0 和 §7.10.2 为准;本节不另行定义第二套 projection schema。
 
 #### 13.2.3 成员函数骨架
 
@@ -1588,8 +1594,8 @@
 |---|---|
 | `update_snapshot(ExternalFactSnapshot snapshot)` | 使用新的安全快照更新投影 |
 | `mark_unresolved(ReferenceResolutionReason reason)` | 标记引用不可解析 |
-| `mark_invalid(ReferenceValidationReason reason)` | 标记引用不可接受 |
-| `to_read_model_fragment(VisibilityScope visibility_scope, ConsumerRef consumer_ref)` | 为授权读取形成可输出片段 |
+| `mark_invalid(ReferenceResolutionReason reason)` | 标记引用不可接受 |
+| `display_fragment(ConsumerRef consumer_ref, VisibilityScope visibility_scope)` | 为授权读取形成可输出片段 |
 
 #### 13.2.4 工厂函数骨架
 

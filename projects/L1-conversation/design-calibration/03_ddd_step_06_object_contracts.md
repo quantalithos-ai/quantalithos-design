@@ -78,8 +78,8 @@ Step 5 已确认所有领域对象归属 domain 模块。
 | `ScopeChangeState` | `ScopeChangeRecord` | 是 |
 | `ConversationFactState` | contracts shared enum;`ConversationFact` 直接复用 | 是 |
 | `FactAppendResult` | `FactAppendReceipt` | 是 |
-| `ManifestationState` | `CrossDomainManifestation` | 是 |
-| `ReferenceResolutionState` | `ReferenceResolutionState` / snapshot / projection | 是 |
+| `ManifestationState` | contracts shared enum;`CrossDomainManifestation` 直接复用 | 是 |
+| `ReferenceResolutionState` | contracts shared enum;reference / snapshot / projection 直接复用 | 是 |
 | `ProjectionFreshnessState` | `ConversationProjectionState` | 是 |
 | `ConversationChangeCursorState` | contracts shared enum;`ConversationChangeCursor` 和 query view 直接复用 | 是 |
 | `ConversationOutboxPublicationState` | `ConversationOutboxRecord` | 是 |
@@ -524,9 +524,9 @@ pub struct ScopeSnapshotRef {
 - `ScopeChangeRecord.previous_scope_ref` 和 `new_scope_ref` 必须使用同一个 `scope_kind` 和同一个 `space_id`。
 - create-space 初始 `ScopeChangeRecord` 的正式口径为 `scope_kind = Space`。`previous_scope_ref` 使用同一 `space_id`、两个 scope id 为 `None`、`scope_version = None`,表示预创建占位,不代表已有持久化 space;`new_scope_ref` 使用同一 `space_id`、两个 scope id 为 `None`,PH-02 下 `scope_version = None`。
 
-### 7.2.2 PH-04 authorized query / projection 共享值对象正式 schema
+### 7.2.2 PH-04 / PH-05 public query / consumer 共享值对象正式 schema
 
-本小节补齐 PH-04 `query DTO / read model / projection freshness` boundary 直接落码所需的共享值对象。实现侧不得把下列类型实现为空 struct、裸字符串别名或另一个未记录字段集。
+本小节补齐 PH-04 `query DTO / read model / projection freshness` 和 PH-05 `inbound consumer public DTO` boundary 直接落码所需的共享值对象。实现侧不得把下列类型实现为空 struct、裸字符串别名或另一个未记录字段集。
 
 归属口径:
 
@@ -534,11 +534,17 @@ pub struct ScopeSnapshotRef {
 - `SearchIndexProjectionId`、`ChangeCursorProjectionId`、`ConversationChangeCursorEntryId`、`SearchQueryText` 和 `PageLimit` 属于 `conversation-contracts/src/refs.rs`。
 - `ConversationChangeCursorEntry` 属于 `conversation-contracts/src/views.rs` 的 shared projection DTO;`domain/projection.rs::ChangeCursorProjection` 直接复用该类型,不得另建 domain-only mirror struct。
 - `ConversationFactState` 属于 `conversation-contracts/src/refs.rs`,与 `ProjectionFreshnessState` 同为 public view / event 可见共享 enum;`domain/fact.rs::ConversationFact` 必须直接复用该 enum,不得在 domain 内另建同名 enum 或 mirror enum。
+- `ManifestationState` 属于 `conversation-contracts/src/refs.rs`,与 `ConversationFactState` 同为 public command result / event / query 可见共享 enum;`domain/manifestation.rs::CrossDomainManifestation` 必须直接复用该 enum,不得在 domain 内另建同名 enum 或 mirror enum。
+- `ReferenceResolutionState` 属于 `conversation-contracts/src/refs.rs`,与 `ProjectionFreshnessState` 同为 public event / query / job report 可见共享 enum;`domain/reference.rs`、`domain/manifestation.rs` 和 projection 维护对象必须直接复用该 enum,不得在 domain 内另建同名 enum 或 mirror enum。
+- `BridgeTargetMode` 属于 `conversation-contracts/src/refs.rs`,是 `BridgeMappedFactReceivedEvent` payload 的公开协议 enum;`ConsumeBridgeMappedFactReceivedFlow` 必须直接读取该字段选择 append fact 或 manifestation 分支,不得从 `fact_kind`、bridge adapter 名称或 routing rule 隐式推导。
 - `ConversationChangeCursorState` 属于 `conversation-contracts/src/refs.rs`,与 `ProjectionFreshnessState` 同为 public query view 可见共享 enum;`domain/cursor.rs::ConversationChangeCursor` 必须直接复用该 enum。
 - `ConversationOutboxEventKind` 属于 `conversation-contracts/src/refs.rs`,供 domain outbox、change cursor entry 和 outbound event DTO 共享;不得在 domain / contracts 分别复制。
+- `EventId`、`EventEnvelopeRef`、`EventSourceRef`、`PolicyId` 和 `DiagnosticRef` 属于 `conversation-contracts/src/refs.rs`,用于 inbound source envelope、consumer receipt、manifestation policy 和 quarantine diagnostic;不得用裸字符串替代。
 - `ConversationReadModelId` 是 projection identity,不是 truth id;不得写入 command result、outbox truth payload 或 upstream source ref。
 - `ConversationChangeCursorRef` 是 query / read model 对游标的轻量引用,不替代 `ConversationChangeCursor` 对象本身。
 - `SearchQueryText` 只表示已进入 query boundary 的搜索文本,不保存搜索结果、payload body 或 external body。
+- `EventEnvelopeRef` 是 source envelope 引用,不是 `EventId`、`ConversationOutboxRecordId`、`ConversationEventId` 或 payload ref。
+- `EventSourceRef` 是 source event producer / source object 的稳定安全引用,不保存上游对象正文。
 
 ```rust
 /// Lightweight reference to a conversation fact without carrying payload body.
@@ -568,6 +574,21 @@ pub struct ConversationFactSequence(pub u64);
 /// Monotonic outbox or change sequence scoped to a conversation space.
 pub struct ConversationOutboxSequence(pub u64);
 
+/// Source event id used by inbound consumers.
+pub struct EventId(pub String);
+
+/// Stable reference to the original inbound source envelope.
+pub struct EventEnvelopeRef(pub String);
+
+/// Stable source producer or source object pointer for routing and deduplication.
+pub struct EventSourceRef(pub String);
+
+/// Stable configured policy id.
+pub struct PolicyId(pub String);
+
+/// Safe diagnostic reference for quarantine and audit without storing raw payload.
+pub struct DiagnosticRef(pub String);
+
 /// Describes lifecycle state for a conversation fact.
 pub enum ConversationFactState {
     /// The fact was accepted and can be read under visibility scope.
@@ -578,6 +599,136 @@ pub enum ConversationFactState {
     Retracted,
     /// The fact is isolated because source, safety, or boundary checks failed.
     Quarantined,
+}
+
+/// Describes manifestation lifecycle for an external fact in conversation.
+pub enum ManifestationState {
+    /// The external fact is manifested and can be read under visibility rules.
+    Manifested,
+    /// The manifested snapshot or source version is stale.
+    Stale,
+    /// The manifestation was revoked but remains traceable.
+    Revoked,
+    /// The source cannot currently be resolved.
+    Unresolved,
+}
+
+/// Describes resolution and freshness state for an external reference or snapshot.
+pub enum ReferenceResolutionState {
+    /// The reference is resolved and aligned with the known source version.
+    Fresh,
+    /// The reference was resolved before but the source version changed.
+    Stale,
+    /// The reference is waiting for asynchronous resolution.
+    Pending,
+    /// The reference cannot currently be resolved.
+    Unresolved,
+    /// The reference is invalid and must not be used for display.
+    Invalid,
+}
+
+/// Stable reference to the manifestation policy selected for an inbound source fact.
+pub struct ManifestationPolicyRef {
+    /// Policy family applied by the consumer or command path.
+    pub policy_kind: ManifestationPolicyKind,
+    /// Stable policy identifier within the configured policy set.
+    pub policy_id: PolicyId,
+}
+
+/// Classifies which manifestation policy family applies to a source event.
+pub enum ManifestationPolicyKind {
+    /// Policy used for governance committed facts.
+    GovernanceFact,
+    /// Policy used for artifact committed facts.
+    ArtifactFact,
+    /// Policy used for bridge mapped facts that create manifestations.
+    BridgeMappedFact,
+    /// Configured default policy for trusted source events.
+    DefaultTrustedSource,
+}
+
+/// Describes how an actor or membership change affects conversation visibility.
+pub enum VisibilityImpact {
+    /// The event may change read access and all affected read models must be stale.
+    ReadScopeChanged,
+    /// The event may change append access and append guards must refresh before write.
+    AppendScopeChanged,
+    /// The event may change manifestation visibility and external reference projections must be stale.
+    ManifestationScopeChanged,
+    /// The event affects identity metadata only and does not change visibility rules.
+    NoVisibilityChange,
+    /// The event impact cannot be narrowed safely, so all affected projections must be stale.
+    UnknownConservative,
+}
+
+/// Outcome category returned by inbound event consumers.
+pub enum ConsumerReceiptOutcome {
+    /// The event changed local state or markers.
+    Accepted,
+    /// The event was already processed with the same digest.
+    Duplicate,
+    /// The event was rejected into quarantine because its envelope or payload is not safe to process.
+    Quarantined,
+    /// The event was valid but cannot be fully applied until a required reference resolves.
+    Delayed,
+    /// The event caused no local change.
+    NoOp,
+}
+
+/// Selects how a bridge mapped fact should enter conversation.
+pub enum BridgeTargetMode {
+    /// Append the mapped fact as a conversation fact.
+    AppendFact,
+    /// Manifest the mapped external fact into the conversation space.
+    ManifestExternalFact,
+}
+
+/// Receipt returned by inbound event consumers.
+pub struct ConsumerReceipt {
+    /// Source event id from the inbound event envelope.
+    pub event_id: EventId,
+    /// Source envelope reference for audit and dead-letter replay.
+    pub event_envelope_ref: EventEnvelopeRef,
+    /// Source system and object reference that produced the event.
+    pub event_source_ref: EventSourceRef,
+    /// Deduplication key used by the consumer.
+    pub idempotency_key: IdempotencyKey,
+    /// Consumer outcome.
+    pub outcome: ConsumerReceiptOutcome,
+    /// Application result reference when the consumer produced a durable local result.
+    pub result_ref: Option<CommandResultRef>,
+    /// Quarantine marker written for invalid envelope or unsafe payload.
+    pub quarantine_ref: Option<QuarantineRecordRef>,
+    /// Projection or reference state marker changed by the consumer.
+    pub projection_state_ref: Option<ConversationProjectionStateId>,
+    /// Trace context used for logs and audit.
+    pub trace_ref: TraceContextRef,
+}
+
+/// Generic inbound event envelope owned by conversation contracts.
+pub struct InboundEventEnvelope<T> {
+    /// Source event id used for deduplication.
+    pub event_id: EventId,
+    /// Reference to the original source envelope, not the payload body.
+    pub event_envelope_ref: EventEnvelopeRef,
+    /// Stable source system/object pointer for routing and deduplication.
+    pub event_source_ref: EventSourceRef,
+    /// Idempotency key supplied by the event bridge or derived from event id + source ref.
+    pub idempotency_key: IdempotencyKey,
+    /// Event occurrence time from the source envelope.
+    pub occurred_at: Timestamp,
+    /// Trace reference propagated from the source envelope.
+    pub trace_ref: TraceContextRef,
+    /// Typed event payload.
+    pub payload: T,
+}
+
+/// Stable quarantine record reference for invalid inbound events.
+pub struct QuarantineRecordRef {
+    /// Source event id that was quarantined.
+    pub event_id: EventId,
+    /// Safe diagnostic reference for the quarantine reason.
+    pub diagnostic_ref: DiagnosticRef,
 }
 
 /// Stable id for an authorized read model projection.
@@ -735,6 +886,16 @@ pub enum CursorStaleReason {
 }
 ```
 
+PH-05 consumer 公共类型归属与校验规则:
+
+- `InboundEventEnvelope<T>`、`ConsumerReceipt`、`ConsumerReceiptOutcome`、`ManifestationPolicyRef`、`ManifestationPolicyKind`、`VisibilityImpact` 和 `QuarantineRecordRef` 均属于 `conversation-contracts/src/events.rs` 或 `conversation-contracts/src/refs.rs`。实现可以按文件职责拆分,但不得让这些 public consumer 类型依赖 domain crate。
+- `InboundEventEnvelope<T>.event_id`、`event_envelope_ref`、`event_source_ref`、`idempotency_key`、`occurred_at`、`trace_ref` 为所有 inbound consumer 必填字段;缺失任一字段时返回 `ConsumerReceipt { outcome: Quarantined, quarantine_ref: Some(...) }`,不得写 business truth。
+- `event_envelope_ref` 是来源 envelope 引用,不等于 `event_id`,也不等于 `ConversationOutboxRecordId`。
+- `idempotency_key` 的 dedup 作用域为 consumer operation + `event_id` + `event_source_ref`;same digest duplicate 返回 `ConsumerReceiptOutcome::Duplicate`,不得重写 snapshot、manifestation、fact、projection 或 outbox。
+- `ConsumerReceipt.result_ref` 只在已产生 durable local result 时填写;quarantine / delayed / no-op path 可以为空。
+- `ManifestationPolicyRef` 只引用已配置或已解析的显化策略,不得携带策略正文;缺失时由 consumer config 默认策略派生,若无默认策略则 quarantine。
+- `VisibilityImpact::UnknownConservative` 必须导致 affected spaces 的 read model / external reference projection stale marker;不得被当作 no-op。
+
 | 类型 | 字段 / 派生口径 | 约束 |
 |---|---|---|
 | `ConversationFactRef` | `fact_id`、`space_id`、`append_sequence` | 不包含 payload body;`append_sequence` 只用于排序和 cursor |
@@ -742,7 +903,15 @@ pub enum CursorStaleReason {
 | `ConversationChangeCursorId` | opaque string | 由 `space_id + consumer_ref` 稳定派生 |
 | `ConversationFactSequence` | `u64` newtype | 同一 space 内单调递增;初始零值使用 `ConversationFactSequence(0)` |
 | `ConversationOutboxSequence` | `u64` newtype | 同一 space 内单调递增;初始零值使用 `ConversationOutboxSequence(0)` |
+| `EventId` | opaque string from source envelope | inbound consumer dedup id;不等同于 trace id、request id 或 conversation outbox event id |
+| `EventEnvelopeRef` | opaque string / source envelope pointer | 用于 replay / audit;不等同于 event id、outbox record id 或 payload ref |
+| `EventSourceRef` | opaque string / source producer + source object pointer | 用于 routing 和 dedup;不保存 source object body |
+| `PolicyId` | opaque configured policy id | 用于 manifestation policy lookup;不携带 policy body |
+| `DiagnosticRef` | opaque safe diagnostic pointer | 用于 quarantine audit;不保存 raw payload、secret 或 resolver error body |
 | `ConversationFactState` | `Accepted`、`VisibilityRestricted`、`Retracted`、`Quarantined` | contracts / domain / event / query view 共享;不得复制第二套 enum |
+| `ManifestationState` | `Manifested`、`Stale`、`Revoked`、`Unresolved` | contracts / domain / command result / event 共享;不得复制第二套 enum |
+| `ReferenceResolutionState` | `Fresh`、`Stale`、`Pending`、`Unresolved`、`Invalid` | contracts / domain / consumer / job report 共享;不得复制第二套 enum |
+| `BridgeTargetMode` | `AppendFact`、`ManifestExternalFact` | `BridgeMappedFactReceivedEvent.target_mode` 的正式类型;append 分支必须要求 `fact_kind = BridgeMapped`;manifest 分支不得把 bridge 平台正文写入 truth |
 | `ConversationReadModelId` | 由 `space_id + consumer_ref` 稳定派生,编码为实现可比较的 opaque string | 同一 `space_id` 与同一 `consumer_ref` 必须得到同一 id;不得使用随机 id |
 | `SearchIndexProjectionId` | 由 repository key `space_id` 稳定派生 | 同一 space 的 search projection 必须得到同一 id;不得随机生成 |
 | `ChangeCursorProjectionId` | 由 repository key `space_id` 稳定派生 | 同一 space 的 change cursor projection 必须得到同一 id;不得随机生成 |
@@ -1460,7 +1629,7 @@ pub struct ConversationFactPayloadRef {
     pub payload_kind: ConversationFactPayloadKind,
     /// External or local object reference that owns the payload body.
     pub object_ref: ExternalSourceObjectRef,
-    /// Whether AppendConversationFactRequest.payload_digest is required.
+    /// Whether any append input carrying this payload_ref must supply payload_digest.
     pub digest_requirement: PayloadDigestRequirement,
 }
 
@@ -1511,11 +1680,12 @@ pub enum PayloadDigestAlgorithm {
 | `ManifestationSnapshot` | `Required` | 外部事实快照必须有 digest 证据 |
 | `SystemFact` | `Optional` | 系统事实引用可按来源配置要求 digest |
 
-`AppendConversationFactRequest.payload_digest` 校验口径:
+fact append 输入的 `payload_digest` 校验口径:
 
-- 当 `payload_ref.digest_requirement = Required` 时,`payload_digest` 必须存在,否则返回 `FactAppendRejectionReason::MissingRequiredPayloadDigest`。
-- 当 `payload_digest` 存在但与 `payload_ref.object_ref` 对应载体 digest 不匹配时,返回 `FactAppendRejectionReason::PayloadDigestMismatch`。
-- 当 `payload_ref.digest_requirement = Forbidden` 但 request 携带 digest 时,返回 `FactAppendRejectionReason::UnexpectedPayloadDigest`。
+- `AppendConversationFactRequest.payload_digest`、`RuntimeResultCommittedEvent.payload_digest` 和 `BridgeMappedFactReceivedEvent.payload_digest` 都属于同一 payload digest 证据输入。
+- 当 `payload_ref.digest_requirement = Required` 时,`payload_digest` 必须存在,否则返回 `FactAppendRejectionReason::MissingRequiredPayloadDigest`;inbound event consumer 将该错误映射为 invalid inbound envelope quarantine。
+- 当 `payload_digest` 存在但与 `payload_ref.object_ref` 对应载体 digest 不匹配时,返回 `FactAppendRejectionReason::PayloadDigestMismatch`;inbound event consumer 将该错误映射为 digest mismatch quarantine。
+- 当 `payload_ref.digest_requirement = Forbidden` 但 append 输入携带 digest 时,返回 `FactAppendRejectionReason::UnexpectedPayloadDigest`。
 - 无论是否携带 digest,`payload_ref` 都不得包含 payload body、runtime reasoning body 或 bridge platform body。
 
 ```rust
@@ -2003,6 +2173,9 @@ pub enum ConversationChangeCursorState {
 
 - `ExternalSourceSystem`、`ExternalFactKind`、`DisplaySummaryRef`、`ManifestationReason`、`ManifestationRevokeReason`、`ReferenceResolutionReason` 属于 `conversation-contracts/src/refs.rs` 或同层 shared value module。
 - `ExternalFactResolution`、`DigestVerification` 属于 `conversation-contracts/src/refs.rs` 中的 resolver-facing safe DTO,由 `ExternalFactResolverPort` 返回,不得包含来源正文。
+- `ExternalReferenceProjectionId`、`DegradedDisplayRefId`、`DisplayFragmentRefId`、`DegradedDisplayRef` 和 `DisplayFragmentRef` 属于 `conversation-contracts/src/refs.rs` 或 `conversation-contracts/src/views.rs` 的 projection-facing shared value object,供 `domain/reference.rs` 和 query view 复用。
+- `ManifestationSourceRuleSet`、`ManifestationVisibilityRuleSet`、`ManifestationSnapshotRuleSet` 和 `ManifestationOwnershipRuleSet` 属于 `domain/manifestation.rs` 的 policy value object,不得只实现为空 struct。
+- `ReferenceResolutionRuleSet`、`ReferenceFreshnessRuleSet`、`ReferenceDigestRuleSet`、`DigestMismatchDecision`、`DigestUnavailableDecision`、`DegradedViewRuleSet` 和 `DegradedViewDecision` 属于 `domain/reference.rs` 的 policy value object,不得只实现为空 struct。
 - `domain/manifestation.rs` 和 `domain/reference.rs` 只能消费这些 shared value object,不得复制第二份 schema。
 
 ```rust
@@ -2155,6 +2328,181 @@ pub enum DigestVerificationState {
     /// The resolver could not read the source digest.
     Unavailable,
 }
+
+/// Rules for source systems and fact kinds that can be manifested.
+pub struct ManifestationSourceRuleSet {
+    /// Source systems accepted by this manifestation policy.
+    pub allowed_source_systems: Vec<ExternalSourceSystem>,
+    /// External fact kinds accepted by this manifestation policy.
+    pub allowed_fact_kinds: Vec<ExternalFactKind>,
+    /// Whether the source version must be supported by the resolver configuration.
+    pub require_supported_source_version: bool,
+}
+
+/// Rules that bind manifestation to conversation visibility.
+pub struct ManifestationVisibilityRuleSet {
+    /// Whether a visibility scope must be present before manifestation.
+    pub require_visibility_scope: bool,
+    /// Whether manifestation is allowed when the visibility scope is restricted.
+    pub allow_manifestation_when_visibility_restricted: bool,
+    /// Optional maximum visibility level allowed for manifested external facts.
+    pub max_visibility_level: Option<VisibilityLevel>,
+}
+
+/// Rules that decide which safe snapshot state is acceptable.
+pub struct ManifestationSnapshotRuleSet {
+    /// Whether manifested external facts require a safe snapshot.
+    pub require_safe_snapshot: bool,
+    /// Whether unresolved marker records may exist without a snapshot.
+    pub allow_unresolved_without_snapshot: bool,
+    /// Whether the snapshot digest must match the source digest.
+    pub require_digest_match: bool,
+    /// Whether a stale snapshot may remain displayable as a degraded marker.
+    pub allow_stale_snapshot: bool,
+}
+
+/// Rules that prevent conversation from taking ownership of source truth.
+pub struct ManifestationOwnershipRuleSet {
+    /// Whether source truth body copy is forbidden.
+    pub forbid_source_truth_copy: bool,
+    /// Whether source truth state mutation is forbidden.
+    pub forbid_source_state_mutation: bool,
+    /// Whether the external ref must carry source_system and source_object_ref.
+    pub require_source_object_ref: bool,
+}
+
+/// Rules for whether an external reference can be resolved.
+pub struct ReferenceResolutionRuleSet {
+    /// Source systems accepted by the reference resolver.
+    pub allowed_source_systems: Vec<ExternalSourceSystem>,
+    /// Whether pending resolution markers are allowed.
+    pub allow_pending_resolution: bool,
+    /// Whether unresolved markers are allowed instead of fabricating local truth.
+    pub allow_unresolved_marker: bool,
+    /// Whether unsupported source systems immediately make the reference invalid.
+    pub invalid_on_unsupported_source: bool,
+}
+
+/// Rules for freshness and refresh behavior of external snapshots.
+pub struct ReferenceFreshnessRuleSet {
+    /// Whether source version changes mark the reference stale.
+    pub mark_stale_on_version_change: bool,
+    /// Whether stale references require a refresh before normal display.
+    pub require_refresh_for_stale: bool,
+    /// Whether stale references may still expose degraded display summaries.
+    pub allow_stale_degraded_display: bool,
+}
+
+/// Rules for external digest validation.
+pub struct ReferenceDigestRuleSet {
+    /// Whether snapshots must carry a source digest.
+    pub require_digest_for_snapshot: bool,
+    /// Decision applied when the expected digest does not match the source.
+    pub mismatch_decision: DigestMismatchDecision,
+    /// Decision applied when the source digest cannot be read.
+    pub unavailable_decision: DigestUnavailableDecision,
+}
+
+/// Decision applied to digest mismatch.
+pub enum DigestMismatchDecision {
+    /// Return DomainError::DigestMismatch and leave existing local truth unchanged.
+    RejectWithDomainError,
+    /// Mark the reference unresolved with a digest mismatch reason.
+    MarkUnresolvedWithReason,
+}
+
+/// Decision applied when digest verification cannot read the source digest.
+pub enum DigestUnavailableDecision {
+    /// Keep the reference pending until retry.
+    MarkPending,
+    /// Mark the reference unresolved.
+    MarkUnresolved,
+}
+
+/// Rules for safely exposing degraded external-reference views.
+pub struct DegradedViewRuleSet {
+    /// Whether pending references can expose a pending marker.
+    pub allow_pending_marker: bool,
+    /// Whether unresolved references can expose an unresolved marker.
+    pub allow_unresolved_marker: bool,
+    /// Whether stale references can expose a stale safe summary.
+    pub allow_stale_summary: bool,
+    /// Whether degraded views must point to a degraded display reference.
+    pub require_degraded_display_ref: bool,
+    /// Whether falling back to source body is forbidden.
+    pub forbid_source_body_fallback: bool,
+}
+
+/// Decision returned by ReferenceValidityPolicy for degraded display.
+pub enum DegradedViewDecision {
+    /// Hide the reference from the current view.
+    Hidden,
+    /// Expose a pending marker without source body.
+    Pending {
+        /// Reason for pending state.
+        reason: ReferenceResolutionReason,
+    },
+    /// Expose an unresolved marker without source body.
+    Unresolved {
+        /// Optional degraded display reference.
+        degraded_display_ref: Option<DegradedDisplayRef>,
+        /// Reason for unresolved state.
+        reason: ReferenceResolutionReason,
+    },
+    /// Expose a stale safe summary.
+    StaleSummary {
+        /// Degraded display reference.
+        degraded_display_ref: DegradedDisplayRef,
+        /// Reason for stale state.
+        reason: ReferenceResolutionReason,
+    },
+    /// Expose an invalid marker without display material.
+    Invalid {
+        /// Reason for invalid state.
+        reason: ReferenceResolutionReason,
+    },
+}
+
+/// Stable id for an external reference projection.
+pub struct ExternalReferenceProjectionId(pub String);
+
+/// Stable id for a degraded display reference.
+pub struct DegradedDisplayRefId(pub String);
+
+/// Stable id for a display fragment reference.
+pub struct DisplayFragmentRefId(pub String);
+
+/// Safe degraded display pointer for unresolved or stale external references.
+pub struct DegradedDisplayRef {
+    /// Stable degraded display reference id.
+    pub degraded_display_ref_id: DegradedDisplayRefId,
+    /// External fact represented by the degraded marker.
+    pub external_fact_ref: ExternalFactRef,
+    /// Resolution state that caused degraded display.
+    pub resolution_state: ReferenceResolutionState,
+    /// Reason for the degraded marker.
+    pub resolution_reason: ReferenceResolutionReason,
+    /// Optional safe summary material.
+    pub display_summary_ref: Option<DisplaySummaryRef>,
+}
+
+/// Safe display fragment pointer exposed by external reference projections.
+pub struct DisplayFragmentRef {
+    /// Stable display fragment reference id.
+    pub display_fragment_ref_id: DisplayFragmentRefId,
+    /// Space that owns the display fragment.
+    pub space_id: ConversationSpaceId,
+    /// External fact represented by the fragment.
+    pub external_fact_ref: ExternalFactRef,
+    /// Snapshot used for normal display, if available.
+    pub source_snapshot_ref: Option<ExternalFactSnapshotRef>,
+    /// Degraded display marker, if normal display is unavailable.
+    pub degraded_display_ref: Option<DegradedDisplayRef>,
+    /// Visibility scope applied to the fragment.
+    pub visibility_scope_id: VisibilityScopeId,
+    /// Resolution state represented by the fragment.
+    pub resolution_state: ReferenceResolutionState,
+}
 ```
 
 | 类型 | 字段闭环 | 禁止事项 |
@@ -2167,6 +2515,38 @@ pub enum DigestVerificationState {
 | `ReferenceResolutionReason` | resolver failure、pending marker、stale marker | 不保存 resolver error body |
 | `ExternalFactResolution` | `ExternalFactResolverPort.resolve_external_fact(...)` | 不包含 source body、raw response 或 secret |
 | `DigestVerification` | `ExternalFactResolverPort.verify_digest(...)` | 不把 mismatch 自动改写成 matched |
+| `ManifestationSourceRuleSet` | `ManifestationPolicy.allowed_source_rules` | 不从 adapter 名称隐式推导 |
+| `ManifestationVisibilityRuleSet` | `ManifestationPolicy.visibility_rules` | 不绕过 `VisibilityScope` |
+| `ManifestationSnapshotRuleSet` | `ManifestationPolicy.snapshot_rules` | 不把来源正文当作 snapshot |
+| `ManifestationOwnershipRuleSet` | `ManifestationPolicy.ownership_rules` | 不接管、修改或复制来源 truth |
+| `ReferenceResolutionRuleSet` | `ReferenceValidityPolicy.resolution_rules` | 不把 unresolved 当作本地 truth |
+| `ReferenceFreshnessRuleSet` | `ReferenceValidityPolicy.freshness_rules` | 不把 stale 伪装成 fresh |
+| `ReferenceDigestRuleSet` | `ReferenceValidityPolicy.digest_rules` | 不忽略 mismatch |
+| `DegradedViewRuleSet` | `ReferenceValidityPolicy.degraded_view_rules` | 不回退读取来源正文 |
+| `DegradedViewDecision` | `ReferenceValidityPolicy.choose_degraded_view(...)` | 不修改 truth |
+| `ExternalReferenceProjectionId` | `ExternalReferenceProjection.external_reference_projection_id` | 不作为 source truth id |
+| `DegradedDisplayRef` | `ExternalReferenceProjection.degraded_display_ref`、query degraded marker | 不保存 external body |
+| `DisplayFragmentRef` | `ExternalReferenceProjection.display_fragment(...)` | 不绕过 visibility 裁剪 |
+
+默认策略口径:
+
+- `ManifestationPolicy::default_policy()` 使用 `allowed_source_systems = [Work, Governance, Artifact, Runtime, Bridge, Identity]`、`allowed_fact_kinds = [WorkContext, GovernanceDecision, ArtifactEvidence, RuntimeResult, BridgeMappedFact, IdentityActorSnapshot]`、`require_supported_source_version = true`。
+- 默认显化可见规则为 `require_visibility_scope = true`、`allow_manifestation_when_visibility_restricted = false`、`max_visibility_level = None`;`None` 表示不额外放宽或收窄既有 `VisibilityScope`。
+- 默认显化快照规则为 `require_safe_snapshot = true`、`allow_unresolved_without_snapshot = true`、`require_digest_match = true`、`allow_stale_snapshot = false`;`allow_unresolved_without_snapshot` 只允许 unresolved marker,不允许正常 display。
+- 默认显化 ownership 规则为 `forbid_source_truth_copy = true`、`forbid_source_state_mutation = true`、`require_source_object_ref = true`;该字段要求 `ExternalFactRef.source_system` 和 `ExternalFactRef.source_object_ref` 均存在,不引入新的 owner 字段。
+- `ManifestationPolicy::from_allowed_sources(rules)` 必须只替换 `allowed_source_rules`,其余 `visibility_rules`、`snapshot_rules` 和 `ownership_rules` 使用默认规则。
+- `ReferenceValidityPolicy::default_policy()` 使用同一组受支持 `allowed_source_systems`,并设置 `allow_pending_resolution = true`、`allow_unresolved_marker = true`、`invalid_on_unsupported_source = true`。
+- 默认 freshness 规则为 `mark_stale_on_version_change = true`、`require_refresh_for_stale = true`、`allow_stale_degraded_display = true`。
+- 默认 digest 规则为 `require_digest_for_snapshot = true`、`mismatch_decision = DigestMismatchDecision::RejectWithDomainError`、`unavailable_decision = DigestUnavailableDecision::MarkUnresolved`。
+- 默认 degraded view 规则为 `allow_pending_marker = true`、`allow_unresolved_marker = true`、`allow_stale_summary = true`、`require_degraded_display_ref = true`、`forbid_source_body_fallback = true`。
+- `ReferenceValidityPolicy::from_source_rules(rules)` 必须只替换 `resolution_rules`,其余 `freshness_rules`、`digest_rules` 和 `degraded_view_rules` 使用默认规则。
+
+Digest mismatch 正式口径:
+
+- 当 `DigestVerification.verification_state = DigestVerificationState::Mismatched` 且 `ReferenceDigestRuleSet.mismatch_decision = DigestMismatchDecision::RejectWithDomainError` 时,`ReferenceValidityPolicy::assert_snapshot_valid(...)` 必须返回 `DomainError::DigestMismatch`。
+- `DomainError::DigestMismatch` 不得创建新的 `ExternalFactSnapshot`,不得把 `ReferenceResolutionState` 标为 `Fresh`,不得把既有 `CrossDomainManifestation.manifestation_state` 推进为 `Manifested`。
+- refresh job 或 application service 可以在错误处理路径写入 `ReferenceResolutionState::Unresolved` + `ReferenceResolutionReasonKind::DigestMismatch` 的 marker / diagnostic evidence,但不得覆盖上一份已验证的 snapshot、manifestation 或 conversation truth。
+- `TC-CONV-MAN-003` 的断言口径固定为:返回 `DomainError::DigestMismatch`,同时保留旧 truth,只追加 unresolved / mismatch marker 或后续 Step 13 evidence。
 
 #### 7.7.1 `CrossDomainManifestation`
 
@@ -2203,6 +2583,8 @@ pub enum ManifestationState {
     Unresolved,
 }
 ```
+
+`ManifestationState` 的正式 enum 定义归属 `contracts/refs.rs`,见 §7.2.2。`domain/manifestation.rs` 中的 `CrossDomainManifestation` 直接引用该共享 enum;实现侧不得在 domain 复制第二套同名 enum。本小节保留 enum code block 是为了说明 domain 对象使用的状态语义、允许来源和允许去向。
 
 | 变体 | Rustdoc 注释 | 作用 | 允许来源 | 允许去向 |
 |---|---|---|---|---|
@@ -2936,6 +3318,8 @@ pub enum ReferenceResolutionState {
 }
 ```
 
+`ReferenceResolutionState` 的正式 enum 定义归属 `contracts/refs.rs`,见 §7.2.2。`domain/reference.rs`、`domain/manifestation.rs` 和 projection 维护对象直接引用该共享 enum;实现侧不得在 domain 复制第二套同名 enum。本小节保留 enum code block 是为了说明 reference 对象使用的状态语义、允许来源和允许去向。
+
 | 变体 | Rustdoc 注释 | 作用 | 允许来源 | 允许去向 |
 |---|---|---|---|---|
 | `Fresh` | `The reference is resolved and aligned with the known source version.` | 已解析且新鲜 | 成功解析 | `Stale`、`Invalid` |
@@ -3043,7 +3427,7 @@ pub struct ExternalReferenceProjection {
 | 待确认事项 | 方案 | 推荐 | 原因 |
 |---|---|---|---|
 | Rust 片段中的 rustdoc 使用中文还是英文 | A. 中文;B. 英文;C. 正式文档中文、实现片段英文 | 推荐 C | design 正文保留中文说明,实现仓源码和可转写 rustdoc 必须英文 |
-| 是否把 `ReferenceResolutionState` 放在 `manifestation.rs` | A. 放 manifestation;B. 放 reference;C. 放 projection | 推荐 B | 它同时服务 snapshot 和 external reference projection,主语是 reference resolution |
+| `ReferenceResolutionState` 的实现归属 | A. domain-only enum;B. contracts shared enum;C. contracts / domain 双 enum | 已确认 B | 它进入 public event / query / job report surface,正式归属 `contracts/refs.rs`,domain reference / manifestation / projection 直接复用 |
 | 是否把 `ConversationReadModel` 放到 `contracts` | A. 放 contracts;B. 放 domain;C. 双层 view | 已确认 C | `domain/projection.rs::ConversationReadModel` 是 repository / policy / job 使用的内部派生对象;`contracts/views.rs::ConversationReadModelView` 是 public query DTO,不得互相替代 |
 | 是否提前定义 repository 对象 | A. 本 Step 定义;B. Step 7 / Step 11 定义 | 推荐 B | repository 是 port / persistence 契约,不属于 domain object 本步主轴 |
 

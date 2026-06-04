@@ -341,6 +341,123 @@ pub struct ConsumerReceipt {
 }
 ```
 
+#### Job shared DTO / receipt / error schema
+
+`JobMetadata`、Operations Job input DTO、`JobRunReceipt`、`JobRunStatus`、`ConversationJobKind`、`JobTriggerKind` 和 `JobError` 归属 `crates/contracts/src/jobs.rs`。core-contracts 当前只提供 `JobRunId`、`BatchSize`、`PageRequest`、`IdempotencyKey`、`Timestamp` 等通用值对象;conversation 不得假设 core 已存在 `JobMetadata`、`JobRunReceipt` 或 `JobError`。
+
+```rust
+/// Conversation operations job kind.
+pub enum ConversationJobKind {
+    PublishConversationOutbox,
+    RebuildConversationReadModels,
+    RebuildConversationSearchIndex,
+    MaintainConversationChangeCursors,
+    RefreshExternalReferenceSnapshots,
+    DeliverTraceHandoff,
+    DeliverArchiveHandoff,
+    ValidateConversationConsistency,
+    CleanupExpiredConversationCursors,
+}
+
+/// Describes why a job run was started.
+pub enum JobTriggerKind {
+    Scheduler,
+    Operator,
+    Recovery,
+    Backfill,
+}
+
+/// Metadata shared by conversation operations jobs.
+pub struct JobMetadata {
+    /// Job kind being executed.
+    pub job_kind: ConversationJobKind,
+    /// Trigger source.
+    pub trigger_kind: JobTriggerKind,
+    /// Optional actor that requested or approved the run.
+    pub requested_by: Option<ActorRef>,
+    /// Safe reason or ticket reference.
+    pub reason_ref: Option<ExternalReferenceRef>,
+    /// Time when the run was scheduled or requested.
+    pub scheduled_at: Timestamp,
+}
+
+/// Final status carried by a job run receipt.
+pub enum JobRunStatus {
+    Running,
+    Succeeded,
+    PartialFailure,
+    Failed,
+}
+
+/// Receipt returned by conversation operations jobs.
+pub struct JobRunReceipt {
+    pub job_run_id: JobRunId,
+    pub job_kind: ConversationJobKind,
+    pub status: JobRunStatus,
+    pub trace_ref: TraceContextRef,
+    pub started_at: Timestamp,
+    pub completed_at: Option<Timestamp>,
+    pub processed_count: u32,
+    pub succeeded_count: u32,
+    pub retry_count: u32,
+    pub failed_count: u32,
+    pub published_outbox_record_ids: Vec<ConversationOutboxRecordId>,
+    pub failed_outbox_record_ids: Vec<ConversationOutboxRecordId>,
+    pub rebuilt_space_ids: Vec<ConversationSpaceId>,
+    pub rebuilt_consumer_refs: Vec<ConsumerRef>,
+    pub projection_error_refs: Vec<ProjectionErrorRef>,
+    pub indexed_fact_refs: Vec<ConversationFactRef>,
+    pub indexed_manifestation_refs: Vec<CrossDomainManifestationRef>,
+    pub advanced_cursor_refs: Vec<ConversationChangeCursorRef>,
+    pub stale_cursor_refs: Vec<ConversationChangeCursorRef>,
+    pub invalid_cursor_refs: Vec<ConversationChangeCursorRef>,
+    pub refreshed_external_fact_refs: Vec<ExternalFactRef>,
+    pub unresolved_external_fact_refs: Vec<ExternalFactRef>,
+    pub digest_mismatch_refs: Vec<ExternalFactRef>,
+    pub delivered_trace_handoff_ids: Vec<TraceHandoffRecordId>,
+    pub trace_handoff_retry_ids: Vec<TraceHandoffRecordId>,
+    pub trace_handoff_failed_ids: Vec<TraceHandoffRecordId>,
+    pub external_receipt_refs: Vec<ObservabilityReceiptRef>,
+    pub archived_handoff_ids: Vec<ArchiveHandoffRecordId>,
+    pub archive_handoff_retry_ids: Vec<ArchiveHandoffRecordId>,
+    pub archive_handoff_failed_ids: Vec<ArchiveHandoffRecordId>,
+    pub archive_package_refs: Vec<ArchivePackageRef>,
+    pub validation_report_ref: Option<ExternalReferenceRef>,
+    pub issue_count: u32,
+    pub suggested_repair_refs: Vec<ExternalReferenceRef>,
+    pub cleaned_cursor_refs: Vec<ConversationChangeCursorRef>,
+    pub skipped_cursor_refs: Vec<ConversationChangeCursorRef>,
+    pub cleanup_evidence_ref: Option<DiagnosticRef>,
+    pub diagnostic_refs: Vec<DiagnosticRef>,
+}
+
+/// Error returned by a conversation operations job before or with a receipt.
+pub enum JobError {
+    InvalidInput { diagnostic_ref: Option<DiagnosticRef> },
+    MissingOutbox { outbox_record_id: ConversationOutboxRecordId },
+    MissingVisibilityScope { space_id: ConversationSpaceId },
+    MissingTraceContext { trace_context_id: ConversationTraceContextId },
+    MissingTraceHandoff { trace_handoff_id: TraceHandoffRecordId },
+    MissingArchiveHandoff { archive_handoff_id: ArchiveHandoffRecordId },
+    RepositoryFailure { retryable: bool, diagnostic_ref: Option<DiagnosticRef> },
+    ResolverFailure { retryable: bool, diagnostic_ref: Option<DiagnosticRef> },
+    PublishFailure { retryable: bool, diagnostic_ref: Option<DiagnosticRef> },
+    HandoffFailure { retryable: bool, diagnostic_ref: Option<DiagnosticRef> },
+    PartialFailure { receipt: JobRunReceipt },
+}
+```
+
+字段与状态约束:
+
+- `JobMetadata.job_kind` 必须与具体 job DTO 类型一致;不一致时返回 `JobError::InvalidInput`。
+- `JobMetadata` 不重复保存 `job_run_id`、`idempotency_key` 或 `trace_ref`;这些字段属于 job envelope / job input 顶层。
+- `JobRunReceipt::started(job_run_id, job_kind, trace_ref, started_at)` 创建 `status = Running`、计数为 0、`completed_at = None` 的临时 receipt builder;返回前必须调用 `completed(completed_at)` 或 `failed(completed_at)`。
+- `completed(...)` 规则: `failed_count == 0` 时 `status = Succeeded`;`processed_count > 0 && failed_count > 0` 或存在 retry refs 时 `status = PartialFailure`;`processed_count == failed_count && failed_count > 0` 时 `status = Failed`。
+- 对外返回的 `JobRunReceipt.status` 不得保持 `Running`。
+- handoff job 必须使用 `count_handoff_delivered(...)`、`count_handoff_retry(...)`、`count_handoff_failed(...)`、`count_archive_delivered(...)`、`count_archive_retry(...)`、`count_archive_failed(...)` 更新对应 ids、count 和 receipt refs。
+- `JobRunReceipt` 只保存 ref、count、safe diagnostic 和 marker;不得保存 outbox payload body、trace payload body、external response body、archive package body、secret 或 token。
+- `JobError::PartialFailure.receipt` 必须携带已完成的 `JobRunReceipt`;直接缺少必填 job 输入时返回 `InvalidInput` 并可写 failed job receipt,不得进入 domain / adapter。
+
 #### Context / metadata / visibility DTO 归属
 
 | 类型 | 正式归属 | 最小 schema / 口径 | 不得混同 |
@@ -376,8 +493,10 @@ pub struct ConsumerReceipt {
 | `ReviewAnchorKind` / `ReviewTargetRef` / `ReviewReasonRef` | `conversation-contracts/src/refs.rs` | review anchor public request / result 共享值对象;完整 schema 见 Step 6 §7.2.3 | 不保存 review report body 或 target body |
 | `ObservabilityDestinationRef` / `HandoffReason` / `ArchiveScope` / `TraceRetentionPolicyRef` | `conversation-contracts/src/refs.rs` | trace / archive handoff public request 共享值对象;完整 schema 见 Step 6 §7.2.3 | 不保存 adapter config、credential、archive body 或 trace payload body |
 | `TraceHandoffPayloadRef` / `ObservabilityReceiptRef` / `ArchivePackageRef` | `conversation-contracts/src/refs.rs` | handoff payload、delivery receipt、archive package 引用;完整 schema 见 Step 6 §7.2.3 | 只保存 ref、digest、marker,不保存外部 response body |
+| `ArchiveDestinationRef` / `TraceHandoffScope` / `ArchiveHandoffScope` | `conversation-contracts/src/refs.rs` | handoff job destination / repository scope 过滤;完整 schema 见 Step 6 §7.2.3 | 不保存 adapter config、credential、archive body 或 trace payload body |
 | `TraceHandoffState` / `ArchiveHandoffState` | `conversation-contracts/src/refs.rs` shared enum | command result / outbound event / domain handoff record 共享 | 不创建 domain-only mirror enum |
 | `RetentionDuration` / `RetentionWindow` / `TraceRetentionRuleSet` / `TraceHandoffRuleSet` / `TraceRedactionRuleSet` / `BodyExclusionRuleSet` | `conversation-contracts/src/refs.rs` 或同层 value module | trace retention / handoff / redaction / forbidden body 纯数据 rule set;完整 schema 见 Step 6 §7.2.3;`RetentionDuration` 是本地秒级正整数 newtype | 不引用当前 core baseline 不存在的 `Duration`,也不放在 domain crate 中让 contracts 反向依赖 domain |
+| `JobMetadata` / `JobRunReceipt` / `JobRunStatus` / `ConversationJobKind` / `JobTriggerKind` / `JobError` | `conversation-contracts/src/jobs.rs` | operations job metadata、receipt 和 public job error DTO;完整 schema 见本节 `Job shared DTO / receipt / error schema` | 不假设 core 已有同名 schema,不放在 application-local 类型中 |
 
 上述值对象字段级 schema 以 `03_ddd_step_06_object_contracts.md` §7.2.1 / §7.2.2 / §7.2.3 为准。协议层不得用裸字符串占位替代这些类型。
 
@@ -388,6 +507,7 @@ pub struct ConsumerReceipt {
 - external reference projection、refresh job、inbound source consumer 中公开的 resolution state 统一使用 `contracts/refs.rs::ReferenceResolutionState`。
 - `BridgeMappedFactReceivedEvent.target_mode` 统一使用 `contracts/refs.rs::BridgeTargetMode`;`ConsumeBridgeMappedFactReceivedFlow` 只能按该字段选择 append fact 或 manifest external fact 分支。
 - `InboundEventEnvelope<T>` 和 `ConsumerReceipt` 是 PH-05 consumer Step 1 public DTO;contract tests 必须覆盖 envelope 必填字段、accepted、duplicate、quarantined、delayed 和 no-op receipt surface。
+- `JobMetadata`、`JobRunReceipt` 和 `JobError` 是 PH-06 job public DTO;contract tests 必须覆盖 invalid input、success receipt、partial failure receipt、handoff retry refs 和 handoff failed refs。
 - 各 inbound consumer 的 payload JSON 示例只表达 payload 字段;`event_id`、`event_envelope_ref`、`event_source_ref`、`idempotency_key`、`occurred_at` 和 `trace_ref` 只能出现在 `InboundEventEnvelope<T>`。
 - PH-06 `CreateReviewAnchor`、`RequestTraceHandoff` 和 `RequestArchiveHandoff` 的 request 依赖类型、result DTO 字段类型、outbound handoff event 字段类型必须复用 Step 6 §7.2.3 的 contracts shared schema;不得在 `commands.rs`、`events.rs`、`domain/trace.rs` 或 application service 中各自复制第二套字段。
 
@@ -993,7 +1113,7 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 ```json
 {
   "space_id": "ConversationSpaceId",
-  "trace_context_id": "Option<ConversationTraceContextId>",
+  "trace_context_id": "ConversationTraceContextId",
   "archive_scope": "Option<ArchiveScope>",
   "retention_policy_ref": "Option<TraceRetentionPolicyRef>"
 }
@@ -1002,13 +1122,15 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `space_id` | `ConversationSpaceId` | `ArchiveHandoffRecord.space_id` | request / trace context | derive from trace or reject |
-| `trace_context_id` | `Option<ConversationTraceContextId>` | handoff source | request | optional if archive whole space |
+| `trace_context_id` | `ConversationTraceContextId` | handoff source and retention state target | request | reject |
 | `archive_scope` | `Option<ArchiveScope>` | `ArchiveHandoffRecord.archive_scope` | request;schema 见 Step 6 §7.2.3 | derive space scope;reject if missing `space_id` or default scope disallowed |
 | `retention_policy_ref` | `Option<TraceRetentionPolicyRef>` | `ArchiveHandoffRecord.retention_policy_ref` | request / config default;schema 见 Step 6 §7.2.3 | derive default;reject if absent and no configured default |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `RequestArchiveHandoffRequest` | `ArchiveHandoffRecord`、`ConversationOutboxRecord` | 是 | archive package ref absent until delivery job | archive request != archive package | reject insufficient scope |
+| `RequestArchiveHandoffRequest` | `ConversationTraceContext`、`ArchiveHandoffRecord`、`ConversationOutboxRecord` | 是 | archive scope may derive to `ArchiveScope::Space`;archive package ref absent until delivery job | archive request != archive package;public request != close-flow archive | reject missing trace context or insufficient scope |
+
+当前 PH-06 public `RequestArchiveHandoffRequest.trace_context_id` 必填。whole-space archive request 可以使用 `ArchiveScope::Space`,但仍必须提供 trace context,以便 `ConversationTraceContext.retention_state` 与 archive handoff intent 在同一 UoW 进入 `HandoffPending`。不允许 service 在缺少 `trace_context_id` 时临时查找或创建 trace context;`ArchiveHandoffRecord::from_space_close(...)` 仅供 close flow 等内部路径使用。
 
 ### 7.4 Query API 协议契约
 
@@ -2163,6 +2285,7 @@ Bridge append path uses `actor_ref` as a trusted integration source actor. The a
   "idempotency_key": "IdempotencyKey",
   "trace_handoff_scope": "TraceHandoffScope",
   "destination_ref": "ObservabilityDestinationRef",
+  "batch_size": "BatchSize",
   "trace_ref": "TraceContextRef"
 }
 ```
@@ -2172,6 +2295,18 @@ Bridge append path uses `actor_ref` as a trusted integration source actor. The a
 | `DeliverTraceHandoffJob` | `TraceHandoffRecord` handoff state | 是 | pending handoff page from trace repository | trace delivery receipt != trace truth | retry / failed handoff marker |
 
 输出:`JobRunReceipt` 必须包含 delivered handoff refs、retry refs、failed refs 和 external receipt refs。
+
+字段闭环:
+
+| 字段 | 类型 | 来源 / 规则 | 缺失时行为 |
+|---|---|---|---|
+| `job_run_id` | `JobRunId` | scheduler / operator 生成 | `JobError::InvalidInput` |
+| `job_metadata` | `JobMetadata` | `job_kind = DeliverTraceHandoff` | `JobError::InvalidInput` |
+| `idempotency_key` | `IdempotencyKey` | job 调用方生成 | `JobError::InvalidInput` |
+| `trace_handoff_scope` | `TraceHandoffScope` | 调用方 scope;空 scope 表示所有 eligible pending trace handoff | `JobError::InvalidInput` |
+| `destination_ref` | `ObservabilityDestinationRef` | adapter 目标 guard;必须匹配待交接记录的 `destination_ref` | mismatch 跳过并记 failed diagnostic |
+| `batch_size` | `BatchSize` | 转换为 repository `PageRequest.limit` | `JobError::InvalidInput` |
+| `trace_ref` | `TraceContextRef` | job run audit trace | `JobError::InvalidInput` |
 
 #### 7.7.7 `DeliverArchiveHandoff`
 
@@ -2189,6 +2324,7 @@ Bridge append path uses `actor_ref` as a trusted integration source actor. The a
   "idempotency_key": "IdempotencyKey",
   "archive_handoff_scope": "ArchiveHandoffScope",
   "archive_destination_ref": "ArchiveDestinationRef",
+  "batch_size": "BatchSize",
   "trace_ref": "TraceContextRef"
 }
 ```
@@ -2198,6 +2334,18 @@ Bridge append path uses `actor_ref` as a trusted integration source actor. The a
 | `DeliverArchiveHandoffJob` | `ArchiveHandoffRecord` handoff state | 是 | pending handoff page from trace repository | archive package ref != archive package body | retry / failed handoff marker |
 
 输出:`JobRunReceipt` 必须包含 archived refs、retry refs、failed refs 和 archive package refs。
+
+字段闭环:
+
+| 字段 | 类型 | 来源 / 规则 | 缺失时行为 |
+|---|---|---|---|
+| `job_run_id` | `JobRunId` | scheduler / operator 生成 | `JobError::InvalidInput` |
+| `job_metadata` | `JobMetadata` | `job_kind = DeliverArchiveHandoff` | `JobError::InvalidInput` |
+| `idempotency_key` | `IdempotencyKey` | job 调用方生成 | `JobError::InvalidInput` |
+| `archive_handoff_scope` | `ArchiveHandoffScope` | 调用方 scope;空 scope 表示所有 eligible pending archive handoff | `JobError::InvalidInput` |
+| `archive_destination_ref` | `ArchiveDestinationRef` | archive adapter 目标;传入 `ArchiveHandoffPort.deliver_archive_handoff(...)` | `JobError::InvalidInput` |
+| `batch_size` | `BatchSize` | 转换为 repository `PageRequest.limit` | `JobError::InvalidInput` |
+| `trace_ref` | `TraceContextRef` | job run audit trace | `JobError::InvalidInput` |
 
 #### 7.7.8 `ValidateConversationConsistency`
 

@@ -158,7 +158,7 @@
 | Outbox publication | `ConversationOutboxRecord` | `publication_state` | `Pending` | `Published` / `Failed` / `Suppressed` | `mark_published(...)`、`mark_retry(...)`、`mark_failed(...)` |
 | Trace retention | `ConversationTraceContext` | `retention_state` | `Open` | `Expired` | trace seal / handoff / retention policy |
 | Trace handoff | `TraceHandoffRecord` | `handoff_state` | `Pending` | `HandedOff` / `Failed` / `Cancelled` | `mark_handed_off(...)`、`mark_retry(...)`、`mark_failed(...)`、`cancel(...)` |
-| Archive handoff | `ArchiveHandoffRecord` | `handoff_state` | `Pending` | `Archived` / `Failed` / `Cancelled` | `mark_archived(...)`、`mark_retry(...)`、`mark_failed(...)` |
+| Archive handoff | `ArchiveHandoffRecord` | `handoff_state` | `Pending` | `Archived` / `Failed` / `Cancelled` | `mark_archived(...)`、`mark_retry(...)`、`mark_failed(...)`、`cancel(...)` |
 
 ### 6.2 全局状态传播图
 
@@ -721,18 +721,18 @@ ConversationChangeCursorState:
 
 ```text
 <Open>
-  | seal retention
+  | seal(actor, reason)
   v
 <Sealed>
-  | request handoff
+  | mark_handoff_pending()
   v
 <HandoffPending>
-  | handoff delivered or policy sealed
+  | mark_handoff_completed()
   v
 <Sealed>
 
 <Open> or <Sealed> or <HandoffPending>
-  | retention window expired
+  | expire(expired_at)
   v
 <Expired>
 ```
@@ -742,10 +742,10 @@ ConversationChangeCursorState:
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | 初始 | `Open` | `ConversationTraceContext::from_fact_append(...)` / `from_manifestation(...)` | fact / manifestation 已提交 | 保存 trace context | `DomainError::InvalidInitialState` |
-| `Open` | `Sealed` | trace seal policy | 不再允许追加 trace link | trace 只读,允许 handoff | `DomainError::InvalidStateTransition` |
-| `Open` / `Sealed` | `HandoffPending` | `RequestTraceHandoffFlow` / `RequestArchiveHandoffFlow` | handoff intent 已创建 | 保存 handoff record,outbox | `DomainError::InvalidStateTransition` |
-| `HandoffPending` | `Sealed` | handoff completion policy | handoff delivered 或归档请求已承接 | 保留 receipt / archive ref | `DomainError::InvalidStateTransition` |
-| `Open` / `Sealed` / `HandoffPending` | `Expired` | retention cleanup policy | retention window 到期 | 只保留 refs,query 返回 expired marker | `DomainError::InvalidStateTransition` |
+| `Open` | `Sealed` | `ConversationTraceContext::seal(ActorRef actor, TraceSealReason reason)` | 不再允许追加 trace link | trace 只读,允许 handoff | `DomainError::InvalidStateTransition` |
+| `Open` / `Sealed` | `HandoffPending` | `ConversationTraceContext::mark_handoff_pending()` | `RequestTraceHandoffFlow` / `RequestArchiveHandoffFlow` 已创建 handoff intent | 保存 trace context、handoff record、outbox | `DomainError::InvalidStateTransition` |
+| `HandoffPending` | `Sealed` | `ConversationTraceContext::mark_handoff_completed()` | handoff delivered 或归档请求已承接 | 保留 receipt / archive ref 在 handoff record,trace context 回到 sealed | `DomainError::InvalidStateTransition` |
+| `Open` / `Sealed` / `HandoffPending` | `Expired` | `ConversationTraceContext::expire(Timestamp expired_at)` | retention window 到期 | 只保留 refs,query 返回 expired marker | `DomainError::InvalidStateTransition` |
 
 #### 非法转换处理表: trace retention
 
@@ -799,11 +799,11 @@ ConversationChangeCursorState:
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | 初始 | `Pending` | `TraceHandoffRecord::from_trace_context(&ConversationTraceContext trace_context, ObservabilityDestinationRef destination_ref)` | trace context 存在且 handoff allowed | 保存 handoff intent,outbox | `DomainError::InvalidInitialState` |
-| `Pending` / `RetryPending` | `HandedOff` | `TraceHandoffRecord::mark_handed_off(ObservabilityReceiptRef receipt_ref, Timestamp handed_off_at)` | `TraceHandoffPort.deliver_trace_handoff(...)` 成功 | 保存 receipt ref,清空 retry marker | `DomainError::InvalidStateTransition` |
+| `Pending` / `RetryPending` | `HandedOff` | `TraceHandoffRecord::mark_handed_off(ObservabilityReceiptRef receipt_ref, Timestamp handed_off_at)` | `TraceHandoffPort.deliver_trace_handoff(...)` 成功 | 写入 `observability_receipt_ref` / `handed_off_at`,清空 retry / failed / cancel evidence | `DomainError::InvalidStateTransition` |
 | `Pending` | `RetryPending` | `TraceHandoffRecord::mark_retry(HandoffRetryReason reason, Timestamp next_retry_at)` | handoff transient failure 且 retry allowed | 保存 retry marker | `DomainError::InvalidStateTransition` |
 | `RetryPending` | `RetryPending` | `mark_retry(...)` | retry 仍未超限 | 更新 retry marker | `DomainError::RetryLimitExceeded` |
-| `Pending` / `RetryPending` | `Failed` | `TraceHandoffRecord::mark_failed(HandoffFailureReason reason, ActorRef actor)` | permanent failure 或 retry exhausted | 保存 failed evidence | `DomainError::InvalidStateTransition` |
-| `Pending` / `RetryPending` | `Cancelled` | `TraceHandoffRecord::cancel(ActorRef actor, HandoffCancelReason reason)` | actor 可取消且未完成 | 保存 cancel evidence | `DomainError::InvalidStateTransition` |
+| `Pending` / `RetryPending` | `Failed` | `TraceHandoffRecord::mark_failed(HandoffFailureReason reason, ActorRef actor)` | permanent failure 或 retry exhausted | 写入 `failure_reason` / `failed_by`,清空 retry marker | `DomainError::InvalidStateTransition` |
+| `Pending` / `RetryPending` | `Cancelled` | `TraceHandoffRecord::cancel(ActorRef actor, HandoffCancelReason reason)` | actor 可取消且未完成 | 写入 `cancel_reason` / `cancelled_by`,清空 retry marker | `DomainError::InvalidStateTransition` |
 
 #### 非法转换处理表: trace handoff
 
@@ -848,7 +848,7 @@ ConversationChangeCursorState:
 <Failed>
 
 <Pending> or <RetryPending>
-  | cancel
+  | cancel(actor, reason)
   v
 <Cancelled>
 ```
@@ -858,11 +858,11 @@ ConversationChangeCursorState:
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | 初始 | `Pending` | `ArchiveHandoffRecord::from_trace_context(...)` / `from_space_close(...)` | trace context、archive scope、retention policy 有效 | 保存 archive handoff intent,outbox | `DomainError::InvalidInitialState` |
-| `Pending` / `RetryPending` | `Archived` | `ArchiveHandoffRecord::mark_archived(ArchivePackageRef archive_package_ref, Timestamp archived_at)` | `ArchiveHandoffPort.deliver_archive_handoff(...)` 成功 | 保存 package ref,清空 retry marker | `DomainError::InvalidStateTransition` |
+| `Pending` / `RetryPending` | `Archived` | `ArchiveHandoffRecord::mark_archived(ArchivePackageRef archive_package_ref, Timestamp archived_at)` | `ArchiveHandoffPort.deliver_archive_handoff(...)` 成功 | 写入 `archive_package_ref` / `archived_at`,清空 retry / failed / cancel evidence | `DomainError::InvalidStateTransition` |
 | `Pending` | `RetryPending` | `ArchiveHandoffRecord::mark_retry(HandoffRetryReason reason, Timestamp next_retry_at)` | archive transient failure 且 retry allowed | 保存 retry marker | `DomainError::InvalidStateTransition` |
 | `RetryPending` | `RetryPending` | `mark_retry(...)` | retry 仍未超限 | 更新 retry marker | `DomainError::RetryLimitExceeded` |
-| `Pending` / `RetryPending` | `Failed` | `ArchiveHandoffRecord::mark_failed(HandoffFailureReason reason, ActorRef actor)` | permanent failure 或 retry exhausted | 保存 failed evidence | `DomainError::InvalidStateTransition` |
-| `Pending` / `RetryPending` | `Cancelled` | archive cancel path | actor 可取消且未完成 | 保存 cancel evidence | `DomainError::InvalidStateTransition` |
+| `Pending` / `RetryPending` | `Failed` | `ArchiveHandoffRecord::mark_failed(HandoffFailureReason reason, ActorRef actor)` | permanent failure 或 retry exhausted | 写入 `failure_reason` / `failed_by`,清空 retry marker | `DomainError::InvalidStateTransition` |
+| `Pending` / `RetryPending` | `Cancelled` | `ArchiveHandoffRecord::cancel(ActorRef actor, HandoffCancelReason reason)` | actor 可取消且未完成 | 写入 `cancel_reason` / `cancelled_by`,清空 retry marker;不得生成 archive package ref | `DomainError::InvalidStateTransition` |
 
 #### 非法转换处理表: archive handoff
 
@@ -929,7 +929,7 @@ ConversationChangeCursorState:
 | §9.1 | 14 组状态机总表和非状态 enum 排除规则 |
 | §9.2 | truth -> outbox / projection / query marker 的单向传播图 |
 | §9.3 ~ §9.8 | 每组状态集合、ASCII 状态图、转换矩阵和非法转换处理 |
-| §9.9 | `InvalidStateTransition`、`BoundaryViolation`、`CursorNotResumable`、`SourceTruthViolation` 等错误口径 |
+| §9.9 | `InvalidStateTransition`、`InvalidInitialState`、`BoundaryViolation`、`CursorNotResumable`、`SourceTruthViolation`、`SequenceRegression`、`SourcePositionRegression`、`DigestMismatch`、`SnapshotMismatch`、`InvalidExternalReference`、`DuplicateAppend`、`ImmutableReceipt`、`RetryLimitExceeded` 等错误口径 |
 
 ## 8. 待确认事项
 
@@ -937,7 +937,7 @@ ConversationChangeCursorState:
 
 | 事项 | 当前口径 | 后续承接 |
 |---|---|---|
-| 具体错误 enum 命名 | 本步给出语义型错误名,实现时可在 Step 12 错误模型中最终落 enum | Step 12 |
+| 具体错误 enum 命名 | 已由 Step 12 错误模型收敛;状态矩阵中出现的 `DomainError::*` 必须在 Step 12 错误类型表存在 | Step 12 |
 | retry limit / next retry 计算 | 本步只定义 retry state 迁移,不定义具体退避配置 | Step 13 / Step 14 |
 | projection disabled 来源 | 本步允许 disabled 状态,具体由配置或运维能力声明决定 | Step 14 |
 | trace retention 过期策略 | 本步定义 `Expired` 终态,具体 retention window 来自配置设计 | Step 14 |

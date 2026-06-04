@@ -952,7 +952,8 @@ PH-05 consumer 公共类型归属与校验规则:
 
 归属口径:
 
-- `ReviewAnchorId`、`ReviewAnchorRef`、`ReviewAnchorKind`、`ReviewTargetKind`、`ReviewTargetRef`、`ReviewReasonKind`、`ReviewReasonRef`、`TraceSealReason`、`TraceSealReasonKind`、`ObservabilityDestinationKind`、`ObservabilityDestinationRef`、`HandoffReasonKind`、`HandoffReason`、`ArchiveScopeKind`、`ArchiveScope`、`TraceRetentionPolicyRef`、`TraceHandoffRecordId`、`ArchiveHandoffRecordId`、`TraceHandoffPayloadRef`、`RetryAttempt`、`HandoffRetryMarker`、`HandoffRetryReason`、`HandoffRetryReasonKind`、`HandoffFailureReason`、`HandoffFailureReasonKind`、`HandoffCancelReason`、`HandoffCancelReasonKind`、`ObservabilityReceiptRef`、`ArchivePackageRef`、`RetentionDuration`、`RetentionWindow`、`TraceRetentionRuleSet`、`TraceHandoffRuleSet`、`TraceRedactionRuleSet` 和 `BodyExclusionRuleSet` 属于 `conversation-contracts/src/refs.rs` 或同层 contracts value module。
+- `ReviewAnchorId`、`ReviewAnchorRef`、`ReviewAnchorKind`、`ReviewTargetKind`、`ReviewTargetRef`、`ReviewReasonKind`、`ReviewReasonRef`、`TraceSealReason`、`TraceSealReasonKind`、`ObservabilityDestinationKind`、`ObservabilityDestinationRef`、`HandoffReasonKind`、`HandoffReason`、`ArchiveScopeKind`、`ArchiveScope`、`TraceRetentionPolicyRef`、`TraceHandoffRecordId`、`ArchiveHandoffRecordId`、`TraceHandoffPayloadRef`、`RetryAttempt`、`HandoffRetryMarker`、`HandoffRetryReason`、`HandoffRetryReasonKind`、`HandoffFailureReason`、`HandoffFailureReasonKind`、`HandoffCancelReason`、`HandoffCancelReasonKind`、`ObservabilityReceiptRef`、`ArchivePackageRef`、`ArchiveDestinationRef`、`TraceHandoffScope`、`ArchiveHandoffScope`、`RetentionDuration`、`RetentionWindow`、`TraceRetentionRuleSet`、`TraceHandoffRuleSet`、`TraceRedactionRuleSet` 和 `BodyExclusionRuleSet` 属于 `conversation-contracts/src/refs.rs` 或同层 contracts value module。
+- `JobMetadata`、`JobRunReceipt`、`JobRunStatus`、`ConversationJobKind`、`JobTriggerKind` 和 `JobError` 属于 `conversation-contracts/src/jobs.rs`,正式 schema 见 Step 8 §6 `Job shared DTO / receipt / error schema`;`HandoffError` 属于 `application/ports.rs` handoff adapter error,正式 schema 见 Step 7 §7.5.3.0。
 - `domain/trace.rs` 和 `domain/policies.rs` 只能消费这些 contracts value object,不得让 `contracts` 反向依赖 `domain`。
 - 这些类型均只保存 ref、digest、marker、reason code、时间和策略数据,不得保存 review report body、trace payload body、archive package body、raw observability response、secret 或 token。
 
@@ -1206,7 +1207,9 @@ pub struct TraceRetentionPolicyRef {
 - `ArchiveScope::TraceContext` 必须携带 `trace_context_id`,且该 trace context 必须属于同一 `space_id`。
 - `ArchiveScope::ReviewAnchor` 必须携带 `review_anchor_ref`,且 `review_anchor_ref.space_id == space_id`。
 - `ArchiveScope::TimeWindow` 必须携带 `from_time` 和 `until_time`,且 `from_time < until_time`。
-- `RequestArchiveHandoffRequest.archive_scope = None` 时,application service 可以派生 `ArchiveScope::Space`;若缺少 `space_id` 或配置不允许默认 space scope,返回 reject。
+- 当前 PH-06 public `RequestArchiveHandoffRequest` 必须携带 `trace_context_id`,用于锁定需要进入 `HandoffPending` 的 `ConversationTraceContext`;缺失时 reject。`ArchiveScope::Space` 仍可作为 scope 值使用,但必须绑定该 trace context。
+- `RequestArchiveHandoffRequest.archive_scope = None` 时,application service 可以基于 request `space_id` 和已加载 trace context 派生 `ArchiveScope::Space`;若缺少 `space_id`、缺少 `trace_context_id` 或配置不允许默认 space scope,返回 reject。
+- `ArchiveHandoffRecord::from_space_close(...)` 只供 close flow 等已持有 `ConversationTraceContext` 的内部写路径使用,不表示 public archive request 可以在缺少 `trace_context_id` 时隐式查找 trace context。
 - `RequestArchiveHandoffRequest.retention_policy_ref = None` 时,application service 必须从配置解析默认 retention policy;若无默认 policy,返回 reject。
 - `TraceHandoffState` 和 `ArchiveHandoffState` 属于 contracts shared enum;`domain/trace.rs` 的 `TraceHandoffRecord` / `ArchiveHandoffRecord`、`TraceHandoffCommandResult` / `ArchiveHandoffCommandResult` 和 outbound handoff event 必须复用同一 enum,不得复制第二套 public state。
 
@@ -1317,6 +1320,40 @@ pub struct ArchivePackageRef {
     /// Package creation time.
     pub created_at: Timestamp,
 }
+
+/// References a configured archive destination without exposing endpoint or credentials.
+pub struct ArchiveDestinationRef {
+    /// Stable configured archive destination reference.
+    pub destination_ref: ExternalReferenceRef,
+}
+
+/// Filters trace handoff records that are eligible for delivery or retry.
+pub struct TraceHandoffScope {
+    /// Optional owning space filter; repository resolves it through trace context ownership.
+    pub space_id: Option<ConversationSpaceId>,
+    /// Optional trace context filter.
+    pub trace_context_id: Option<ConversationTraceContextId>,
+    /// Optional single handoff filter.
+    pub trace_handoff_id: Option<TraceHandoffRecordId>,
+    /// Optional observability destination filter.
+    pub destination_ref: Option<ObservabilityDestinationRef>,
+    /// Retry due-time upper bound; application fills clock.now() when absent.
+    pub ready_at_or_before: Option<Timestamp>,
+}
+
+/// Filters archive handoff records that are eligible for delivery or retry.
+pub struct ArchiveHandoffScope {
+    /// Optional owning space filter.
+    pub space_id: Option<ConversationSpaceId>,
+    /// Optional trace context filter.
+    pub trace_context_id: Option<ConversationTraceContextId>,
+    /// Optional single handoff filter.
+    pub archive_handoff_id: Option<ArchiveHandoffRecordId>,
+    /// Optional archive scope filter.
+    pub archive_scope: Option<ArchiveScope>,
+    /// Retry due-time upper bound; application fills clock.now() when absent.
+    pub ready_at_or_before: Option<Timestamp>,
+}
 ```
 
 约束:
@@ -1327,6 +1364,11 @@ pub struct ArchivePackageRef {
 - `RetryAttempt.0` 必须大于 0;`HandoffRetryMarker.next_retry_at` 必须晚于当前失败时间。
 - `ObservabilityReceiptRef.receipt_ref` 只保存外部 receipt 引用,不得保存完整 response body。
 - `ArchivePackageRef.archive_ref` 只保存归档包引用,不得保存归档包正文;`package_digest` 必填。
+- `ArchiveDestinationRef.destination_ref` 只指向已配置 archive destination,不得携带 URL、bucket、credential、secret、package body 或 adapter config。
+- `TraceHandoffScope` / `ArchiveHandoffScope` 是 job 与 repository 共享的纯过滤 DTO;空 scope 表示列出所有 eligible pending records,不表示跳过 visibility / retention / retry policy。
+- `list_pending_trace_handoffs(...)` 只返回 `TraceHandoffState::Pending` 或 retry due 的 `TraceHandoffState::RetryPending`;`space_id` 过滤通过 `ConversationTraceContext.space_id` 或等价持久化索引匹配,不得从 handoff payload body 反查。
+- `list_pending_archive_handoffs(...)` 只返回 `ArchiveHandoffState::Pending` 或 retry due 的 `ArchiveHandoffState::RetryPending`;`ArchiveDestinationRef` 是 job-level adapter 目标,不属于 `ArchiveHandoffScope` 过滤字段。
+- `ready_at_or_before = None` 时,application job service 必须在调用 repository 前以 `clock.now()` 补齐,repository 不得自行读取 wall clock。
 
 #### 7.2.3.4 trace retention / redaction / body exclusion rule set
 
@@ -3376,6 +3418,9 @@ pub enum TraceRetentionState {
 | `attach_manifestation(&mut self, manifestation: &CrossDomainManifestation) -> Result<(), DomainError>` | 附加显化引用 | manifestation | `Result<(), DomainError>` | 不改 manifestation |
 | `attach_scope_change(&mut self, change: &ScopeChangeRecord) -> Result<(), DomainError>` | 附加范围变化引用 | scope change | `Result<(), DomainError>` | 不改 scope |
 | `seal(&mut self, actor: ActorRef, reason: TraceSealReason) -> Result<(), DomainError>` | 封存追溯上下文 | actor 和原因 | `Result<(), DomainError>` | 不删除引用 |
+| `mark_handoff_pending(&mut self) -> Result<(), DomainError>` | 标记已有 handoff intent 待交接 | 无 | `Result<(), DomainError>` | `Open` / `Sealed` -> `HandoffPending`;不创建 handoff record |
+| `mark_handoff_completed(&mut self) -> Result<(), DomainError>` | handoff 已承接后恢复封存 | 无 | `Result<(), DomainError>` | `HandoffPending` -> `Sealed`;receipt / package ref 保存在 handoff record |
+| `expire(&mut self, expired_at: Timestamp) -> Result<(), DomainError>` | 标记本地 trace 保留过期 | 过期时间 | `Result<(), DomainError>` | `Open` / `Sealed` / `HandoffPending` -> `Expired`;不删除 refs |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -3387,6 +3432,9 @@ pub enum TraceRetentionState {
 - 不替代全局 trace store。
 - 不保存完整日志正文。
 - trace 不改写事实。
+- `mark_handoff_pending(...)` 只推进 `ConversationTraceContext.retention_state`,正式 handoff intent、actor 和 reason 仍由 `TraceHandoffRecord` / `ArchiveHandoffRecord`、command audit 或 outbox 保存。
+- 当前 PH-06 必须在 `RequestTraceHandoffFlow` 和 `RequestArchiveHandoffFlow` 中把 trace context 的 `HandoffPending` 状态与 handoff record / outbox 放在同一 UoW 保存。
+- `expire(...)` 是 `TraceRetentionState::Expired` 的 domain state transition 触发器;当前 PH-06 只要求 domain state tests,不新增 trace retention cleanup job。
 
 #### 7.8.2 `ReviewAnchor`
 
@@ -3453,6 +3501,18 @@ pub struct TraceHandoffRecord {
     pub handoff_state: TraceHandoffState,
     /// Retry marker for failed handoff.
     pub retry_marker: Option<HandoffRetryMarker>,
+    /// Observability delivery receipt after successful handoff.
+    pub observability_receipt_ref: Option<ObservabilityReceiptRef>,
+    /// Time when observability accepted the handoff.
+    pub handed_off_at: Option<Timestamp>,
+    /// Permanent failure reason when handoff reaches Failed.
+    pub failure_reason: Option<HandoffFailureReason>,
+    /// Actor that recorded the permanent failure.
+    pub failed_by: Option<ActorRef>,
+    /// Cancel reason when handoff reaches Cancelled.
+    pub cancel_reason: Option<HandoffCancelReason>,
+    /// Actor that cancelled the handoff intent.
+    pub cancelled_by: Option<ActorRef>,
 }
 ```
 
@@ -3473,14 +3533,20 @@ pub struct TraceHandoffRecord {
 | `destination_ref` | `ObservabilityDestinationRef` | 接收目标 | 不表示外部存储实现 |
 | `handoff_payload_ref` | `TraceHandoffPayloadRef` | 脱敏 payload 引用 | 不含 forbidden body |
 | `handoff_state` | `TraceHandoffState` | 交接状态 | 失败不回滚 truth |
-| `retry_marker` | `Option<HandoffRetryMarker>` | 重试标记 | 成功后清空 |
+| `retry_marker` | `Option<HandoffRetryMarker>` | 重试标记 | 仅 `RetryPending` 保留;成功、失败和取消后清空 |
+| `observability_receipt_ref` | `Option<ObservabilityReceiptRef>` | 成功交接 receipt 引用 | 仅 `HandedOff` 必有;不得保存外部 response body |
+| `handed_off_at` | `Option<Timestamp>` | 成功交接时间 | 仅 `HandedOff` 必有;与 `observability_receipt_ref` 成对写入 |
+| `failure_reason` | `Option<HandoffFailureReason>` | 永久失败原因 | 仅 `Failed` 必有;不含外部正文 |
+| `failed_by` | `Option<ActorRef>` | 记录永久失败的 actor | 仅 `Failed` 必有;与 `failure_reason` 成对写入 |
+| `cancel_reason` | `Option<HandoffCancelReason>` | 取消原因 | 仅 `Cancelled` 必有 |
+| `cancelled_by` | `Option<ActorRef>` | 取消 actor | 仅 `Cancelled` 必有;与 `cancel_reason` 成对写入 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `mark_handed_off(&mut self, receipt_ref: ObservabilityReceiptRef, handed_off_at: Timestamp) -> Result<(), DomainError>` | 标记交接成功 | receipt 和时间 | `Result<(), DomainError>` | 不改 trace truth |
-| `mark_retry(&mut self, reason: HandoffRetryReason, next_retry_at: Timestamp) -> Result<(), DomainError>` | 标记重试 | 原因和下次时间 | `Result<(), DomainError>` | 保留 retry marker |
-| `mark_failed(&mut self, reason: HandoffFailureReason, actor: ActorRef) -> Result<(), DomainError>` | 标记失败 | 原因和 actor | `Result<(), DomainError>` | 进入失败终态 |
-| `cancel(&mut self, actor: ActorRef, reason: HandoffCancelReason) -> Result<(), DomainError>` | 取消交接 | actor 和原因 | `Result<(), DomainError>` | 记录取消证据 |
+| `mark_handed_off(&mut self, receipt_ref: ObservabilityReceiptRef, handed_off_at: Timestamp) -> Result<(), DomainError>` | 标记交接成功 | receipt 和时间 | `Result<(), DomainError>` | 写入 `observability_receipt_ref` / `handed_off_at`,清空 retry / failed / cancel evidence,不改 trace truth |
+| `mark_retry(&mut self, reason: HandoffRetryReason, next_retry_at: Timestamp) -> Result<(), DomainError>` | 标记重试 | 原因和下次时间 | `Result<(), DomainError>` | 写入 `retry_marker`,不得覆盖 success / failed / cancel evidence |
+| `mark_failed(&mut self, reason: HandoffFailureReason, actor: ActorRef) -> Result<(), DomainError>` | 标记失败 | 原因和 actor | `Result<(), DomainError>` | 写入 `failure_reason` / `failed_by`,清空 retry marker,进入失败终态 |
+| `cancel(&mut self, actor: ActorRef, reason: HandoffCancelReason) -> Result<(), DomainError>` | 取消交接 | actor 和原因 | `Result<(), DomainError>` | 写入 `cancel_reason` / `cancelled_by`,清空 retry marker |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -3492,6 +3558,8 @@ pub struct TraceHandoffRecord {
 - 交接成功不决定 truth 成立。
 - payload 必须脱敏。
 - observability 不能反写 Conversation truth。
+- `observability_receipt_ref` / `handed_off_at`、`failure_reason` / `failed_by`、`cancel_reason` / `cancelled_by` 分别是 success / failed / cancel evidence 的正式持久化字段;当前 PH-06 不引入独立 handoff evidence store。
+- `Failed` / `Cancelled` 终态不得同时保留 `retry_marker`;`HandedOff` 不得保留 failed / cancel evidence。
 
 #### 7.8.4 `ArchiveHandoffRecord`
 
@@ -3508,10 +3576,22 @@ pub struct ArchiveHandoffRecord {
     pub archive_scope: ArchiveScope,
     /// Archive package reference once available.
     pub archive_package_ref: Option<ArchivePackageRef>,
+    /// Time when archive handoff completed.
+    pub archived_at: Option<Timestamp>,
     /// Archive handoff lifecycle state.
     pub handoff_state: ArchiveHandoffState,
+    /// Retry marker for failed archive delivery attempts.
+    pub retry_marker: Option<HandoffRetryMarker>,
     /// Retention policy reference used for this handoff.
     pub retention_policy_ref: TraceRetentionPolicyRef,
+    /// Permanent failure reason when archive handoff reaches Failed.
+    pub failure_reason: Option<HandoffFailureReason>,
+    /// Actor that recorded the permanent failure.
+    pub failed_by: Option<ActorRef>,
+    /// Cancel reason when archive handoff reaches Cancelled.
+    pub cancel_reason: Option<HandoffCancelReason>,
+    /// Actor that cancelled the archive handoff intent.
+    pub cancelled_by: Option<ActorRef>,
 }
 ```
 
@@ -3531,15 +3611,22 @@ pub struct ArchiveHandoffRecord {
 | `space_id` | `ConversationSpaceId` | 归档空间 | 必须匹配 archive scope |
 | `trace_context_id` | `ConversationTraceContextId` | 归档材料来源 trace | 必须能读取到已提交 trace context |
 | `archive_scope` | `ArchiveScope` | 归档范围 | 不含正文 |
-| `archive_package_ref` | `Option<ArchivePackageRef>` | 归档包引用 | 完成后必有 |
+| `archive_package_ref` | `Option<ArchivePackageRef>` | 归档包引用 | 仅 `Archived` 必有;不得保存归档包正文 |
+| `archived_at` | `Option<Timestamp>` | 归档完成时间 | 仅 `Archived` 必有;与 `archive_package_ref` 成对写入 |
 | `handoff_state` | `ArchiveHandoffState` | 交接状态 | 失败不回滚 truth |
+| `retry_marker` | `Option<HandoffRetryMarker>` | 重试标记 | 仅 `RetryPending` 保留;归档完成、失败和取消后清空 |
 | `retention_policy_ref` | `TraceRetentionPolicyRef` | 保留策略引用 | 必须已校验 |
+| `failure_reason` | `Option<HandoffFailureReason>` | 永久失败原因 | 仅 `Failed` 必有;不含外部正文 |
+| `failed_by` | `Option<ActorRef>` | 记录永久失败的 actor | 仅 `Failed` 必有;与 `failure_reason` 成对写入 |
+| `cancel_reason` | `Option<HandoffCancelReason>` | 取消原因 | 仅 `Cancelled` 必有 |
+| `cancelled_by` | `Option<ActorRef>` | 取消 actor | 仅 `Cancelled` 必有;与 `cancel_reason` 成对写入 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `mark_archived(&mut self, archive_package_ref: ArchivePackageRef, archived_at: Timestamp) -> Result<(), DomainError>` | 标记归档完成 | package ref 和时间 | `Result<(), DomainError>` | 不保存归档包正文 |
-| `mark_retry(&mut self, reason: HandoffRetryReason, next_retry_at: Timestamp) -> Result<(), DomainError>` | 标记重试 | 原因和时间 | `Result<(), DomainError>` | 保留 retry marker |
-| `mark_failed(&mut self, reason: HandoffFailureReason, actor: ActorRef) -> Result<(), DomainError>` | 标记失败 | 原因和 actor | `Result<(), DomainError>` | 进入失败终态 |
+| `mark_archived(&mut self, archive_package_ref: ArchivePackageRef, archived_at: Timestamp) -> Result<(), DomainError>` | 标记归档完成 | package ref 和时间 | `Result<(), DomainError>` | 写入 `archive_package_ref` / `archived_at`,清空 retry / failed / cancel evidence,不保存归档包正文 |
+| `mark_retry(&mut self, reason: HandoffRetryReason, next_retry_at: Timestamp) -> Result<(), DomainError>` | 标记重试 | 原因和时间 | `Result<(), DomainError>` | 写入 `retry_marker`,不得覆盖 archived / failed / cancel evidence |
+| `mark_failed(&mut self, reason: HandoffFailureReason, actor: ActorRef) -> Result<(), DomainError>` | 标记失败 | 原因和 actor | `Result<(), DomainError>` | 写入 `failure_reason` / `failed_by`,清空 retry marker,进入失败终态 |
+| `cancel(&mut self, actor: ActorRef, reason: HandoffCancelReason) -> Result<(), DomainError>` | 取消归档交接 | actor 和原因 | `Result<(), DomainError>` | 写入 `cancel_reason` / `cancelled_by`,清空 retry marker,进入取消终态,不得生成 archive package |
 | `covers_space(&self, space_id: ConversationSpaceId) -> bool` | 判断归档范围是否覆盖空间 | space id | `bool` | 只读 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
@@ -3552,6 +3639,9 @@ pub struct ArchiveHandoffRecord {
 - 不保存归档包正文。
 - archive 状态不替代 conversation 状态。
 - archive 不能反写对话事实。
+- `cancel(...)` 是 `ArchiveHandoffState::Cancelled` 的唯一 domain 成员函数触发器;当前 PH-06 不新增 public `CancelArchiveHandoff` command。
+- `archive_package_ref` / `archived_at`、`failure_reason` / `failed_by`、`cancel_reason` / `cancelled_by` 分别是 archived / failed / cancel evidence 的正式持久化字段;当前 PH-06 不引入独立 archive handoff evidence store。
+- `Failed` / `Cancelled` 终态不得同时保留 `retry_marker`;`Archived` 不得保留 failed / cancel evidence。
 
 #### 7.8.5 `TraceRetentionPolicy`
 

@@ -170,8 +170,8 @@ Repository 函数沿用 Step 7:
 | `external_reference_projections` | 保存 external refs / snapshot refs 聚合 | `external_reference_projection_id` | `space_id`、`resolution_state` | `version` |
 | `conversation_trace_contexts` | 保存 trace refs 和 retention state | `trace_context_id` | `space_id`、`retention_state` | `version` |
 | `review_anchors` | 保存 review anchor | `review_anchor_id` | `space_id`、`target_ref`、`anchor_kind` | `version` |
-| `trace_handoff_records` | 保存 trace handoff intent / state | `trace_handoff_id` | `trace_context_id`、`handoff_state`、`destination_ref` | `version` |
-| `archive_handoff_records` | 保存 archive handoff intent / state | `archive_handoff_id` | `space_id`、`trace_context_id`、`handoff_state` | `version` |
+| `trace_handoff_records` | 保存 trace handoff intent / state / evidence | `trace_handoff_id` | `trace_context_id`、`handoff_state`、`destination_ref`、`observability_receipt_ref`、`retry_marker`、`failure_reason`、`cancel_reason` | `version` |
+| `archive_handoff_records` | 保存 archive handoff intent / state / evidence | `archive_handoff_id` | `space_id`、`trace_context_id`、`handoff_state`、`archive_package_ref`、`retry_marker`、`failure_reason`、`cancel_reason` | `version` |
 | `conversation_outbox_records` | 保存待发布 / 已发布事件 | `outbox_record_id` | `space_id`、`outbox_sequence`、`publication_state`、`event_kind` | `version` |
 | `conversation_read_models` | 授权读取视图 | `space_id + consumer_ref` | `projection_state_id`、`source_position` | `version` |
 | `conversation_change_cursors` | consumer 增量位置 | `cursor_id` | `space_id + consumer_ref`、`cursor_state`、`last_outbox_sequence` | `version` |
@@ -205,9 +205,9 @@ Repository 函数沿用 Step 7:
 | `ManifestationRepository.get_manifestation_for_update(manifestation_id, uow)` | 写事务读取 manifestation | 行锁语义 | `Option<CrossDomainManifestation>` | `RepositoryError` |
 | `TraceRepository.save_trace_context(trace_context, uow)` | 保存 trace context | 与 fact / manifestation / handoff intent 同事务 | `Version` | `RepositoryError` |
 | `TraceRepository.save_review_anchor(review_anchor, uow)` | 保存 review anchor | 与 outbox / idempotency 同事务 | `Version` | `RepositoryError` |
-| `TraceRepository.save_trace_handoff(handoff, uow)` | 保存 trace handoff | command 或 job 短事务 | `Version` | `RepositoryError` |
+| `TraceRepository.save_trace_handoff(handoff, uow)` | 保存 trace handoff | command 或 job 短事务;必须持久化 `observability_receipt_ref` / `handed_off_at`、`retry_marker`、`failure_reason` / `failed_by`、`cancel_reason` / `cancelled_by` | `Version` | `RepositoryError` |
 | `TraceRepository.get_trace_handoff_for_update(handoff_id, uow)` | 锁定 trace handoff | job 状态推进前必须调用 | `Option<TraceHandoffRecord>` | `RepositoryError` |
-| `TraceRepository.save_archive_handoff(handoff, uow)` | 保存 archive handoff | command 或 job 短事务 | `Version` | `RepositoryError` |
+| `TraceRepository.save_archive_handoff(handoff, uow)` | 保存 archive handoff | command 或 job 短事务;必须持久化 `archive_package_ref` / `archived_at`、`retry_marker`、`failure_reason` / `failed_by`、`cancel_reason` / `cancelled_by` | `Version` | `RepositoryError` |
 | `TraceRepository.get_archive_handoff_for_update(handoff_id, uow)` | 锁定 archive handoff | job 状态推进前必须调用 | `Option<ArchiveHandoffRecord>` | `RepositoryError` |
 | `ProjectionRepository.upsert_read_model(read_model, uow)` | 保存 read model | 与 projection state 同事务 | `Version` | `RepositoryError` |
 | `ProjectionRepository.save_projection_state(state, uow)` | 保存 freshness state | 与相关 projection 同事务 | `Version` | `RepositoryError` |
@@ -235,8 +235,8 @@ Repository 函数沿用 Step 7:
 | `RetractConversationFactFlow` | lock fact 后 | fact state、trace、outbox 保存后 | fact missing、terminal fact、repository failure | idempotency、fact state、retraction receipt、trace、outbox |
 | `ManifestExternalFactFlow` | command service 进入 manifestation | snapshot、manifestation、fact / trace / outbox 保存后 | resolver failure when required、visibility reject、repository failure | idempotency、safe snapshot、manifestation、optional fact、trace、outbox |
 | `CreateReviewAnchorFlow` | command service 进入 review | review anchor 与 outbox 保存后 | target missing、not visible、repository failure | idempotency、review anchor、outbox |
-| `RequestTraceHandoffFlow` | handoff command service | handoff record 与 outbox 保存后 | trace missing、handoff not allowed、repository failure | idempotency、trace handoff record、outbox |
-| `RequestArchiveHandoffFlow` | archive handoff command service | archive handoff record 与 outbox 保存后 | trace / space missing、retention invalid、repository failure | idempotency、archive handoff record、outbox |
+| `RequestTraceHandoffFlow` | handoff command service | trace context、handoff record 与 outbox 保存后 | trace missing、handoff not allowed、repository failure | idempotency、trace context retention state、trace handoff record、outbox |
+| `RequestArchiveHandoffFlow` | archive handoff command service | trace context、archive handoff record 与 outbox 保存后 | trace / space missing、retention invalid、repository failure | idempotency、trace context retention state、archive handoff record、outbox |
 | Inbound source consumer | consumer envelope 校验后 | projection / snapshot / fact / manifestation / outbox 保存后 | invalid envelope、quarantine、repository failure | event idempotency、local reference / manifestation / fact / projection state、outbox where needed |
 | Query API | 不开启写事务 | 不适用 | repository failure、visibility denied | 无写入;必须重新检查 visibility |
 | Outbound event publish function | 不开启 DB 事务 | 不适用 | publish validation / transport failure | 无 DB 写入 |

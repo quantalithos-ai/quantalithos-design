@@ -54,7 +54,7 @@ publish / handoff 失败不得回滚 truth。
 | `ApplicationError::NotFound` | 404 / not found view |
 | `ApplicationError::NotVisible` | 403 或 empty authorized view |
 | `ApplicationError::Conflict` / `IdempotencyError::Conflict` | 409 / conflict receipt |
-| `DomainError::InvalidStateTransition` / `BoundaryViolation` | 4xx domain rejection / audit |
+| `DomainError::InvalidStateTransition` / `BoundaryViolation` / `RetryLimitExceeded` | 4xx domain rejection / audit |
 | `RepositoryError` / `TransactionError` | 5xx / retryable job or command failure |
 | `ResolverError` | unresolved / delayed marker,必要时 quarantine |
 | `PublishError` | outbox retry / failed marker |
@@ -101,7 +101,7 @@ publish / handoff 失败不得回滚 truth。
 |---|---|---|
 | Step 8 只给协议错误汇总 | 实现者还缺模块级错误类型表 | 本步补模块错误类型和映射 |
 | Step 9 错误分散在每个 flow | 需要聚合异常分支和恢复方式 | 本步按场景归纳 |
-| Step 10 已给非法转换语义 | 需要映射到具体 `DomainError` | 本步落成错误模型 |
+| Step 10 已给非法转换语义 | 需要映射到具体 `DomainError` | 本步落成错误模型,并要求状态矩阵引用的 domain error variant 全部进入错误类型表 |
 | Step 11 已给补偿策略 | 需要区分 retry / manual / reject | 本步落成恢复口径 |
 
 ## 5. 设计取舍
@@ -128,17 +128,39 @@ publish / handoff 失败不得回滚 truth。
 | `ApplicationError::Conflict` | `application` | version、state、idempotency 冲突 | 视场景 | 409 |
 | `ApplicationError::CursorNotResumable` | `application` | cursor expired / invalidated | 否 | 409 / reset cursor marker |
 | `DomainError::InvalidStateTransition` | `domain` | 状态转换不符合 Step 10 | 否 | 4xx / domain audit |
+| `DomainError::InvalidInitialState` | `domain` | 初始 factory / constructor 的前置 truth、ref、actor 或 policy 不满足 | 否 | 4xx / domain audit |
 | `DomainError::BoundaryViolation` | `domain` | projection / outbox / external adapter 试图改 truth | 否 | 4xx / audit |
 | `DomainError::SourceTruthViolation` | `domain` | 试图保存外部来源正文或补造来源事实 | 否 | 4xx / quarantine |
 | `DomainError::SequenceRegression` | `domain` | fact / outbox / cursor sequence 倒退 | 否 | 409 |
+| `DomainError::SourcePositionRegression` | `domain` | projection rebuild source position 倒退或覆盖 newer committed position | 否 | 409 / projection evidence |
 | `DomainError::DigestMismatch` | `domain` | snapshot digest 与 source digest 不一致 | 需人工判断 | unresolved / digest evidence |
+| `DomainError::SnapshotMismatch` | `domain` | manifestation refresh snapshot 与 external fact ref / source version 不匹配 | 否 | unresolved / mismatch evidence |
+| `DomainError::InvalidExternalReference` | `domain` | object ref、version ref、digest 或 external reference 格式 / 权限 / 边界非法 | 否 | invalid marker / quarantine |
+| `DomainError::DuplicateAppend` | `domain` | duplicate append path 试图绕过幂等结果生成新的 `ConversationFact` | 否 | 409 / idempotency conflict evidence |
+| `DomainError::ImmutableReceipt` | `domain` | 已 rejected / completed 的 append receipt 被反向改写 | 否 | 409 / domain audit |
+| `DomainError::RetryLimitExceeded` | `domain` | outbox、trace handoff 或 archive handoff 的 `mark_retry(...)` 超过 retry limit | 否 | failed marker / operations evidence |
 | `RepositoryError` | `infra` / repository | 读写存储失败、唯一键冲突、版本冲突 | transient 可重试 | 5xx / retry marker |
 | `TransactionError` | `infra` / UnitOfWork | begin / commit / rollback 失败 | transient 可重试 | 5xx |
 | `IdempotencyError::Conflict` | `application` | 同 key 不同请求内容或不同 result | 否 | 409 |
 | `ResolverError` | source resolver adapter | 外部来源不可解析、超时、digest 不一致 | 部分可重试 | unresolved / delayed / quarantine |
 | `PublishError` | outbox publisher | event build / transport / topic publish 失败 | transport 可重试 | outbox retry / failed |
-| `HandoffError` | handoff adapter | observability / archive 交接失败 | 部分可重试 | handoff retry / failed |
+| `HandoffError::DestinationUnavailable` | handoff adapter | 目标暂不可用 | 是 | handoff retry |
+| `HandoffError::Timeout` | handoff adapter | adapter 调用超时 | 是 | handoff retry |
+| `HandoffError::RateLimited` | handoff adapter | 目标要求稍后重试 | 是 | handoff retry |
+| `HandoffError::DestinationRejected` | handoff adapter | 目标永久拒绝 | 否 | handoff failed |
+| `HandoffError::InvalidArchivePackage` | handoff adapter | archive adapter 返回包正文或非法 package ref | 否 | archive handoff failed |
+| `HandoffError::ForbiddenBody` | handoff adapter | handoff payload / archive material 违反 forbidden body policy | 否 | handoff failed |
+| `HandoffError::AdapterMisconfigured` | handoff adapter | destination adapter 配置非法 | 否 | handoff failed |
 | `JobError::InvalidInput` | jobs | job run id、scope、metadata、idempotency key 非法 | 否 | failed job receipt |
+| `JobError::MissingOutbox` | jobs | publish job candidate 在锁定时缺失 | 否 | failed job receipt |
+| `JobError::MissingVisibilityScope` | jobs | refresh / projection job 缺可见范围 | 否 | failed job receipt |
+| `JobError::MissingTraceContext` | jobs | handoff job 缺 trace context | 否 | failed job receipt |
+| `JobError::MissingTraceHandoff` | jobs | trace handoff candidate 在锁定时缺失 | 否 | failed job receipt |
+| `JobError::MissingArchiveHandoff` | jobs | archive handoff candidate 在锁定时缺失 | 否 | failed job receipt |
+| `JobError::RepositoryFailure` | jobs | repository / transaction 失败 | transient 可重试 | failed or partial job receipt |
+| `JobError::ResolverFailure` | jobs | resolver 失败 | 部分可重试 | unresolved / partial job receipt |
+| `JobError::PublishFailure` | jobs | outbox publish 失败 | transport 可重试 | outbox retry / partial receipt |
+| `JobError::HandoffFailure` | jobs | handoff adapter failure 已映射到 job surface | 部分可重试 | handoff retry / failed + partial receipt |
 | `JobError::PartialFailure` | jobs | 部分 outbox、projection、snapshot、handoff 失败 | 是或人工 | job evidence + failed refs |
 
 ### 6.2 错误映射表
@@ -152,11 +174,21 @@ publish / handoff 失败不得回滚 truth。
 | `ApplicationError::NotVisible` | HTTP 403 或 empty view marker | 不应重试同一权限上下文 |
 | `ApplicationError::CursorNotResumable` | HTTP 409 / cursor reset marker | 重新读取 read model 并创建新 cursor |
 | `DomainError::InvalidStateTransition` | HTTP 409 / domain audit | 按当前状态重新发起合法 command |
+| `DomainError::InvalidInitialState` | HTTP 409 / domain audit | 修正 factory input、前置 truth 或 ref 后重新发起 |
 | `DomainError::BoundaryViolation` | HTTP 400 / audit | 修正实现或请求边界 |
+| `DomainError::SourcePositionRegression` | HTTP 409 / projection evidence | 重新读取 committed source position 后重建 |
+| `DomainError::DigestMismatch` | unresolved / digest mismatch evidence | 保留旧 snapshot / manifestation,等待人工或 refresh policy 处理 |
+| `DomainError::SnapshotMismatch` | unresolved / mismatch evidence | 修正 external ref / snapshot 后重试 refresh |
+| `DomainError::InvalidExternalReference` | invalid marker / quarantine | 修正 external ref、version ref 或权限边界 |
+| `DomainError::DuplicateAppend` | HTTP 409 / idempotency conflict evidence | 使用已有 result / receipt 或更换 idempotency key |
+| `DomainError::ImmutableReceipt` | HTTP 409 / domain audit | 重新提交新 request,不得改写既有 receipt |
+| `DomainError::RetryLimitExceeded` | outbox / handoff `Failed` marker | 停止自动 retry,交由 operations review 或新 intent |
 | `RepositoryError` | HTTP 500 / retryable job marker | 可按 retry policy 重试 |
 | `ResolverError` | unresolved / delayed marker | 等待 refresh job 或人工处理 digest mismatch |
 | `PublishError` | outbox `RetryPending` / `Failed` | 由 publish job 重试或 operations 处理 |
-| `HandoffError` | handoff `RetryPending` / `Failed` | 由 handoff job 重试或 operations 处理 |
+| `HandoffError` retryable variants | handoff `RetryPending` | 由 handoff job 按 retry policy 重试 |
+| `HandoffError` permanent variants | handoff `Failed` | operations review 或新 handoff intent |
+| `JobError::InvalidInput` | failed `JobRunReceipt` | 修正 job input、scope、metadata 或 idempotency key 后重新触发 |
 | `JobError::PartialFailure` | `JobRunReceipt` partial failure | 读取 failed refs 后局部重跑 |
 
 ### 6.3 异常分支处理表
@@ -169,12 +201,19 @@ publish / handoff 失败不得回滚 truth。
 | space / fact / trace missing | application service | return not found | read / command audit |
 | visibility denied | query / command policy | empty view / 403 / command reject | read audit |
 | invalid state transition | domain method | reject and rollback | domain audit |
+| invalid initial state | domain factory / constructor | reject and rollback | domain audit |
 | forbidden payload body | fact / manifestation / publish validation | reject or quarantine | boundary audit |
+| immutable receipt overwrite | fact append receipt transition | reject and rollback | receipt evidence |
+| duplicate append bypass | append idempotency / fact factory | reject conflict | idempotency evidence |
+| invalid external reference | reference validation policy | invalid marker or quarantine | reference evidence |
+| snapshot mismatch | manifestation / reference refresh | unresolved / mismatch marker | digest / snapshot evidence |
+| source position regression | projection rebuild completion | reject rebuild completion or mark failed | projection evidence |
 | inbound event envelope invalid | worker consumer | quarantine | quarantine evidence |
 | resolver unavailable | resolver adapter | unresolved / delayed marker | resolver evidence |
 | digest mismatch | resolver / snapshot validation | unresolved / manual evidence | digest mismatch evidence |
 | repository write failure | repository adapter | rollback UnitOfWork | error log |
 | publish transport failure | outbox publish job | mark retry / failed | outbox evidence |
+| retry limit exceeded | outbox / handoff state method | mark failed via explicit failed path,not retry again | operations evidence |
 | handoff transport failure | handoff job | mark retry / failed | handoff evidence |
 | projection rebuild failure | projection job | mark `ProjectionFreshnessState::Failed` | projection error ref |
 | cursor expired | query / cleanup job | reset cursor or cleanup | cursor evidence |
@@ -191,6 +230,7 @@ publish / handoff 失败不得回滚 truth。
 | projection failed | rebuild job 重跑 | 是 | 多次 rebuild failed |
 | outbox retry pending | publish job 重跑 | 是 | retry exhausted -> `Failed` |
 | handoff retry pending | handoff job 重跑 | 是 | retry exhausted -> `Failed` |
+| retry limit exceeded | 停止 `mark_retry(...)`,改走 `mark_failed(...)` 或创建新 operations intent | 否 | 需要 operations review |
 | cursor expired | 重新建立 cursor | 否 | 不适用 |
 | invalid state transition | 调用方按当前状态重新发合法 command | 否 | 若实现误触发需要修代码 |
 

@@ -909,8 +909,10 @@ unit_of_work.commit(uow).await?;
   | load trace context
   | call TraceRetentionPolicy.assert_retention_allowed(...)
   | call TraceHandoffRecord::from_trace_context(...)
+  | call ConversationTraceContext::mark_handoff_pending(...)
   v
 [Repository + Outbox]
+  | save trace context
   | save trace handoff
   | enqueue trace handoff requested outbox
   | complete idempotency
@@ -927,7 +929,7 @@ let request_digest = RequestDigest::from_command(&request)?;
 let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::RequestTraceHandoff, request_digest.clone(), uow.clone()).await?;
 
 // [TraceRepository.get_trace_context(ConversationTraceContextId trace_context_id)]
-let trace_context = trace_repo.get_trace_context(request.trace_context_id).await?.ok_or(ApplicationError::NotFound)?;
+let mut trace_context = trace_repo.get_trace_context(request.trace_context_id).await?.ok_or(ApplicationError::NotFound)?;
 
 // [TraceRetentionPolicy::default_policy()]
 let policy = TraceRetentionPolicy::default_policy();
@@ -935,10 +937,12 @@ policy.assert_retention_allowed(&trace_context)?;
 
 // [TraceHandoffRecord::from_trace_context(&ConversationTraceContext trace_context, ObservabilityDestinationRef destination_ref)]
 let handoff = TraceHandoffRecord::from_trace_context(&trace_context, request.destination_ref)?;
+trace_context.mark_handoff_pending()?;
 let visibility = space_scope_repo.get_visibility_scope(trace_context.space_id).await?.ok_or(ApplicationError::NotFound)?;
 let committed_at = clock.now();
 let outbox = ConversationOutboxRecord::from_trace_handoff(handoff.clone(), trace_context.space_id, visibility.visibility_scope_id, committed_at)?;
 
+trace_repo.save_trace_context(trace_context, uow.clone()).await?;
 trace_repo.save_trace_handoff(handoff.clone(), uow.clone()).await?;
 outbox_repo.enqueue(outbox, uow.clone()).await?;
 idempotency.complete(reservation, handoff.result_ref(), uow.clone()).await?;
@@ -949,9 +953,9 @@ unit_of_work.commit(uow).await?;
 
 | 项 | 内容 |
 |---|---|
-| 事务边界 | handoff intent 与 outbox 同事务;实际外部交付不在本 Command 内 |
+| 事务边界 | trace context retention state、handoff intent 与 outbox 同事务;实际外部交付不在本 Command 内 |
 | 回滚错误 | trace missing、retention reject、payload forbidden、outbox failure |
-| 状态副作用 | `TraceHandoffState::Pending` |
+| 状态副作用 | `ConversationTraceContext.retention_state = HandoffPending`;`TraceHandoffState::Pending` |
 | 事件副作用 | `TraceHandoffRequestedEvent` |
 | 测试切口 | request handoff、missing trace、retention denied、duplicate idempotent |
 
@@ -976,11 +980,13 @@ unit_of_work.commit(uow).await?;
   | validate archive scope and retention policy
   | tx begin
   | reserve idempotency
-  | load trace context or space
+  | load trace context and space
   | call TraceRetentionPolicy.choose_archive_scope(...)
-  | call ArchiveHandoffRecord::from_trace_context(...) or from_space_close(...)
+  | call ArchiveHandoffRecord::from_trace_context(...)
+  | call ConversationTraceContext::mark_handoff_pending(...)
   v
 [Repository + Outbox]
+  | save trace context
   | save archive handoff
   | enqueue archive handoff requested outbox
   | complete idempotency
@@ -996,7 +1002,7 @@ let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::
 let request_digest = RequestDigest::from_command(&request)?;
 let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::RequestArchiveHandoff, request_digest.clone(), uow.clone()).await?;
 
-let trace_context = trace_repo.get_trace_context(request.trace_context_id).await?.ok_or(ApplicationError::NotFound)?;
+let mut trace_context = trace_repo.get_trace_context(request.trace_context_id).await?.ok_or(ApplicationError::NotFound)?;
 let space = space_scope_repo.get_space_for_update(request.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
 
 // [TraceRetentionPolicy::default_policy()]
@@ -1005,10 +1011,12 @@ let archive_scope = policy.choose_archive_scope(&space, &trace_context);
 
 // [ArchiveHandoffRecord::from_trace_context(&ConversationTraceContext trace_context, ArchiveScope archive_scope, TraceRetentionPolicyRef retention_policy_ref)]
 let handoff = ArchiveHandoffRecord::from_trace_context(&trace_context, archive_scope, request.retention_policy_ref)?;
+trace_context.mark_handoff_pending()?;
 let visibility = space_scope_repo.get_visibility_scope(request.space_id).await?.ok_or(ApplicationError::NotFound)?;
 let committed_at = clock.now();
 let outbox = ConversationOutboxRecord::from_archive_handoff(handoff.clone(), visibility.visibility_scope_id, committed_at)?;
 
+trace_repo.save_trace_context(trace_context, uow.clone()).await?;
 trace_repo.save_archive_handoff(handoff.clone(), uow.clone()).await?;
 outbox_repo.enqueue(outbox, uow.clone()).await?;
 idempotency.complete(reservation, handoff.result_ref(), uow.clone()).await?;
@@ -1019,11 +1027,57 @@ unit_of_work.commit(uow).await?;
 
 | 项 | 内容 |
 |---|---|
-| 事务边界 | archive handoff intent 与 outbox 同事务;archive package 由 job 后续交付 |
+| 事务边界 | trace context retention state、archive handoff intent 与 outbox 同事务;archive package 由 job 后续交付 |
 | 回滚错误 | trace / space missing、archive scope invalid、retention policy missing、outbox failure |
-| 状态副作用 | `ArchiveHandoffState::Pending` |
+| 状态副作用 | `ConversationTraceContext.retention_state = HandoffPending`;`ArchiveHandoffState::Pending` |
 | 事件副作用 | `ArchiveHandoffRequestedEvent` |
 | 测试切口 | request archive handoff、invalid scope rejected、package ref absent while pending、duplicate idempotent |
+
+当前 public `RequestArchiveHandoffFlow` 必须由 request 显式提供 `trace_context_id`;不得在缺少 trace context 时按 `space_id` 临时查找、创建或选择 trace context。`ArchiveHandoffRecord::from_space_close(...)` 仅供 close flow 等已持有 trace context 的内部写路径使用,不属于本 public command flow。
+
+#### 7.2.10.1 `ArchiveHandoffCancelStateTransition`
+
+##### 入口与目标
+
+| 项 | 内容 |
+|---|---|
+| 对应协议 | 无 public command;当前 PH-06 只定义 domain state transition |
+| 入口函数 | domain unit test 或后续 operations flow 持有 locked `ArchiveHandoffRecord` 后调用 |
+| Application service | 当前不新增 service;未来若暴露 cancel command 必须先补 Step 8 协议和本 Step 独立 flow |
+| 目标对象 | `ArchiveHandoffRecord` handoff state |
+
+##### 函数级调用图
+
+```text
+[domain/operations caller]
+  | load ArchiveHandoffRecord for update
+  | validate caller is allowed to cancel unfinished handoff
+  | call ArchiveHandoffRecord::cancel(...)
+  v
+[ArchiveHandoffRecord]
+  | Pending / RetryPending -> Cancelled
+  | Archived / Failed / Cancelled -> InvalidStateTransition
+```
+
+##### 关键伪代码
+
+```rust
+// no public CancelArchiveHandoff command in current PH-06 boundary
+let mut handoff = trace_repo.get_archive_handoff_for_update(archive_handoff_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
+handoff.cancel(actor_ref, cancel_reason)?;
+trace_repo.save_archive_handoff_state(handoff, uow.clone()).await?;
+unit_of_work.commit(uow).await?;
+```
+
+##### 事务、错误、状态与测试
+
+| 项 | 内容 |
+|---|---|
+| 事务边界 | cancel 状态写入独立短事务;不得调用 archive adapter |
+| 回滚错误 | handoff missing、actor not allowed、already archived / failed / cancelled |
+| 状态副作用 | `ArchiveHandoffState::Pending` / `RetryPending` -> `Cancelled` |
+| 事件副作用 | 当前无 public outbox event;未来若需要通知必须先补协议和 outbox 契约 |
+| 测试切口 | pending cancel、retry pending cancel、archived cannot cancel、cancelled cannot reopen、cancel does not generate `ArchivePackageRef` |
 
 ### 7.3 Query API 处理流
 
@@ -2573,13 +2627,13 @@ Ok(published_ref)
 ```rust
 job.validate()?;
 let pending = outbox_repo.list_pending(job.batch_size).await?;
-let mut receipt = JobRunReceipt::started(job.job_run_id);
+let mut receipt = JobRunReceipt::started(job.job_run_id, job.job_metadata.job_kind, job.trace_ref, clock.now());
 
 for candidate in pending {
     let publish_result = outbox_publisher.publish(candidate.clone(), job.trace_ref).await;
 
     let uow = unit_of_work.begin().await?;
-    let mut outbox = outbox_repo.get_for_update(candidate.outbox_record_id, uow.clone()).await?.ok_or(JobError::MissingOutbox)?;
+    let mut outbox = outbox_repo.get_for_update(candidate.outbox_record_id, uow.clone()).await?.ok_or(JobError::MissingOutbox { outbox_record_id: candidate.outbox_record_id })?;
 
     match publish_result {
         Ok(published_ref) => {
@@ -2645,7 +2699,7 @@ Ok(receipt.completed(clock.now()))
 
 ```rust
 job.validate()?;
-let mut receipt = JobRunReceipt::started(job.job_run_id);
+let mut receipt = JobRunReceipt::started(job.job_run_id, job.job_metadata.job_kind, job.trace_ref, clock.now());
 let spaces = space_scope_repo.list_spaces(job.space_scope, job.page_request()).await?;
 
 for space in spaces.items {
@@ -2712,7 +2766,7 @@ Ok(receipt.completed(clock.now()))
 
 ```rust
 job.validate()?;
-let mut receipt = JobRunReceipt::started(job.job_run_id);
+let mut receipt = JobRunReceipt::started(job.job_run_id, job.job_metadata.job_kind, job.trace_ref, clock.now());
 let spaces = space_scope_repo.list_spaces(job.space_scope, job.page_request()).await?;
 
 for space in spaces.items {
@@ -2785,7 +2839,7 @@ Ok(receipt.completed(clock.now()))
 
 ```rust
 job.validate()?;
-let mut receipt = JobRunReceipt::started(job.job_run_id);
+let mut receipt = JobRunReceipt::started(job.job_run_id, job.job_metadata.job_kind, job.trace_ref, clock.now());
 let spaces = space_scope_repo.list_spaces(job.space_scope, job.page_request()).await?;
 
 for space in spaces.items {
@@ -2852,11 +2906,11 @@ Ok(receipt.completed(clock.now()))
 
 ```rust
 job.validate()?;
-let mut receipt = JobRunReceipt::started(job.job_run_id);
+let mut receipt = JobRunReceipt::started(job.job_run_id, job.job_metadata.job_kind, job.trace_ref, clock.now());
 let projections = external_ref_repo.list_reference_projections(job.space_scope, job.page_request()).await?;
 
 for mut projection in projections.items {
-    let visibility = space_scope_repo.get_visibility_scope(projection.space_id).await?.ok_or(JobError::MissingVisibilityScope)?;
+    let visibility = space_scope_repo.get_visibility_scope(projection.space_id).await?.ok_or(JobError::MissingVisibilityScope { space_id: projection.space_id })?;
     let uow = unit_of_work.begin().await?;
 
     for external_ref in projection.external_fact_refs.clone() {
@@ -2921,15 +2975,17 @@ Ok(receipt.completed(clock.now()))
 
 ```rust
 job.validate()?;
-let mut receipt = JobRunReceipt::started(job.job_run_id);
-let handoffs = trace_repo.list_pending_trace_handoffs(job.trace_handoff_scope, job.page_request()).await?;
+let mut receipt = JobRunReceipt::started(job.job_run_id, job.job_metadata.job_kind, job.trace_ref, clock.now());
+let mut scope = job.trace_handoff_scope;
+scope.ready_at_or_before = Some(clock.now());
+let handoffs = trace_repo.list_pending_trace_handoffs(scope, job.page_request()).await?;
 
 for candidate in handoffs.items {
-    let trace_context = trace_repo.get_trace_context(candidate.trace_context_id).await?.ok_or(JobError::MissingTraceContext)?;
+    let trace_context = trace_repo.get_trace_context(candidate.trace_context_id).await?.ok_or(JobError::MissingTraceContext { trace_context_id: candidate.trace_context_id })?;
     let delivery = trace_handoff_port.deliver_trace_handoff(candidate.clone(), trace_context).await;
 
     let uow = unit_of_work.begin().await?;
-    let mut handoff = trace_repo.get_trace_handoff_for_update(candidate.trace_handoff_id, uow.clone()).await?.ok_or(JobError::MissingHandoff)?;
+    let mut handoff = trace_repo.get_trace_handoff_for_update(candidate.trace_handoff_id, uow.clone()).await?.ok_or(JobError::MissingTraceHandoff { trace_handoff_id: candidate.trace_handoff_id })?;
 
     match delivery {
         Ok(receipt_ref) => {
@@ -2959,7 +3015,7 @@ Ok(receipt.completed(clock.now()))
 |---|---|
 | 事务边界 | 外部 handoff 不包在 DB 事务内;每条 handoff state 独立事务 |
 | 错误映射 | transient handoff -> retry;permanent handoff -> failed;missing trace -> failed job evidence |
-| 状态副作用 | `Pending` / `RetryPending` -> `HandedOff`、`RetryPending` 或 `Failed` |
+| 状态副作用 | `Pending` / `RetryPending` -> `HandedOff`、`RetryPending` 或 `Failed`;success 写 `observability_receipt_ref` / `handed_off_at`,retry 写 `retry_marker`,failed 写 `failure_reason` / `failed_by` |
 | 事件副作用 | 无反写 truth event;job receipt 暴露 external receipt ref |
 | 测试切口 | delivered、retryable failure、permanent failure、missing trace context |
 
@@ -2994,15 +3050,17 @@ Ok(receipt.completed(clock.now()))
 
 ```rust
 job.validate()?;
-let mut receipt = JobRunReceipt::started(job.job_run_id);
-let handoffs = trace_repo.list_pending_archive_handoffs(job.archive_handoff_scope, job.page_request()).await?;
+let mut receipt = JobRunReceipt::started(job.job_run_id, job.job_metadata.job_kind, job.trace_ref, clock.now());
+let mut scope = job.archive_handoff_scope;
+scope.ready_at_or_before = Some(clock.now());
+let handoffs = trace_repo.list_pending_archive_handoffs(scope, job.page_request()).await?;
 
 for candidate in handoffs.items {
-    let trace_context = trace_repo.get_trace_context(candidate.trace_context_id).await?.ok_or(JobError::MissingTraceContext)?;
-    let delivery = archive_handoff_port.deliver_archive_handoff(candidate.clone(), trace_context).await;
+    let trace_context = trace_repo.get_trace_context(candidate.trace_context_id).await?.ok_or(JobError::MissingTraceContext { trace_context_id: candidate.trace_context_id })?;
+    let delivery = archive_handoff_port.deliver_archive_handoff(candidate.clone(), trace_context, job.archive_destination_ref.clone()).await;
 
     let uow = unit_of_work.begin().await?;
-    let mut handoff = trace_repo.get_archive_handoff_for_update(candidate.archive_handoff_id, uow.clone()).await?.ok_or(JobError::MissingHandoff)?;
+    let mut handoff = trace_repo.get_archive_handoff_for_update(candidate.archive_handoff_id, uow.clone()).await?.ok_or(JobError::MissingArchiveHandoff { archive_handoff_id: candidate.archive_handoff_id })?;
 
     match delivery {
         Ok(package_ref) => {
@@ -3032,7 +3090,7 @@ Ok(receipt.completed(clock.now()))
 |---|---|
 | 事务边界 | 外部 archive delivery 不包在 DB 事务内;每条 archive state 独立事务 |
 | 错误映射 | transient archive error -> retry;permanent archive error -> failed;missing trace -> failed job evidence |
-| 状态副作用 | `Pending` / `RetryPending` -> `Archived`、`RetryPending` 或 `Failed` |
+| 状态副作用 | `Pending` / `RetryPending` -> `Archived`、`RetryPending` 或 `Failed`;success 写 `archive_package_ref` / `archived_at`,retry 写 `retry_marker`,failed 写 `failure_reason` / `failed_by` |
 | 事件副作用 | 无本仓 truth event;job receipt 暴露 archive package refs |
 | 测试切口 | archived、retryable archive failure、permanent failure、archive package body not stored |
 
@@ -3067,7 +3125,7 @@ Ok(receipt.completed(clock.now()))
 
 ```rust
 job.validate()?;
-let mut receipt = JobRunReceipt::started(job.job_run_id);
+let mut receipt = JobRunReceipt::started(job.job_run_id, job.job_metadata.job_kind, job.trace_ref, clock.now());
 let spaces = space_scope_repo.list_spaces(job.space_scope, job.page_request()).await?;
 
 for space in spaces.items {
@@ -3125,7 +3183,7 @@ Ok(receipt.completed(clock.now()))
 
 ```rust
 job.validate()?;
-let mut receipt = JobRunReceipt::started(job.job_run_id);
+let mut receipt = JobRunReceipt::started(job.job_run_id, job.job_metadata.job_kind, job.trace_ref, clock.now());
 let cursors = projection_repo.list_expired_change_cursors(job.cursor_scope, job.expired_before, job.page_request()).await?;
 
 let uow = unit_of_work.begin().await?;

@@ -510,6 +510,14 @@ pub trait TraceRepository {
 | `list_pending_trace_handoffs(scope: TraceHandoffScope, page: PageRequest)` | 分页列出待交接 trace handoff | scope、分页参数 | `Page<TraceHandoffRecord>` | `RepositoryError` |
 | `list_pending_archive_handoffs(scope: ArchiveHandoffScope, page: PageRequest)` | 分页列出待归档 handoff | scope、分页参数 | `Page<ArchiveHandoffRecord>` | `RepositoryError` |
 
+Scope 过滤语义:
+
+- `TraceHandoffScope`、`ArchiveHandoffScope` 属于 `contracts/refs.rs`,字段级 schema 见 Step 6 §7.2.3;repository 不得定义 application-local scope。
+- 两个 list 函数只返回 `Pending` 或 retry due 的 `RetryPending` 记录;`Failed`、`Cancelled`、`HandedOff`、`Archived` 终态不得返回。
+- `ready_at_or_before` 必须由 application job service 在调用前用 `ClockPort.now()` 补齐;repository 只比较字段,不得自行读取 wall clock。
+- trace handoff 按 `TraceHandoffRecord.destination_ref` 匹配 destination;archive handoff 的 `ArchiveDestinationRef` 是 job-level adapter 目标,不进入 repository scope。
+- 排序必须稳定:优先 `retry_marker.next_retry_at ASC NULLS FIRST`,其次创建时间或记录 id 单调字段 ASC,最后 handoff id ASC;分页在过滤和排序后应用。
+
 #### 7.3.5 `ProjectionRepository`
 
 ```rust
@@ -977,6 +985,49 @@ pub trait ConversationOutboxPublisherPort {
 | `publish_batch(outbox_records: Vec<ConversationOutboxRecord>, trace_ref: TraceContextRef)` | 批量发布 outbox | outbox 列表与 trace | `Vec<PublishedEventRef>` | `PublishError` |
 | `publish_projection_state_changed(state: ConversationProjectionState, trace_ref: TraceContextRef)` | 发布派生状态变化事件 | projection state 与 trace | `PublishedEventRef` | `PublishError` |
 
+#### 7.5.3.0 `HandoffError`
+
+`HandoffError` 属于 `application/ports.rs`,是 `TraceHandoffPort` / `ArchiveHandoffPort` 返回的 adapter error。它不是 public job DTO;job runner 必须把它映射为 handoff record 的 retry / failed state,并在需要返回 job surface 时转换成 `JobError` 或 `JobRunReceipt` evidence。
+
+```rust
+/// Adapter-level error returned by observability / archive handoff ports.
+pub enum HandoffError {
+    /// Destination is temporarily unavailable.
+    DestinationUnavailable { diagnostic_ref: Option<DiagnosticRef> },
+    /// Adapter call timed out.
+    Timeout { diagnostic_ref: Option<DiagnosticRef> },
+    /// Destination asked the caller to retry later.
+    RateLimited {
+        retry_after: Option<Timestamp>,
+        diagnostic_ref: Option<DiagnosticRef>,
+    },
+    /// Destination rejected the handoff permanently.
+    DestinationRejected { diagnostic_ref: Option<DiagnosticRef> },
+    /// Archive adapter returned a package body or malformed package ref.
+    InvalidArchivePackage { diagnostic_ref: Option<DiagnosticRef> },
+    /// Payload or archive material violated forbidden-body policy.
+    ForbiddenBody { diagnostic_ref: Option<DiagnosticRef> },
+    /// Adapter configuration is invalid for this destination.
+    AdapterMisconfigured { diagnostic_ref: Option<DiagnosticRef> },
+}
+```
+
+| 变体 | `is_retryable()` | retry / failure 映射 |
+|---|---:|---|
+| `DestinationUnavailable` | 是 | `HandoffRetryReasonKind::DestinationUnavailable` |
+| `Timeout` | 是 | `HandoffRetryReasonKind::Timeout` |
+| `RateLimited` | 是 | `HandoffRetryReasonKind::RateLimited` |
+| `DestinationRejected` | 否 | `HandoffFailureReasonKind::DestinationRejected` |
+| `InvalidArchivePackage` | 否 | `HandoffFailureReasonKind::PermanentAdapterError` |
+| `ForbiddenBody` | 否 | `HandoffFailureReasonKind::PayloadUnsafe` |
+| `AdapterMisconfigured` | 否 | `HandoffFailureReasonKind::PermanentAdapterError` |
+
+约束:
+
+- `diagnostic_ref` 只能指向安全诊断,不得保存外部 response body、archive package body、payload body、secret 或 token。
+- retryable error 只能进入 `mark_retry(...)` 分支;若 retry policy 已耗尽,必须转换为 `HandoffFailureReasonKind::MaxRetryExceeded` 后进入 `mark_failed(...)`。
+- permanent error 不得进入 retry 分支。
+
 #### 7.5.4 `TraceHandoffPort`
 
 ```rust
@@ -1005,13 +1056,14 @@ pub trait ArchiveHandoffPort {
         &self,
         handoff: ArchiveHandoffRecord,
         trace_context: ConversationTraceContext,
+        destination_ref: ArchiveDestinationRef,
     ) -> Result<ArchivePackageRef, HandoffError>;
 }
 ```
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 错误类型 |
 |---|---|---|---|---|
-| `deliver_archive_handoff(handoff: ArchiveHandoffRecord, trace_context: ConversationTraceContext)` | 交接归档材料 | handoff record 与 trace context | `ArchivePackageRef` | `HandoffError` |
+| `deliver_archive_handoff(handoff: ArchiveHandoffRecord, trace_context: ConversationTraceContext, destination_ref: ArchiveDestinationRef)` | 交接归档材料 | handoff record、trace context 与归档目的地 | `ArchivePackageRef` | `HandoffError` |
 
 ### 7.6 实现方 / 调用方关系表
 

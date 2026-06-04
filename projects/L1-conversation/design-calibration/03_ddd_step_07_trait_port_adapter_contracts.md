@@ -985,7 +985,64 @@ pub trait ConversationOutboxPublisherPort {
 | `publish_batch(outbox_records: Vec<ConversationOutboxRecord>, trace_ref: TraceContextRef)` | 批量发布 outbox | outbox 列表与 trace | `Vec<PublishedEventRef>` | `PublishError` |
 | `publish_projection_state_changed(state: ConversationProjectionState, trace_ref: TraceContextRef)` | 发布派生状态变化事件 | projection state 与 trace | `PublishedEventRef` | `PublishError` |
 
-#### 7.5.3.0 `HandoffError`
+#### 7.5.3.0 `PublishError`
+
+`PublishError` 属于 `application/ports.rs`,是 `ConversationOutboxPublisherPort` 返回的 adapter error。它不是 public job DTO;publish job runner 必须把它映射为 outbox record 的 retry / failed state,并在需要返回 job surface 时转换成 `JobError` 或 `JobRunReceipt` evidence。
+
+```rust
+/// Adapter-level error returned by conversation outbox publisher.
+pub enum PublishError {
+    /// Outbox event kind does not match the requested publisher path.
+    InvalidEventKind {
+        expected: Option<ConversationOutboxEventKind>,
+        actual: ConversationOutboxEventKind,
+        diagnostic_ref: Option<DiagnosticRef>,
+    },
+    /// Required redacted payload reference is missing.
+    PayloadMissing {
+        outbox_record_id: ConversationOutboxRecordId,
+        diagnostic_ref: Option<DiagnosticRef>,
+    },
+    /// Event payload violates forbidden-body policy.
+    ForbiddenBody { diagnostic_ref: Option<DiagnosticRef> },
+    /// Event destination is temporarily unavailable.
+    TransportUnavailable { diagnostic_ref: Option<DiagnosticRef> },
+    /// Publisher transport timed out.
+    Timeout { diagnostic_ref: Option<DiagnosticRef> },
+    /// Event destination asked the caller to retry later.
+    RateLimited {
+        retry_after: Option<Timestamp>,
+        diagnostic_ref: Option<DiagnosticRef>,
+    },
+    /// Destination rejected the event permanently.
+    DestinationRejected { diagnostic_ref: Option<DiagnosticRef> },
+    /// Publisher adapter configuration is invalid.
+    AdapterMisconfigured { diagnostic_ref: Option<DiagnosticRef> },
+    /// Publisher adapter returned an unspecified permanent failure.
+    PermanentPublisherError { diagnostic_ref: Option<DiagnosticRef> },
+}
+```
+
+| 变体 | `is_retryable()` | retry / failure 映射 |
+|---|---:|---|
+| `TransportUnavailable` | 是 | `RetryReasonKind::DestinationUnavailable`;retry exhausted -> `OutboxFailureReasonKind::RetryLimitExceeded` |
+| `Timeout` | 是 | `RetryReasonKind::Timeout`;retry exhausted -> `OutboxFailureReasonKind::RetryLimitExceeded` |
+| `RateLimited` | 是 | `RetryReasonKind::RateLimited`;retry exhausted -> `OutboxFailureReasonKind::RetryLimitExceeded` |
+| `InvalidEventKind` | 否 | `OutboxFailureReasonKind::InvalidEventKind` |
+| `PayloadMissing` | 否 | `OutboxFailureReasonKind::PayloadMissing` |
+| `ForbiddenBody` | 否 | `OutboxFailureReasonKind::ForbiddenBody` |
+| `DestinationRejected` | 否 | `OutboxFailureReasonKind::DestinationRejected` |
+| `AdapterMisconfigured` | 否 | `OutboxFailureReasonKind::AdapterMisconfigured` |
+| `PermanentPublisherError` | 否 | `OutboxFailureReasonKind::PermanentPublisherError` |
+
+约束:
+
+- `diagnostic_ref` 只能指向安全诊断,不得保存 event body、broker response body、payload body、source body、secret 或 token。
+- retryable error 只能进入 `ConversationOutboxRecord::mark_retry(...)` 分支;若 retry limit 已耗尽,必须转换为 `OutboxFailureReasonKind::RetryLimitExceeded` 后进入 `mark_failed(...)`。
+- permanent error 不得进入 retry 分支。
+- `InvalidEventKind`、`PayloadMissing` 和 `ForbiddenBody` 是 event builder / payload boundary 错误,不得伪装成 transport retry。
+
+#### 7.5.3.1 `HandoffError`
 
 `HandoffError` 属于 `application/ports.rs`,是 `TraceHandoffPort` / `ArchiveHandoffPort` 返回的 adapter error。它不是 public job DTO;job runner 必须把它映射为 handoff record 的 retry / failed state,并在需要返回 job surface 时转换成 `JobError` 或 `JobRunReceipt` evidence。
 

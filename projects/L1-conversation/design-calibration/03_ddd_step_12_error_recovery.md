@@ -143,7 +143,15 @@ publish / handoff 失败不得回滚 truth。
 | `TransactionError` | `infra` / UnitOfWork | begin / commit / rollback 失败 | transient 可重试 | 5xx |
 | `IdempotencyError::Conflict` | `application` | 同 key 不同请求内容或不同 result | 否 | 409 |
 | `ResolverError` | source resolver adapter | 外部来源不可解析、超时、digest 不一致 | 部分可重试 | unresolved / delayed / quarantine |
-| `PublishError` | outbox publisher | event build / transport / topic publish 失败 | transport 可重试 | outbox retry / failed |
+| `PublishError::TransportUnavailable` | outbox publisher | event destination 暂不可用 | 是 | outbox retry;超 `RetryLimit` 后 failed |
+| `PublishError::Timeout` | outbox publisher | publisher transport 超时 | 是 | outbox retry;超 `RetryLimit` 后 failed |
+| `PublishError::RateLimited` | outbox publisher | event destination 要求稍后重试 | 是 | outbox retry;超 `RetryLimit` 后 failed |
+| `PublishError::InvalidEventKind` | outbox publisher | outbox event kind 与 publisher path 不匹配 | 否 | outbox failed |
+| `PublishError::PayloadMissing` | outbox publisher | redacted payload ref 缺失 | 否 | outbox failed |
+| `PublishError::ForbiddenBody` | outbox publisher | event payload 违反 forbidden body policy | 否 | outbox failed |
+| `PublishError::DestinationRejected` | outbox publisher | event destination 永久拒绝 | 否 | outbox failed |
+| `PublishError::AdapterMisconfigured` | outbox publisher | publisher adapter 配置非法 | 否 | outbox failed |
+| `PublishError::PermanentPublisherError` | outbox publisher | publisher adapter 永久失败 | 否 | outbox failed |
 | `HandoffError::DestinationUnavailable` | handoff adapter | 目标暂不可用 | 是 | handoff retry |
 | `HandoffError::Timeout` | handoff adapter | adapter 调用超时 | 是 | handoff retry |
 | `HandoffError::RateLimited` | handoff adapter | 目标要求稍后重试 | 是 | handoff retry |
@@ -185,7 +193,8 @@ publish / handoff 失败不得回滚 truth。
 | `DomainError::RetryLimitExceeded` | outbox / handoff `Failed` marker | 停止自动 retry,交由 operations review 或新 intent |
 | `RepositoryError` | HTTP 500 / retryable job marker | 可按 retry policy 重试 |
 | `ResolverError` | unresolved / delayed marker | 等待 refresh job 或人工处理 digest mismatch |
-| `PublishError` | outbox `RetryPending` / `Failed` | 由 publish job 重试或 operations 处理 |
+| `PublishError` retryable variants | outbox `RetryPending` | 由 publish job 按 `RetryLimit` 重试 |
+| `PublishError` permanent variants | outbox `Failed` | operations review 或新 publish intent |
 | `HandoffError` retryable variants | handoff `RetryPending` | 由 handoff job 按 retry policy 重试 |
 | `HandoffError` permanent variants | handoff `Failed` | operations review 或新 handoff intent |
 | `JobError::InvalidInput` | failed `JobRunReceipt` | 修正 job input、scope、metadata 或 idempotency key 后重新触发 |

@@ -953,7 +953,7 @@ PH-05 consumer 公共类型归属与校验规则:
 归属口径:
 
 - `ReviewAnchorId`、`ReviewAnchorRef`、`ReviewAnchorKind`、`ReviewTargetKind`、`ReviewTargetRef`、`ReviewReasonKind`、`ReviewReasonRef`、`TraceSealReason`、`TraceSealReasonKind`、`ObservabilityDestinationKind`、`ObservabilityDestinationRef`、`HandoffReasonKind`、`HandoffReason`、`ArchiveScopeKind`、`ArchiveScope`、`TraceRetentionPolicyRef`、`TraceHandoffRecordId`、`ArchiveHandoffRecordId`、`TraceHandoffPayloadRef`、`RetryAttempt`、`HandoffRetryMarker`、`HandoffRetryReason`、`HandoffRetryReasonKind`、`HandoffFailureReason`、`HandoffFailureReasonKind`、`HandoffCancelReason`、`HandoffCancelReasonKind`、`ObservabilityReceiptRef`、`ArchivePackageRef`、`ArchiveDestinationRef`、`TraceHandoffScope`、`ArchiveHandoffScope`、`RetentionDuration`、`RetentionWindow`、`TraceRetentionRuleSet`、`TraceHandoffRuleSet`、`TraceRedactionRuleSet` 和 `BodyExclusionRuleSet` 属于 `conversation-contracts/src/refs.rs` 或同层 contracts value module。
-- `JobMetadata`、`JobRunReceipt`、`JobRunStatus`、`ConversationJobKind`、`JobTriggerKind` 和 `JobError` 属于 `conversation-contracts/src/jobs.rs`,正式 schema 见 Step 8 §6 `Job shared DTO / receipt / error schema`;`HandoffError` 属于 `application/ports.rs` handoff adapter error,正式 schema 见 Step 7 §7.5.3.0。
+- `JobMetadata`、`JobRunReceipt`、`JobRunStatus`、`ConversationJobKind`、`JobTriggerKind` 和 `JobError` 属于 `conversation-contracts/src/jobs.rs`,正式 schema 见 Step 8 §6 `Job shared DTO / receipt / error schema`;`HandoffError` 属于 `application/ports.rs` handoff adapter error,正式 schema 见 Step 7 §7.5.3.1。
 - `domain/trace.rs` 和 `domain/policies.rs` 只能消费这些 contracts value object,不得让 `contracts` 反向依赖 `domain`。
 - 这些类型均只保存 ref、digest、marker、reason code、时间和策略数据,不得保存 review report body、trace payload body、archive package body、raw observability response、secret 或 token。
 
@@ -1439,6 +1439,151 @@ pub struct BodyExclusionRuleSet {
 - `TraceRetentionPolicy::from_retention_rules(...)` 只接收纯数据 rule set,不得读取 repository、port、env var 或外部系统。
 - `BodyExclusionRuleSet` 同时供 `ConversationTruthPolicy` 和 `TraceRetentionPolicy` 消费,正式归属为 contracts shared value object;不得在 `domain/policies.rs` 复制第二套字段。
 
+### 7.2.4 PH-07 outbox / outbound event 共享值对象正式 schema
+
+本小节补齐 PH-07 `outbox publish / outbound event / publish job` boundary 直接落码所需的 public protocol 共享值对象。实现侧不得把下列类型临时实现成裸 `String`、空 struct 或 application-local placeholder。
+
+归属口径:
+
+- `VisibilityMarker`、`VisibilityMarkerKind`、`PublishedEventRef`、`RetryCount`、`RetryLimit`、`RetryReason`、`RetryReasonKind`、`OutboxRetryMarker`、`OutboxFailureReason` 和 `OutboxFailureReasonKind` 属于 `conversation-contracts/src/refs.rs` 或同层 contracts value module。
+- `ConversationOutboxRecord` 属于 `domain/outbox.rs`,但其 `retry_marker`、`retry_count()`、`mark_retry(...)` 和 `mark_failed(...)` 必须消费上述 contracts value object,不得在 domain 内复制第二套 retry / failure enum。
+- `PublishError` 属于 `application/ports.rs` publisher adapter error,正式 variant 和 `is_retryable()` 口径见 Step 7 §7.5.3.0;`RetryReason::from_publish_error(...)` 和 `OutboxFailureReason::from_publish_error(...)` 必须按该表映射。
+- 这些类型只保存 ref、marker、safe diagnostic、时间、计数和 reason code,不得保存 event body、broker response body、payload body、source body、secret 或 token。
+
+```rust
+/// Visibility marker carried by outbound events without exposing participant lists or rule bodies.
+pub struct VisibilityMarker {
+    /// Visibility scope that downstream consumers must use for authorization or cursor filtering.
+    pub visibility_scope_id: VisibilityScopeId,
+    /// Marker family.
+    pub marker_kind: VisibilityMarkerKind,
+    /// Optional safe scope snapshot reference used by consumers that can dereference snapshots.
+    pub scope_snapshot_ref: Option<ScopeSnapshotRef>,
+    /// Optional safe diagnostic marker for suppressed or restricted publication.
+    pub diagnostic_ref: Option<DiagnosticRef>,
+}
+
+/// Describes how much visibility information is carried in an outbound event.
+pub enum VisibilityMarkerKind {
+    /// Event only carries a visibility scope id; consumers must query by scope.
+    ScopeRefOnly,
+    /// Event is publishable but known to be visibility restricted.
+    Restricted,
+    /// Event publication was suppressed and only safe evidence may be retained.
+    Suppressed,
+}
+
+/// Reference returned by an event publisher after a successful publish.
+pub struct PublishedEventRef {
+    /// Stable outbound event id.
+    pub event_id: EventId,
+    /// Published topic or event name.
+    pub topic_ref: ExternalReferenceRef,
+    /// Published event version.
+    pub event_version: String,
+    /// Time reported by the publisher boundary.
+    pub published_at: Timestamp,
+}
+
+/// Current outbox retry count.
+pub struct RetryCount(pub u32);
+
+/// Maximum retry count for one publish job / retry policy.
+pub struct RetryLimit(pub u32);
+
+/// Retryable publisher failure reason.
+pub enum RetryReasonKind {
+    /// Event destination is temporarily unavailable.
+    DestinationUnavailable,
+    /// Publisher transport timed out.
+    Timeout,
+    /// Event destination asked the caller to retry later.
+    RateLimited,
+    /// Publisher adapter returned an unspecified transient error.
+    TransientPublisherError,
+}
+
+/// Reason why an outbox publish attempt is scheduled for retry.
+pub struct RetryReason {
+    /// Retry reason kind.
+    pub reason_kind: RetryReasonKind,
+    /// Safe diagnostic reference.
+    pub diagnostic_ref: Option<DiagnosticRef>,
+}
+
+/// Retry evidence for one outbox record.
+pub struct OutboxRetryMarker {
+    /// Retry reason.
+    pub retry_reason: RetryReason,
+    /// Number of retry attempts already recorded.
+    pub retry_count: RetryCount,
+    /// Time when the next retry is allowed.
+    pub next_retry_at: Timestamp,
+}
+
+/// Permanent outbox publish failure reason.
+pub enum OutboxFailureReasonKind {
+    /// Outbox event kind does not match the publisher path.
+    InvalidEventKind,
+    /// Required redacted payload reference is missing.
+    PayloadMissing,
+    /// Event or payload violates forbidden-body policy.
+    ForbiddenBody,
+    /// Destination rejected the event permanently.
+    DestinationRejected,
+    /// Publisher adapter is misconfigured.
+    AdapterMisconfigured,
+    /// Publisher adapter returned an unspecified permanent error.
+    PermanentPublisherError,
+    /// Retry limit was exhausted for an otherwise retryable failure.
+    RetryLimitExceeded,
+}
+
+/// Reason why outbox publication failed permanently.
+pub struct OutboxFailureReason {
+    /// Failure reason kind.
+    pub reason_kind: OutboxFailureReasonKind,
+    /// Safe diagnostic reference.
+    pub diagnostic_ref: Option<DiagnosticRef>,
+}
+```
+
+构造与映射规则:
+
+| 类型 / 函数 | 正式口径 |
+|---|---|
+| `VisibilityMarker::scope_ref_only(visibility_scope_id)` | PH-07 outbound event 默认构造口径;只复制 `visibility_scope_id`,设置 `marker_kind = ScopeRefOnly`,不读取 participant list 或 rule body |
+| `VisibilityMarker::restricted(visibility_scope_id, scope_snapshot_ref)` | 仅在 publisher 已持有安全 scope snapshot ref 时使用;不得嵌入 scope 规则正文 |
+| `VisibilityMarker::suppressed(visibility_scope_id, diagnostic_ref)` | publication 被 visibility / boundary rule suppress 时使用;只保存 safe diagnostic |
+| `PublishedEventRef::from_publish_result(event_id, topic_ref, event_version, published_at)` | 成功发布后构造;`published_at` 来自 publisher boundary 或 job clock,不得改写 outbox `committed_at` |
+| `RetryLimit::new(value)` | `value > 0`;非法值返回 `ProtocolError::InvalidJob` 或配置校验错误 |
+| `RetryCount::zero()` | 初始 retry count;无 `retry_marker` 时 `ConversationOutboxRecord::retry_count()` 返回 `RetryCount(0)` |
+| `RetryReason::from_publish_error(error)` | 只接受 retryable `PublishError`;permanent error 调用该函数必须返回 application / domain error 或 unreachable test failure |
+| `OutboxFailureReason::from_publish_error(error)` | permanent `PublishError` 映射到具体 failure kind;retryable error 只有在 retry exhausted 分支可映射为 `RetryLimitExceeded` |
+| `OutboxFailureReason::retry_limit_exceeded(error)` | retryable `PublishError` 已达到 `RetryLimit` 时使用;保留 safe diagnostic,不保存 publisher response body |
+
+`PublishError` 到 outbox reason 的正式映射:
+
+| `PublishError` 变体 | `is_retryable()` | retry 映射 | failure 映射 |
+|---|---:|---|---|
+| `TransportUnavailable` | 是 | `RetryReasonKind::DestinationUnavailable` | retry exhausted -> `OutboxFailureReasonKind::RetryLimitExceeded` |
+| `Timeout` | 是 | `RetryReasonKind::Timeout` | retry exhausted -> `OutboxFailureReasonKind::RetryLimitExceeded` |
+| `RateLimited` | 是 | `RetryReasonKind::RateLimited` | retry exhausted -> `OutboxFailureReasonKind::RetryLimitExceeded` |
+| `InvalidEventKind` | 否 | 不适用 | `OutboxFailureReasonKind::InvalidEventKind` |
+| `PayloadMissing` | 否 | 不适用 | `OutboxFailureReasonKind::PayloadMissing` |
+| `ForbiddenBody` | 否 | 不适用 | `OutboxFailureReasonKind::ForbiddenBody` |
+| `DestinationRejected` | 否 | 不适用 | `OutboxFailureReasonKind::DestinationRejected` |
+| `AdapterMisconfigured` | 否 | 不适用 | `OutboxFailureReasonKind::AdapterMisconfigured` |
+| `PermanentPublisherError` | 否 | 不适用 | `OutboxFailureReasonKind::PermanentPublisherError` |
+
+约束:
+
+- `VisibilityMarker` 是 outbound event 的 marker,不是授权结果缓存。消费者仍必须按 `visibility_scope_id` 和自身 consumer context 做授权读取。
+- Outbound event payload 不得携带 `VisibilityScope` rule body、participant list、payload body、source body、broker response body、secret 或 token。
+- `PublishedEventRef` 只证明 publisher boundary 接受了 event,不证明 conversation truth 成立;truth 成立只由 outbox 所指 committed truth 决定。
+- `RetryCount` 与 `RetryLimit` 只能比较计数,不得与 job `BatchSize`、page limit 或 rate limit 混用。
+- retryable `PublishError` 只能进入 `mark_retry(...)` 或 retry exhausted -> `mark_failed(...)` 分支;permanent `PublishError` 不得进入 retry 分支。
+
 ### 7.3 `domain/truth.rs` 对象实现契约
 
 #### 7.3.1 `ConversationTruthState`
@@ -1666,7 +1811,7 @@ pub enum ConversationOutboxPublicationState {
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `mark_published(&mut self, published_ref: PublishedEventRef, published_at: Timestamp) -> Result<(), DomainError>` | 标记发布完成 | 发布引用和时间 | `Result<(), DomainError>` | 只能从 `Pending` / `RetryPending` 进入 |
-| `mark_retry(&mut self, reason: RetryReason, next_retry_at: Timestamp) -> Result<(), DomainError>` | 标记重试 | 失败原因和下次时间 | `Result<(), DomainError>` | 不修改 truth |
+| `mark_retry(&mut self, reason: RetryReason, next_retry_at: Timestamp, retry_limit: RetryLimit) -> Result<(), DomainError>` | 标记重试 | 失败原因、下次时间和最大重试次数 | `Result<(), DomainError>` | 不修改 truth;超限返回 `DomainError::RetryLimitExceeded` |
 | `mark_failed(&mut self, reason: OutboxFailureReason, actor: ActorRef) -> Result<(), DomainError>` | 标记失败 | 失败原因和操作人 | `Result<(), DomainError>` | 保留证据 |
 | `can_publish(&self, visibility: &VisibilityScope) -> bool` | 判断是否可发布 | 可见范围 | `bool` | 不绕过 visibility |
 | `retry_count(&self) -> RetryCount` | 返回已记录重试次数 | 无 | `RetryCount` | 只读 retry marker |
@@ -1689,6 +1834,7 @@ pub enum ConversationOutboxPublicationState {
 不变量与禁止事项:
 
 - outbox 不能决定 truth 是否成立。
+- `ConversationOutboxRecord::mark_retry(...)` 必须把当前 `retry_count()` 加一后写入 `OutboxRetryMarker`;如果新增后的 retry count 大于 `retry_limit`,必须返回 `DomainError::RetryLimitExceeded` 且不写 retry marker。application / job 捕获该错误后必须调用 `mark_failed(OutboxFailureReason::retry_limit_exceeded(error), actor)` 或同等 failed marker 分支。
 - `ConversationOutboxRecord::from_fact_append(...)` 和 `from_fact_retraction(...)` 必须设置 `fact_sequence = Some(fact.append_sequence)`、`fact_ref = Some(ConversationFactRef::from_fact(&fact))`、`visibility_scope_id = fact.visibility_scope_id`、`manifestation_ref = None`、`committed_at = committed_at`。
 - `ConversationOutboxRecord::from_manifestation(...)` 必须设置 `manifestation_ref = Some(CrossDomainManifestationRef::from_manifestation(&manifestation))`、`visibility_scope_id = manifestation.visibility_scope_id`、`committed_at = committed_at`;若 `manifested_fact = Some(fact)`,则同时设置 `fact_sequence` 和 `fact_ref`,否则二者为 `None`。
 - `ConversationOutboxRecord::from_scope_change(...)` 必须按 `change.scope_kind` 映射 event kind:`ScopeKind::Space` -> `ConversationOutboxEventKind::SpaceChanged`;`ScopeKind::Participant` / `ScopeKind::Visibility` -> `ConversationOutboxEventKind::ScopeChanged`。scope change outbox 的 `fact_sequence`、`fact_ref`、`manifestation_ref` 必须为 `None`,`visibility_scope_id` 来自 application service 读取到的当前可见范围或该次 visibility scope change 的目标 scope。

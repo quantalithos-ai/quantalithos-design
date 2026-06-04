@@ -2161,6 +2161,17 @@ Bridge append path uses `actor_ref` as a trusted integration source actor. The a
 
 输出:`JobRunReceipt` 必须包含 published count、failed count、retry count 和 failed record refs。
 
+| 字段 | 类型 | 必填 | 来源 / 校验 | 不得混同 |
+|---|---|---:|---|---|
+| `job_run_id` | `JobRunId` | 是 | job runner 生成或 scheduler 传入 | 不等于 outbox record id |
+| `job_metadata` | `JobMetadata` | 是 | Job shared DTO,见 §6 | 不等于 command metadata |
+| `idempotency_key` | `IdempotencyKey` | 是 | job run 幂等键 | 不等于 event id |
+| `batch_size` | `BatchSize` | 是 | job 读取 pending outbox 的批量上限 | 不等于 `RetryLimit`、`PageLimit` |
+| `max_retry_count` | `RetryLimit` | 是 | `RetryLimit::new(value)` 校验 `value > 0`;非法返回 `JobError::InvalidInput` | 不等于 `BatchSize`、rate limit、page limit |
+| `trace_ref` | `TraceContextRef` | 是 | job log / receipt trace | 不等于 published event id |
+
+`RetryLimit` 的字段级 schema、`RetryCount`、`RetryReason`、`OutboxFailureReason` 和 `PublishError` 映射见 Step 6 §7.2.4 与 Step 7 §7.5.3.0。`max_retry_count` 缺失或非法时,job 不得开始 publish,必须返回 failed job receipt 或 `JobError::InvalidInput`。
+
 #### 7.7.2 `RebuildConversationReadModels`
 
 | 项 | 内容 |

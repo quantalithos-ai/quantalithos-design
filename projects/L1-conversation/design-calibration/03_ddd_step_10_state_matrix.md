@@ -692,7 +692,7 @@ ConversationChangeCursorState:
 |---|---|---|---|---|---|
 | 初始 | `Pending` | `ConversationOutboxRecord::from_fact_append(...)` / `from_fact_retraction(...)` / `from_manifestation(...)` / `from_scope_change(...)` / `from_trace_handoff(...)` / `from_archive_handoff(...)` | truth 已在 command / consumer 事务内提交 | outbox 入队,truth 不等待 publish 成功 | `DomainError::InvalidInitialState` |
 | `Pending` / `RetryPending` | `Published` | `ConversationOutboxRecord::mark_published(PublishedEventRef published_ref, Timestamp published_at)` | publisher 返回 `PublishedEventRef` | 保存 published state,清空 retry marker | `DomainError::InvalidStateTransition` |
-| `Pending` | `RetryPending` | `ConversationOutboxRecord::mark_retry(RetryReason reason, Timestamp next_retry_at)` | publish transient failure 且未超 retry limit | 保存 retry marker | `DomainError::InvalidStateTransition` |
+| `Pending` | `RetryPending` | `ConversationOutboxRecord::mark_retry(RetryReason reason, Timestamp next_retry_at, RetryLimit retry_limit)` | publish transient failure 且未超 retry limit | 保存 retry marker | `DomainError::InvalidStateTransition` |
 | `RetryPending` | `RetryPending` | `mark_retry(...)` | retry 再次失败但仍可重试 | 更新 retry marker / next retry | `DomainError::RetryLimitExceeded` |
 | `Pending` / `RetryPending` | `Failed` | `ConversationOutboxRecord::mark_failed(OutboxFailureReason reason, ActorRef actor)` | non-retry failure 或 retry exhausted | 保存 failed evidence,truth 不回滚 | `DomainError::InvalidStateTransition` |
 | `Pending` | `Suppressed` | visibility / boundary suppression path | event 不应跨边界发布 | 保存 suppressed evidence | `DomainError::InvalidStateTransition` |

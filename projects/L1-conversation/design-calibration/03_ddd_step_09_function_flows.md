@@ -2640,9 +2640,22 @@ for candidate in pending {
             outbox.mark_published(published_ref, clock.now())?;
             receipt.count_published(outbox.outbox_record_id);
         }
-        Err(error) if error.is_retryable() && outbox.retry_count() < job.max_retry_count => {
-            outbox.mark_retry(RetryReason::from_publish_error(error), job.next_retry_at(clock.now()))?;
-            receipt.count_retry(outbox.outbox_record_id);
+        Err(error) if error.is_retryable() => {
+            let retry_result = outbox.mark_retry(
+                RetryReason::from_publish_error(error.clone())?,
+                job.next_retry_at(clock.now()),
+                job.max_retry_count,
+            );
+            match retry_result {
+                Ok(()) => {
+                    receipt.count_retry(outbox.outbox_record_id);
+                }
+                Err(DomainError::RetryLimitExceeded) => {
+                    outbox.mark_failed(OutboxFailureReason::retry_limit_exceeded(error), job.actor_ref())?;
+                    receipt.count_failed(outbox.outbox_record_id);
+                }
+                Err(error) => return Err(error.into()),
+            }
         }
         Err(error) => {
             outbox.mark_failed(OutboxFailureReason::from_publish_error(error), job.actor_ref())?;
@@ -2662,7 +2675,7 @@ Ok(receipt.completed(clock.now()))
 | 项 | 内容 |
 |---|---|
 | 事务边界 | 每条 outbox 独立事务;外部 publish 不包在 DB 事务内 |
-| 错误映射 | transient publish -> retry;non-retry publish -> failed;missing locked record -> job failed evidence |
+| 错误映射 | retryable `PublishError` -> `RetryReason::from_publish_error(...)` -> `mark_retry(..., job.max_retry_count)`;`DomainError::RetryLimitExceeded` -> `OutboxFailureReason::retry_limit_exceeded(...)` -> failed;permanent `PublishError` -> `OutboxFailureReason::from_publish_error(...)` -> failed;missing locked record -> job failed evidence |
 | 状态副作用 | `Pending` / `RetryPending` -> `Published`、`RetryPending` 或 `Failed` |
 | 事件副作用 | 触发 §7.5 对应 event publish |
 | 测试切口 | all success、partial retry、permanent failure、duplicate job does not double mark |

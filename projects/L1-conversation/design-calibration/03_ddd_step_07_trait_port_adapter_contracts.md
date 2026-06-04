@@ -891,6 +891,22 @@ pub trait ActorResolverPort {
 | `resolve_actor(actor: ActorRef, trace_ref: TraceContextRef)` | 解析 actor 安全快照 | actor 与 trace | `ActorSnapshot` | `ResolverError` |
 | `is_actor_resolvable(actor: ActorRef)` | 判断 actor 是否可解析 | actor | `bool` | `ResolverError` |
 
+`ActorSnapshot` 的正式 schema 见 Step 6 §7.7.0,归属 `conversation-contracts/src/refs.rs` 的 resolver-facing safe DTO。`ActorResolverPort` 必须定义在 `crates/application/src/ports.rs`;默认 adapter `ConfiguredActorResolverAdapter` 定义在 `crates/infra/src/source_resolvers.rs`,实现该 port。
+
+Actor resolver 落码口径:
+
+| 项 | 正式口径 |
+|---|---|
+| port 文件 | `crates/application/src/ports.rs` |
+| safe DTO | `crates/contracts/src/refs.rs::ActorSnapshot` |
+| configured adapter | `crates/infra/src/source_resolvers.rs::ConfiguredActorResolverAdapter` |
+| fake adapter / fixture | 同文件或测试 fixture,必须返回 `ActorSnapshot` 或 `ResolverError`,不得返回 identity crate DTO |
+| 成功返回 | `ActorSnapshot { actor_ref, actor_version_ref, actor_digest, display_summary_ref, resolution_state, resolution_reason }` |
+| not found / unavailable | `ResolverError` 或 `ActorSnapshot.resolution_state = Unresolved/Pending` 的明确策略;consumer flow 按 Step 9 处理 stale / quarantine marker |
+| 禁止返回 | identity private profile、role assignment list、raw upstream response、secret、token、source body |
+
+`is_actor_resolvable(...)` 是 lightweight guard,只能表达当前 actor ref 是否可解析;不得替代 `resolve_actor(...)` 的 snapshot freshness、digest 或 display summary。
+
 #### 7.5.2 `ExternalFactResolverPort`
 
 ```rust

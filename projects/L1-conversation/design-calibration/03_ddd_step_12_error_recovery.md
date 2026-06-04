@@ -50,7 +50,7 @@ publish / handoff 失败不得回滚 truth。
 
 | 错误类型 | HTTP / RPC / Event 映射 |
 |---|---|
-| `ProtocolError::MissingRequiredField` / `InvalidQuery` / `InvalidEnvelope` | 4xx / quarantine |
+| `ProtocolError::MissingRequiredField` / `InvalidCommand` / `InvalidQuery` / `InvalidEnvelope` | 4xx / quarantine |
 | `ApplicationError::NotFound` | 404 / not found view |
 | `ApplicationError::NotVisible` | 403 或 empty authorized view |
 | `ApplicationError::Conflict` / `IdempotencyError::Conflict` | 409 / conflict receipt |
@@ -120,6 +120,7 @@ publish / handoff 失败不得回滚 truth。
 | 错误类型 | 所属模块 | 触发条件 | 是否可重试 | 对外映射 |
 |---|---|---|---|---|
 | `ProtocolError::MissingRequiredField` | `contracts` | command / event / job 缺必填字段 | 否 | 400 / quarantine / failed job input |
+| `ProtocolError::InvalidCommand` | `contracts` | command 字段齐全但 target pair、mode、operation 或当前 boundary 不支持 | 否 | 400 |
 | `ProtocolError::InvalidQuery` | `contracts` | page、cursor、projection kind、consumer 参数非法 | 否 | 400 |
 | `ProtocolError::InvalidEnvelope` | `contracts` | inbound event envelope 缺 event id、source ref、idempotency key | 否 | quarantine |
 | `ApplicationError::NotFound` | `application` | space、fact、manifestation、trace、handoff 不存在 | 否 | 404 / job failed evidence |
@@ -145,6 +146,7 @@ publish / handoff 失败不得回滚 truth。
 | 内部错误 | HTTP / RPC / Event 映射 | 调用方应如何处理 |
 |---|---|---|
 | `ProtocolError::MissingRequiredField` | HTTP 400 / command reject | 修正请求后重试 |
+| `ProtocolError::InvalidCommand` | HTTP 400 / command reject | 修正 command target、mode 或 operation 后重试 |
 | `ProtocolError::InvalidEnvelope` | consumer quarantine | 修正来源事件或重放合法事件 |
 | `ApplicationError::NotFound` | HTTP 404 / job failed evidence | 检查引用是否存在 |
 | `ApplicationError::NotVisible` | HTTP 403 或 empty view marker | 不应重试同一权限上下文 |

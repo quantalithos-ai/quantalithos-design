@@ -865,8 +865,10 @@ pub trait RepositoryName {
 14. HLD `*Query`、DDD `*Request`、Rust DTO 名称是否存在收敛映射？
 15. Command result、event payload、consumer envelope / receipt、job report 中引用的 enum / ref / helper 是否都有 schema 和归属？
 16. Inbound consumer 的 envelope、receipt、duplicate、quarantine、delayed、no-op marker 是否有字段级 schema？
-17. 每个协议失败时映射成什么错误？
-18. 哪些协议需要幂等键或审计记录？
+17. 每个 command / event / job 的 actor 是 participant、system、integration 还是 trusted source actor？是否必须在 participant / visibility scope 中？
+18. 如果存在 trusted source actor 例外,适用的 source kind、actor kind、入口协议和不可绕过的 gate 是否写清？
+19. 每个协议失败时映射成什么错误？
+20. 哪些协议需要幂等键或审计记录？
 ```
 
 #### 期望产出
@@ -919,6 +921,7 @@ pub trait RepositoryName {
 - Repository page helper 如 `Page<T>` / `PageInfo` 必须在 Step 7 定义 schema 和归属,Step 8 必须说明如何映射到 public page DTO。
 - Command result、inbound event envelope / payload、consumer receipt、outbound event payload、job input / output / report 中引用的 enum / ref / helper / receipt 必须定义 schema 和归属,不得只在字段类型中出现名称。
 - Inbound consumer public DTO 必须定义公共 `InboundEventEnvelope<T>`、`ConsumerReceipt`、outcome / disposition enum、quarantine marker、duplicate / delayed 返回字段和缺失 envelope 字段的处理规则。
+- Actor / consumer / source actor 必须明确 authority kind、scope membership 要求和 trusted source 例外;例外不得隐式绕过 visibility、digest、source isolation、forbidden body、idempotency 或状态 gate。
 - Query 的分页、consistency、consumer / actor context 必须明确来自 query body 还是 metadata / envelope，不得双承载。
 - 引用类字段必须区分 contract ref、envelope ref、record ref、payload ref 等语义，不得用相近名称互相代替。
 

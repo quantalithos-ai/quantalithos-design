@@ -373,8 +373,13 @@ pub struct ConsumerReceipt {
 | `VisibilityRestrictionReason` | `conversation-contracts/src/refs.rs` | `reason_ref: CommandReasonRef`、`restriction_kind: VisibilityRestrictionKind` | 不保存正文说明或外部 source body |
 | `ScopeSnapshotRef` | `conversation-contracts/src/refs.rs` | `scope_kind: ScopeKind`、`space_id`、可选 participant / visibility scope id、`scope_version` | 不嵌入完整 scope body |
 | `SpaceCloseMode` | `conversation-contracts/src/refs.rs` | `ReadOnly | Closed | Archived` | `Archived` 必须携带 archive intent |
+| `ReviewAnchorKind` / `ReviewTargetRef` / `ReviewReasonRef` | `conversation-contracts/src/refs.rs` | review anchor public request / result 共享值对象;完整 schema 见 Step 6 §7.2.3 | 不保存 review report body 或 target body |
+| `ObservabilityDestinationRef` / `HandoffReason` / `ArchiveScope` / `TraceRetentionPolicyRef` | `conversation-contracts/src/refs.rs` | trace / archive handoff public request 共享值对象;完整 schema 见 Step 6 §7.2.3 | 不保存 adapter config、credential、archive body 或 trace payload body |
+| `TraceHandoffPayloadRef` / `ObservabilityReceiptRef` / `ArchivePackageRef` | `conversation-contracts/src/refs.rs` | handoff payload、delivery receipt、archive package 引用;完整 schema 见 Step 6 §7.2.3 | 只保存 ref、digest、marker,不保存外部 response body |
+| `TraceHandoffState` / `ArchiveHandoffState` | `conversation-contracts/src/refs.rs` shared enum | command result / outbound event / domain handoff record 共享 | 不创建 domain-only mirror enum |
+| `RetentionDuration` / `RetentionWindow` / `TraceRetentionRuleSet` / `TraceHandoffRuleSet` / `TraceRedactionRuleSet` / `BodyExclusionRuleSet` | `conversation-contracts/src/refs.rs` 或同层 value module | trace retention / handoff / redaction / forbidden body 纯数据 rule set;完整 schema 见 Step 6 §7.2.3;`RetentionDuration` 是本地秒级正整数 newtype | 不引用当前 core baseline 不存在的 `Duration`,也不放在 domain crate 中让 contracts 反向依赖 domain |
 
-上述值对象字段级 schema 以 `03_ddd_step_06_object_contracts.md` §7.2.1 / §7.2.2 为准。协议层不得用裸字符串占位替代这些类型。
+上述值对象字段级 schema 以 `03_ddd_step_06_object_contracts.md` §7.2.1 / §7.2.2 / §7.2.3 为准。协议层不得用裸字符串占位替代这些类型。
 
 公开协议 surface 的传递类型归属规则:
 
@@ -384,6 +389,7 @@ pub struct ConsumerReceipt {
 - `BridgeMappedFactReceivedEvent.target_mode` 统一使用 `contracts/refs.rs::BridgeTargetMode`;`ConsumeBridgeMappedFactReceivedFlow` 只能按该字段选择 append fact 或 manifest external fact 分支。
 - `InboundEventEnvelope<T>` 和 `ConsumerReceipt` 是 PH-05 consumer Step 1 public DTO;contract tests 必须覆盖 envelope 必填字段、accepted、duplicate、quarantined、delayed 和 no-op receipt surface。
 - 各 inbound consumer 的 payload JSON 示例只表达 payload 字段;`event_id`、`event_envelope_ref`、`event_source_ref`、`idempotency_key`、`occurred_at` 和 `trace_ref` 只能出现在 `InboundEventEnvelope<T>`。
+- PH-06 `CreateReviewAnchor`、`RequestTraceHandoff` 和 `RequestArchiveHandoff` 的 request 依赖类型、result DTO 字段类型、outbound handoff event 字段类型必须复用 Step 6 §7.2.3 的 contracts shared schema;不得在 `commands.rs`、`events.rs`、`domain/trace.rs` 或 application service 中各自复制第二套字段。
 
 #### Command result DTO
 
@@ -419,6 +425,34 @@ pub struct ConsumerReceipt {
     "scope_change_ref": "ScopeChangeRecordRef",
     "outbox_record_ref": "Option<ConversationOutboxRecordId>",
     "projection_state_ref": "Option<ConversationProjectionStateId>",
+    "result_ref": "CommandResultRef",
+    "receipt": "CommandReceipt"
+  },
+  "ReviewAnchorCommandResult": {
+    "review_anchor_id": "ReviewAnchorId",
+    "space_id": "ConversationSpaceId",
+    "trace_context_id": "ConversationTraceContextId",
+    "outbox_record_ref": "Option<ConversationOutboxRecordId>",
+    "result_ref": "CommandResultRef",
+    "receipt": "CommandReceipt"
+  },
+  "TraceHandoffCommandResult": {
+    "trace_handoff_id": "TraceHandoffRecordId",
+    "trace_context_id": "ConversationTraceContextId",
+    "destination_ref": "ObservabilityDestinationRef",
+    "handoff_state": "TraceHandoffState",
+    "outbox_record_ref": "Option<ConversationOutboxRecordId>",
+    "result_ref": "CommandResultRef",
+    "receipt": "CommandReceipt"
+  },
+  "ArchiveHandoffCommandResult": {
+    "archive_handoff_id": "ArchiveHandoffRecordId",
+    "space_id": "ConversationSpaceId",
+    "trace_context_id": "ConversationTraceContextId",
+    "archive_scope": "ArchiveScope",
+    "retention_policy_ref": "TraceRetentionPolicyRef",
+    "handoff_state": "ArchiveHandoffState",
+    "outbox_record_ref": "Option<ConversationOutboxRecordId>",
     "result_ref": "CommandResultRef",
     "receipt": "CommandReceipt"
   }
@@ -492,6 +526,154 @@ pub struct ManifestExternalFactResult {
 | `receipt` | `CommandReceipt` | command receipt builder | 必填 |
 
 Duplicate `ManifestExternalFact` 必须在 same key + same digest 时返回已保存的 `ManifestExternalFactResult`,其中 `receipt.outcome = duplicate`,且不得重新解析外部来源、重建 snapshot、重写 manifestation、fact、trace 或 outbox。Unresolved path 若 policy 允许写 unresolved manifestation,`manifestation_state = Unresolved`,`snapshot_ref = None`,`manifested_fact_id = None`;若 policy 不允许 unresolved manifestation,返回 `ApplicationError::ExternalReferenceUnresolved`,不返回 result DTO。
+
+#### 7.2.2 `ReviewAnchorCommandResult`
+
+`ReviewAnchorCommandResult` 是 `CreateReviewAnchor` 的正式 command result DTO,归属 `crates/contracts/src/commands.rs`。它不得由 application service 临时替换成 `ReviewAnchor`、`ConversationTraceContext`、outbox id tuple 或裸 `ReviewAnchorId`。
+
+```rust
+/// Result returned after creating a review anchor.
+pub struct ReviewAnchorCommandResult {
+    /// Review anchor created or reused by the command.
+    pub review_anchor_id: ReviewAnchorId,
+    /// Space that owns the review anchor.
+    pub space_id: ConversationSpaceId,
+    /// Trace context linked to the review anchor.
+    pub trace_context_id: ConversationTraceContextId,
+    /// Outbox record written for the review anchor when a local change was committed.
+    pub outbox_record_ref: Option<ConversationOutboxRecordId>,
+    /// Stable command result reference for idempotency duplicates.
+    pub result_ref: CommandResultRef,
+    /// Shared command receipt.
+    pub receipt: CommandReceipt,
+}
+```
+
+```json
+{
+  "review_anchor_id": "ReviewAnchorId",
+  "space_id": "ConversationSpaceId",
+  "trace_context_id": "ConversationTraceContextId",
+  "outbox_record_ref": "Option<ConversationOutboxRecordId>",
+  "result_ref": "CommandResultRef",
+  "receipt": "CommandReceipt"
+}
+```
+
+| 字段 | 类型 | 字段来源 | 可空 / 缺失口径 |
+|---|---|---|---|
+| `review_anchor_id` | `ReviewAnchorId` | `ReviewAnchor.review_anchor_id` | 必填 |
+| `space_id` | `ConversationSpaceId` | request / `ReviewAnchor.space_id` | 必填 |
+| `trace_context_id` | `ConversationTraceContextId` | `ConversationTraceContext.trace_context_id` | 必填 |
+| `outbox_record_ref` | `Option<ConversationOutboxRecordId>` | `ConversationOutboxRecord.outbox_record_id` | duplicate 可返回既有值;无 outbox 写入时为空 |
+| `result_ref` | `CommandResultRef` | command result builder / idempotency result | 必填 |
+| `receipt` | `CommandReceipt` | command receipt builder | 必填 |
+
+Duplicate `CreateReviewAnchor` 必须在 same key + same digest 时返回已保存的 `ReviewAnchorCommandResult`,其中 `receipt.outcome = duplicate`,且不得重新创建 review anchor、trace context 或 outbox。目标不可见、target not found、缺失 idempotency key 或同 key 不同 digest 时返回错误,不得返回 result DTO。
+
+#### 7.2.3 `TraceHandoffCommandResult`
+
+`TraceHandoffCommandResult` 是 `RequestTraceHandoff` 的正式 command result DTO,归属 `crates/contracts/src/commands.rs`。它表达“handoff intent 已提交”,不表达外部交付完成,不得替代 `TraceHandoffRequestedEvent` 或 `ObservabilityReceiptRef`。
+
+```rust
+/// Result returned after requesting trace handoff.
+pub struct TraceHandoffCommandResult {
+    /// Trace handoff record created or reused by the command.
+    pub trace_handoff_id: TraceHandoffRecordId,
+    /// Trace context being handed off.
+    pub trace_context_id: ConversationTraceContextId,
+    /// Observability destination selected for this handoff.
+    pub destination_ref: ObservabilityDestinationRef,
+    /// Current handoff intent state.
+    pub handoff_state: TraceHandoffState,
+    /// Outbox record written for the handoff request when a local change was committed.
+    pub outbox_record_ref: Option<ConversationOutboxRecordId>,
+    /// Stable command result reference for idempotency duplicates.
+    pub result_ref: CommandResultRef,
+    /// Shared command receipt.
+    pub receipt: CommandReceipt,
+}
+```
+
+```json
+{
+  "trace_handoff_id": "TraceHandoffRecordId",
+  "trace_context_id": "ConversationTraceContextId",
+  "destination_ref": "ObservabilityDestinationRef",
+  "handoff_state": "TraceHandoffState",
+  "outbox_record_ref": "Option<ConversationOutboxRecordId>",
+  "result_ref": "CommandResultRef",
+  "receipt": "CommandReceipt"
+}
+```
+
+| 字段 | 类型 | 字段来源 | 可空 / 缺失口径 |
+|---|---|---|---|
+| `trace_handoff_id` | `TraceHandoffRecordId` | `TraceHandoffRecord.trace_handoff_id` | 必填 |
+| `trace_context_id` | `ConversationTraceContextId` | request / `TraceHandoffRecord.trace_context_id` | 必填 |
+| `destination_ref` | `ObservabilityDestinationRef` | request or configured default | 必填 after resolution |
+| `handoff_state` | `TraceHandoffState` | `TraceHandoffRecord.handoff_state` | 必填;initial request 为 `Pending` |
+| `outbox_record_ref` | `Option<ConversationOutboxRecordId>` | `ConversationOutboxRecord.outbox_record_id` | duplicate 可返回既有值;无 outbox 写入时为空 |
+| `result_ref` | `CommandResultRef` | command result builder / idempotency result | 必填 |
+| `receipt` | `CommandReceipt` | command receipt builder | 必填 |
+
+Duplicate `RequestTraceHandoff` 必须在 same key + same digest 时返回已保存的 `TraceHandoffCommandResult`,其中 `receipt.outcome = duplicate`,且不得重新创建 handoff intent、payload ref、trace context 或 outbox,也不得触发外部 handoff delivery。缺少 trace context、缺少 destination 且无配置默认、缺失 idempotency key 或同 key 不同 digest 时返回错误,不得返回 result DTO。
+
+#### 7.2.4 `ArchiveHandoffCommandResult`
+
+`ArchiveHandoffCommandResult` 是 `RequestArchiveHandoff` 的正式 command result DTO,归属 `crates/contracts/src/commands.rs`。它表达“archive handoff intent 已提交”,不表达 archive package 已生成或交付完成。
+
+```rust
+/// Result returned after requesting archive handoff.
+pub struct ArchiveHandoffCommandResult {
+    /// Archive handoff record created or reused by the command.
+    pub archive_handoff_id: ArchiveHandoffRecordId,
+    /// Space covered by the archive handoff.
+    pub space_id: ConversationSpaceId,
+    /// Trace context used to build the archive handoff.
+    pub trace_context_id: ConversationTraceContextId,
+    /// Archive scope resolved for this handoff.
+    pub archive_scope: ArchiveScope,
+    /// Retention policy selected for this archive handoff.
+    pub retention_policy_ref: TraceRetentionPolicyRef,
+    /// Current archive handoff intent state.
+    pub handoff_state: ArchiveHandoffState,
+    /// Outbox record written for the archive request when a local change was committed.
+    pub outbox_record_ref: Option<ConversationOutboxRecordId>,
+    /// Stable command result reference for idempotency duplicates.
+    pub result_ref: CommandResultRef,
+    /// Shared command receipt.
+    pub receipt: CommandReceipt,
+}
+```
+
+```json
+{
+  "archive_handoff_id": "ArchiveHandoffRecordId",
+  "space_id": "ConversationSpaceId",
+  "trace_context_id": "ConversationTraceContextId",
+  "archive_scope": "ArchiveScope",
+  "retention_policy_ref": "TraceRetentionPolicyRef",
+  "handoff_state": "ArchiveHandoffState",
+  "outbox_record_ref": "Option<ConversationOutboxRecordId>",
+  "result_ref": "CommandResultRef",
+  "receipt": "CommandReceipt"
+}
+```
+
+| 字段 | 类型 | 字段来源 | 可空 / 缺失口径 |
+|---|---|---|---|
+| `archive_handoff_id` | `ArchiveHandoffRecordId` | `ArchiveHandoffRecord.archive_handoff_id` | 必填 |
+| `space_id` | `ConversationSpaceId` | request / trace context / `ArchiveHandoffRecord.space_id` | 必填 after resolution |
+| `trace_context_id` | `ConversationTraceContextId` | request or derived trace context for space archive | 必填 after resolution |
+| `archive_scope` | `ArchiveScope` | request or derived space scope | 必填 after resolution |
+| `retention_policy_ref` | `TraceRetentionPolicyRef` | request or configured default | 必填 after resolution |
+| `handoff_state` | `ArchiveHandoffState` | `ArchiveHandoffRecord.handoff_state` | 必填;initial request 为 `Pending` |
+| `outbox_record_ref` | `Option<ConversationOutboxRecordId>` | `ConversationOutboxRecord.outbox_record_id` | duplicate 可返回既有值;无 outbox 写入时为空 |
+| `result_ref` | `CommandResultRef` | command result builder / idempotency result | 必填 |
+| `receipt` | `CommandReceipt` | command receipt builder | 必填 |
+
+Duplicate `RequestArchiveHandoff` 必须在 same key + same digest 时返回已保存的 `ArchiveHandoffCommandResult`,其中 `receipt.outcome = duplicate`,且不得重新创建 archive handoff intent、archive scope、trace context、retention policy ref 或 outbox,也不得生成 archive package。缺少 space / trace context、缺少 retention policy 且无配置默认、scope 不足、缺失 idempotency key 或同 key 不同 digest 时返回错误,不得返回 result DTO。
 
 ### 7.3 Command API 协议契约
 
@@ -643,7 +825,7 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 | 函数签名 | `handle_append_conversation_fact(AppendConversationFactRequest request) -> Result<FactAppendReceipt, ApiError>` |
 | HTTP / RPC / Event 名称 | `POST /conversation/spaces/{space_id}/facts` |
 | 调用方 | trusted service / runtime / bridge adapter |
-| 处理方 | `FactCommandHandler` -> `ConversationFactAppendService` |
+| 处理方 | `ConversationFactCommandHandler` -> `ConversationFactAppendService` |
 
 ```json
 {
@@ -676,7 +858,7 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 | 函数签名 | `handle_retract_conversation_fact(RetractConversationFactRequest request) -> Result<FactAppendReceipt, ApiError>` |
 | HTTP / RPC / Event 名称 | `POST /conversation/spaces/{space_id}/facts/{fact_id}:retract` |
 | 调用方 | trusted service / operator |
-| 处理方 | `FactCommandHandler` -> `ConversationFactAppendService` |
+| 处理方 | `ConversationFactCommandHandler` -> `ConversationFactAppendService` |
 
 ```json
 {
@@ -697,6 +879,8 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
 | `RetractConversationFactRequest` | `ConversationFact`、`FactAppendReceipt`、`ConversationTraceContext` | 是 | current fact from repository;receipt / trace ids from technical ports | retraction != deletion | reject missing reason or invisible fact |
+
+`ConversationFactCommandHandler` 和 `ConversationFactAppendService` 只承载 `AppendConversationFact` / `RetractConversationFact` 的 append / retract 路径,不得承载 `ManifestExternalFact`。
 
 #### 7.3.7 `ManifestExternalFact`
 
@@ -752,14 +936,23 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `space_id` | `ConversationSpaceId` | `ReviewAnchor.space_id` | route / request | reject |
-| `anchor_kind` | `ReviewAnchorKind` | `ReviewAnchor.anchor_kind` | request | reject |
-| `target_ref` | `ReviewTargetRef` | `ReviewAnchor.target_ref` | request | reject |
-| `reason_ref` | `ReviewReasonRef` | `ReviewAnchor.reason_ref` | request | reject |
+| `anchor_kind` | `ReviewAnchorKind` | `ReviewAnchor.anchor_kind` | request;schema 见 Step 6 §7.2.3 | reject unknown kind;unsupported pair 返回 `ProtocolError::InvalidCommand` |
+| `target_ref` | `ReviewTargetRef` | `ReviewAnchor.target_ref` | request;schema 见 Step 6 §7.2.3 | reject missing target field,ambiguous target,unsupported target pair,target not found or not visible |
+| `reason_ref` | `ReviewReasonRef` | `ReviewAnchor.reason_ref` | request;schema 见 Step 6 §7.2.3 | reject missing reason |
 | `actor` | `ActorContext` | `ReviewAnchor.created_by` | command envelope | reject |
+
+`CreateReviewAnchorRequest` 当前只允许两组 pair:
+
+| `anchor_kind` | `target_ref.target_kind` | 加载对象 | Domain factory |
+|---|---|---|---|
+| `ReviewAnchorKind::Fact` | `ReviewTargetKind::Fact` | `ConversationFact` | `ReviewAnchor::for_fact(...)` |
+| `ReviewAnchorKind::Manifestation` | `ReviewTargetKind::Manifestation` | `CrossDomainManifestation` | `ReviewAnchor::for_manifestation(...)` |
+
+`ReviewTargetKind::ScopeChange`、`TraceContext`、`TraceHandoff`、`ArchiveHandoff` 和 `ProjectionState` 在本协议中不得作为 create review anchor 写路径输入;`ReviewAnchorKind::ScopeChange`、`TraceHandoff`、`ArchiveHandoff` 和 `ProjectionIssue` 只作为 shared enum 预留。调用方传入这些 target / anchor pair 时返回 `ProtocolError::InvalidCommand`,不得查 repository、不得创建 anchor、trace 或 outbox。
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
-| `CreateReviewAnchorRequest` | `ReviewAnchor`、`ConversationTraceContext` | 是 | anchor id / timestamp from technical ports | review anchor != governance decision | reject target not found or not visible |
+| `CreateReviewAnchorRequest` | `ReviewAnchor`、`ConversationTraceContext` | 是 for fact / manifestation target only | anchor id / timestamp from technical ports | review anchor != governance decision;scope change / trace / handoff / projection target != current create anchor path | reject unsupported target pair,target not found or not visible |
 
 #### 7.3.9 `RequestTraceHandoff`
 
@@ -773,7 +966,7 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 ```json
 {
   "trace_context_id": "ConversationTraceContextId",
-  "destination_ref": "ObservabilityDestinationRef",
+  "destination_ref": "Option<ObservabilityDestinationRef>",
   "handoff_reason": "HandoffReason"
 }
 ```
@@ -781,8 +974,8 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `trace_context_id` | `ConversationTraceContextId` | `TraceHandoffRecord.trace_context_id` | request | reject |
-| `destination_ref` | `ObservabilityDestinationRef` | `TraceHandoffRecord.destination_ref` | request / config default | derive default or reject |
-| `handoff_reason` | `HandoffReason` | audit reason | request | reject |
+| `destination_ref` | `Option<ObservabilityDestinationRef>` | `TraceHandoffRecord.destination_ref` | request / config default;schema 见 Step 6 §7.2.3 | derive default;reject if absent and no configured default |
+| `handoff_reason` | `HandoffReason` | audit reason | request;schema 见 Step 6 §7.2.3 | reject |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
@@ -800,9 +993,9 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 ```json
 {
   "space_id": "ConversationSpaceId",
-  "trace_context_id": "ConversationTraceContextId",
-  "archive_scope": "ArchiveScope",
-  "retention_policy_ref": "TraceRetentionPolicyRef"
+  "trace_context_id": "Option<ConversationTraceContextId>",
+  "archive_scope": "Option<ArchiveScope>",
+  "retention_policy_ref": "Option<TraceRetentionPolicyRef>"
 }
 ```
 
@@ -810,8 +1003,8 @@ Create-space 初始 `ScopeChangeRecord` 的正式口径:
 |---|---|---|---|---|
 | `space_id` | `ConversationSpaceId` | `ArchiveHandoffRecord.space_id` | request / trace context | derive from trace or reject |
 | `trace_context_id` | `Option<ConversationTraceContextId>` | handoff source | request | optional if archive whole space |
-| `archive_scope` | `ArchiveScope` | `ArchiveHandoffRecord.archive_scope` | request | derive space scope or reject |
-| `retention_policy_ref` | `TraceRetentionPolicyRef` | `ArchiveHandoffRecord.retention_policy_ref` | request / config default | derive default or reject |
+| `archive_scope` | `Option<ArchiveScope>` | `ArchiveHandoffRecord.archive_scope` | request;schema 见 Step 6 §7.2.3 | derive space scope;reject if missing `space_id` or default scope disallowed |
+| `retention_policy_ref` | `Option<TraceRetentionPolicyRef>` | `ArchiveHandoffRecord.retention_policy_ref` | request / config default;schema 见 Step 6 §7.2.3 | derive default;reject if absent and no configured default |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
@@ -1488,6 +1681,8 @@ Query error / empty surface 口径:
 |---|---|---|---|---|---|
 | `RuntimeResultCommittedEvent` | `FactSourceRef`、`ConversationFact`、`FactAppendReceipt`、`ConversationTraceContext` | 是 | `fact_kind` from event and must equal `RuntimeResult`;`FactSourceRef::from_runtime_result(RuntimeResultRef result_ref, ActorRef actor)`; participant / visibility from repository;`payload_digest` follows `result_payload_ref.digest_requirement` | runtime result ref != reasoning process; result payload ref != payload body;payload digest != payload body | quarantine / reject |
 
+Runtime result append path uses `system_actor_ref` as a trusted source actor. The actor must satisfy `SystemActorRef` / `ActorKind::System`, but it does not need to be present in `ParticipantScope.participants`. `FactAppendPolicy.assert_append_allowed(...)` must still require active space, appendable participant scope, open visibility scope, allowed fact kind, allowed source, payload digest validation, and forbidden-body rejection.
+
 #### 7.5.5 `ConsumeBridgeMappedFactReceived`
 
 | 项 | 内容 |
@@ -1519,12 +1714,15 @@ Query error / empty surface 口径:
 | `bridge_fact_ref` | `ExternalSourceObjectRef` | `BridgeSourceRef.bridge_fact_ref` then `FactSourceRef.bridge_source_ref` 或 `ExternalFactRef.source_object_ref` | 来源事件 | quarantine |
 | `mapped_payload_ref` | `ConversationFactPayloadRef` | `ConversationFact.payload_ref` | bridge adapter | reject if forbidden body |
 | `payload_digest` | `Option<PayloadDigest>` | append digest evidence / idempotency digest input | bridge adapter | required / optional / forbidden follows `mapped_payload_ref.digest_requirement`;missing required or mismatch -> quarantine |
+| `source_version_ref` | `ExternalSourceVersionRef` | `ExternalFactRef.source_version_ref` | 来源事件 | quarantine |
 | `source_digest` | `ExternalSourceDigest` | `ExternalFactRef.source_digest` | 来源事件 | quarantine |
 | `actor_ref` | `ActorRef` | `FactSourceRef.actor_ref` / audit actor | bridge mapping metadata 或 source actor resolver | quarantine |
 
 | 输入契约 | 目标 Domain 对象 | 必填字段是否齐全 | 派生字段来源 | 不得混同的字段 | 缺失时行为 |
 |---|---|---|---|---|---|
 | `BridgeMappedFactReceivedEvent` | `FactSourceRef`、`ConversationFact` 或 `ExternalFactRef`、`CrossDomainManifestation` | 是 | `target_mode` and `fact_kind` from bridge mapping metadata;append target must use `BridgeMapped`;`actor_ref` from bridge mapping metadata or source actor resolver;append path `payload_digest` follows `mapped_payload_ref.digest_requirement` | bridge payload ref != external platform body;target mode != fact kind;payload digest != bridge platform body | quarantine / reject |
+
+Bridge append path uses `actor_ref` as a trusted integration source actor. The actor must satisfy `ActorKind::Integration`, but it does not need to be present in `ParticipantScope.participants`. This exception applies only when `target_mode = AppendFact` and `fact_kind = BridgeMapped`; manifestation mode follows manifestation policy and must not create a conversation fact through the append policy.
 
 #### 7.5.6 `ConsumeIdentityActorChanged`
 
@@ -1772,7 +1970,7 @@ Query error / empty surface 口径:
   "archive_handoff_id": "ArchiveHandoffRecordId",
   "space_id": "ConversationSpaceId",
   "archive_scope": "ArchiveScope",
-  "archive_package_ref": "ArchivePackageRef",
+  "archive_package_ref": "Option<ArchivePackageRef>",
   "handoff_state": "ArchiveHandoffState",
   "requested_at": "Timestamp"
 }
@@ -2065,7 +2263,7 @@ Query error / empty surface 口径:
 | Fact command | `AppendConversationFactCommand` | `ConversationFact`、`FactSourceRef`、`FactAppendReceipt`、`ConversationTraceContext`、`ConversationOutboxRecord` | 闭合 | space / participant / visibility from repositories | reject / duplicate |
 | Retraction command | `RetractConversationFactCommand` | `ConversationFact` state、`ConversationTraceContext`、`ConversationOutboxRecord` | 闭合 | current fact from repository | reject / not found |
 | Manifest command | `ManifestExternalFactCommand` | `ExternalFactRef`、`ExternalFactSnapshot`、`CrossDomainManifestation`、`ConversationFact` | 闭合 | safe snapshot from resolver; visibility from repository | unresolved / reject |
-| Review command | `CreateReviewAnchorCommand` | `ReviewAnchor`、`ConversationTraceContext`、`ConversationOutboxRecord` | 闭合 | target fact / manifestation / scope change lookup | reject / not found |
+| Review command | `CreateReviewAnchorCommand` | `ReviewAnchor`、`ConversationTraceContext`、`ConversationOutboxRecord` | 闭合 for fact / manifestation target only | target fact / manifestation lookup;scope change / trace / handoff / projection target pair rejected before lookup | reject / not found |
 | Trace handoff command | `RequestTraceHandoffCommand` | `TraceHandoffRecord`、`ConversationOutboxRecord` | 闭合 | trace context from repository | reject / not found |
 | Archive handoff command | `RequestArchiveHandoffCommand` | `ArchiveHandoffRecord`、`ConversationOutboxRecord` | 闭合 | trace context / space / retention policy lookup | reject / not found |
 | Query APIs | `*QueryRequest` | `ConversationReadModel`、`ConversationFact`、`CrossDomainManifestation`、`ConversationTraceContext`、`ConversationProjectionState` | 闭合 | repository / projection store | not visible / stale / not found |
@@ -2078,6 +2276,7 @@ Query error / empty surface 口径:
 | 协议类别 | 主要错误 | 映射规则 | 对外响应 / 记录 |
 |---|---|---|---|
 | Command API | `ProtocolError::MissingRequiredField` | 缺少 schema 必填字段、actor、metadata 或 `metadata.request.idempotency_key` | 4xx / command audit |
+| Command API | `ProtocolError::InvalidCommand` | command 字段齐全但 target pair、mode、operation 或当前 boundary 不支持 | 4xx / command audit |
 | Command API | `ApplicationError::Conflict` | 幂等冲突、版本冲突、状态已变化 | 409 / idempotency conflict |
 | Command API | `DomainError` | space、scope、visibility、manifestation、handoff 规则不满足 | 4xx / domain audit |
 | Command API | `RepositoryError` | 写入 truth、outbox、trace 或 projection 失败 | 5xx / retryable marker |

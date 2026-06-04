@@ -601,13 +601,12 @@ if let Some(requested_visibility_scope_id) = request.visibility_scope_id.clone()
     }
 }
 
-// [FactSourceRef::from_actor(ActorRef actor)]
-// 根据 actor / runtime / bridge / system 来源创建可追溯 source ref。
-let source = FactSourceRef::from_actor(request.actor.actor_ref);
+let source = request.source_ref.clone();
 
 // [FactAppendPolicy::for_space(&ConversationSpace space, &VisibilityScope visibility)]
 let policy = FactAppendPolicy::for_space(&space, &visibility);
-policy.assert_append_allowed(&space, &participant, &visibility)?;
+policy.assert_source_allowed(&request.source_ref)?;
+policy.assert_append_allowed(&space, &participant, &visibility, &request.source_ref, &request.source_ref.actor_ref)?;
 policy.assert_fact_kind_allowed(request.fact_kind)?;
 
 // [ConversationFact::from_append_input(&ConversationSpace space, ConversationFactKind fact_kind, FactSourceRef source, &VisibilityScope visibility, ConversationFactPayloadRef payload_ref)]
@@ -725,7 +724,7 @@ unit_of_work.commit(uow).await?;
 |---|---|
 | 对应协议 | `ManifestExternalFact` |
 | 入口函数 | `handle_manifest_external_fact(ManifestExternalFactRequest request) -> Result<ManifestExternalFactResult, ApiError>` |
-| Application service | `CrossDomainManifestationService.manifest_external_fact(...)` |
+| Application service | `ConversationManifestationService.manifest_external_fact(...)` |
 | 目标对象 | `ExternalFactRef`、`ExternalFactSnapshot`、`CrossDomainManifestation`、`ConversationFact`、`ConversationTraceContext`、`ConversationOutboxRecord` |
 
 ##### 函数级调用图
@@ -734,7 +733,7 @@ unit_of_work.commit(uow).await?;
 [api::command_handlers]
   | call handle_manifest_external_fact(ManifestExternalFactRequest request)
   v
-[CrossDomainManifestationService]
+[ConversationManifestationService]
   | validate external ref and visibility
   | tx begin
   | reserve idempotency
@@ -824,10 +823,11 @@ unit_of_work.commit(uow).await?;
   v
 [ConversationTraceReviewService]
   | validate target and reason
+  | reject unsupported review target pair
   | tx begin
   | reserve idempotency
-  | load target fact / manifestation / scope change
-  | call ReviewAnchor::for_fact(...) or for_manifestation(...) or for_scope_change(...)
+  | load target fact / manifestation
+  | call ReviewAnchor::for_fact(...) or for_manifestation(...)
   | call VisibilityPolicy.assert_review_allowed(...)
   v
 [Repository + Outbox]
@@ -842,17 +842,24 @@ unit_of_work.commit(uow).await?;
 ```rust
 // [CreateReviewAnchorRequest.validate()]
 request.validate()?;
+request.assert_allowed_create_review_target_pair()?; // only Fact and Manifestation pairs are accepted in this command boundary.
 let uow = unit_of_work.begin().await?;
 let key = request.metadata.request.idempotency_key.clone().ok_or(ProtocolError::MissingRequiredField)?;
 let request_digest = RequestDigest::from_command(&request)?;
 let reservation = idempotency.reserve(key.clone(), IdempotencyOperation::CreateReviewAnchor, request_digest.clone(), uow.clone()).await?;
 
 // [ReviewAnchor::for_fact(&ConversationFact fact, ActorRef actor, ReviewReasonRef reason_ref)]
-// 根据 target_kind 选择 fact、manifestation 或 scope change 工厂。
-let anchor = match request.target {
-    ReviewTarget::Fact(fact_id) => ReviewAnchor::for_fact(&fact_repo.get_fact(fact_id).await?.ok_or(ApplicationError::NotFound)?, request.actor.actor_ref, request.reason_ref)?,
-    ReviewTarget::Manifestation(manifestation_id) => ReviewAnchor::for_manifestation(&manifestation_repo.get_manifestation(manifestation_id).await?.ok_or(ApplicationError::NotFound)?, request.actor.actor_ref, request.reason_ref)?,
-    ReviewTarget::ScopeChange(change) => ReviewAnchor::for_scope_change(&change, request.actor.actor_ref, request.reason_ref)?,
+// CreateReviewAnchor 当前只接受 Fact / Manifestation 两组 target pair。
+let anchor = match (request.anchor_kind, request.target_ref.target_kind) {
+    (ReviewAnchorKind::Fact, ReviewTargetKind::Fact) => {
+        let fact_ref = request.target_ref.fact_ref.ok_or(ProtocolError::MissingRequiredField)?;
+        ReviewAnchor::for_fact(&fact_repo.get_fact(fact_ref.fact_id).await?.ok_or(ApplicationError::NotFound)?, request.actor.actor_ref, request.reason_ref)?
+    }
+    (ReviewAnchorKind::Manifestation, ReviewTargetKind::Manifestation) => {
+        let manifestation_ref = request.target_ref.manifestation_ref.ok_or(ProtocolError::MissingRequiredField)?;
+        ReviewAnchor::for_manifestation(&manifestation_repo.get_manifestation(manifestation_ref.manifestation_id).await?.ok_or(ApplicationError::NotFound)?, request.actor.actor_ref, request.reason_ref)?
+    }
+    _ => return Err(ProtocolError::InvalidCommand.into()),
 };
 
 // [VisibilityPolicy.assert_review_allowed(&ReviewAnchor anchor, ActorRef actor)]
@@ -876,7 +883,7 @@ unit_of_work.commit(uow).await?;
 | 回滚错误 | target not found、review not allowed、repository failure、outbox failure |
 | 状态副作用 | 新增 review anchor;不改变治理裁决或事实状态 |
 | 事件副作用 | review anchor 可通过 `ConversationChangeAvailableEvent` 通知 |
-| 测试切口 | anchor fact、anchor manifestation、not visible rejected、target missing |
+| 测试切口 | anchor fact、anchor manifestation、unsupported ScopeChange / TraceContext / TraceHandoff / ArchiveHandoff / ProjectionState target rejected before lookup、not visible rejected、target missing |
 
 #### 7.2.9 `RequestTraceHandoffFlow`
 
@@ -1689,8 +1696,8 @@ let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
 let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeWorkContextChanged, request_digest.clone(), uow.clone()).await?;
 
-// [ExternalFactRef::from_work_fact(WorkFactRef work_fact_ref, ExternalSourceVersionRef version_ref)]
-let external_ref = ExternalFactRef::from_work_fact(event.payload.work_context_ref, event.payload.source_version_ref)?;
+// [ExternalFactRef::from_work_fact(ExternalSourceObjectRef work_fact_ref, ExternalSourceVersionRef version_ref, ExternalSourceDigest source_digest)]
+let external_ref = ExternalFactRef::from_work_fact(event.payload.work_context_ref, event.payload.source_version_ref, event.payload.source_digest)?;
 
 // [ExternalReferenceRepository.get_reference_projection(ConversationSpaceId space_id)]
 let mut projection = external_ref_repo.get_reference_projection(event.payload.space_id).await?.unwrap_or_else(|| ExternalReferenceProjection::for_space(event.payload.space_id));
@@ -1757,8 +1764,8 @@ let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
 let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeGovernanceFactCommitted, request_digest.clone(), uow.clone()).await?;
 
-// [ExternalFactRef::from_governance_decision(GovernanceDecisionRef decision_ref, ExternalSourceVersionRef version_ref)]
-let external_ref = ExternalFactRef::from_governance_decision(event.payload.governance_fact_ref, event.payload.source_version_ref)?;
+// [ExternalFactRef::from_governance_decision(ExternalSourceObjectRef decision_ref, ExternalSourceVersionRef version_ref, ExternalSourceDigest source_digest)]
+let external_ref = ExternalFactRef::from_governance_decision(event.payload.governance_fact_ref, event.payload.source_version_ref, event.payload.source_digest)?;
 
 // [SpaceScopeRepository.get_visibility_scope(ConversationSpaceId space_id)]
 let visibility = space_scope_repo.get_visibility_scope(event.payload.target_space_id).await?.ok_or(ApplicationError::NotFound)?;
@@ -1827,8 +1834,8 @@ let request_digest = RequestDigest::from_event(&event)?;
 let uow = unit_of_work.begin().await?;
 let reservation = idempotency.reserve(event.idempotency_key, IdempotencyOperation::ConsumeArtifactFactCommitted, request_digest.clone(), uow.clone()).await?;
 
-// [ExternalFactRef::from_artifact_version(ArtifactVersionRef artifact_version_ref)]
-let external_ref = ExternalFactRef::from_artifact_version(event.payload.artifact_fact_ref)?;
+// [ExternalFactRef::from_artifact_version(ExternalSourceObjectRef artifact_fact_ref, ExternalSourceVersionRef artifact_version_ref, ExternalSourceDigest artifact_digest)]
+let external_ref = ExternalFactRef::from_artifact_version(event.payload.artifact_fact_ref, event.payload.artifact_version_ref, event.payload.artifact_digest)?;
 
 let mut projection = external_ref_repo.get_reference_projection(event.payload.space_id).await?.unwrap_or_else(|| ExternalReferenceProjection::for_space(event.payload.space_id));
 projection.attach_reference(external_ref)?;
@@ -1901,7 +1908,8 @@ let source = FactSourceRef::from_runtime_result(event.payload.runtime_result_ref
 source.assert_result_only()?;
 
 let policy = FactAppendPolicy::for_space(&space, &visibility);
-policy.assert_append_allowed(&space, &participant, &visibility)?;
+policy.assert_source_allowed(&source)?;
+policy.assert_append_allowed(&space, &participant, &visibility, &source, &source.actor_ref)?;
 policy.assert_fact_kind_allowed(event.payload.fact_kind)?;
 if event.payload.fact_kind != ConversationFactKind::RuntimeResult {
     return Err(ProtocolError::InvalidEnvelope.into());
@@ -1980,7 +1988,8 @@ match event.payload.target_mode {
     // [FactSourceRef::from_bridge_mapping(BridgeSourceRef source_ref, ActorRef actor)]
     let source = FactSourceRef::from_bridge_mapping(event.payload.bridge_fact_ref.into(), event.payload.actor_ref)?;
     let policy = FactAppendPolicy::for_space(&space, &visibility);
-    policy.assert_append_allowed(&space, &participant, &visibility)?;
+    policy.assert_source_allowed(&source)?;
+    policy.assert_append_allowed(&space, &participant, &visibility, &source, &source.actor_ref)?;
     policy.assert_fact_kind_allowed(event.payload.fact_kind)?;
     if event.payload.fact_kind != ConversationFactKind::BridgeMapped {
         return Err(ProtocolError::InvalidEnvelope.into());
@@ -1995,8 +2004,8 @@ match event.payload.target_mode {
     outbox_repo.enqueue(ConversationOutboxRecord::from_fact_append(fact, receipt, committed_at)?, uow.clone()).await?;
   }
   BridgeTargetMode::ManifestExternalFact => {
-    // [ExternalFactRef::from_bridge_event(BridgeEventRef bridge_event_ref)]
-    let external_ref = ExternalFactRef::from_bridge_event(event.payload.bridge_fact_ref.into())?;
+    // [ExternalFactRef::from_bridge_event(ExternalSourceObjectRef bridge_event_ref, ExternalSourceVersionRef source_version_ref, ExternalSourceDigest source_digest)]
+    let external_ref = ExternalFactRef::from_bridge_event(event.payload.bridge_fact_ref, event.payload.source_version_ref, event.payload.source_digest)?;
     let space = space_scope_repo.get_space_for_update(event.payload.space_id, uow.clone()).await?.ok_or(ApplicationError::NotFound)?;
     let visibility = space_scope_repo.get_visibility_scope(event.payload.space_id).await?.ok_or(ApplicationError::NotFound)?;
     let manifestation = CrossDomainManifestation::from_external_fact(&space, external_ref, &visibility)?;
@@ -2068,7 +2077,7 @@ for space_id in event.payload.affected_space_refs {
     projection_repo.save_projection_state(state, uow.clone()).await?;
 }
 
-idempotency.complete(reservation, actor_snapshot.result_ref(), uow.clone()).await?;
+idempotency.complete(reservation, event.result_ref(), uow.clone()).await?;
 unit_of_work.commit(uow).await?;
 ```
 

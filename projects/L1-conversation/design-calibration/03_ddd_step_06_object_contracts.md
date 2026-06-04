@@ -84,8 +84,8 @@ Step 5 已确认所有领域对象归属 domain 模块。
 | `ConversationChangeCursorState` | contracts shared enum;`ConversationChangeCursor` 和 query view 直接复用 | 是 |
 | `ConversationOutboxPublicationState` | `ConversationOutboxRecord` | 是 |
 | `TraceRetentionState` | `ConversationTraceContext` | 是 |
-| `TraceHandoffState` | `TraceHandoffRecord` | 是 |
-| `ArchiveHandoffState` | `ArchiveHandoffRecord` | 是 |
+| `TraceHandoffState` | contracts shared enum;`TraceHandoffRecord` 直接复用 | 是 |
+| `ArchiveHandoffState` | contracts shared enum;`ArchiveHandoffRecord` 直接复用 | 是 |
 
 ### 3.7 每个 enum variant 的 Rustdoc 注释是什么？带载荷 variant 的载荷类型承载什么语义？
 
@@ -946,6 +946,457 @@ PH-05 consumer 公共类型归属与校验规则:
 - `CrossDomainManifestationRef::from_manifestation(manifestation)` 必须复制 `manifestation_id` 和 `space_id`,不得复制 `external_fact_ref`、`snapshot_ref` 或 source body。
 - `ConversationSourcePosition::zero()` 使用 `ConversationFactSequence(0)` 和 `ConversationOutboxSequence(0)`,用于 empty / initial projection marker。
 
+### 7.2.3 PH-06 review / handoff 共享值对象正式 schema
+
+本小节补齐 PH-06 `review / trace handoff / archive handoff` boundary 直接落码所需的 public protocol 共享值对象。实现侧不得把下列类型临时实现成裸 `String`、空 struct 或 application-local placeholder。
+
+归属口径:
+
+- `ReviewAnchorId`、`ReviewAnchorRef`、`ReviewAnchorKind`、`ReviewTargetKind`、`ReviewTargetRef`、`ReviewReasonKind`、`ReviewReasonRef`、`TraceSealReason`、`TraceSealReasonKind`、`ObservabilityDestinationKind`、`ObservabilityDestinationRef`、`HandoffReasonKind`、`HandoffReason`、`ArchiveScopeKind`、`ArchiveScope`、`TraceRetentionPolicyRef`、`TraceHandoffRecordId`、`ArchiveHandoffRecordId`、`TraceHandoffPayloadRef`、`RetryAttempt`、`HandoffRetryMarker`、`HandoffRetryReason`、`HandoffRetryReasonKind`、`HandoffFailureReason`、`HandoffFailureReasonKind`、`HandoffCancelReason`、`HandoffCancelReasonKind`、`ObservabilityReceiptRef`、`ArchivePackageRef`、`RetentionDuration`、`RetentionWindow`、`TraceRetentionRuleSet`、`TraceHandoffRuleSet`、`TraceRedactionRuleSet` 和 `BodyExclusionRuleSet` 属于 `conversation-contracts/src/refs.rs` 或同层 contracts value module。
+- `domain/trace.rs` 和 `domain/policies.rs` 只能消费这些 contracts value object,不得让 `contracts` 反向依赖 `domain`。
+- 这些类型均只保存 ref、digest、marker、reason code、时间和策略数据,不得保存 review report body、trace payload body、archive package body、raw observability response、secret 或 token。
+
+#### 7.2.3.1 review anchor refs 与 target
+
+```rust
+/// Stable id for a review anchor.
+pub struct ReviewAnchorId(pub String);
+
+/// Lightweight reference to a review anchor.
+pub struct ReviewAnchorRef {
+    /// Stable review anchor id.
+    pub review_anchor_id: ReviewAnchorId,
+    /// Space that owns the review anchor.
+    pub space_id: ConversationSpaceId,
+}
+
+/// Describes what kind of review anchor is being created.
+pub enum ReviewAnchorKind {
+    /// Review anchor points to a conversation fact.
+    Fact,
+    /// Review anchor points to a cross-domain manifestation.
+    Manifestation,
+    /// Review anchor points to a scope change record.
+    ScopeChange,
+    /// Review anchor points to a trace handoff intent.
+    TraceHandoff,
+    /// Review anchor points to an archive handoff intent.
+    ArchiveHandoff,
+    /// Review anchor points to a projection issue marker.
+    ProjectionIssue,
+}
+
+/// Describes the target reference family carried by ReviewTargetRef.
+pub enum ReviewTargetKind {
+    /// Target is a conversation fact.
+    Fact,
+    /// Target is a cross-domain manifestation.
+    Manifestation,
+    /// Target is a scope change record.
+    ScopeChange,
+    /// Target is a trace context.
+    TraceContext,
+    /// Target is a trace handoff record.
+    TraceHandoff,
+    /// Target is an archive handoff record.
+    ArchiveHandoff,
+    /// Target is a projection state marker.
+    ProjectionState,
+}
+
+/// References a review target without owning or embedding the target body.
+pub struct ReviewTargetRef {
+    /// Target family.
+    pub target_kind: ReviewTargetKind,
+    /// Required when target kind is Fact.
+    pub fact_ref: Option<ConversationFactRef>,
+    /// Required when target kind is Manifestation.
+    pub manifestation_ref: Option<CrossDomainManifestationRef>,
+    /// Required when target kind is ScopeChange.
+    pub scope_change_ref: Option<ScopeChangeRecordRef>,
+    /// Required when target kind is TraceContext.
+    pub trace_context_id: Option<ConversationTraceContextId>,
+    /// Required when target kind is TraceHandoff.
+    pub trace_handoff_id: Option<TraceHandoffRecordId>,
+    /// Required when target kind is ArchiveHandoff.
+    pub archive_handoff_id: Option<ArchiveHandoffRecordId>,
+    /// Required when target kind is ProjectionState.
+    pub projection_state_id: Option<ConversationProjectionStateId>,
+}
+
+/// Describes why a review anchor was created.
+pub enum ReviewReasonKind {
+    /// Operator or trusted service requested manual inspection.
+    ManualInspection,
+    /// Safety policy requested review.
+    SafetyReview,
+    /// Source boundary policy requested review.
+    SourceBoundaryReview,
+    /// Visibility policy requested review.
+    VisibilityReview,
+    /// Handoff policy requested review.
+    HandoffReview,
+    /// Projection freshness or consistency issue requested review.
+    ProjectionIssue,
+}
+
+/// References the reason for creating a review anchor.
+pub struct ReviewReasonRef {
+    /// Shared command reason reference.
+    pub reason_ref: CommandReasonRef,
+    /// Review reason kind.
+    pub reason_kind: ReviewReasonKind,
+}
+
+/// Describes why a trace context was sealed.
+pub enum TraceSealReasonKind {
+    /// Retention policy sealed the trace.
+    RetentionPolicy,
+    /// Handoff preparation sealed the trace.
+    HandoffPreparation,
+    /// Archive preparation sealed the trace.
+    ArchivePreparation,
+    /// Operator sealed the trace.
+    ManualSeal,
+}
+
+/// References the reason for sealing a trace context.
+pub struct TraceSealReason {
+    /// Shared command reason reference.
+    pub reason_ref: CommandReasonRef,
+    /// Trace seal reason kind.
+    pub reason_kind: TraceSealReasonKind,
+}
+```
+
+约束:
+
+- `ReviewTargetRef` 必须按 `target_kind` 精确携带唯一对应字段,其余字段必须为 `None`。
+- `CreateReviewAnchorRequest` 当前写路径只允许 `(ReviewAnchorKind::Fact, ReviewTargetKind::Fact)` 和 `(ReviewAnchorKind::Manifestation, ReviewTargetKind::Manifestation)` 两组 target pair;其它 target kind 即使字段齐全也必须返回 `ProtocolError::InvalidCommand`,不得进入 repository lookup 或 domain factory。
+- `ReviewAnchorKind::ScopeChange` / `ReviewTargetKind::ScopeChange` 当前只作为 shared value object 预留;在补齐 `ScopeChangeRecordRef` 字段级 schema、scope change repository lookup 和 flow 前,不得被 `CreateReviewAnchorRequest` 接受。
+- `ReviewAnchorKind::TraceHandoff`、`ReviewAnchorKind::ArchiveHandoff` 和 `ReviewAnchorKind::ProjectionIssue` 仅作为 PH-06 shared value object 预留给后续 handoff / projection review surface;在补齐对应 flow、repository load 和 factory 前,不得被 `CreateReviewAnchorRequest` 接受。
+- `ReviewTargetKind::TraceContext` 当前没有对应的 `ReviewAnchorKind` 映射,只能作为 query / archive / handoff 共享 target ref 预留;不得作为 `CreateReviewAnchorRequest.target_ref`。
+- 未来若启用 handoff / projection review anchor,必须先补齐正式映射:`ReviewAnchorKind::TraceHandoff -> ReviewTargetKind::TraceHandoff`、`ReviewAnchorKind::ArchiveHandoff -> ReviewTargetKind::ArchiveHandoff`、`ReviewAnchorKind::ProjectionIssue -> ReviewTargetKind::ProjectionState`,并同步补 domain factory 与 Step 9 flow。
+- `ReviewAnchorRef` 只复制 `review_anchor_id` 和 `space_id`,不得复制 target、reason 或 review report。
+- `ReviewReasonRef` 和 `TraceSealReason` 只保存原因引用与枚举分类,不得保存长文本报告或外部正文。
+
+#### 7.2.3.2 handoff request refs 与 archive scope
+
+```rust
+/// Stable id for a trace handoff record.
+pub struct TraceHandoffRecordId(pub String);
+
+/// Stable id for an archive handoff record.
+pub struct ArchiveHandoffRecordId(pub String);
+
+/// Describes handoff state for trace delivery.
+pub enum TraceHandoffState {
+    /// The handoff waits for delivery.
+    Pending,
+    /// The handoff was delivered successfully.
+    HandedOff,
+    /// The handoff failed and is scheduled for retry.
+    RetryPending,
+    /// The handoff failed permanently and requires operations handling.
+    Failed,
+    /// The handoff intent was cancelled.
+    Cancelled,
+}
+
+/// Describes archive handoff state.
+pub enum ArchiveHandoffState {
+    /// The archive handoff waits for delivery.
+    Pending,
+    /// The archive handoff completed and has an archive package reference.
+    Archived,
+    /// The archive handoff failed and is scheduled for retry.
+    RetryPending,
+    /// The archive handoff failed permanently and requires operations handling.
+    Failed,
+    /// The archive handoff intent was cancelled.
+    Cancelled,
+}
+
+/// Describes the class of destination used by trace handoff.
+pub enum ObservabilityDestinationKind {
+    /// Destination is a trace store.
+    TraceStore,
+    /// Destination is an audit sink.
+    AuditSink,
+    /// Destination is a metrics sink.
+    MetricsSink,
+    /// Destination is a diagnostic report store.
+    DiagnosticReport,
+    /// Destination is a configured external handoff target.
+    ExternalHandoffTarget,
+}
+
+/// References a configured observability destination.
+pub struct ObservabilityDestinationRef {
+    /// Destination family.
+    pub destination_kind: ObservabilityDestinationKind,
+    /// Stable configured target reference.
+    pub target_ref: ExternalReferenceRef,
+}
+
+/// Describes why handoff was requested.
+pub enum HandoffReasonKind {
+    /// Operator or trusted service requested handoff.
+    ManualRequest,
+    /// Retention policy requested handoff.
+    RetentionPolicy,
+    /// Space close flow requested handoff.
+    SpaceClose,
+    /// Safety or review policy requested handoff.
+    SafetyReview,
+    /// Operations requested replay or recovery handoff.
+    OperationsReplay,
+}
+
+/// References the reason for requesting a trace or archive handoff.
+pub struct HandoffReason {
+    /// Shared command reason reference.
+    pub reason_ref: CommandReasonRef,
+    /// Handoff reason kind.
+    pub reason_kind: HandoffReasonKind,
+}
+
+/// Describes the archive material scope.
+pub enum ArchiveScopeKind {
+    /// Archive the whole conversation space scope.
+    Space,
+    /// Archive one trace context.
+    TraceContext,
+    /// Archive material around one review anchor.
+    ReviewAnchor,
+    /// Archive committed material in a time window.
+    TimeWindow,
+}
+
+/// References archive scope without embedding archived material.
+pub struct ArchiveScope {
+    /// Scope family.
+    pub scope_kind: ArchiveScopeKind,
+    /// Space covered by the archive scope.
+    pub space_id: ConversationSpaceId,
+    /// Required when scope kind is TraceContext.
+    pub trace_context_id: Option<ConversationTraceContextId>,
+    /// Required when scope kind is ReviewAnchor.
+    pub review_anchor_ref: Option<ReviewAnchorRef>,
+    /// Required when scope kind is TimeWindow.
+    pub from_time: Option<Timestamp>,
+    /// Required when scope kind is TimeWindow.
+    pub until_time: Option<Timestamp>,
+}
+
+/// References the retention policy used for trace or archive handoff.
+pub struct TraceRetentionPolicyRef {
+    /// Stable configured policy id.
+    pub policy_id: PolicyId,
+    /// Optional external policy version reference.
+    pub policy_version_ref: Option<ExternalReferenceRef>,
+}
+```
+
+约束:
+
+- `ObservabilityDestinationRef.target_ref` 只指向已配置 destination,不得携带 adapter config、credential、URL secret 或 response body。
+- `RequestTraceHandoffRequest.destination_ref = None` 时,application service 必须从配置解析默认 destination;若无默认 destination,返回 `ApplicationError::MissingConfiguration` 或对应 protocol/application error,不得自行构造 destination。
+- `ArchiveScope::Space` 只要求 `space_id`,其他可选字段必须为 `None`。
+- `ArchiveScope::TraceContext` 必须携带 `trace_context_id`,且该 trace context 必须属于同一 `space_id`。
+- `ArchiveScope::ReviewAnchor` 必须携带 `review_anchor_ref`,且 `review_anchor_ref.space_id == space_id`。
+- `ArchiveScope::TimeWindow` 必须携带 `from_time` 和 `until_time`,且 `from_time < until_time`。
+- `RequestArchiveHandoffRequest.archive_scope = None` 时,application service 可以派生 `ArchiveScope::Space`;若缺少 `space_id` 或配置不允许默认 space scope,返回 reject。
+- `RequestArchiveHandoffRequest.retention_policy_ref = None` 时,application service 必须从配置解析默认 retention policy;若无默认 policy,返回 reject。
+- `TraceHandoffState` 和 `ArchiveHandoffState` 属于 contracts shared enum;`domain/trace.rs` 的 `TraceHandoffRecord` / `ArchiveHandoffRecord`、`TraceHandoffCommandResult` / `ArchiveHandoffCommandResult` 和 outbound handoff event 必须复用同一 enum,不得复制第二套 public state。
+
+#### 7.2.3.3 handoff payload、retry、receipt 与 archive package refs
+
+```rust
+/// Redacted payload reference used by trace handoff.
+pub struct TraceHandoffPayloadRef {
+    /// Reference to redacted handoff material.
+    pub payload_ref: ExternalReferenceRef,
+    /// Digest for the redacted handoff material.
+    pub payload_digest: PayloadDigest,
+    /// Safe diagnostic or redaction evidence marker.
+    pub redaction_marker_ref: Option<DiagnosticRef>,
+}
+
+/// Positive retry attempt counter.
+pub struct RetryAttempt(pub u32);
+
+/// Describes retryable handoff failure reasons.
+pub enum HandoffRetryReasonKind {
+    /// Destination is temporarily unavailable.
+    DestinationUnavailable,
+    /// Destination rate limit was reached.
+    RateLimited,
+    /// Handoff timed out.
+    Timeout,
+    /// Adapter reported a transient error.
+    TransientAdapterError,
+}
+
+/// References why a handoff retry was scheduled.
+pub struct HandoffRetryReason {
+    /// Retry reason kind.
+    pub reason_kind: HandoffRetryReasonKind,
+    /// Safe diagnostic reference.
+    pub diagnostic_ref: Option<DiagnosticRef>,
+}
+
+/// Retry marker for failed handoff attempts.
+pub struct HandoffRetryMarker {
+    /// Retry reason.
+    pub retry_reason: HandoffRetryReason,
+    /// Current retry attempt.
+    pub attempt: RetryAttempt,
+    /// Time when next retry is allowed.
+    pub next_retry_at: Timestamp,
+}
+
+/// Describes permanent handoff failure reasons.
+pub enum HandoffFailureReasonKind {
+    /// Destination rejected the request permanently.
+    DestinationRejected,
+    /// Payload failed body exclusion or redaction policy.
+    PayloadUnsafe,
+    /// Retention policy denied handoff.
+    RetentionPolicyDenied,
+    /// Adapter reported a permanent error.
+    PermanentAdapterError,
+    /// Retry policy exhausted attempts.
+    MaxRetryExceeded,
+}
+
+/// References why a handoff failed permanently.
+pub struct HandoffFailureReason {
+    /// Failure reason kind.
+    pub reason_kind: HandoffFailureReasonKind,
+    /// Safe diagnostic reference.
+    pub diagnostic_ref: Option<DiagnosticRef>,
+}
+
+/// Describes why a handoff intent was cancelled.
+pub enum HandoffCancelReasonKind {
+    /// Operator cancelled the handoff.
+    OperatorCancelled,
+    /// Handoff was superseded by an archive flow.
+    SupersededByArchive,
+    /// Retention expired before handoff.
+    RetentionExpired,
+    /// Relevant policy changed before delivery.
+    PolicyChanged,
+}
+
+/// References why a handoff intent was cancelled.
+pub struct HandoffCancelReason {
+    /// Shared command reason reference.
+    pub reason_ref: CommandReasonRef,
+    /// Cancel reason kind.
+    pub reason_kind: HandoffCancelReasonKind,
+}
+
+/// References an observability delivery receipt without storing response body.
+pub struct ObservabilityReceiptRef {
+    /// Destination that accepted the handoff.
+    pub destination_ref: ObservabilityDestinationRef,
+    /// External receipt reference.
+    pub receipt_ref: ExternalReferenceRef,
+    /// Delivery time.
+    pub delivered_at: Timestamp,
+}
+
+/// References an archive package without storing package body.
+pub struct ArchivePackageRef {
+    /// External archive package reference.
+    pub archive_ref: ExternalReferenceRef,
+    /// Digest for the archive package.
+    pub package_digest: PayloadDigest,
+    /// Package creation time.
+    pub created_at: Timestamp,
+}
+```
+
+约束:
+
+- `TraceHandoffPayloadRef.payload_digest` 必填;不得把 payload URL、body length 或 adapter-local marker 当作 digest。
+- `TraceHandoffPayloadRef.payload_ref` 只能指向 redacted handoff material;不得指向 raw runtime output、bridge body、artifact body、prompt body、secret 或 token。
+- 面向 `ObservabilityDestinationKind::ExternalHandoffTarget` 的 handoff payload 必须携带 `redaction_marker_ref = Some(...)`;内部 trace store / audit sink 可按配置要求同样强制携带。
+- `RetryAttempt.0` 必须大于 0;`HandoffRetryMarker.next_retry_at` 必须晚于当前失败时间。
+- `ObservabilityReceiptRef.receipt_ref` 只保存外部 receipt 引用,不得保存完整 response body。
+- `ArchivePackageRef.archive_ref` 只保存归档包引用,不得保存归档包正文;`package_digest` 必填。
+
+#### 7.2.3.4 trace retention / redaction / body exclusion rule set
+
+```rust
+/// Positive retention duration in seconds.
+pub struct RetentionDuration {
+    /// Positive duration seconds.
+    pub seconds: u64,
+}
+
+/// Retention window duration used by trace retention policy.
+pub struct RetentionWindow {
+    /// Positive duration owned by conversation contracts.
+    pub duration: RetentionDuration,
+}
+
+/// Pure data rules for trace retention.
+pub struct TraceRetentionRuleSet {
+    /// How long trace references remain locally available.
+    pub retention_window: RetentionWindow,
+    /// Whether archive handoff is allowed after local retention expiry.
+    pub allow_archive_after_expiry: bool,
+    /// Whether expiry requires a review anchor before local references are reduced.
+    pub require_review_anchor_before_expiry: bool,
+}
+
+/// Pure data rules for trace handoff routing and retry.
+pub struct TraceHandoffRuleSet {
+    /// Handoff payload must carry digest evidence.
+    pub require_payload_digest: bool,
+    /// Handoff delivery can be retried on retryable errors.
+    pub allow_retry: bool,
+    /// Maximum retry attempts when retry is allowed.
+    pub max_retry_attempts: RetryAttempt,
+}
+
+/// Pure data rules for trace material redaction.
+pub struct TraceRedactionRuleSet {
+    /// Actor refs must be redacted or summarized before external handoff.
+    pub redact_actor_refs: bool,
+    /// External refs must be redacted or summarized before external handoff.
+    pub redact_external_refs: bool,
+    /// A redaction marker is required before external handoff.
+    pub require_redaction_marker: bool,
+}
+
+/// Pure data rules that prevent forbidden bodies from entering conversation truth or trace handoff.
+pub struct BodyExclusionRuleSet {
+    /// Reject inline body fields.
+    pub reject_inline_body: bool,
+    /// Reject raw payload references that are not safe snapshots or redacted material.
+    pub reject_raw_payload: bool,
+    /// Reject source repository body material.
+    pub reject_source_body: bool,
+    /// Reject secrets, credentials, tokens, and private keys.
+    pub reject_secret_material: bool,
+}
+```
+
+默认值与校验规则:
+
+- `BodyExclusionRuleSet::default()` 的四个字段全部为 `true`;PH-06 不允许通过配置关闭任一字段。
+- `TraceHandoffRuleSet::default()` 必须满足 `require_payload_digest = true`、`allow_retry = true`、`max_retry_attempts.0 > 0`。
+- `TraceRedactionRuleSet::default()` 必须满足 `require_redaction_marker = true`;是否 redacted actor / external refs 可由已校验配置收窄,但不得让 raw body 进入 handoff payload。
+- `RetentionDuration.seconds` 必须大于 0;超过系统配置上限时按配置校验失败处理。
+- `RetentionWindow.duration` 使用本节定义的 `RetentionDuration`,不得引用当前 core baseline 不存在的 `Duration` 类型,也不得在实现侧复制一个伪 core duration。
+- `TraceRetentionPolicy::default_policy()` 只能由已校验默认配置或测试 fixture 构造上述 rule set;生产路径不得在缺配置时静默生成无限 retention 或无 body exclusion 策略。
+- `TraceRetentionPolicy::from_retention_rules(...)` 只接收纯数据 rule set,不得读取 repository、port、env var 或外部系统。
+- `BodyExclusionRuleSet` 同时供 `ConversationTruthPolicy` 和 `TraceRetentionPolicy` 消费,正式归属为 contracts shared value object;不得在 `domain/policies.rs` 复制第二套字段。
+
 ### 7.3 `domain/truth.rs` 对象实现契约
 
 #### 7.3.1 `ConversationTruthState`
@@ -1778,6 +2229,16 @@ pub struct FactScopeRuleSet {
     pub allow_default_visibility: bool,
 }
 
+/// Trusted inbound source actor rules for append policy.
+pub struct TrustedAppendActorRuleSet {
+    /// Source kinds whose actor represents a trusted source boundary rather than a conversation participant.
+    pub trusted_source_kinds: Vec<FactSourceKind>,
+    /// Trusted runtime result append must use a system actor.
+    pub require_system_actor_for_runtime_result: bool,
+    /// Trusted bridge append must use an integration actor.
+    pub require_integration_actor_for_bridge: bool,
+}
+
 /// Idempotency matching rules for append policy.
 pub struct FactAppendIdempotencyRuleSet {
     /// Idempotency key is required for append.
@@ -1818,6 +2279,7 @@ pub enum FactAppendDuplicateDecision {
 | `FactKindRuleSet` | `allowed_kinds`、`reject_ui_only_kinds` | `ConversationFactKind` 不允许 UI-only 类型 |
 | `FactSourceRuleSet` | `allowed_source_kinds`、`require_result_only`、`reject_mixed_concrete_sources` | source 必须可追溯且只携带一种具体来源 |
 | `FactScopeRuleSet` | active space、participant append、visibility open、default visibility 开关 | scope 规则只判断,不创建 space / scope |
+| `TrustedAppendActorRuleSet` | trusted source kind、runtime system actor、bridge integration actor | inbound trusted source actor 不要求在 participant scope 中 |
 | `FactAppendIdempotencyRuleSet` | key 必填、duplicate 匹配字段、冲突 reason | duplicate 和 conflict 必须区分 |
 | `FactAppendDuplicateDecision` | `TreatAsNew` / `ReturnExistingResult` / `RejectConflict` | service 负责用 repository existing record 计算具体 existing receipt |
 
@@ -1943,6 +2405,8 @@ pub struct FactAppendPolicy {
     pub source_rules: FactSourceRuleSet,
     /// Space and scope validation rules.
     pub scope_rules: FactScopeRuleSet,
+    /// Trusted inbound source actor rules.
+    pub trusted_actor_rules: TrustedAppendActorRuleSet,
     /// Idempotency behavior rules.
     pub idempotency_rules: FactAppendIdempotencyRuleSet,
 }
@@ -1953,11 +2417,12 @@ pub struct FactAppendPolicy {
 | `allowed_fact_kinds` | `FactKindRuleSet` | 限定可追加事实类型 | 不含 UI-only 类型 |
 | `source_rules` | `FactSourceRuleSet` | 校验来源引用 | 来源必须可追溯 |
 | `scope_rules` | `FactScopeRuleSet` | 校验 space / scope | 必须已成立 |
+| `trusted_actor_rules` | `TrustedAppendActorRuleSet` | 校验 runtime / bridge trusted source actor 例外 | 只适用于 inbound trusted source append |
 | `idempotency_rules` | `FactAppendIdempotencyRuleSet` | 幂等与冲突规则 | duplicate 与 conflict 必须区分 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `assert_append_allowed(&self, space: &ConversationSpace, participant: &ParticipantScope, visibility: &VisibilityScope) -> Result<(), DomainError>` | 校验空间和范围允许追加 | space、participant、visibility | `Result<(), DomainError>` | 不写事实 |
+| `assert_append_allowed(&self, space: &ConversationSpace, participant: &ParticipantScope, visibility: &VisibilityScope, source: &FactSourceRef, actor: &ActorRef) -> Result<(), DomainError>` | 校验空间、范围、来源 actor 是否允许追加 | space、participant、visibility、source、actor | `Result<(), DomainError>` | 不写事实 |
 | `assert_source_allowed(&self, source: &FactSourceRef) -> Result<(), DomainError>` | 校验来源 | source ref | `Result<(), DomainError>` | 不解析外部正文 |
 | `assert_fact_kind_allowed(&self, kind: ConversationFactKind) -> Result<(), DomainError>` | 校验事实类型 | kind | `Result<(), DomainError>` | 不修改输入 |
 | `detect_duplicate(&self, key: IdempotencyKey, source: &FactSourceRef) -> FactAppendDuplicateDecision` | 判断幂等重复 | 幂等键和来源 | `FactAppendDuplicateDecision` | 不访问 repository |
@@ -1971,6 +2436,10 @@ pub struct FactAppendPolicy {
 
 - policy 不写事实。
 - 不接受不可追溯来源。
+- 普通 `FactSourceKind::Actor` / `FactSourceKind::System` append 仍要求 `actor` 属于 `participant_scope` 且角色可 append。
+- `FactSourceKind::RuntimeResult` 和 `FactSourceKind::BridgeMapped` 属于 trusted inbound source append;其 actor 表示来源边界而非普通 conversation participant,不要求出现在 `participant_scope`。
+- trusted source actor 例外不得绕过 active space、participant scope appendable、visibility open、fact kind、payload digest、source result-only、forbidden body 和 source isolation 校验。
+- runtime trusted append 必须使用 `SystemActorRef` / `ActorKind::System`;bridge trusted append 必须使用 `ActorKind::Integration`。
 - projection / rebuild job 不能借此生成业务事实。
 
 #### 7.5.4 `FactAppendReceipt`
@@ -2172,6 +2641,7 @@ pub enum ConversationChangeCursorState {
 归属口径:
 
 - `ExternalSourceSystem`、`ExternalFactKind`、`DisplaySummaryRef`、`ManifestationReason`、`ManifestationRevokeReason`、`ReferenceResolutionReason` 属于 `conversation-contracts/src/refs.rs` 或同层 shared value module。
+- `ActorSnapshot` 属于 `conversation-contracts/src/refs.rs` 中的 identity resolver-facing safe DTO,由 `ActorResolverPort` 返回,不得包含 identity 正文、private profile、role assignment list、raw upstream response、secret 或 token。
 - `ExternalFactResolution`、`DigestVerification` 属于 `conversation-contracts/src/refs.rs` 中的 resolver-facing safe DTO,由 `ExternalFactResolverPort` 返回,不得包含来源正文。
 - `ExternalReferenceProjectionId`、`DegradedDisplayRefId`、`DisplayFragmentRefId`、`DegradedDisplayRef` 和 `DisplayFragmentRef` 属于 `conversation-contracts/src/refs.rs` 或 `conversation-contracts/src/views.rs` 的 projection-facing shared value object,供 `domain/reference.rs` 和 query view 复用。
 - `ManifestationSourceRuleSet`、`ManifestationVisibilityRuleSet`、`ManifestationSnapshotRuleSet` 和 `ManifestationOwnershipRuleSet` 属于 `domain/manifestation.rs` 的 policy value object,不得只实现为空 struct。
@@ -2224,6 +2694,38 @@ pub struct DisplaySummaryRef {
     /// Digest of the safe summary material.
     pub summary_digest: ExternalSourceDigest,
 }
+
+/// Safe identity actor snapshot returned by ActorResolverPort without owning identity truth.
+pub struct ActorSnapshot {
+    /// Actor reference resolved by the identity resolver.
+    pub actor_ref: ActorRef,
+    /// Source version observed for this actor snapshot.
+    pub actor_version_ref: ExternalSourceVersionRef,
+    /// Digest of the safe actor snapshot material.
+    pub actor_digest: ExternalSourceDigest,
+    /// Safe display summary when one is available.
+    pub display_summary_ref: Option<DisplaySummaryRef>,
+    /// Resolution state after actor lookup.
+    pub resolution_state: ReferenceResolutionState,
+    /// Reason for pending, unresolved, stale, or failed resolution.
+    pub resolution_reason: Option<ReferenceResolutionReason>,
+}
+
+| 字段 | 类型 | 作用 | 约束 |
+|---|---|---|---|
+| `actor_ref` | `ActorRef` | identity actor 引用 | 必须来自 resolver 输入或 identity safe surface;不保存 identity truth |
+| `actor_version_ref` | `ExternalSourceVersionRef` | actor 快照版本 | 用于 stale / freshness marker |
+| `actor_digest` | `ExternalSourceDigest` | 安全快照摘要 | 只校验 safe snapshot material,不代表 identity 正文 |
+| `display_summary_ref` | `Option<DisplaySummaryRef>` | 安全展示摘要引用 | 可为空;不得包含 display body |
+| `resolution_state` | `ReferenceResolutionState` | actor 解析状态 | pending / unresolved / stale 必须显式暴露 |
+| `resolution_reason` | `Option<ReferenceResolutionReason>` | 解析原因 | pending / unresolved / stale / failed 时应存在 |
+
+Actor resolver 约束:
+
+- `ActorSnapshot` 只作为 resolver 返回的 safe DTO,不得进入 identity truth ownership。
+- `ConfiguredActorResolverAdapter` 可以从 L1-identity safe surface、fixture 或 configured resolver 构造该 DTO,但不得依赖 identity crate 类型。
+- `resolve_actor(...)` 不得返回 role assignment list、identity private profile、credential、raw upstream response 或 actor body。
+- `ActorSnapshot` 不提供 `result_ref()`;consumer 幂等完成必须使用 inbound event 的 `event.result_ref()` 或 application service 明确定义的 consumer result ref。
 
 /// Reason attached when manifesting an external fact into a conversation space.
 pub struct ManifestationReason {
@@ -2658,10 +3160,26 @@ pub struct ExternalFactRef {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `ExternalFactRef::from_work_fact(work_fact_ref: WorkFactRef, version_ref: ExternalSourceVersionRef) -> Result<Self, DomainError>` | 从 work 事实创建引用 | work ref 与版本 | `Result<Self, DomainError>` | work context changed |
-| `ExternalFactRef::from_governance_decision(decision_ref: GovernanceDecisionRef, version_ref: ExternalSourceVersionRef) -> Result<Self, DomainError>` | 从治理结论创建引用 | decision ref 与版本 | `Result<Self, DomainError>` | governance fact committed |
-| `ExternalFactRef::from_artifact_version(artifact_version_ref: ArtifactVersionRef) -> Result<Self, DomainError>` | 从 artifact 版本创建引用 | artifact version ref | `Result<Self, DomainError>` | artifact fact committed |
-| `ExternalFactRef::from_bridge_event(bridge_event_ref: BridgeEventRef) -> Result<Self, DomainError>` | 从 bridge event 创建引用 | bridge event ref | `Result<Self, DomainError>` | bridge mapped fact |
+| `ExternalFactRef::from_work_fact(work_fact_ref: ExternalSourceObjectRef, version_ref: ExternalSourceVersionRef, source_digest: ExternalSourceDigest) -> Result<Self, DomainError>` | 从 work 事实创建引用 | work object ref、版本、摘要 | `Result<Self, DomainError>` | work context changed |
+| `ExternalFactRef::from_governance_decision(decision_ref: ExternalSourceObjectRef, version_ref: ExternalSourceVersionRef, source_digest: ExternalSourceDigest) -> Result<Self, DomainError>` | 从治理结论创建引用 | governance object ref、版本、摘要 | `Result<Self, DomainError>` | governance fact committed |
+| `ExternalFactRef::from_artifact_version(artifact_fact_ref: ExternalSourceObjectRef, artifact_version_ref: ExternalSourceVersionRef, artifact_digest: ExternalSourceDigest) -> Result<Self, DomainError>` | 从 artifact 版本创建引用 | artifact object ref、版本、摘要 | `Result<Self, DomainError>` | artifact fact committed |
+| `ExternalFactRef::from_bridge_event(bridge_event_ref: ExternalSourceObjectRef, source_version_ref: ExternalSourceVersionRef, source_digest: ExternalSourceDigest) -> Result<Self, DomainError>` | 从 bridge event 创建引用 | bridge object ref、版本、摘要 | `Result<Self, DomainError>` | bridge mapped fact |
+
+构造器字段来源:
+
+| 构造器 | `source_system` | `source_kind` | `source_object_ref` 来源 | `source_version_ref` 来源 | `source_digest` 来源 | `external_fact_ref_id` |
+|---|---|---|---|---|---|---|
+| `from_work_fact(...)` | `ExternalSourceSystem::Work` | `ExternalFactKind::WorkContext` | `work_fact_ref` | `version_ref` | `source_digest` | 按 `Work + WorkContext + work_fact_ref + version_ref` 稳定派生 |
+| `from_governance_decision(...)` | `ExternalSourceSystem::Governance` | `ExternalFactKind::GovernanceDecision` | `decision_ref` | `version_ref` | `source_digest` | 按 `Governance + GovernanceDecision + decision_ref + version_ref` 稳定派生 |
+| `from_artifact_version(...)` | `ExternalSourceSystem::Artifact` | `ExternalFactKind::ArtifactEvidence` | `artifact_fact_ref` | `artifact_version_ref` | `artifact_digest` | 按 `Artifact + ArtifactEvidence + artifact_fact_ref + artifact_version_ref` 稳定派生 |
+| `from_bridge_event(...)` | `ExternalSourceSystem::Bridge` | `ExternalFactKind::BridgeMappedFact` | `bridge_event_ref` | `source_version_ref` | `source_digest` | 按 `Bridge + BridgeMappedFact + bridge_event_ref + source_version_ref` 稳定派生 |
+
+构造器约束:
+
+- 构造器属于 `contracts/refs.rs` 的 `ExternalFactRef` impl surface,供 domain / application / consumer flow 复用。
+- 构造器不得读取外部仓、不得解析 source object、不得保存 source body。
+- 任一 object ref、version ref 或 digest 缺失 / 空值时返回 `DomainError::InvalidExternalReference` 或同等 invalid reference 错误,不得生成占位 ref。
+- inbound consumer flow 必须优先调用上述构造器,不得手写 `ExternalFactRef::new(...)` 拼装 work / governance / artifact / bridge 引用。
 
 不变量与禁止事项:
 
@@ -2894,7 +3412,7 @@ pub struct ReviewAnchor {
 |---|---|---|---|
 | `review_anchor_id` | `ReviewAnchorId` | 标识复盘锚点 | 系统生成 |
 | `space_id` | `ConversationSpaceId` | 所属空间 | 必须匹配 target |
-| `anchor_kind` | `ReviewAnchorKind` | fact / manifestation / scope change / handoff / projection issue | 不表达治理裁决 |
+| `anchor_kind` | `ReviewAnchorKind` | fact / manifestation / scope change / handoff / projection issue | `CreateReviewAnchor` 当前只构造 fact / manifestation;其它 kind 为 shared value object 预留 |
 | `target_ref` | `ReviewTargetRef` | 被复盘对象引用 | 只保存引用 |
 | `created_by` | `ActorRef` | 创建 actor | 不保存身份正文 |
 | `reason_ref` | `ReviewReasonRef` | 复盘原因引用 | 不保存长报告 |
@@ -2909,13 +3427,14 @@ pub struct ReviewAnchor {
 |---|---|---|---|---|
 | `ReviewAnchor::for_fact(fact: &ConversationFact, actor: ActorRef, reason_ref: ReviewReasonRef) -> Result<Self, DomainError>` | 为事实创建锚点 | fact、actor、reason | `Result<Self, DomainError>` | review command |
 | `ReviewAnchor::for_manifestation(manifestation: &CrossDomainManifestation, actor: ActorRef, reason_ref: ReviewReasonRef) -> Result<Self, DomainError>` | 为显化创建锚点 | manifestation、actor、reason | `Result<Self, DomainError>` | manifestation review |
-| `ReviewAnchor::for_scope_change(change: &ScopeChangeRecord, actor: ActorRef, reason_ref: ReviewReasonRef) -> Result<Self, DomainError>` | 为 scope change 创建锚点 | change、actor、reason | `Result<Self, DomainError>` | scope review |
+| `ReviewAnchor::for_scope_change(change: &ScopeChangeRecord, actor: ActorRef, reason_ref: ReviewReasonRef) -> Result<Self, DomainError>` | 为 scope change 创建锚点 | change、actor、reason | `Result<Self, DomainError>` | 预留给后续 scope review path;当前 `CreateReviewAnchor` 不调用 |
 
 不变量与禁止事项:
 
 - 不替代 governance decision。
 - 不包含审查正文全集。
 - 锚点输出仍需经过 `VisibilityPolicy`。
+- 当前 `CreateReviewAnchor` command 只调用 `for_fact(...)` 和 `for_manifestation(...)`;scope change、handoff 和 projection 相关 anchor kind 只有 shared enum 归属,没有本 boundary 的写路径。
 
 #### 7.8.3 `TraceHandoffRecord`
 
@@ -2937,21 +3456,7 @@ pub struct TraceHandoffRecord {
 }
 ```
 
-```rust
-/// Describes handoff state for trace delivery.
-pub enum TraceHandoffState {
-    /// The handoff waits for delivery.
-    Pending,
-    /// The handoff was delivered successfully.
-    HandedOff,
-    /// The handoff failed and is scheduled for retry.
-    RetryPending,
-    /// The handoff failed permanently and requires operations handling.
-    Failed,
-    /// The handoff intent was cancelled.
-    Cancelled,
-}
-```
+`TraceHandoffState` 是 `conversation-contracts/src/refs.rs` shared enum,正式 enum schema 见 §7.2.3.2。`domain/trace.rs::TraceHandoffRecord` 必须复用该 enum,不得复制 domain-only mirror enum。
 
 | 变体 | Rustdoc 注释 | 作用 | 允许来源 | 允许去向 |
 |---|---|---|---|---|
@@ -3010,21 +3515,7 @@ pub struct ArchiveHandoffRecord {
 }
 ```
 
-```rust
-/// Describes archive handoff state.
-pub enum ArchiveHandoffState {
-    /// The archive handoff waits for delivery.
-    Pending,
-    /// The archive handoff completed and has an archive package reference.
-    Archived,
-    /// The archive handoff failed and is scheduled for retry.
-    RetryPending,
-    /// The archive handoff failed permanently and requires operations handling.
-    Failed,
-    /// The archive handoff intent was cancelled.
-    Cancelled,
-}
-```
+`ArchiveHandoffState` 是 `conversation-contracts/src/refs.rs` shared enum,正式 enum schema 见 §7.2.3.2。`domain/trace.rs::ArchiveHandoffRecord` 必须复用该 enum,不得复制 domain-only mirror enum。
 
 | 变体 | Rustdoc 注释 | 作用 | 允许来源 | 允许去向 |
 |---|---|---|---|---|

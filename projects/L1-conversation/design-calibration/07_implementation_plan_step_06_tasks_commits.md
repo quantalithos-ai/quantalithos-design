@@ -285,23 +285,24 @@
 | 任务编号 | 编写顺序 | 实施动作 | 输入 | 输出 | 完成判定 |
 |---|---:|---|---|---|---|
 | IMPL-08-01 | 1 | 固定 release gate suite、run id、artifact root 和 report root | `05` §13、`06` §3 / §4 | gate config、`artifacts/test/<run_id>`、`reports/runs/<run_id>` | 无 `<project>` / `latest` path tests 通过 |
-| IMPL-08-02 | 2 | 生成 evidence index、gate results、EV pages 和 redaction report | `05` §14、`06` AC-EVID-* | evidence pages、redaction-check、gate-results | EV 页面齐全且 redaction 通过 |
-| IMPL-08-03 | 3 | 生成 acceptance handoff、veto checklist、risk acceptance 和 open issues | `06` §4 / §11~§14 | `reports/acceptance/*` | VETO 覆盖，风险分级清楚 |
-| IMPL-08-04 | 4 | 执行最终 release gate 并固定送验提交说明 | `06` §3 / §15 | fixed implementation commit、run summary、handoff package | gate 非 0 时保留 failure summary |
+| IMPL-08-02 | 2 | 生成最小 evidence index 壳、gate results 和 redaction report | `05` §14、`06` AC-EVID-* | minimal `evidence-index.md`、redaction-check、gate-results | path / link / redaction script tests 通过,不生成最终 EV 页面 |
+| IMPL-08-03 | 3 | 生成最终 EV pages 和完整 evidence index | `05` EV table、`06` AC-EVID-* | evidence pages、完整 evidence-index | EV 页面齐全且被 index 引用 |
+| IMPL-08-04 | 4 | 生成 acceptance handoff、veto checklist、risk acceptance 和 open issues | `06` §4 / §11~§14 | `reports/acceptance/*` | VETO 覆盖，风险分级清楚 |
+| IMPL-08-05 | 5 | 执行最终 release gate 并固定送验提交说明 | `06` §3 / §15 | fixed implementation commit、run summary、handoff package | gate 非 0 时保留 failure summary |
 
 #### 代码实现批次
 
 | 批次编号 | 目标 | 输入 | 输出 | 预计规模 | 验证门禁 | 提交关系 |
 |---|---|---|---|---|---|---|
-| BATCH-08-01 | 完成 gate / report / redaction scripts 的正式参数和 path checks | `03` §15、`05` scripts、`06` AC-NFR-010 | script implementation、path check tests | 100~300 行 | `TC-CONV-REPORT-001` | commit-08-a |
-| BATCH-08-02 | 完成 EV pages、evidence index 和 acceptance handoff 生成 | `05` EV table、`06` AC-EVID-* | report generator、acceptance files、tests | 需拆分；每批不超过 300 行 | `EV-CONV-GATE-001`、`EV-CONV-ACCEPT-001` | commit-08-b |
+| BATCH-08-01 | 完成 gate / report / redaction scripts 的正式参数、path checks 和最小 evidence-index 壳渲染 | `03` §15、`05` scripts、`06` AC-NFR-010 | script implementation、path check tests、minimal `evidence-index.md` | 100~300 行 | `TC-CONV-REPORT-001` | commit-08-a |
+| BATCH-08-02 | 完成 EV pages、完整 evidence index 和 acceptance handoff 生成 | `05` EV table、`06` AC-EVID-* | report generator、acceptance files、tests | 需拆分；每批不超过 300 行 | `EV-CONV-GATE-001`、`EV-CONV-ACCEPT-001` | commit-08-b |
 
 #### 提交边界
 
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
-| commit-08-a | release gate、report、redaction path scripts 可独立运行后 | final scripts、path checks、redaction checker、script tests | acceptance conclusion、未生成的最终 EV 页面 | `TC-CONV-REPORT-001`、`TC-CONV-REDACTION-001` |
-| commit-08-b | 所有 P0 / P0-supporting EV、gate results、acceptance handoff 和 veto checklist 齐全后 | final reports、evidence index、acceptance handoff、risk / open issues | 新业务代码、生产 adapter、未审查通过结论 | full release gate、`EV-CONV-GATE-001`、`EV-CONV-ACCEPT-001` |
+| commit-08-a | release gate、report、redaction path scripts 可独立运行后 | final scripts、path checks、redaction checker、script tests、最小 `evidence-index.md` 壳 | acceptance conclusion、最终 EV 明细页、acceptance handoff / veto / risk 结论 | `TC-CONV-REPORT-001`、`TC-CONV-REDACTION-001` |
+| commit-08-b | 所有 P0 / P0-supporting EV、gate results、acceptance handoff 和 veto checklist 齐全后 | final reports、完整 evidence index、EV 明细页、acceptance handoff、risk / open issues | 新业务代码、生产 adapter、未审查通过结论 | full release gate、`EV-CONV-GATE-001`、`EV-CONV-ACCEPT-001` |
 
 ## 8. 开工前设计闭环复核矩阵
 
@@ -323,8 +324,8 @@
 | commit-06-b | handoff adapter input、safe diagnostic、audit ref 字段闭合 | failure 不回滚 fact / trace truth | fake handoff 必须有 controlled seam marker | 暂停并回写 handoff recovery 冲突 |
 | commit-07-a | outbox event、publisher input、stable event id 字段闭合 | publish retry / failed 不回滚 truth | 不引入 production broker | 暂停并回写 outbox event 冲突 |
 | commit-07-b | job input、projection state、cursor position、report ref 字段闭合 | rebuild / cursor / consistency 不修写真相 | operations job 覆盖 PH-02~PH-06 truth | 暂停并回写 job / projection 冲突 |
-| commit-08-a | gate / report / redaction script 参数闭合 | 无新业务状态 | path shape、redaction、failure summary 可验证 | 暂停并修正 evidence path 冲突 |
-| commit-08-b | EV page、handoff、veto、risk / issue 字段闭合 | 不新增业务状态 | 所有 P0 evidence 可追溯到 fixed commit / run id | 暂停并补证据或回写验收冲突 |
+| commit-08-a | gate / report / redaction script 参数闭合 | 无新业务状态 | path shape、redaction、failure summary 和最小 evidence-index 壳可验证 | 暂停并修正 evidence path 冲突 |
+| commit-08-b | EV page、完整 index、handoff、veto、risk / issue 字段闭合 | 不新增业务状态 | 所有 P0 evidence 可追溯到 fixed commit / run id | 暂停并补证据或回写验收冲突 |
 
 ## 9. 提交粒度判断表
 

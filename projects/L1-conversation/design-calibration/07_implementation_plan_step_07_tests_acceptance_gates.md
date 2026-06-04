@@ -96,7 +96,8 @@
 | PH-01 | `scripts/reports/generate_reports.sh --suite main-config` | `artifacts/test/<run_id>/main-config` | `reports/runs/<run_id>/main-config.md` | 检查路径、profile 和 fake marker，没有验收结论 |
 | PH-02~PH-04 | `scripts/reports/generate_reports.sh --suite <suite>` | service / query suite artifact | `reports/runs/<run_id>/evidence/EV-CONV-TRUTH-001.md`; `EV-CONV-FACT-001.md`; `EV-CONV-AUTH-001.md` | 检查 TC / AC 追溯、失败解释和无 forbidden body |
 | PH-05~PH-07 | `scripts/reports/generate_reports.sh --suite <suite>` | worker / job / operations artifact | `EV-CONV-MAN-001.md`; `EV-CONV-CONSUMER-001.md`; `EV-CONV-HANDOFF-001.md`; `EV-CONV-OUTBOX-001.md`; `EV-CONV-DERIVED-001.md` | 检查 source isolation、fake marker、rerun 和 no-auto-repair 证据 |
-| PH-08 | `scripts/reports/generate_reports.sh --run-id <run_id>` | `artifacts/test/<run_id>` | `reports/runs/<run_id>/summary.md`; `evidence-index.md`; `gate-results.md`; `redaction-check.md` | 审查 EV 覆盖、失败摘要、redaction 和 path shape |
+| PH-08 / commit-08-a | `scripts/reports/generate_reports.sh --run-id <run_id>` | `artifacts/test/<run_id>` | `reports/runs/<run_id>/summary.md`; 最小 `evidence-index.md`; `gate-results.md`; `redaction-check.md` | 审查 path shape、链接、失败摘要和 redaction,不生成 acceptance 结论 |
+| PH-08 / commit-08-b | `scripts/reports/generate_reports.sh --run-id <run_id>` | `artifacts/test/<run_id>` | 完整 `evidence-index.md`; `reports/runs/<run_id>/evidence/EV-CONV-*.md` | 审查 EV 覆盖和 P0 evidence 完整性 |
 | PH-08 | acceptance report generator 或 report script 子命令 | `reports/runs/<run_id>` | `reports/acceptance/handoff.md`; `veto-checklist.md`; optional `risk-acceptance.md`; `open-issues.md` | 必须由人或 Agent 补充 baseline、scope、commit、run id、风险 owner、截止时间和 veto 结论 |
 
 ### 7.3 证据归档规则
@@ -106,7 +107,7 @@
 | artifact root | 只允许 `artifacts/test/<run_id>`；每个 suite 使用子目录，例如 `main-service`、`main-query`、`nightly-ops-replay`、`release-redline` |
 | report root | 人类可读报告只允许 `reports/runs/<run_id>` 和 `reports/acceptance` |
 | 禁止路径 | 不得使用 `artifacts/test/<project>/<run_id>`、`reports/<project>`、`latest` 或隐式当前 run |
-| EV 页面 | 每个 P0 EV 必须在 `reports/runs/<run_id>/evidence/EV-CONV-*.md` 中出现并被 `evidence-index.md` 引用 |
+| EV 页面 | commit-08-a 只要求最小 `evidence-index.md` 壳可从 `artifacts/test/<run_id>/evidence-index.json` 渲染;commit-08-b / final release gate 要求每个 P0 EV 在 `reports/runs/<run_id>/evidence/EV-CONV-*.md` 中出现并被完整 `evidence-index.md` 引用 |
 | failure summary | 失败 suite 也必须保留 stdout / stderr、tc-results、failure summary 和重跑说明 |
 | redaction | `redaction-check.md` 必须扫描 artifact 与 report；命中 raw secret、raw payload、forbidden body 即阻断 |
 | acceptance | `reports/acceptance/*` 只能作为 PH-08 送验交接；脚本初稿不等于审查通过 |
@@ -166,7 +167,7 @@
 
 | 事项 | 方案 | 推荐 | 原因 |
 |---|---|---|---|
-| 是否每个 PH 都生成 EV 页面 | A: 每阶段生成对应 EV；B: PH-08 统一生成全部 EV | 推荐 A | EV 随阶段增长更容易定位失败；PH-08 只做总索引和送验 |
+| 是否每个 PH 都生成 EV 页面 | A: 每阶段生成对应 EV；B: PH-08 统一生成全部 EV | 推荐 A | EV 随阶段增长更容易定位失败；PH-08 的 commit-08-a 只验证最小 index 壳,commit-08-b 再做完整总索引和送验 |
 | nightly readiness failure 是否允许推进 | A: 全部阻断；B: 非 P0 / 非 VETO 的 S2/S3 可条件推进 | 推荐 B | projection / integration-like readiness 可能不影响 P0 truth，但必须在 PH-08 风险接受 |
 | acceptance handoff 是否提前生成 | A: 每阶段生成；B: PH-08 生成并审查 | 推荐 B | acceptance handoff 需要 fixed implementation commit、run id 和完整 P0 EV，提前生成容易误导 |
 

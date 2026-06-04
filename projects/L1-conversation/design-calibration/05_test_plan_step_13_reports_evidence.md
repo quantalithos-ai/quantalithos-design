@@ -196,6 +196,8 @@ reports/
 | risk acceptance | S2 / S3 defects and residual risk | report script 初稿 | `reports/acceptance/risk-acceptance.md` | 仅有条件通过时填写,需 owner 和修复时间 |
 | open issues | failure summaries and defect tracker refs | report script 初稿 | `reports/acceptance/open-issues.md` | 检查是否存在 S0 / S1 未关闭 |
 
+`scripts/reports/generate_reports.sh` 的实现成熟度分两层。commit-08-a 只要求从 `artifacts/test/<run_id>/evidence-index.json` 渲染最小 `reports/runs/<run_id>/evidence-index.md` 壳,并生成 summary / gate-results / redaction-check 的 path-safe 初稿;不得生成最终 EV 明细页或 acceptance 结论。commit-08-b 才要求生成完整 EV 明细页、完整 evidence index 和 acceptance handoff 初稿。
+
 ### 7.5 evidence-index 最小字段
 
 | 字段 | 含义 | 示例 |
@@ -237,7 +239,7 @@ reports/
 
 证据 ID 使用 `EV-CONV-<TYPE>-<NNN>`。`artifacts/test/<run_id>/evidence-index.json` 和 `reports/runs/<run_id>/evidence-index.md` 必须记录 EV、TC、suite、artifact path、report path、设计来源和验收主题。正式 AC 编号由 `06-验收标准.md` 生成后回指本章 EV。
 
-`scripts/reports/generate_reports.sh` 负责从 `artifacts/test/<run_id>` 生成报告初稿。`reports/acceptance/handoff.md`、`veto-checklist.md`、`risk-acceptance.md` 和 `open-issues.md` 必须由人或 Agent 审查补充后才能作为验收交接依据。redaction / boundary scan 失败时,不得通过证据门禁。
+`scripts/reports/generate_reports.sh` 负责从 `artifacts/test/<run_id>` 生成报告初稿。commit-08-a 只要求最小 `evidence-index.md` 壳和 path / redaction / gate report 初稿;commit-08-b 才要求最终 EV 明细页、完整 evidence index 和 acceptance 初稿。`reports/acceptance/handoff.md`、`veto-checklist.md`、`risk-acceptance.md` 和 `open-issues.md` 必须由人或 Agent 审查补充后才能作为验收交接依据。redaction / boundary scan 失败时,不得通过证据门禁。
 ```
 
 ## 9. 待确认事项

@@ -151,7 +151,7 @@ Step 15 observability
 | `OpenIteration_contract` | `OpenIterationFlow` | iteration planning;timebox unresolved、timebox summary project mismatch、timebox summary cannot open、missing digest fixture、project closed, duplicate | API + application |
 | `CommitIterationScope_contract` | `CommitIterationScopeFlow` | iteration + commitment + root / child work marks same UoW;child candidate uses `ChildWorkItem::mark_committed(...)`;scope invalid、work version conflict | API + application |
 | `UpdateIterationCommitment_contract` | `UpdateIterationCommitmentFlow` | commitment changed;closed commitment reject、work membership conflict | API + application |
-| `UpdateIterationLifecycle_contract` | `UpdateIterationLifecycleFlow` | Planning / Committed / InProgress / Closed / Cancelled;`InProgress` / `Cancelled` require `change_reason`;`Closed` requires `close_reason`;close path uses `get_commitment_with_version(...)`;commitment version conflict;wrong reason field reject;illegal target reject | API + application |
+| `UpdateIterationLifecycle_contract` | `UpdateIterationLifecycleFlow` | Planning / Committed / InProgress / Closed / Cancelled;`InProgress` / `Cancelled` require `change_reason`;`Closed` requires `close_reason`;close path uses `get_commitment_with_version(...)`;no `IterationChangeRecord` append;commitment version conflict;wrong reason field reject;illegal target reject | API + application |
 
 #### 8.4 Query / Event / Job 接口测试切口汇总表
 

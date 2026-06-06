@@ -44,7 +44,7 @@
 
 4. 每个转换的前置条件、副作用和错误是什么?
 
-   回答:§7.4~§7.15 给出每个状态机的转换矩阵。核心写路径的共同副作用是 truth save、history / audit trace、outbox enqueue、idempotency complete,以及有正式 public view identity 时的 affected projection stale;非法 transition 在 domain method 返回 `DomainError::InvalidStateTransition`,由 application 映射 `ApplicationError::DomainRejected`,再由 handler 映射 `WorkProtocolError::DomainRejected`。
+   回答:§7.4~§7.15 给出每个状态机的转换矩阵。核心写路径的共同副作用是 truth save、正式定义的 history 或 audit trace、outbox enqueue、idempotency complete,以及有正式 public view identity 时的 affected projection stale;非法 transition 在 domain method 返回 `DomainError::InvalidStateTransition`,由 application 映射 `ApplicationError::DomainRejected`,再由 handler 映射 `WorkProtocolError::DomainRejected`。
 
 5. 非法转换应该返回什么错误,是否写审计?
 
@@ -379,8 +379,8 @@ Dependency / blocker 的 projection stale scope 不得从 `FormalWorkRef` 字符
 | `Planning` | `Committed` | `Iteration::commit(commitment, actor)` via `CommitIterationScopeFlow` | candidates 全部 formalized;backlog / dependency gate 通过 | save iteration;save commitment;mark work `Committed`;outbox;projection stale | 同上 |
 | `Planning` | `Cancelled` | `Iteration::cancel(reason, actor)` via `UpdateIterationLifecycleFlow` | cancel reason / actor 存在 | save iteration;trace;outbox;projection stale | 同上 |
 | `Committed` | `InProgress` | `Iteration::start(reason, actor)` via `UpdateIterationLifecycleFlow` | commitment exists;reason / actor 存在 | save iteration;trace;outbox;projection stale | 同上 |
-| `Committed` | `Cancelled` | `Iteration::cancel(reason, actor)` via `UpdateIterationLifecycleFlow` | cancel reason / actor 存在 | save iteration;optional commitment close / history;outbox;projection stale | 同上 |
-| `InProgress` | `Closed` | `Iteration::close(reason, actor)` via `UpdateIterationLifecycleFlow` | close reason / actor 存在;completion policy 通过 | save iteration;call `IterationCommitment::close(...)`;outbox;projection stale | 同上 |
+| `Committed` | `Cancelled` | `Iteration::cancel(reason, actor)` via `UpdateIterationLifecycleFlow` | cancel reason / actor 存在 | save iteration;optional commitment close;trace;outbox;projection stale | 同上 |
+| `InProgress` | `Closed` | `Iteration::close(reason, actor)` via `UpdateIterationLifecycleFlow` | close reason / actor 存在;completion policy 通过 | save iteration;call `IterationCommitment::close(...)`;trace;outbox;projection stale | 同上 |
 
 ##### `CommitmentState`
 
@@ -497,7 +497,7 @@ Dependency / blocker 的 projection stale scope 不得从 `FormalWorkRef` 字符
 
 #### 5.9 状态机与转换矩阵
 
-L1-work 详细设计将状态机分为业务 truth 状态和辅助状态。业务 truth 状态由 domain object method 修改,并经 application command flow 在同一 UnitOfWork 内保存 truth、history / audit、outbox、idempotency result,以及有正式 public view identity 时的 projection stale marker。没有 query / projection identity 的 truth 或 marker 不得临时派生 `DerivedWorkViewRef`。辅助状态包括 derived projection freshness、external reference resolution 和 outbox publication,它们不得反向修改业务 truth。
+L1-work 详细设计将状态机分为业务 truth 状态和辅助状态。业务 truth 状态由 domain object method 修改,并经 application command flow 在同一 UnitOfWork 内保存 truth、正式定义的 history 或 audit、outbox、idempotency result,以及有正式 public view identity 时的 projection stale marker。没有 query / projection identity 的 truth 或 marker 不得临时派生 `DerivedWorkViewRef`。辅助状态包括 derived projection freshness、external reference resolution 和 outbox publication,它们不得反向修改业务 truth。
 
 正式状态机如下:
 

@@ -72,7 +72,7 @@ Query 不写状态、不触发修复、不写幂等记录。
 
 | 事务族 | 必须同 UoW 的写入 |
 |---|---|
-| accepted Command truth write | truth save、history / trace、audit summary、outbox enqueue、projection stale marker、idempotency complete |
+| accepted Command truth write | truth save、正式定义的 history 或 trace、audit summary、outbox enqueue、projection stale marker、idempotency complete |
 | `CreateProjectFlow` | Project create、Backlog create、trace / audit、outbox、projection stale、idempotency complete |
 | promote accept | PromoteResult、optional WorkItem / membership、decision record、trace、outbox、projection stale、idempotency complete |
 | iteration commit | Iteration、IterationCommitment、Work marks、iteration change record、trace、outbox、projection stale、idempotency complete |
@@ -163,7 +163,7 @@ Query 不写状态、不触发修复、不写幂等记录。
 | `ST-WORK-STATE-006` | Dependency / Blocker 状态迁移 | dependency `Proposed` / `Active` / `Satisfied` / `Waived` / `Cancelled` 和 blocker `Open` -> `Resolved` 成立 | cycle / self-loop 成功;terminal reopen;缺 evidence resolve / satisfy | `TC-WORK-DEP-001`~`005`;`EV-WORK-DEP-*` |
 | `ST-WORK-STATE-007` | Iteration / Commitment 状态迁移 | Iteration `Planning` -> `Committed` -> `InProgress` -> `Closed`,cancel path 和 Commitment `Candidate` -> `Committed` -> `Changed` / `Closed` 成立 | non-formal candidate commit;非法 reopen;commitment 与 iteration 半提交 | `TC-WORK-ITER-001`~`005`;`EV-WORK-ITER-*` |
 | `ST-WORK-STATE-008` | Auxiliary states | `DerivedFreshnessState`、`ReferenceResolutionStatus`、`OutboxPublicationState` 按正式矩阵推进,且不反写业务 truth | projection / reference / outbox state 改写 Project、WorkItem、Iteration 等 truth | `TC-WORK-QUERY-004`~`008`;`TC-WORK-OPS-001`~`003`;`EV-WORK-QUERY-*`;`EV-WORK-OPS-*` |
-| `ST-WORK-TX-001` | Command UoW 原子性 | accepted Command 同 UoW 完成 truth、history / trace、audit、outbox、projection stale、idempotency complete | truth 已写但 outbox / trace / idempotency 缺失;idempotency complete 但 truth 缺失 | `TC-WORK-CORE-001`;`TC-WORK-PROMOTE-002`;`TC-WORK-ITER-002`;`EV-WORK-CORE-*`;`EV-WORK-PROMOTE-002`;`EV-WORK-ITER-002` |
+| `ST-WORK-TX-001` | Command UoW 原子性 | accepted Command 同 UoW 完成 truth、正式定义的 history 或 trace、audit、outbox、projection stale、idempotency complete | truth 已写但 outbox / trace / idempotency 缺失;idempotency complete 但 truth 缺失 | `TC-WORK-CORE-001`;`TC-WORK-PROMOTE-002`;`TC-WORK-ITER-002`;`EV-WORK-CORE-*`;`EV-WORK-PROMOTE-002`;`EV-WORK-ITER-002` |
 | `ST-WORK-TX-002` | Reject / rollback | metadata reject、domain reject、policy reject、version conflict、cycle reject 后无 accepted truth、无 business trace、无 outbox、无 projection stale | reject path 写入任何 accepted side effect | `TC-WORK-CORE-002`;`TC-WORK-DEP-002`;`TC-WORK-PROMOTE-005`;`EV-WORK-CORE-002`;`EV-WORK-DEP-002`;`EV-WORK-PROMOTE-005` |
 | `ST-WORK-TX-003` | Query no-write consistency | 8 Query 在 hit / missing / not visible / stale / failed / rebuilding 时均不写任何状态 | Query 写 audit、outbox、idempotency、projection state 或触发 rebuild | `TC-WORK-QUERY-001`~`008`;`EV-WORK-QUERY-*` |
 | `ST-WORK-TX-004` | Job no truth repair | publish、rebuild、refresh、reconciliation、handoff job 只写允许的 marker / report / projection / publication state | Job 自动修复 Project / WorkItem / Iteration / dependency truth | `TC-WORK-OPS-001`~`006`;`EV-WORK-OPS-*` |
@@ -267,7 +267,7 @@ Async recovery path
 ```text
 本章用于裁决 `L1-work` 的状态转换、事务原子性、幂等、并发和恢复语义是否成立。状态名必须使用 `03-详细设计.md` §9 的正式 enum variant;任何旧状态名、口语状态名、临时状态或未开放 public flow 的后续状态,不得写成本轮 P0 通过条件。
 
-accepted 写路径必须在同一 UnitOfWork 内完成 truth save、history / trace、outbox、projection stale 和 idempotency complete。reject、policy failure、version conflict、idempotency conflict 和 commit unknown retry 不得产生 accepted truth、副作用或盲重试。projection、reference、outbox、handoff 和 reconciliation 只推进辅助状态或 report,不得修复业务 truth。
+accepted 写路径必须在同一 UnitOfWork 内完成 truth save、正式定义的 history 或 trace、outbox、projection stale 和 idempotency complete。reject、policy failure、version conflict、idempotency conflict 和 commit unknown retry 不得产生 accepted truth、副作用或盲重试。projection、reference、outbox、handoff 和 reconciliation 只推进辅助状态或 report,不得修复业务 truth。
 ```
 
 ## 10. 待确认事项

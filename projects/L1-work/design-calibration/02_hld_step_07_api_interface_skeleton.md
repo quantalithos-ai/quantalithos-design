@@ -59,10 +59,10 @@
 | `UpdateWorkDependencyState` | `WorkDependencyRef` + `DependencyTarget` + `DependencyChangeReason` + `Option<ExternalEvidenceRef>` + context | `DependencyCommandResult` | `WorkDependency`、`DependencyChangeRecord`、`WorkOutboxRecord` | `Active` target 激活 proposed dependency;满足、豁免或取消依赖必须有 evidence 或同族 reason |
 | `OpenWorkBlocker` | `FormalWorkRef blocked` + `BlockerCauseRef` + context | `BlockerCommandResult` | `WorkBlocker`、`DependencyChangeRecord`、`WorkOutboxRecord` | blocker 不替代 governance 裁决 |
 | `ResolveWorkBlocker` | `WorkBlockerRef` + `ExternalEvidenceRef` + context | `BlockerCommandResult` | `WorkBlocker`、`DependencyChangeRecord`、`WorkOutboxRecord` | 解除必须有可接受依据引用,并写入 blocker 的 `resolved_evidence_ref` |
-| `OpenIteration` | `ProjectRef` + `ProcessTimeboxRef` + context | `IterationCommandResult` | `Iteration`、`IterationChangeRecord`、`WorkOutboxRecord` | process 只提供节奏引用,不拥有 Iteration |
+| `OpenIteration` | `ProjectRef` + `ProcessTimeboxRef` + context | `IterationCommandResult` | `Iteration`、`WorkOutboxRecord` | process 只提供节奏引用,不拥有 Iteration |
 | `CommitIterationScope` | `IterationRef` + `FormalWorkRefSet candidates` + context | `IterationCommandResult` | `IterationCommitment`、`IterationChangeRecord`、`WorkOutboxRecord` | 候选必须来自正式工作全集 |
 | `UpdateIterationCommitment` | `IterationRef` + `IterationCommitmentChangeSet` + `IterationChangeReason` + context | `IterationCommandResult` | `IterationCommitment`、`IterationChangeRecord`、`WorkOutboxRecord` | 调整承诺集合必须显式记录变化原因 |
-| `UpdateIterationLifecycle` | `IterationRef` + `IterationLifecycleTarget` + target-specific reason + context | `IterationCommandResult` | `Iteration`、`IterationChangeRecord`、`WorkOutboxRecord` | start / cancel 使用 `IterationChangeReason`;close 使用 `IterationCloseReason`;不改变 process truth |
+| `UpdateIterationLifecycle` | `IterationRef` + `IterationLifecycleTarget` + target-specific reason + context | `IterationCommandResult` | `Iteration`、`WorkOutboxRecord` | start / cancel 使用 `IterationChangeReason`;close 使用 `IterationCloseReason`;不改变 process truth;不追加 `IterationChangeRecord` |
 
 ---
 

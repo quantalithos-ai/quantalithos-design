@@ -122,7 +122,7 @@
 |---|---|---|---|
 | 字段 / DTO 闭环 | 所有 P0 public protocol、domain object、repository return、job receipt 和 report DTO 按 `03` 正式 schema 落码,无 placeholder | contract tests、design closure checklist | 通过 / 不通过 |
 | 状态闭环 | 代码、测试、report 和验收均使用 `03` / Step 10 的正式状态名和错误名 | domain state tests、state matrix coverage、report samples | 通过 / 不通过 |
-| 事务闭环 | accepted command 同 UoW 完成 truth、history / trace、audit、outbox、projection stale 和 idempotency complete | service tests、UoW report、EVG audit evidence | 通过 / 不通过 |
+| 事务闭环 | accepted command 同 UoW 完成 truth、正式定义的 history 或 trace、audit、outbox、projection stale 和 idempotency complete | service tests、UoW report、EVG audit evidence | 通过 / 不通过 |
 | 幂等 / 并发闭环 | duplicate、dedup、version conflict、commit unknown 不产生重复 truth | idempotency / dedup / single-winner tests | 通过 / 不通过 |
 | Visibility / authorization 闭环 | unauthorized command / query 不返回 visible truth,不写 truth | authorization negative report、query no-write report | 通过 / 不通过 |
 | External body boundary | Work 只保存 ref / snapshot / summary marker,不保存相邻仓正文 | redaction report、forbidden body tests | 通过 / 不通过 |

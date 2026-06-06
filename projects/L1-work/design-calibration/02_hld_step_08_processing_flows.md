@@ -246,7 +246,7 @@
 |        v                                                          |
 | Iteration transitions lifecycle explicitly                         |
 |        v                                                          |
-| save Iteration + IterationChangeRecord + audit + outbox            |
+| save Iteration + audit + outbox                                    |
 +=================================================================+
 ```
 
@@ -383,7 +383,7 @@
 | `CreateWorkItem` | `CreateWorkItem`、`CreateChildWorkItem`、`UpdateWorkItemLifecycle` | `Backlog`、`WorkItem`、`ChildWorkItem`、`FormalWorkPolicy`、`CompletionEvidencePolicy` |
 | `RequestWorkPromotion` | `RequestWorkPromotion`、`ReviewWorkPromotion`、promote 接收路径 | `SourceWorkRef`、`PromoteResult`、`PromoteDecisionRecord` |
 | `LinkWorkDependency` | `LinkWorkDependency`、`UpdateWorkDependencyState`、`OpenWorkBlocker`、`ResolveWorkBlocker` | `WorkDependency`、`WorkBlocker`、`DependencyChangeRecord` |
-| `CommitIterationScope` | `OpenIteration`、`CommitIterationScope`、`UpdateIterationCommitment`、`UpdateIterationLifecycle` | `Iteration`、`IterationCommitment`、`IterationChangeRecord` |
+| `CommitIterationScope` | `OpenIteration`、`CommitIterationScope`、`UpdateIterationCommitment`、`UpdateIterationLifecycle` | `Iteration`、`IterationCommitment`;`IterationChangeRecord` 仅由 `CommitIterationScope` / `UpdateIterationCommitment` 生成 |
 | `GetProjectBoardView` | projection / stale query 类 | `ProjectBoardView`、`DerivedWorkViewState` |
 | `ConsumeRuntimePromoteRequested` | runtime promote event | `SourceWorkRef`、`ReferenceResolutionState` |
 | `ConsumeIdentityMemberChanged` | external snapshot refresh event 类 | `MemberCapabilitySnapshot`、`MethodDefinitionSnapshot`、`ExternalEvidenceRef` |

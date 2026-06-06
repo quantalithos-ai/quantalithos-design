@@ -46,7 +46,7 @@
 
 4. 哪些处理流需要事务,事务内必须完成哪些写入?
 
-   回答:所有 Command、Inbound Event Consumer 和 Operations Job 写路径需要本地 UoW。核心 truth Command 必须在同一 UoW 内完成 truth save、history / trace、outbox enqueue、idempotency complete,以及有正式 public view identity 时的 projection stale marker。Query 不开写事务、不写 audit、不触发 rebuild。
+   回答:所有 Command、Inbound Event Consumer 和 Operations Job 写路径需要本地 UoW。核心 truth Command 必须在同一 UoW 内完成 truth save、正式定义的 history 或 trace、outbox enqueue、idempotency complete,以及有正式 public view identity 时的 projection stale marker。Query 不开写事务、不写 audit、不触发 rebuild。
 
 5. 是否需要乐观锁、行锁、版本号、outbox 或 projection?
 
@@ -128,7 +128,7 @@
 | `iteration_commitments` | Iteration commitment truth | PK `commitment_id`;unique active `iteration_id` | `iteration_id`、`commitment_state` | `version` |
 | `promote_decision_records` | Promote history | PK `decision_id` | `result_ref`、`source_ref` | append-only, no overwrite |
 | `dependency_change_records` | Dependency / blocker history | PK `change_id` | `relation_ref` | append-only |
-| `iteration_change_records` | Iteration history | PK `change_id` | `iteration_ref` | append-only |
+| `iteration_change_records` | Iteration commitment history | PK `change_id` | `iteration_ref` | append-only;只由 commitment scope / work set change 形成 |
 | `work_trace_records` | Work trace records | PK `trace_id` | `subject_ref`、`trace_context_ref` | append-only |
 | `work_audit_trails` | Subject audit summary | PK `subject_ref` | `latest_trace_id` | `version` |
 | `work_outbox_records` | Committed event publication | PK `outbox_id` | `publication_state`、`event_kind` | `version` |
@@ -222,7 +222,7 @@
 |---|---|---|
 | optimistic version | 修改已有 truth / state 必须传 `expected_version`;adapter mismatch 返回 `RepositoryError::VersionConflict` | Project、ProjectMember、Backlog、WorkItem、PromoteResult、Dependency、Blocker、Iteration、Commitment、Outbox、Reference、Audit summary |
 | create uniqueness | create 函数必须在 UoW 内原子检查 PK / unique key;冲突不得覆盖 | all `create_*` |
-| append-only history | history / trace record 不允许 update;duplicate id 是 conflict | promote / dependency / iteration history、trace |
+| append-only history | history / trace record 不允许 update;duplicate id 是 conflict | promote / dependency / iteration commitment history、trace |
 | formal work identity | `FormalWorkRef::WorkItem(id)` 和 `FormalWorkRef::ChildWorkItem(id)` 共享查询面,但 durable storage 可分表 | work repository |
 | formal work scope closure | 任何 flow 需要从 `FormalWorkRef` 得到 `ProjectRef` / `BacklogRef` / `ProjectMemberRef` 以读取 graph、校验 scope 或构造 projection stale 时,必须调用 `WorkItemRepository.get_formal_work_scope(...)`;不得实现 `project_ref_from(FormalWorkRef)`、解析 id 字符串或私自读取 storage join | WorkItemRepository / application services |
 | backlog membership | membership 与 work truth 创建同 UoW;不得先加入 membership 后 create work 失败 | Backlog + WorkItem |
@@ -254,7 +254,7 @@
 | Iteration open | service reserve idempotency | Iteration create + side effects + command result 后 | timebox unresolved、project gate reject、command result save failure | Iteration create;resolver summary validation only;trace;outbox;projection stale;command result save;idempotency complete;does not write process timebox reference state |
 | Commit iteration scope | service reserve idempotency | iteration + commitment + work marks + side effects + command result 后 | non-formal candidate、dependency gate reject、version conflict、command result save failure | Iteration save;Commitment save;Work marks using `get_formal_work_with_version` as version source;IterationChangeRecord;trace;outbox;projection stale;command result save;idempotency complete |
 | Update iteration commitment | service reserve idempotency | commitment save + history + side effects + command result 后 | closed commitment、invalid change set、version conflict、command result save failure | Commitment save;optional work membership / mark writes use `get_formal_work_with_version` as version source;IterationChangeRecord;trace;outbox;projection stale;command result save;idempotency complete |
-| Update iteration lifecycle | service reserve idempotency | iteration save + optional commitment close + side effects + command result 后 | illegal state、commitment close failure、version conflict、command result save failure | Iteration save;close path Commitment save uses `get_commitment_with_version` as version source;history;trace;outbox;projection stale;command result save;idempotency complete |
+| Update iteration lifecycle | service reserve idempotency | iteration save + optional commitment close + side effects + command result 后 | illegal state、commitment close failure、version conflict、command result save failure | Iteration save;close path Commitment save uses `get_commitment_with_version` as version source;trace;outbox;projection stale;command result save;idempotency complete;no `IterationChangeRecord` append |
 | Inbound event consumer | consumer service after dedup key build | reference / snapshot / pending intake + stale when public view exists + idempotency complete 后 | missing envelope -> no UoW accepted;unsupported version dead-letter;repo failure rollback | idempotency reserve;reference / snapshot / intake writes;projection stale only for formally defined public `DerivedWorkViewRef`;idempotency complete |
 | Publish outbox one record | publish service per record | mark published / failed 后 | outbox version conflict、repository failure | publication state update only;job report item result |
 | Rebuild projections | job service after idempotency reserve and truth snapshot load | mark rebuilding + replace views + fresh marker + idempotency complete 后 | truth snapshot missing、build failure、replace failure、version conflict | idempotency reserve;mark rebuilding;replace projection batch;fresh marker;optional outbox;idempotency complete |
@@ -353,7 +353,7 @@ L1-work 的持久化设计只锁定逻辑存储契约,不锁定具体数据库�
 | 类型 | 对象 | 一致性口径 |
 |---|---|---|
 | 业务 truth | Project、ProjectMember、Backlog、WorkItem、ChildWorkItem、PromoteResult、Dependency、Blocker、Iteration、Commitment | 强一致,由 Command flow 在同一 UoW 内成立或 rollback |
-| history / trace / outbox | promote / dependency / iteration history、WorkTraceRecord、WorkOutboxRecord | accepted truth 同 UoW 写入;outbox publication 最终一致 |
+| history / trace / outbox | promote / dependency / iteration commitment history、WorkTraceRecord、WorkOutboxRecord | accepted truth 同 UoW 写入;outbox publication 最终一致 |
 | reference / snapshot | ReferenceResolutionState、MemberCapabilitySnapshot、MethodDefinitionSnapshot | 最终一致,不得复制外部正文 |
 | projection / report / handoff | ProjectBoardView、MemberWorkView、IterationSummaryView、WorkSearchProjection、ReconciliationReport、handoff marker | 只读 / 可重建 / 最终一致,不得反写业务 truth |
 
@@ -366,7 +366,7 @@ IdempotencyRepository.reserve(...)
   -> load truth / snapshot / reference as needed
   -> domain factory / transition
   -> save truth with expected_version
-  -> append history / trace
+  -> append formally defined history and/or trace
   -> WorkOutboxRepository.enqueue(...)
   -> ProjectionRepository.mark_stale(...) when affected public DerivedWorkViewRef exists
   -> IdempotencyRepository.complete(...)

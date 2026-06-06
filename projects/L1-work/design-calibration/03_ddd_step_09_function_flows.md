@@ -970,7 +970,6 @@ iteration_repo.append_change(history, &uow).await?;
      -> Iteration.start(change_reason, actor) / close(close_reason, actor) / cancel(change_reason, actor)
      -> if Close: IterationCommitment.close(close_reason, actor)
      -> save iteration + optional commitment
-     -> append IterationChangeRecord
      -> audit + IterationChanged outbox + stale
 ```
 
@@ -1003,9 +1002,9 @@ let version = iteration_repo.save_iteration(iteration, request.expected_version,
 | 项 | 口径 |
 |---|---|
 | DTO -> Domain | `target = InProgress` / `Cancelled` 必须提供 `change_reason` 且禁止 `close_reason`;`target = Closed` 必须提供 `close_reason` 且禁止 `change_reason`;close path 必须通过 `IterationRepository.get_commitment_with_version(...)` 加载 `(IterationCommitment, Version)` |
-| 事务边界 | iteration save、optional commitment save、history、audit、outbox、stale、idempotency complete 同一 UoW |
+| 事务边界 | iteration save、optional commitment save、audit、outbox、stale、idempotency complete 同一 UoW;不追加 `IterationChangeRecord` |
 | 错误映射 | iteration missing -> `NotFound`;target/reason 组合非法 -> `InvalidInput`;close without commitment -> `DomainRejected`;invalid transition -> `DomainRejected`;version conflict |
-| 状态 / 事件 | Iteration `InProgress` / `Closed` / `Cancelled`;close path Commitment `Closed`;enqueue `IterationChanged` |
+| 状态 / 事件 | Iteration `InProgress` / `Closed` / `Cancelled`;close path Commitment `Closed`;enqueue `IterationChanged`;lifecycle-only change 由 trace / outbox 表达,`IterationChangeRecord` 只由 commitment scope / work set change 形成 |
 | 测试切口 | start;close closes commitment;cancel;invalid transition;duplicate |
 
 ### 9. Query 函数级处理流

@@ -30,7 +30,7 @@
 | 类型 | 必测对象 | 主要切口 |
 |---|---|---|
 | truth object | `Project`、`ProjectMember`、`Backlog`、`WorkItem`、`ChildWorkItem`、`WorkDependency`、`WorkBlocker`、`Iteration`、`IterationCommitment`、`PromoteResult` | 构造、字段不变量、合法状态迁移、非法状态迁移、终态保护 |
-| history / trace / outbox | `WorkTraceRecord`、`WorkAuditTrail`、`WorkOutboxRecord`、`PromoteDecisionRecord`、`DependencyChangeRecord`、`IterationChangeRecord` | 只能从 accepted truth change 形成;不得保存外部正文 |
+| history / trace / outbox | `WorkTraceRecord`、`WorkAuditTrail`、`WorkOutboxRecord`、`PromoteDecisionRecord`、`DependencyChangeRecord`、`IterationChangeRecord` | 只能从 accepted truth change 形成;`IterationChangeRecord` 只覆盖 commitment / work-set change;不得保存外部正文 |
 | reference / snapshot | `MemberCapabilitySnapshot`、`MethodDefinitionSnapshot`、`ReferenceResolutionState`、`PendingPromoteIntake` | ref / snapshot / marker 边界;unresolved / failed 不补造外部 truth |
 | projection support | `DerivedWorkViewState`、`ProjectBoardView`、`MemberWorkView`、`IterationSummaryView`、`WorkSearchProjection`、`ReconciliationReport` | 派生只读、stale / rebuilding / failed surface、rebuild 不反写真相 |
 | policy | `WorkTruthPolicy`、`ProjectLifecyclePolicy`、`MemberResponsibilityPolicy`、`FormalWorkPolicy`、`BacklogAvailabilityPolicy`、`PromotePolicy`、`DependencyGraphPolicy`、`IterationCommitmentPolicy`、`CompletionEvidencePolicy`、`DerivedWorkViewPolicy` | accept / reject、边界外输入、forbidden body、completion evidence、dependency cycle、iteration scope |
@@ -82,7 +82,7 @@
 | 切口族 | 必测内容 |
 |---|---|
 | 12 组状态机 | `ProjectLifecycleState`、`ProjectMemberResponsibilityState`、`BacklogState`、`WorkItemState`、`PromoteResultState`、`DependencyState`、`BlockerState`、`IterationState`、`CommitmentState`、`DerivedFreshnessState`、`ReferenceResolutionStatus`、`OutboxPublicationState` 的合法 / 非法转换 |
-| 事务 | accepted truth、history / trace、outbox、projection stale、idempotency result 同 UoW;outbox enqueue / repository failure rollback |
+| 事务 | accepted truth、正式定义的 history 或 trace、outbox、projection stale、idempotency result 同 UoW;outbox enqueue / repository failure rollback |
 | 幂等 | command duplicate / conflict、duplicate result store replay、event redelivery / digest conflict、job rerun、commit unknown 先查 idempotency |
 | 并发 | optimistic version conflict、unique create conflict、outbox dual publisher、projection rebuild race、reference refresh race |
 | 恢复 | resolver unresolved / failed marker、publisher failed marker、handoff failed marker、projection stale / failed surface、reconciliation read-only report |

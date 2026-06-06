@@ -428,6 +428,20 @@ pub enum MethodDefinitionKind {
 /// Process timebox reference.
 pub struct ProcessTimeboxRef(pub String);
 
+/// Safe summary resolved from Process for iteration opening.
+pub struct ProcessTimeboxSummary {
+    /// Process timebox reference resolved by the port.
+    pub timebox_ref: ProcessTimeboxRef,
+    /// Project scope that this timebox may bind to.
+    pub project_ref: ProjectRef,
+    /// Whether Process currently allows Work to open an iteration for this timebox.
+    pub can_open_iteration: bool,
+    /// Optional safe summary supplied by Process.
+    pub summary: Option<SafeSummaryText>,
+    /// Digest of the Process-owned timebox summary snapshot.
+    pub source_digest: SourceDigest,
+}
+
 /// Digest supplied by an external source summary.
 pub struct SourceDigest(pub String);
 
@@ -546,6 +560,7 @@ pub enum OutboxFailureReasonKind {
 | `CapabilityRef` / `CapabilityRefSet` | string ref / ref set | capability summary | 只读 ref |
 | `MethodDefinitionRef` / `MethodDefinitionKind` | ref / enum | method summary | 不保存 method definition body |
 | `ProcessTimeboxRef` | string ref | process timebox pointer | 不保存 process body |
+| `ProcessTimeboxSummary` | `timebox_ref`、`project_ref`、`can_open_iteration`、`summary`、`source_digest` | process timebox resolver safe summary | 归属 `contracts/refs.rs`;用于 `ProcessTimeboxResolution.summary` 和 OpenIteration validation;不得保存 process body;不得进入 `Iteration` truth;OpenIteration 不写 process timebox reference state;`source_digest` 必填 |
 | `SourceDigest` | string digest | source summary verification | 格式由 resolver / tests 固定;Work 不解释 digest algorithm |
 | `EvidenceKind` | enum | evidence category | 与 `EvidenceVerifiedState` 搭配使用 |
 | `DerivedWorkViewKind` / `DerivedWorkViewScopeRef` | enum | projection key derivation | kind 与 scope 必须匹配 |
@@ -1406,6 +1421,7 @@ pub struct ChildWorkItem {
 |---|---|---|---|---|
 | `attach_to_parent(&mut self, parent_id: WorkItemId, actor: ActorRef) -> Result<(), DomainError>` | 固定父子关系 | parent、actor | `Result<(), DomainError>` | 不形成多父 |
 | `promote_from_source(&mut self, source_ref: SourceWorkRef, actor: ActorRef) -> Result<(), DomainError>` | 标记显式 promote 来源 | source、actor | `Result<(), DomainError>` | 不保存来源正文 |
+| `mark_committed(&mut self, iteration_ref: IterationRef, actor: ActorRef) -> Result<(), DomainError>` | 标记子工作进入承诺范围 | iteration、actor | `Result<(), DomainError>` | 与 `WorkItem::mark_committed(...)` 同约束;只从 formalized 进入 committed |
 | `transition_lifecycle(&mut self, target: WorkLifecycleTarget, reason: WorkLifecycleReason, evidence_ref: Option<ExternalEvidenceRef>, actor: ActorRef) -> Result<(), DomainError>` | 子工作生命周期迁移 | target、reason、evidence、actor | `Result<(), DomainError>` | 与 WorkItem 同约束;完成时写入 `completion_ref` |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
@@ -1416,6 +1432,7 @@ pub struct ChildWorkItem {
 
 - 不得把普通 plan item、tool execution step 或个人 checklist 自动升级为 child work。
 - child work 仍是正式 Work truth,不是 runtime 执行步骤。
+- `CommitIterationScopeFlow` 的 unified `FormalWorkRecord` candidate 可以是 root work 或 child work;child candidate 必须通过 `ChildWorkItem::mark_committed(...)` 进入 `Committed`,不得把 candidate set 收窄为 root-only。
 
 #### 7.5 `domain/dependency.rs` object 契约
 

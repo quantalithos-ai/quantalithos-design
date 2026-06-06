@@ -148,10 +148,10 @@ Step 15 observability
 | `UpdateWorkDependencyState_contract` | `UpdateWorkDependencyStateFlow` | Proposed -> Active with `DependencyChangeReasonKind::Activated`;Active -> Satisfied / Waived / Cancelled;reason kind mismatch reject;terminal reject、version conflict;downstream relation views stale | API + application |
 | `OpenWorkBlocker_contract` | `OpenWorkBlockerFlow` | blocker open + history + outbox;blocked work scope resolved;evidence unresolved、duplicate blocker;blocked project-board + resolvable member-work stale | API + application |
 | `ResolveWorkBlocker_contract` | `ResolveWorkBlockerFlow` | blocker resolved path writes `resolved_evidence_ref`;evidence missing、closed reject、version conflict;blocked relation views stale | API + application |
-| `OpenIteration_contract` | `OpenIterationFlow` | iteration planning;timebox unresolved、project closed, duplicate | API + application |
-| `CommitIterationScope_contract` | `CommitIterationScopeFlow` | iteration + commitment + work marks same UoW;scope invalid、work version conflict | API + application |
+| `OpenIteration_contract` | `OpenIterationFlow` | iteration planning;timebox unresolved、timebox summary project mismatch、timebox summary cannot open、missing digest fixture、project closed, duplicate | API + application |
+| `CommitIterationScope_contract` | `CommitIterationScopeFlow` | iteration + commitment + root / child work marks same UoW;child candidate uses `ChildWorkItem::mark_committed(...)`;scope invalid、work version conflict | API + application |
 | `UpdateIterationCommitment_contract` | `UpdateIterationCommitmentFlow` | commitment changed;closed commitment reject、work membership conflict | API + application |
-| `UpdateIterationLifecycle_contract` | `UpdateIterationLifecycleFlow` | Planning / Committed / InProgress / Closed / Cancelled;`InProgress` / `Cancelled` require `change_reason`;`Closed` requires `close_reason`;wrong reason field reject;illegal target reject | API + application |
+| `UpdateIterationLifecycle_contract` | `UpdateIterationLifecycleFlow` | Planning / Committed / InProgress / Closed / Cancelled;`InProgress` / `Cancelled` require `change_reason`;`Closed` requires `close_reason`;close path uses `get_commitment_with_version(...)`;commitment version conflict;wrong reason field reject;illegal target reject | API + application |
 
 #### 8.4 Query / Event / Job 接口测试切口汇总表
 

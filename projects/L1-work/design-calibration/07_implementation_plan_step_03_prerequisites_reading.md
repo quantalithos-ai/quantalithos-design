@@ -216,6 +216,7 @@ core-contracts = { path = "../quantalithos-core/crates/contracts" }
 - 验证与证据路径。
 - 依赖裁剪。
 - 永久记忆自身生成约束。
+- 设计文档修复后的提交归并与 agent 交接后序任务。
 
 ### 3.21 永久记忆种子是否只写执行规则和规范索引,没有复制详细设计字段 schema、状态矩阵或业务规则正文?
 
@@ -361,6 +362,7 @@ core-contracts = { path = "../quantalithos-core/crates/contracts" }
 | `MEM-WORK-006` | phase | 验证门禁 | 每个 phase 或 commit boundary 完成前必须运行并记录该 boundary 在 `07-实施计划.md` §7 声明的 fmt、check、test、gate、report 或 acceptance 证据;未通过不得提交。 | `07-实施计划.md` §3 阅读清单 / §7 测试门禁 | `07-实施计划.md` | §3 / §7 | 进入新 phase / 提交前 | phase complete / until superseded | 正式门禁优先,暂停并补验证 | 是 |
 | `MEM-WORK-007` | project | 证据路径 | 正式测试、验收和交付证据只能引用 `artifacts/test/<run_id>`、`reports/runs/<run_id>` 和 `reports/acceptance`;不得正式引用 `latest`、`artifacts/test/<project>/<run_id>` 或 `reports/<project>`。 | `07-实施计划.md` §3 阅读清单 | `07-实施计划.md` | §3 测试脚本与报告工具前置检查 | 编写 gate / report / acceptance 证据时 | until superseded | 正式测试方案和验收标准优先,暂停并修正路径 | 是 |
 | `MEM-WORK-008` | project | 永久记忆生成 | 项目永久记忆只能逐条来自 `07-实施计划.md` §3 的种子表 `必须写入的记忆文本`;不得把对话、历史提交、详细设计字段 schema、状态矩阵、DTO 表、业务规则正文或测试用例全文自由总结进永久记忆。 | 不适用 | `07-实施计划.md` | §3 Agent 启动与永久记忆种子表 | 生成或刷新永久记忆时 | until superseded | 种子表优先,删除自由总结内容并刷新记忆 | 是 |
+| `MEM-WORK-009` | project | 设计修复后序任务 | 修复设计文档后必须先判断上一笔提交与本次改动是否属于同一个项目;不同项目则新增提交;同一项目且本次产生可复用经验时,把项目改动与经验更新合并到同一笔上一提交;同一项目且无新经验时,把本次改动合并到上一提交;最后输出一段可交给遇阻 agent 继续实现的交接说明。 | 不适用 | `07-实施计划.md` | §3 Agent 启动与永久记忆种子表 | 每次修复设计文档后 / 提交前 | until superseded | 先判断项目归属和经验沉淀,再提交或 amend,最后输出交接说明 | 是 |
 
 ### 7.6 Agent 永久记忆生成门禁
 

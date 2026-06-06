@@ -325,7 +325,7 @@ Pending --> Published
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | create | `Formalized` | `WorkItem::formalize(...)` via `CreateWorkItemFlow`;`ChildWorkItem::create_child(...)` via `CreateChildWorkItemFlow`;promote accept path | backlog 可接收;source ref / intent 合法;assignee policy 通过 | save work;trace;enqueue `WorkItemChanged`;mark board/search/member views stale | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
-| `Formalized` | `Committed` | `WorkItem::mark_committed(iteration_ref, actor)` via `CommitIterationScopeFlow` | iteration `Planning`;work 在 candidate set;未终止 | save work;save commitment;enqueue `IterationChanged` / `WorkItemChanged`;projection stale | 同上 |
+| `Formalized` | `Committed` | `WorkItem::mark_committed(iteration_ref, actor)` or `ChildWorkItem::mark_committed(iteration_ref, actor)` via `CommitIterationScopeFlow` | iteration `Planning`;work 在 candidate set;未终止 | save work;save commitment;enqueue `IterationChanged` / `WorkItemChanged`;projection stale | 同上 |
 | `Formalized` | `InProgress` | `WorkItem::transition_lifecycle(target, reason, evidence_ref, actor)` via `UpdateWorkItemLifecycleFlow` | target = `InProgress`;project / backlog gate 允许 | save work;trace;outbox;projection stale | 同上 |
 | `Formalized` | `Cancelled` | `WorkItem::transition_lifecycle(...)` via `UpdateWorkItemLifecycleFlow` | cancellation reason 存在 | save work;trace;outbox;projection stale | 同上 |
 | `Formalized` | `Superseded` | `WorkItem::transition_lifecycle(...)` via `UpdateWorkItemLifecycleFlow` | superseding ref / reason 由 request / policy 提供 | save work;trace;outbox;projection stale | 同上 |

@@ -853,6 +853,7 @@ fn affected_relation_views(scope: &FormalWorkScope) -> Vec<DerivedWorkViewRef> {
      -> reserve idempotency in UoW
      -> ProjectRepository.get(project_ref)
      -> ProcessTimeboxResolverPort.resolve_timebox(timebox_ref)
+     -> ensure_timebox_can_bind_to_project(resolution.summary, project.project_ref())
      -> IdGeneratorPort.next_iteration_id()
      -> Iteration::open(iteration_id, project_id, timebox_ref, actor)
      -> IterationRepository.create_iteration(iteration, &uow)
@@ -862,8 +863,8 @@ fn affected_relation_views(scope: &FormalWorkScope) -> Vec<DerivedWorkViewRef> {
 ```rust
 // IterationCommandService::open_iteration(WorkCommandEnvelope<OpenIterationRequest> envelope)
 let project = project_repo.get(request.project_ref).await?.ok_or(ApplicationError::NotFound)?;
-let timebox = process_timebox_resolver.resolve_timebox(request.timebox_ref).await?;
-ensure_timebox_can_bind_to_project(timebox, project.project_ref())?;
+let timebox_resolution = process_timebox_resolver.resolve_timebox(request.timebox_ref).await?;
+ensure_timebox_can_bind_to_project(&timebox_resolution.summary, project.project_ref())?;
 let iteration_id = ids.next_iteration_id()?;
 let iteration = Iteration::open(iteration_id, project.project_id, request.timebox_ref, actor)?;
 let version = iteration_repo.create_iteration(iteration, &uow).await?;
@@ -871,11 +872,18 @@ let version = iteration_repo.create_iteration(iteration, &uow).await?;
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | `timebox_ref` resolved only as safe summary;generated `IterationId` |
-| 事务边界 | iteration create、audit、outbox、stale、idempotency complete 同一 UoW |
-| 错误映射 | project missing -> `NotFound`;timebox unresolved -> `ExternalReferenceUnresolved`;closed project reject |
+| DTO -> Domain | `timebox_ref` resolved only as `ProcessTimeboxSummary`;generated `IterationId`;summary 不进入 `Iteration` truth |
+| 事务边界 | iteration create、audit、outbox、stale、idempotency complete 同一 UoW;OpenIteration 不写 process timebox reference state |
+| 错误映射 | project missing -> `NotFound`;timebox unresolved -> `ExternalReferenceUnresolved`;summary.project_ref mismatch 或 `can_open_iteration == false` -> `InvalidRequest` / `ExternalReferenceUnresolved`;closed project reject |
 | 状态 / 事件 | Iteration `Planning`;enqueue `IterationChanged` |
-| 测试切口 | open iteration;timebox unresolved;project read-only/closed reject;duplicate |
+| 测试切口 | open iteration;timebox unresolved;summary project mismatch;summary cannot open;missing digest fixture reject;project read-only/closed reject;duplicate |
+
+`ensure_timebox_can_bind_to_project(summary, project_ref)` 只读取 Step 6 `ProcessTimeboxSummary` 字段:
+
+- `summary.project_ref == project_ref`;
+- `summary.can_open_iteration == true`;
+- `summary.source_digest` must be present and valid as `SourceDigest`;
+- `summary.summary` 可用于 safe audit / diagnostic text,但不得复制 Process 正文。
 
 #### 8.16 `CommitIterationScopeFlow`
 
@@ -884,20 +892,20 @@ let version = iteration_repo.create_iteration(iteration, &uow).await?;
   -> IterationCommandService.commit_iteration_scope(envelope)
      -> reserve idempotency in UoW
      -> IterationRepository.get_iteration(iteration_ref)
-     -> WorkItemRepository.get_formal_work(each candidate)
+     -> WorkItemRepository.get_formal_work_with_version(each candidate)
      -> BacklogRepository.contains_formal_work(...)
      -> IterationCommitmentPolicy.assert_commitment_allowed(...)
      -> IdGeneratorPort.next_iteration_commitment_id()
      -> IterationCommitment::from_candidates(commitment_id, iteration_id, candidates, actor)
      -> Iteration.commit(commitment, actor)
-     -> WorkItem.mark_committed(iteration_ref, actor) for each candidate
+     -> WorkItem.mark_committed(...) or ChildWorkItem.mark_committed(...) for each loaded candidate
      -> save iteration + commitment + work records
 ```
 
 ```rust
 // IterationCommandService::commit_iteration_scope(WorkCommandEnvelope<CommitIterationScopeRequest> envelope)
 let mut iteration = iteration_repo.get_iteration(request.iteration_ref).await?.ok_or(ApplicationError::NotFound)?;
-let candidates = validate_formal_candidates(request.candidate_work_refs).await?;
+let candidates = validate_formal_candidates_with_versions(request.candidate_work_refs).await?;
 IterationCommitmentPolicy::assert_commitment_allowed(&iteration, candidates)?;
 let commitment_id = ids.next_iteration_commitment_id()?;
 let commitment = IterationCommitment::from_candidates(commitment_id, iteration.iteration_id, candidates, actor)?;
@@ -909,7 +917,7 @@ mark_candidate_work_committed(candidates, request.iteration_ref, actor, &uow).aw
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | `candidate_work_refs` 必须全是 backlog 内正式 work;generated `IterationCommitmentId` |
+| DTO -> Domain | `candidate_work_refs` 必须全是 backlog 内正式 work;每个 candidate 必须通过 `WorkItemRepository.get_formal_work_with_version(...)` 取得 `(FormalWorkRecord, Version)`;`FormalWorkRecord::WorkItem` 调用 `WorkItem::mark_committed(...)`,`FormalWorkRecord::ChildWorkItem` 调用 `ChildWorkItem::mark_committed(...)`;generated `IterationCommitmentId` |
 | 事务边界 | iteration save、commitment create、work marks、history、audit、outbox、stale、idempotency complete 同一 UoW |
 | 错误映射 | empty candidates -> `InvalidRequest`;non-formal candidate -> `DomainRejected`;iteration missing -> `NotFound` |
 | 状态 / 事件 | Iteration `Committed`;Commitment `Committed`;work `Committed`;enqueue `IterationChanged` |
@@ -923,7 +931,7 @@ mark_candidate_work_committed(candidates, request.iteration_ref, actor, &uow).aw
      -> reserve idempotency in UoW
      -> IterationRepository.get_iteration(iteration_ref)
      -> IterationRepository.get_commitment(iteration_ref)
-     -> validate added work refs through WorkItemRepository + BacklogRepository
+     -> validate added work refs through WorkItemRepository.get_formal_work_with_version + BacklogRepository
      -> IterationCommitment.apply_change(change_set, reason, actor)
      -> IterationRepository.save_commitment(commitment, expected_commitment_version, &uow)
      -> append IterationChangeRecord
@@ -935,7 +943,7 @@ mark_candidate_work_committed(candidates, request.iteration_ref, actor, &uow).aw
 ensure_non_empty_change_set(request.change_set)?;
 let iteration = iteration_repo.get_iteration(request.iteration_ref).await?.ok_or(ApplicationError::NotFound)?;
 let mut commitment = iteration_repo.get_commitment(request.iteration_ref).await?.ok_or(ApplicationError::NotFound)?;
-validate_added_work_refs(request.change_set.add_work_refs).await?;
+validate_added_work_refs_with_versions(request.change_set.add_work_refs).await?;
 commitment.apply_change(request.change_set, request.reason, actor)?;
 let version = iteration_repo.save_commitment(commitment, Some(request.expected_commitment_version), &uow).await?;
 let change_id = ids.next_iteration_change_id()?;
@@ -945,7 +953,7 @@ iteration_repo.append_change(history, &uow).await?;
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | `change_set` 两边都空 reject;added refs 必须 formal work |
+| DTO -> Domain | `change_set` 两边都空 reject;added refs 必须 formal work;added refs 若会写 membership / work mark,必须通过 `WorkItemRepository.get_formal_work_with_version(...)` 取得 optimistic version |
 | 事务边界 | commitment save、history、audit、outbox、stale、idempotency complete 同一 UoW |
 | 错误映射 | no commitment -> `NotFound`;empty change -> `InvalidRequest`;closed commitment -> `DomainRejected`;version conflict |
 | 状态 / 事件 | Commitment `Changed`;enqueue `IterationChanged`;iteration/member views stale |
@@ -958,7 +966,7 @@ iteration_repo.append_change(history, &uow).await?;
   -> IterationCommandService.update_iteration_lifecycle(envelope)
      -> reserve idempotency in UoW
      -> IterationRepository.get_iteration(iteration_ref)
-     -> if Close: IterationRepository.get_commitment(iteration_ref)
+     -> if Close: IterationRepository.get_commitment_with_version(iteration_ref)
      -> Iteration.start(change_reason, actor) / close(close_reason, actor) / cancel(change_reason, actor)
      -> if Close: IterationCommitment.close(close_reason, actor)
      -> save iteration + optional commitment
@@ -976,7 +984,10 @@ match request.target {
     }
     IterationLifecycleTarget::Closed => {
         let reason = require_close_reason(request.close_reason, request.change_reason)?;
-        let mut commitment = iteration_repo.get_commitment(request.iteration_ref).await?.ok_or(ApplicationError::NotFound)?;
+        let (mut commitment, current_commitment_version) = iteration_repo
+            .get_commitment_with_version(request.iteration_ref)
+            .await?
+            .ok_or(ApplicationError::NotFound)?;
         iteration.close(reason.clone(), actor)?;
         commitment.close(reason, actor)?;
         iteration_repo.save_commitment(commitment, Some(current_commitment_version), &uow).await?;
@@ -991,7 +1002,7 @@ let version = iteration_repo.save_iteration(iteration, request.expected_version,
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | `target = InProgress` / `Cancelled` 必须提供 `change_reason` 且禁止 `close_reason`;`target = Closed` 必须提供 `close_reason` 且禁止 `change_reason`;close path 必须加载 commitment |
+| DTO -> Domain | `target = InProgress` / `Cancelled` 必须提供 `change_reason` 且禁止 `close_reason`;`target = Closed` 必须提供 `close_reason` 且禁止 `change_reason`;close path 必须通过 `IterationRepository.get_commitment_with_version(...)` 加载 `(IterationCommitment, Version)` |
 | 事务边界 | iteration save、optional commitment save、history、audit、outbox、stale、idempotency complete 同一 UoW |
 | 错误映射 | iteration missing -> `NotFound`;target/reason 组合非法 -> `InvalidInput`;close without commitment -> `DomainRejected`;invalid transition -> `DomainRejected`;version conflict |
 | 状态 / 事件 | Iteration `InProgress` / `Closed` / `Cancelled`;close path Commitment `Closed`;enqueue `IterationChanged` |

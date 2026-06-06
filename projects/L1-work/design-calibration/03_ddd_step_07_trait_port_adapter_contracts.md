@@ -342,6 +342,12 @@ pub trait WorkItemRepository {
         work_ref: FormalWorkRef,
     ) -> Result<Option<FormalWorkRecord>, RepositoryError>;
 
+    /// Loads a formal work record by reference together with its optimistic version.
+    async fn get_formal_work_with_version(
+        &self,
+        work_ref: FormalWorkRef,
+    ) -> Result<Option<(FormalWorkRecord, Version)>, RepositoryError>;
+
     /// Loads the project and projection scope for a formal work reference.
     async fn get_formal_work_scope(
         &self,
@@ -414,6 +420,7 @@ pub struct FormalWorkScope {
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
 | `get_formal_work` | `FormalWorkRef` | `Option<FormalWorkRecord>` | `RepositoryError` | lifecycle / dependency / iteration / query | 统一 root / child 读取 |
+| `get_formal_work_with_version` | `FormalWorkRef` | `Option<(FormalWorkRecord, Version)>` | `RepositoryError` | iteration work mark / membership write paths | 仅供需要立即 `save_formal_work(record, expected_version, &uow)` 的写路径;返回 version 是 formal work optimistic save 的唯一正式来源 |
 | `get_formal_work_scope` | `FormalWorkRef` | `Option<FormalWorkScope>` | `RepositoryError` | dependency / blocker command、projection stale 构造 | 只读 scope 解析;不得从 `FormalWorkRef` 字符串推断 project;root work 由 backlog membership 得到 project / backlog / assignee;child work 必须经 parent root / membership 得到 project / backlog,无法稳定得到 assignee 时返回 `assignee_ref = None` |
 | `list_by_backlog` | `BacklogRef`、`PageRequest` | `Page<FormalWorkRef>` | `RepositoryError` | query / projection rebuild | 只返回正式工作引用 |
 | `create_*` | work truth、UoW | `Version` | `RepositoryError` | create / promote accept | 不保存 source body |
@@ -566,6 +573,12 @@ pub trait IterationRepository {
         iteration_ref: IterationRef,
     ) -> Result<Option<IterationCommitment>, RepositoryError>;
 
+    /// Loads the current commitment together with its optimistic version.
+    async fn get_commitment_with_version(
+        &self,
+        iteration_ref: IterationRef,
+    ) -> Result<Option<(IterationCommitment, Version)>, RepositoryError>;
+
     /// Lists iterations for a project.
     async fn list_by_project(
         &self,
@@ -607,7 +620,8 @@ pub trait IterationRepository {
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
-| `get_commitment` | `IterationRef` | `Option<IterationCommitment>` | `RepositoryError` | commit / update / query | no commitment 返回 `None` |
+| `get_commitment` | `IterationRef` | `Option<IterationCommitment>` | `RepositoryError` | commit / update / query | no commitment 返回 `None`;不提供 optimistic version |
+| `get_commitment_with_version` | `IterationRef` | `Option<(IterationCommitment, Version)>` | `RepositoryError` | lifecycle close / immediate commitment save path | 仅供需要紧随其后 `save_commitment(commitment, Some(version), &uow)` 的写路径;返回 version 是 close path commitment optimistic save 的唯一正式来源 |
 | `save_commitment` | `IterationCommitment`、`Option<Version>`、UoW | `Version` | `RepositoryError` | commit / update | `None` 只用于首次创建 |
 | `append_change` | `IterationChangeRecord`、UoW | `()` | `RepositoryError` | iteration commands | 与 state change 同 UoW |
 
@@ -1089,14 +1103,21 @@ pub struct ProcessTimeboxResolution {
     pub timebox_ref: ProcessTimeboxRef,
     /// Safe timebox summary used for iteration validation.
     pub summary: ProcessTimeboxSummary,
-    /// Resolution state to persist locally.
-    pub reference_state: ReferenceResolutionState,
 }
 ```
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
-| `resolve_timebox` | `ProcessTimeboxRef` | `ProcessTimeboxResolution` | `PortError` | open iteration / process timing consumer / refresh job | process 不拥有 iteration truth |
+| `resolve_timebox` | `ProcessTimeboxRef` | `ProcessTimeboxResolution` | `PortError` | open iteration / refresh job | process 不拥有 iteration truth |
+
+`ProcessTimeboxResolution.summary` 必须使用 Step 6 定义的 `ProcessTimeboxSummary`。`FakeProcessTimeboxResolverPort` 的 resolved fixture 至少要能表达:
+
+- `summary.timebox_ref == requested timebox_ref`;
+- `summary.project_ref` 用于校验 `OpenIterationRequest.project_ref`;
+- `summary.can_open_iteration == true` 才允许 `OpenIterationFlow` 继续;
+- `summary.source_digest` 必填,用于证明 resolver 输出来自 Process safe summary snapshot。
+
+该 summary 在 `OpenIterationFlow` 中只作为 validation input,不得保存到 `Iteration` truth,不得包含 Process timebox 正文、planning body、stage body 或 execution body。Process timebox 的 `ReferenceResolutionState` 只能由 `ConsumeProcessTimingChangedFlow` 或 `RefreshExternalReferenceSnapshotsJob` 按 reference / snapshot 口径写入;`OpenIterationFlow` 不写 reference state。
 
 #### 9.7 `WorkOutboxPublisherPort`
 
@@ -1468,7 +1489,7 @@ pub enum StoredCommandResult {
 | `ReviewWorkPromotion` | `PromoteRepository`、`WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `SourceWorkResolverPort`、`IdGeneratorPort`、`ClockPort` | accepted path enqueue promote + work events;accept-created / bound formal work marks existing work views stale;reject no projection stale |
 | `LinkWorkDependency` | `DependencyRepository`、`WorkItemRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `IdGeneratorPort`、`ClockPort` | enqueue `WorkDependencyChanged`;`WorkItemRepository.get_formal_work_scope(downstream)` 提供 graph project scope;mark downstream project-board + resolvable member-work stale |
 | `OpenWorkBlocker` / `ResolveWorkBlocker` | `DependencyRepository`、`WorkItemRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `EvidenceResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `WorkBlockerChanged`;`WorkItemRepository.get_formal_work_scope(blocked_work_ref)` 提供 stale project / member scope |
-| `OpenIteration` | `ProjectRepository`、`IterationRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ProcessTimeboxResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `IterationChanged` |
+| `OpenIteration` | `ProjectRepository`、`IterationRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ProcessTimeboxResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `IterationChanged`;resolver summary validation only;does not write process timebox reference state |
 | `CommitIterationScope` / `UpdateIterationCommitment` | `IterationRepository`、`WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ClockPort` | enqueue `IterationChanged`;mark iteration / member views stale |
 | `GetProjectBoardView` / `SearchWork` | `ProjectionRepository`、可选 truth repository | 否 | 无 | query 不触发 rebuild |
 | `ConsumeIdentityMemberChanged` | `ReferenceSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | mark affected views stale |

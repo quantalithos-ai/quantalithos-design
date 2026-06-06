@@ -96,14 +96,14 @@
 | `TraceRepository` | append / handoff repository | `application/src/ports.rs` | `infra/src/repositories.rs` | trace / audit / handoff records | `append_trace`、`append_audit_record`、`save_handoff_ref` |
 | `ProcessOutboxRepository` | outbox repository | `application/src/ports.rs` | `infra/src/outbox_store.rs` | outbox record persistence with outbound payload snapshot | `append`、`list_pending`、`save_state` |
 | `ProjectionRepository` | projection repository | `application/src/ports.rs` | `infra/src/projection_stores.rs` | read model / timeline / summary / view state | `upsert_read_model`、`find_timeline`、`mark_view_state` |
-| `ReferenceSnapshotRepository` | snapshot repository | `application/src/ports.rs` | `infra/src/reference_stores.rs` | external snapshot / reference state | `upsert_method_snapshot`、`upsert_work_snapshot`、`upsert_reference_state` |
+| `ReferenceSnapshotRepository` | snapshot repository | `application/src/ports.rs` | `infra/src/reference_stores.rs` | external snapshot / reference state | `upsert_method_snapshot`、`upsert_work_snapshot`、`upsert_runtime_feedback_summary`、`upsert_reference_state` |
 | `ReconciliationReportRepository` | report repository | `application/src/ports.rs` | `infra/src/projection_stores.rs` | reconciliation report | `save_report`、`get_report` |
 | `MethodDefinitionResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | method definition snapshot | `resolve_definition` |
 | `WorkContextResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | work context snapshot | `resolve_work_context` |
 | `ActorCapabilityResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | actor capability snapshot | `resolve_actor_capability` |
 | `GovernanceDecisionResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | governance decision marker | `resolve_decision` |
 | `ArtifactEvidenceResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | artifact evidence marker | `resolve_evidence` |
-| `RuntimeFeedbackResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | runtime feedback marker | `resolve_feedback` |
+| `RuntimeFeedbackResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | runtime feedback marker / body-free summary | `resolve_feedback` |
 | `ConversationContextResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | conversation context marker | `resolve_context` |
 | `ProcessOutboxPublisherPort` | publisher port | `application/src/ports.rs` | `infra/src/publishers.rs` | outbound event publish | `publish` |
 | `TraceHandoffPort` | handoff port | `application/src/ports.rs` | `infra/src/handoff_adapters.rs` | observability handoff | `deliver_trace` |
@@ -890,6 +890,19 @@ pub trait ReferenceSnapshotRepository {
         uow: &mut dyn UnitOfWorkHandle,
     ) -> Result<(), RepositoryError>;
 
+    /// Saves or replaces a body-free runtime feedback summary.
+    async fn upsert_runtime_feedback_summary(
+        &self,
+        summary: RuntimeFeedbackSummary,
+        uow: &mut dyn UnitOfWorkHandle,
+    ) -> Result<(), RepositoryError>;
+
+    /// Loads a body-free runtime feedback summary by summary reference.
+    async fn get_runtime_feedback_summary(
+        &self,
+        summary_ref: RuntimeFeedbackSummaryRef,
+    ) -> Result<Option<RuntimeFeedbackSummary>, RepositoryError>;
+
     /// Saves or replaces a conversation context marker summary.
     async fn upsert_conversation_context_marker(
         &self,
@@ -1003,7 +1016,15 @@ pub trait RuntimeFeedbackResolverPort {
         feedback_ref: ExternalRuntimeFeedbackRef,
         activity_ref: ActivityRef,
         source_digest: Option<SourceDigest>,
-    ) -> Result<RuntimeFeedbackRef, ResolverError>;
+    ) -> Result<RuntimeFeedbackResolution, ResolverError>;
+}
+
+/// Body-free runtime feedback resolution returned by runtime/member resolvers.
+pub struct RuntimeFeedbackResolution {
+    /// Process-visible feedback marker.
+    pub runtime_feedback_ref: RuntimeFeedbackRef,
+    /// Body-free feedback summary used by ActivityFeedbackPolicy.
+    pub feedback_summary: RuntimeFeedbackSummary,
 }
 
 /// Resolves conversation context markers used by trace and query surfaces.

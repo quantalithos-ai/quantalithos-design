@@ -206,6 +206,9 @@
 | `ProcessIdempotencyOperation` | `contracts/src/refs.rs` | command / event / job idempotency namespace |
 | `ProcessIdempotencyKey` | `contracts/src/refs.rs` | normalized command / event / job idempotency key |
 | `ProcessTruthRef` / `ProcessTruthRefKind` / `ProcessTruthCursorRef` / `ProcessTruthChangeRef` | `contracts/src/refs.rs` | committed truth refs used by outbox envelope、projection cursor、trace records |
+| `ActivityKind` / `GatewayKind` / `RuntimeFeedbackKind` | `contracts/src/refs.rs` | public execution kind enums reused by DTO、event and domain object signatures |
+| `ProcessCancelReason` / `ActivityCompletionReason` / `ActivitySkipReason` / `ActivityFailureReason` / `TokenTerminationReason` / `GatewayDecisionReason` / `GatewayInvalidReason` | `contracts/src/refs.rs` | public reason newtypes used by command DTO and domain transitions |
+| `RuntimeFeedbackSummaryRef` / `SourceDigest` / `ProcessTokenRef` / `GatewayRouteRef` | `contracts/src/refs.rs` | secondary shared refs used by feedback、token and gateway protocols |
 | `ProcessSearchFilter` | `contracts/src/queries.rs` | projection search filter derived from search request |
 | `ProcessReconciliationScopeRef` / `ReconciliationReportTargetRef` | `contracts/src/refs.rs` | reconciliation report scope and target |
 | `ArchiveDestinationRef` / `ArchiveScopeRef` / `ArchivePackageRef` | `contracts/src/refs.rs` | archive handoff destination、scope and package marker |
@@ -1098,9 +1101,9 @@ pub struct RecordActivityFeedbackRequest {
     pub metadata: CommandMetadata,
     /// Activity receiving feedback.
     pub activity_ref: ActivityRef,
-    /// External runtime feedback reference.
-    pub runtime_feedback_ref: RuntimeFeedbackRef,
-    /// Feedback summary reference without execution body.
+    /// External runtime feedback reference supplied by the runtime/member source.
+    pub runtime_feedback_ref: ExternalRuntimeFeedbackRef,
+    /// Feedback summary reference without execution body. The concrete summary schema is Step 6 `RuntimeFeedbackSummary`.
     pub feedback_summary_ref: RuntimeFeedbackSummaryRef,
 }
 ```
@@ -1110,8 +1113,8 @@ pub struct RecordActivityFeedbackRequest {
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `activity_ref` | `ActivityRef` | `Activity.activity_id` | caller | missing -> reject |
-| `runtime_feedback_ref` | `RuntimeFeedbackRef` | `Activity.feedback_ref` | caller / resolver | unresolved -> reject / retry |
-| `feedback_summary_ref` | `RuntimeFeedbackSummaryRef` | policy input | caller | reject |
+| `runtime_feedback_ref` | `ExternalRuntimeFeedbackRef` | resolver input;forms `Activity.feedback_ref: RuntimeFeedbackRef` | caller / runtime event | unresolved -> reject / retry |
+| `feedback_summary_ref` | `RuntimeFeedbackSummaryRef` | `RuntimeFeedbackSummary.feedback_summary_ref` | caller;resolver must return matching body-free summary | missing / mismatch -> reject |
 
 ##### 7.6.7 `OpenWaitingGate`
 
@@ -2194,7 +2197,7 @@ pub struct RuntimeActivityFeedbackEvent {
     pub runtime_feedback_ref: ExternalRuntimeFeedbackRef,
     /// Feedback kind.
     pub feedback_kind: RuntimeFeedbackKind,
-    /// Feedback summary reference without execution body.
+    /// Feedback summary reference without execution body. The concrete summary schema is Step 6 `RuntimeFeedbackSummary`.
     pub feedback_summary_ref: RuntimeFeedbackSummaryRef,
     /// Source digest proving the feedback summary.
     pub source_digest: Option<SourceDigest>,

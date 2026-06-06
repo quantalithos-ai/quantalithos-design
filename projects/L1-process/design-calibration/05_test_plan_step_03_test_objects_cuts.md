@@ -105,8 +105,8 @@
 | Command metadata / operation digest | `03` §7 / §12 | idempotency key、operation namespace、canonical digest、volatile metadata 排除 | duplicate replay 错误 | contract unit |
 | Query metadata | `03` §7 / §8 | Query 不携带 idempotency key,不写 truth | 读路径污染状态 | contract + query |
 | RuntimeProcessShape / ProcessProfile | `03` §6 / §9 | adoption、tailoring、retired / stale / active 状态转换 | profile 错误启动实例 | domain unit |
-| ProcessInstance / Activity / Token / Gateway | `03` §6 / §9 | start、advance、route、join、terminal guard | 运行态推进错误 | domain unit + service |
-| WaitingGate / ProcessCheckpoint / RecoveryAttempt | `03` §6 / §9 | open、resume、checkpoint、recover、abandon、expired guard | 恢复链断裂 | domain unit + service |
+| ProcessInstance / Activity / Token / Gateway | `03` §6 / §9 | start、advance、route、join、terminal guard;commit-03-a 只覆盖 running subset,waiting/recovery reserved | 运行态推进错误 | domain unit + service |
+| WaitingGate / ProcessCheckpoint / RecoveryAttempt | `03` §6 / §9 | PH-04 起覆盖 open、resume、checkpoint、recover、abandon、expired guard | 恢复链断裂 | domain unit + service |
 | StageState / TimeboxBinding | `03` §6 / §9 | stage activate / pause / complete / skip;timebox stale / release | 节奏状态污染 Work truth | domain unit + service |
 | ReferenceResolutionState | `03` §6 / §9 / §11 | resolved / stale / unavailable / invalid;last good snapshot | 外部 snapshot 污染 truth | reference fake |
 | ProcessOutboxRecord | `03` §6 / §10 / §15 | truth change mapping、publication state、retry / failure | 下游事件漏发或乱发 | domain + worker |
@@ -134,7 +134,7 @@
 | Inbound event | 7 个 event 每个 accepted + duplicate + quarantine/delayed/noop |
 | Outbound event | 10 个 event 每个 payload mapping + forbidden body absent + publish failure |
 | Operations job | 7 个 job 每个 completed + duplicate + invalid input + partial failure |
-| 状态机 | 16 组状态机每个 legal + illegal transition |
+| 状态机 | P0 总体验收覆盖 16 组状态机每个 legal + illegal transition;单个 commit boundary 只覆盖该 boundary 非 reserved 子集 |
 | 横切 | duplicate replay、idempotency conflict、result missing、version conflict、commit unknown、rollback failure |
 | 安全 / 配置 | forbidden body、raw secret、config validation、topic map missing、no fake fallback |
 | 证据 | gate artifact、report、evidence index、redaction check |
@@ -163,4 +163,3 @@
 | P0 测试对象都有明确切口 | 通过 |
 | 测试切口能回指设计真相源 | 通过 |
 | 字段 / 状态 / protocol 不使用旧口径 | 通过 |
-

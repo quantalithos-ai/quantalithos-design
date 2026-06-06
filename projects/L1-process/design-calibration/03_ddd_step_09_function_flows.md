@@ -349,9 +349,9 @@ Steps:
 2. Load active `ProcessProfile`;load `WorkContextSnapshot`.
 3. `InstanceProgressionPolicy.assert_can_start(profile, project_ref)`.
 4. Generate `ProcessInstanceId`、`ProcessTokenSetRef`、initial `ActivityId` / `TokenId`.
-5. `ProcessInstance::create(...)` then `ProcessInstance.start(&profile, actor)`.
-6. Create initial `Activity::from_shape_node(...)` and `Token::start_at(...)`.
-7. Save instance, activity, token / gateway initial state, progression record, trace, outbox `InstanceChanged`.
+5. Create initial `Activity::from_shape_node(...)` and `Token::start_at(...)`;create gateway initial state when the start node requires gateway tracking.
+6. `ProcessInstance::create(...)` then `ProcessInstance.start(&profile, initial_activity.ref(), actor)`.
+7. Save instance, activity, token / gateway initial state, trace, outbox `InstanceChanged`;do not append `ActivityProgressionRecord` during instance bootstrap.
 8. Store `ProcessInstanceCommandResult`.
 
 Tests:success;duplicate;profile suspended;work context mismatch;missing start node.
@@ -382,12 +382,15 @@ Steps:
 
 1. Reserve command idempotency.
 2. Load `Activity`.
-3. Resolve / validate `RuntimeFeedbackRef` through `RuntimeFeedbackResolverPort.resolve_feedback(...)` if needed.
-4. `ActivityFeedbackPolicy.assert_feedback_matches_activity(...)`.
-5. `Activity.attach_feedback(runtime_feedback_ref)`.
-6. Save activity, append progression record and trace.
-7. Outbox only when policy says feedback binding is a publishable `ActivityProgressed` truth.
-8. Store `ActivityProgressionCommandResult`.
+3. Resolve `RuntimeFeedbackResolution` through `RuntimeFeedbackResolverPort.resolve_feedback(request.runtime_feedback_ref, request.activity_ref, None)`.
+4. Assert `resolution.feedback_summary.feedback_summary_ref == request.feedback_summary_ref`.
+5. `ActivityFeedbackPolicy.assert_feedback_matches_activity(activity, resolution.runtime_feedback_ref)`.
+6. `ActivityFeedbackPolicy.assert_no_runtime_body(resolution.feedback_summary)`.
+7. Plain feedback binding must not complete activity; explicit completion paths consume the stored body-free summary before `Activity.complete(...)`.
+8. `Activity.attach_feedback(resolution.runtime_feedback_ref)`.
+9. Save activity, append progression record and trace.
+10. Outbox only when policy says feedback binding is a publishable `ActivityProgressed` truth.
+11. Store `ActivityProgressionCommandResult`.
 
 Tests:success;feedback mismatch;runtime body rejected;duplicate;unresolved feedback.
 
@@ -687,7 +690,7 @@ Steps:
 
 1. Validate envelope / reserve event.
 2. `RuntimeFeedbackResolverPort.resolve_feedback(runtime_feedback_ref, activity_ref, source_digest)`.
-3. Upsert `RuntimeFeedbackRef` marker.
+3. Upsert `RuntimeFeedbackRef` marker and body-free `RuntimeFeedbackSummary` marker.
 4. Mark activity pending feedback / stale;do not call `Activity.complete`.
 5. Complete event idempotency.
 

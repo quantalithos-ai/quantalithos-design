@@ -173,9 +173,9 @@ Suspended --retire--> Retired
 | 状态 | 作用 | 是否终态 | 允许的关键操作 |
 |---|---|---|---|
 | `NotStarted` | instance 已创建但未运行 | 否 | `start`、`cancel` |
-| `Running` | 可推进活动 | 否 | `advance`、`pause_for_gate`、`mark_recovering`、`complete`、`cancel` |
-| `Waiting` | 等待 external resume condition | 否 | `resume_from_gate`、`mark_recovering`、`cancel` |
-| `Recovering` | 正在同一 instance 上恢复 | 否 | `complete_recovery`、`cancel`;失败 outcome 可转 `Failed` |
+| `Running` | 可推进活动 | 否 | `advance`、`complete`、`cancel`;`pause_for_gate` / `mark_recovering` 为 PH-04 reserved |
+| `Waiting` | 等待 external resume condition | 否 | PH-04 reserved:`resume_from_gate`、`mark_recovering`、`cancel` |
+| `Recovering` | 正在同一 instance 上恢复 | 否 | PH-04 reserved:`complete_recovery`、`cancel`;失败 outcome 可转 `Failed` |
 | `Completed` | 成功完成 | 是 | 无 |
 | `Cancelled` | 显式取消 | 是 | 无 |
 | `Failed` | 失败终态 | 是 | 无 |
@@ -203,13 +203,13 @@ Recovering --cancel--> Cancelled
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | factory | `NotStarted` | `ProcessInstance::create(process_instance_id, profile, project_ref, token_set_ref, actor)` | profile state 为 `Active`;project ref 只保存引用 | 创建 instance 初始 truth | `DomainError::InvalidStateTransition` / `DomainError::BoundaryViolation` |
-| `NotStarted` | `Running` | `ProcessInstance.start(&ProcessProfile, ActorRef)` | profile 仍为 `Active`;初始 token / activity 已建立 | 创建 `ActivityProgressionRecord`;写 trace / outbox `ProcessInstanceChanged` | `DomainError::InvalidStateTransition` |
+| `NotStarted` | `Running` | `ProcessInstance.start(&ProcessProfile, ActivityRef, ActorRef)` | profile 仍为 `Active`;初始 token / activity 已建立 | 设置 current activity;写 trace / outbox `ProcessInstanceChanged`;不创建 `ActivityProgressionRecord` | `DomainError::InvalidStateTransition` |
 | `Running` | `Running` | `ProcessInstance.advance(ActivityRef, ActorRef)` | current activity / token position 与 request expected position 匹配 | 更新 `current_activity_ref`;写 progression record | `DomainError::InvalidStateTransition` |
-| `Running` | `Waiting` | `ProcessInstance.pause_for_gate(&WaitingGate, ActorRef)` | gate 属于同一 instance 且 state 为 `Waiting` | 写 waiting change record;token `Active -> Waiting` | `DomainError::InvalidStateTransition` |
-| `Waiting` | `Running` | `ProcessInstance.resume_from_gate(&WaitingGate, ActorRef)` | gate state 为 `Resumed`;token 可恢复 | 写 waiting change record;token `Waiting -> Active` | `DomainError::InvalidStateTransition` |
-| `NotStarted` / `Running` / `Waiting` | `Recovering` | `ProcessInstance.mark_recovering(&ProcessCheckpoint, ActorRef)` | checkpoint `Available`;同一 instance;不会 fork recovery | 写 recovery history;创建 recovery attempt | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
-| `Recovering` | `Running` | `ProcessInstance.complete_recovery(&RecoveryAttempt, ActorRef)` | recovery attempt state 为 `Applied`;attempt 属于同一 instance | 写 recovery history;不得创建新 instance | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
-| `Recovering` | `Failed` | `CompleteRecoveryAttemptFlow` after `RecoveryAttempt.mark_failed(...)` | recovery outcome 为 `Failed`;failure reason 必填;policy 判定不可继续 | 写 recovery history / outbox | `DomainError::InvalidStateTransition` |
+| `Running` | `Waiting` | `ProcessInstance.pause_for_gate(&WaitingGate, ActorRef)` | PH-04 reserved;gate 属于同一 instance 且 state 为 `Waiting` | 写 waiting change record;token `Active -> Waiting` | `DomainError::InvalidStateTransition` |
+| `Waiting` | `Running` | `ProcessInstance.resume_from_gate(&WaitingGate, ActorRef)` | PH-04 reserved;gate state 为 `Resumed`;token 可恢复 | 写 waiting change record;token `Waiting -> Active` | `DomainError::InvalidStateTransition` |
+| `NotStarted` / `Running` / `Waiting` | `Recovering` | `ProcessInstance.mark_recovering(&ProcessCheckpoint, ActorRef)` | PH-04 reserved;checkpoint `Available`;同一 instance;不会 fork recovery | 写 recovery history;创建 recovery attempt | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
+| `Recovering` | `Running` | `ProcessInstance.complete_recovery(&RecoveryAttempt, ActorRef)` | PH-04 reserved;recovery attempt state 为 `Applied`;attempt 属于同一 instance | 写 recovery history;不得创建新 instance | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
+| `Recovering` | `Failed` | `CompleteRecoveryAttemptFlow` after `RecoveryAttempt.mark_failed(...)` | PH-04 reserved;recovery outcome 为 `Failed`;failure reason 必填;policy 判定不可继续 | 写 recovery history / outbox | `DomainError::InvalidStateTransition` |
 | `Running` | `Completed` | `ProcessInstance.complete(ActorRef)` | 当前活动 / token 已无未完成阻塞 | 写 completion trace / outbox | `DomainError::InvalidStateTransition` |
 | `NotStarted` / `Running` / `Waiting` / `Recovering` | `Cancelled` | `ProcessInstance.cancel(ProcessCancelReason, ActorRef)` | reason 必填;actor 有权限 | 终止 active/waiting token;写 trace / outbox | `DomainError::InvalidStateTransition` |
 

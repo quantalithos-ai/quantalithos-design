@@ -87,19 +87,19 @@
 
 | 模块 | 文件 | 对象 / 类型 |
 |---|---|---|
-| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef` |
+| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RuntimeFeedbackSummaryRef`、`SourceDigest` |
 | `contracts` | `events.rs` | `ProcessOutboxEventKind`、`ProcessOutboundEventPayload` 及 outbound event payload DTO |
 | `contracts` | `views.rs` | `RuntimeProcessShapeView`、`ProcessProfileView`、`ProcessInstanceView`、`ActivityStatusView`、`ProcessTimelineView`、`ProcessProgressSummaryView`、`ReconciliationReportView` |
 | `domain` | `runtime_shape.rs` | `RuntimeProcessShape`、`RuntimeProcessShapeState` |
 | `domain` | `process_profile.rs` | `ProcessProfile`、`ProcessProfileState`、`ProfileChangeRecord` |
 | `domain` | `process_instance.rs` | `ProcessInstance`、`ProcessInstanceState` |
 | `domain` | `activity.rs` | `Activity`、`ActivityState`、`ActivityProgressionRecord` |
-| `domain` | `token_gateway.rs` | `Token`、`TokenState`、`Gateway`、`GatewayState` |
+| `domain` | `token_gateway.rs` | `Token`、`TokenState`、`TokenSet`、`TokenSnapshot`、`Gateway`、`GatewayState`、`GatewayRouteSet` |
 | `domain` | `waiting_gate.rs` | `WaitingGate`、`WaitingGateState`、`PauseContext`、`WaitingGateChangeRecord` |
 | `domain` | `checkpoint.rs` | `ProcessCheckpoint`、`CheckpointState` |
 | `domain` | `recovery.rs` | `RecoveryAttempt`、`RecoveryAttemptState`、`RecoveryHistoryRecord` |
 | `domain` | `rhythm.rs` | `ProcessStageState`、`StageState`、`ProcessTimeboxBinding`、`TimeboxBindingState` |
-| `domain` | `reference.rs` | `MethodDefinitionSnapshot`、`WorkContextSnapshot`、`ActorCapabilitySnapshot`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState` |
+| `domain` | `reference.rs` | `MethodDefinitionSnapshot`、`WorkContextSnapshot`、`ActorCapabilitySnapshot`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`RuntimeFeedbackSummary`、`ConversationContextRef`、`ReferenceResolutionState` |
 | `domain` | `projection.rs` | `DerivedProcessViewState`、`ProcessReadModel`、`ProcessTimelineView`、`ProcessProgressSummary`、`ActivityStatusView`、`ReconciliationReport` |
 | `domain` | `trace.rs` | `ProcessTraceRecord`、`ProcessAuditTrail`、`TraceHandoffRecord`;使用 `contracts::refs::TraceHandoffRef` 作为 handoff record identity |
 | `domain` | `outbox.rs` | `ProcessOutboxRecord`、`ProcessTruthChange` |
@@ -126,6 +126,131 @@ pub struct ExampleRef {
 | public state enum | `contracts::refs` | 若会进入 DTO / Event / View,归 contracts;domain 复用同一 enum |
 | internal-only state enum | `domain::<file>` | 不进入 public protocol;若后续 Step 8 需要暴露,必须上提到 contracts |
 | external refs | `contracts::refs` | `value: String` + kind / source 字段,只表达外部稳定引用,不得保存正文 |
+
+##### 7.2.1 PH-03 execution shared enum / reason schema
+
+以下类型已经进入 ProcessInstance / Activity / Token / Gateway / RuntimeFeedback 的 public protocol 或 domain object 签名,必须在 `contracts::refs` 中显式定义,不得只依赖裸字符串或实现侧临时 enum。
+
+```rust
+/// Runtime shape activity category supported by the process execution boundary.
+pub enum ActivityKind {
+    /// A human participant performs the activity.
+    HumanTask,
+    /// A configured runtime or integration performs the activity.
+    AutomatedTask,
+    /// The activity collects or waits for runtime/member feedback.
+    FeedbackTask,
+    /// The activity performs a review or approval step.
+    ReviewTask,
+    /// The activity records a decision point without owning the decision body.
+    DecisionTask,
+}
+
+/// Runtime gateway category supported by the process execution boundary.
+pub enum GatewayKind {
+    /// Select exactly one route from the available route set.
+    ExclusiveDecision,
+    /// Split one active token into multiple configured routes.
+    ParallelSplit,
+    /// Join the required incoming tokens before continuing.
+    ParallelJoin,
+}
+
+/// Kind of runtime or member feedback visible to L1-process.
+pub enum RuntimeFeedbackKind {
+    /// Feedback states that an activity can be completed by command policy.
+    Completion,
+    /// Feedback states partial progress without completing the activity.
+    Progress,
+    /// Feedback states a runtime or member failure.
+    Failure,
+    /// Feedback states explicit cancellation by the source boundary.
+    Cancellation,
+    /// Feedback is observational and must not change activity truth by itself.
+    Observation,
+}
+```
+
+| 类型 | 归属 | 最小 schema | validation / 语义 |
+|---|---|---|---|
+| `ProcessCancelReason` | `contracts::refs` | `value: String` | 非空;表达取消分类或原因引用;正文说明进入 trace / audit |
+| `ActivityCompletionReason` | `contracts::refs` | `value: String` | 非空;完成活动时必填;不得保存 runtime body |
+| `ActivitySkipReason` | `contracts::refs` | `value: String` | 非空;跳过活动时必填 |
+| `ActivityFailureReason` | `contracts::refs` | `value: String` | 非空;失败活动时必填 |
+| `TokenTerminationReason` | `contracts::refs` | `value: String` | 非空;终止 token 时必填 |
+| `GatewayDecisionReason` | `contracts::refs` | `value: String` | 非空;选择 route 的解释依据;不得保存 governance / runtime 正文 |
+| `GatewayInvalidReason` | `contracts::refs` | `value: String` | 非空;标记 gateway invalid 的分类或原因引用 |
+| `ProcessTokenRef` | `contracts::refs` | `value: String` | 非空;指向 process-local token;不保存 token body |
+| `GatewayRouteRef` | `contracts::refs` | `value: String` | 非空;指向 runtime shape 中的 route;不保存 shape body |
+| `RuntimeFeedbackSummaryRef` | `contracts::refs` | `value: String` | 非空;指向无执行正文的 feedback summary |
+| `SourceDigest` | `contracts::refs` | `value: String` | 非空;opaque source digest;Process 只比较稳定值,不解释算法 |
+
+##### 7.2.2 feedback summary and gateway policy input schema
+
+`RuntimeFeedbackSummary`、`TokenSet`、`TokenSnapshot` 和 `GatewayRouteSet` 是 PH-03 domain policy input,归 `domain::reference` 或 `domain::token_gateway`。它们可以进入测试 fixture 和 fake resolver output,但不得保存外部正文、runtime queue、method shape body 或 provider response body。
+
+```rust
+/// Body-free summary used by ActivityFeedbackPolicy.
+pub struct RuntimeFeedbackSummary {
+    /// Stable summary reference supplied by runtime/member source or resolver.
+    pub feedback_summary_ref: RuntimeFeedbackSummaryRef,
+    /// Process-visible feedback marker.
+    pub runtime_feedback_ref: RuntimeFeedbackRef,
+    /// Activity the feedback claims to describe.
+    pub activity_ref: ActivityRef,
+    /// Feedback kind used by completion policy.
+    pub feedback_kind: RuntimeFeedbackKind,
+    /// Resolution state of the feedback source.
+    pub feedback_state: ReferenceResolutionState,
+    /// Optional source digest proving the summary material.
+    pub source_digest: Option<SourceDigest>,
+    /// Must be false; true means the summary leaked runtime body and is rejected.
+    pub contains_runtime_body: bool,
+}
+
+/// Explicit token set passed to gateway join policy.
+pub struct TokenSet {
+    /// Token set reference owned by the process instance.
+    pub token_set_ref: ProcessTokenSetRef,
+    /// Owning process instance.
+    pub process_instance_id: ProcessInstanceId,
+    /// Tokens participating in this operation.
+    pub token_refs: Vec<ProcessTokenRef>,
+}
+
+/// Body-free token state summary used by GatewayRoutingPolicy.
+pub struct TokenSnapshot {
+    /// Token set reference owned by the process instance.
+    pub token_set_ref: ProcessTokenSetRef,
+    /// Owning process instance.
+    pub process_instance_id: ProcessInstanceId,
+    /// Tokens visible in the snapshot.
+    pub token_refs: Vec<ProcessTokenRef>,
+    /// Number of active tokens in this set.
+    pub active_count: u32,
+    /// Number of waiting tokens in this set.
+    pub waiting_count: u32,
+    /// Number of consumed tokens in this set.
+    pub consumed_count: u32,
+    /// Number of terminated tokens in this set.
+    pub terminated_count: u32,
+}
+
+/// Route set available to one gateway according to the runtime shape summary.
+pub struct GatewayRouteSet {
+    /// Gateway whose routes are described.
+    pub gateway_ref: GatewayRef,
+    /// Available route references for this gateway.
+    pub route_refs: Vec<GatewayRouteRef>,
+}
+```
+
+| 类型 | 字段闭环 | validation / policy 使用 |
+|---|---|---|
+| `RuntimeFeedbackSummary` | `feedback_summary_ref` 来自 request / inbound event;`runtime_feedback_ref` 来自 resolver marker;`activity_ref` 必须匹配 `Activity.activity_id`;`source_digest` 来自 source event / resolver | `assert_feedback_can_complete` 要求 `feedback_kind = Completion`、`feedback_state` 可用、activity 匹配;`assert_no_runtime_body` 要求 `contains_runtime_body = false` |
+| `TokenSet` | `token_set_ref` 必须匹配 `ProcessInstance.token_set_ref`;`token_refs` 来自 token repository / command candidate | gateway join 时 `token_refs` 必须非空且全部属于同一 `process_instance_id` |
+| `TokenSnapshot` | counts 和 `token_refs` 来自 token repository committed truth | counts 必须与 repository snapshot 一致;不得从 runtime queue 反推 |
+| `GatewayRouteSet` | `gateway_ref` 来自 `Gateway`;`route_refs` 来自 runtime shape summary / repository | `assert_route_allowed` 要求 route 属于 `route_refs`;空 route set 只能导致 policy reject |
 
 ### 8. domain truth / execution 对象契约
 
@@ -315,12 +440,12 @@ pub struct ProcessInstance {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn start(&mut self, profile: &ProcessProfile, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 启动实例 | active profile、actor | `Result<ActivityProgressionRecord, DomainError>` | `NotStarted` -> `Running` |
+| `pub fn start(&mut self, profile: &ProcessProfile, initial_activity_ref: ActivityRef, actor: ActorRef) -> Result<(), DomainError>` | 启动实例 | active profile、初始 activity ref、actor | `Result<(), DomainError>` | `NotStarted` -> `Running`;设置 `current_activity_ref = Some(initial_activity_ref)`;不生成 `ActivityProgressionRecord` |
 | `pub fn advance(&mut self, activity_ref: ActivityRef, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 推进当前活动 | activity ref、actor | `Result<ActivityProgressionRecord, DomainError>` | 仅 `Running` 可推进 |
-| `pub fn pause_for_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 进入等待 | waiting gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | `Running` -> `Waiting` |
-| `pub fn resume_from_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 从等待恢复 | resumed gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | `Waiting` -> `Running` |
-| `pub fn mark_recovering(&mut self, checkpoint: &ProcessCheckpoint, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 进入恢复 | checkpoint、actor | `Result<RecoveryHistoryRecord, DomainError>` | 非终态 -> `Recovering` |
-| `pub fn complete_recovery(&mut self, attempt: &RecoveryAttempt, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 完成恢复并回到运行 | 已 `Applied` 的 recovery attempt、actor | `Result<RecoveryHistoryRecord, DomainError>` | `Recovering` -> `Running`;不得创建第二份 instance |
+| `pub fn pause_for_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 进入等待 | waiting gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Running` -> `Waiting` |
+| `pub fn resume_from_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 从等待恢复 | resumed gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Waiting` -> `Running` |
+| `pub fn mark_recovering(&mut self, checkpoint: &ProcessCheckpoint, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 进入恢复 | checkpoint、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;非终态 -> `Recovering` |
+| `pub fn complete_recovery(&mut self, attempt: &RecoveryAttempt, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 完成恢复并回到运行 | 已 `Applied` 的 recovery attempt、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;`Recovering` -> `Running`;不得创建第二份 instance |
 | `pub fn complete(&mut self, actor: ActorRef) -> Result<ProcessTraceRecord, DomainError>` | 完成实例 | actor | `Result<ProcessTraceRecord, DomainError>` | `Running` -> `Completed` |
 | `pub fn cancel(&mut self, reason: ProcessCancelReason, actor: ActorRef) -> Result<ProcessTraceRecord, DomainError>` | 取消实例 | 原因、actor | `Result<ProcessTraceRecord, DomainError>` | 非终态 -> `Cancelled` |
 
@@ -361,6 +486,7 @@ pub enum ProcessInstanceState {
 不变量与禁止事项:
 
 - 不等同 Project / Work truth。
+- commit-03-a 只落 `NotStarted` / `Running` / `Completed` / `Cancelled` 运行子集;`Waiting` / `Recovering` / `Failed` 及对应方法为 PH-04 waiting/recovery boundary reserved,当前 domain tests 只需确认这些路径不可由 commit-03-a public flow 推进。
 - recovery 不创建第二份实例。
 - Query、consumer、projection、job 不得隐式创建或推进实例。
 

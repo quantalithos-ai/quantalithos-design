@@ -139,7 +139,7 @@ Step 15 observability and audit
 | `SyncRuntimeProcessShape_contract` | `SyncRuntimeProcessShapeFlow` | create / refresh success;duplicate replay;source unavailable;digest mismatch;no method body persisted | API + application |
 | `AdoptProcessProfile_contract` | `AdoptProcessProfileFlow` | profile adoption success;duplicate;shape retired rejected;work context mismatch;result store failure rollback | API + application |
 | `UpdateProcessProfileTailoring_contract` | `UpdateProcessProfileTailoringFlow` | switch tailoring success;duplicate;high-risk missing evidence;stale version conflict;retired profile reject | API + application |
-| `StartProcessInstance_contract` | `StartProcessInstanceFlow` | instance + initial activity / token / gateway success;duplicate;inactive profile;work context mismatch;missing start node | API + application |
+| `StartProcessInstance_contract` | `StartProcessInstanceFlow` | instance + initial activity / token / gateway success;`ProcessInstance::start(profile, initial_activity_ref, actor)` sets current activity;no bootstrap `ActivityProgressionRecord`;duplicate;inactive profile;work context mismatch;missing start node | API + application |
 | `AdvanceProcessActivity_contract` | `AdvanceProcessActivityFlow` | activity / token / gateway progression success;expected position conflict;invalid activity state;gateway invalid route;duplicate | API + application |
 | `RecordActivityFeedback_contract` | `RecordActivityFeedbackFlow` | feedback ref attach success;duplicate;feedback mismatch;runtime body rejected;unresolved feedback | API + application |
 | `OpenWaitingGate_contract` | `OpenWaitingGateFlow` | gate open success;duplicate;instance terminal;activity mismatch;missing resume requirement | API + application |
@@ -206,7 +206,7 @@ Step 15 observability and audit
 |---|---|---|---|
 | `runtime_process_shape_state_transitions` | `RuntimeProcessShapeState` | `DraftIndexed -> Active -> Stale -> Active`;invalid / retired paths;`Retired -> Active` 拒绝 | domain unit |
 | `process_profile_state_transitions` | `ProcessProfileState` | `Proposed -> Active -> Suspended -> Active`;switch shape;`Retired` 后拒绝 | domain unit |
-| `process_instance_state_transitions` | `ProcessInstanceState` | `NotStarted -> Running -> Waiting -> Running`;recovery path;terminal state 拒绝推进 | domain unit |
+| `process_instance_state_transitions` | `ProcessInstanceState` | commit-03-a:`NotStarted -> Running -> Completed / Cancelled` running subset and terminal guard;PH-04:`Waiting` / `Recovering` / `Failed` paths | domain unit |
 | `activity_state_transitions` | `ActivityState` | `Planned -> Ready -> InProgress -> WaitingFeedback -> Completed`;consumer 不可 direct complete | domain unit |
 | `token_state_transitions` | `TokenState` | `Active -> Waiting -> Active -> Consumed`;terminated token 不可 resume | domain unit |
 | `gateway_state_transitions` | `GatewayState` | `PendingDecision -> RouteSelected -> Joined`;invalid route -> `Invalid`;joined 后拒绝改 route | domain unit |

@@ -26,14 +26,14 @@
 | 9.1 | 文件骨架、SOP 问题回答、共享处理模板、处理流总表 | [x] |
 | 9.2 | 18 个 Command 函数级处理流 | [x] |
 | 9.3 | 8 个 Query 函数级处理流 | [x] |
-| 9.4 | 7 个 Inbound Event Consumer 和 9 个 Outbound Event 发布流 | [x] |
+| 9.4 | 7 个 Inbound Event Consumer 和 10 个 Outbound Event 发布流 | [x] |
 | 9.5 | 6 个 Operations Job、错误映射、闭环检查和回填草稿 | [x] |
 
 ### 4. SOP 问题回答
 
 1. 哪些协议必须拥有函数级处理流?
 
-   回答:Step 8 协议总表中标记“是否需要 Step 9 处理流 = 是”的 18 个 Command、8 个 Query、7 个 Inbound Event Consumer、9 个 Outbound Event 和 6 个 Operations Job 均必须拥有本 Step flow。Outbound Event 的 flow 是 outbox record 到 event payload 的发布转换流。
+   回答:Step 8 协议总表中标记“是否需要 Step 9 处理流 = 是”的 18 个 Command、8 个 Query、7 个 Inbound Event Consumer、10 个 Outbound Event 和 6 个 Operations Job 均必须拥有本 Step flow。Outbound Event 的 flow 是 outbox record 到 event payload 的发布转换流。
 
 2. 每个处理流的入口函数是什么?
 
@@ -100,7 +100,9 @@
   | save truth with expected_version when present
   | WorkTraceRecord::from_truth_change(trace_id, change, trace_context_ref)
   | WorkOutboxRecord::from_truth_change(outbox_id, change)
-  | ProjectionRepository.mark_stale(affected_views, cursor, &uow)
+  | ProjectionRepository.mark_stale(affected_views, cursor, &uow) when affected public DerivedWorkViewRef exists
+  | build command result surface with WorkCommandReceipt { idempotency: Applied, ... }
+  | CommandResultRepository.save_result(result_ref, StoredCommandResult::<kind>(result), &uow)
   | IdempotencyRepository.complete(reservation, result_ref, &uow)
   | UnitOfWork.commit()
 ```
@@ -115,7 +117,15 @@ let digest = RequestDigest::from_canonical_command_input(
 )?;
 let uow = unit_of_work.begin().await?;
 match idempotency.reserve(key, operation, digest, &uow).await? {
-    IdempotencyReservation::Duplicate(result_ref) => return load_duplicate_result(result_ref).await,
+    IdempotencyReservation::Duplicate(result_ref) => {
+        unit_of_work.rollback(uow).await?;
+        return command_results
+            .get_result(result_ref)
+            .await?
+            .and_then(|stored| stored.into_expected_result(operation))
+            .map(|result| result.with_duplicate_receipt())
+            .ok_or(ApplicationError::DuplicateResultMissing);
+    }
     IdempotencyReservation::Conflict(conflict) => {
         idempotency.mark_conflict(conflict, &uow).await?;
         unit_of_work.rollback(uow).await?;
@@ -131,7 +141,10 @@ Command 写路径不变量:
 - Domain 不访问 id generator、clock、repository、publisher 或 external resolver。
 - `WorkOutboxRecord` 只从 committed truth change 构造;publisher failure 不回滚 truth。
 - `ProjectionRepository.mark_stale(...)` 只标记 derived view freshness,不得改业务 truth。
-- duplicate 必须返回原 `ApplicationResultRef` 对应 result surface,不得重放 domain transition。
+- success path 必须先 `CommandResultRepository.save_result(...)`,再 `IdempotencyRepository.complete(...)`,二者与 truth / trace / outbox / stale marker 同一 UoW。
+- duplicate 必须通过 `CommandResultRepository.get_result(ApplicationResultRef)` 返回原 result surface,不得从当前 truth 现算,不得重放 domain transition。
+- duplicate replay 只把 receipt 的 `idempotency` surface 标记为 `Duplicate`;`result_ref`、primary ref、state、trace / outbox refs 和 applied version 必须保持原值。
+- `ApplicationResultRef` 缺失、result surface 缺失或 stored result variant 与当前 operation 不匹配时,返回 `ApplicationError::DuplicateResultMissing`。
 
 #### 6.2 Query 读路径模板
 
@@ -214,7 +227,7 @@ Outbound 不变量:
 | `RequestWorkPromotionFlow` | `RequestWorkPromotion` | `handle_request_work_promotion` | PromoteResult + audit + outbox | PromoteResult PendingReview,enqueue `PromoteResultRecorded` | `TC-WORK-PROMOTE-001` |
 | `ReviewWorkPromotionFlow` | `ReviewWorkPromotion` | `handle_review_work_promotion` | PromoteResult (+ WorkItem on accept) + audit + outbox | promote accepted/rejected,optional WorkItem Formalized | `TC-WORK-PROMOTE-002` |
 | `LinkWorkDependencyFlow` | `LinkWorkDependency` | `handle_link_work_dependency` | Dependency + history + audit + outbox | dependency Proposed/Active,enqueue `WorkDependencyChanged` | `TC-WORK-DEP-001` |
-| `UpdateWorkDependencyStateFlow` | `UpdateWorkDependencyState` | `handle_update_work_dependency_state` | Dependency + history + audit + outbox | dependency transition,enqueue `WorkDependencyChanged` | `TC-WORK-DEP-002` |
+| `UpdateWorkDependencyStateFlow` | `UpdateWorkDependencyState` | `handle_update_work_dependency_state` | Dependency + history + audit + outbox | dependency transition,enqueue `WorkDependencyChanged` | `TC-WORK-DEP-003` |
 | `OpenWorkBlockerFlow` | `OpenWorkBlocker` | `handle_open_work_blocker` | Blocker + history + audit + outbox | blocker Open,enqueue `WorkBlockerChanged` | `TC-WORK-BLOCKER-001` |
 | `ResolveWorkBlockerFlow` | `ResolveWorkBlocker` | `handle_resolve_work_blocker` | Blocker + history + audit + outbox | blocker Resolved,enqueue `WorkBlockerChanged` | `TC-WORK-BLOCKER-002` |
 | `OpenIterationFlow` | `OpenIteration` | `handle_open_iteration` | Iteration + audit + outbox | iteration Planning,enqueue `IterationChanged` | `TC-WORK-ITER-001` |
@@ -230,7 +243,7 @@ Outbound 不变量:
 | `GetWorkTraceFlow` | `GetWorkTrace` | `handle_get_work_trace` | none | trace page read | `TC-WORK-QUERY-007` |
 | `GetProjectBoardViewFlow` | `GetProjectBoardView` | `handle_get_project_board_view` | none | projection surface mapped | `TC-WORK-QUERY-008` |
 | inbound consumer flows | 7 inbound events | `consume_*` | snapshot/reference + idempotency | reference state saved,views stale when affected | `TC-WORK-INBOUND-*` |
-| outbound event flows | 9 outbound events | `publish_*_event` | publish marker only | outbox Published/Failed | `TC-WORK-OUTBOX-*` |
+| outbound event flows | 10 outbound events | `publish_*_event` | publish marker only | outbox Published/Failed | `TC-WORK-OUTBOX-*` |
 | operations job flows | 6 jobs | `run_*` | job-specific write UoW | reports / projection / handoff / outbox state | `TC-WORK-JOB-*` |
 
 ### 8. Command 函数级处理流
@@ -248,7 +261,10 @@ Outbound 不变量:
      -> Backlog::open_for_project(backlog_id, project.project_id, actor)
      -> ProjectRepository.create(project, &uow)
      -> BacklogRepository.create(backlog, &uow)
-     -> trace + outbox + stale views + idempotency complete
+     -> trace + outbox + stale views
+     -> ProjectCommandResult::from_project(... receipt Applied ...)
+     -> CommandResultRepository.save_result(result_ref, StoredCommandResult::Project(result), &uow)
+     -> IdempotencyRepository.complete(reservation, result_ref, &uow)
      -> UnitOfWork.commit()
 ```
 
@@ -262,16 +278,26 @@ let backlog = Backlog::open_for_project(backlog_id, project.project_id, actor)?;
 let project_version = project_repo.create(project, &uow).await?;
 backlog_repo.create(backlog, &uow).await?;
 let change = WorkTruthChange::project_created(project.project_ref());
-finalize_command(change, project_version, ProjectCommandResult::from_project).await?;
+let (trace_ref, outbox_refs) = append_trace_outbox_and_mark_stale(change, &uow).await?;
+let result_ref = ApplicationResultRef::for_operation(operation, ids.next_result_id()?);
+let result = ProjectCommandResult::from_project(
+    project.project_ref(),
+    project.lifecycle_state,
+    WorkCommandReceipt::applied(result_ref, trace_ref, outbox_refs, project_version),
+);
+command_results.save_result(result_ref, StoredCommandResult::Project(result.clone()), &uow).await?;
+idempotency.complete(reservation, result_ref, &uow).await?;
+unit_of_work.commit(uow).await?;
+return Ok(result);
 ```
 
 | 项 | 口径 |
 |---|---|
 | DTO -> Domain | `CreateProjectRequest.project_spec` 构造 `Project`;`ProjectId` / `BacklogId` 来自 `IdGeneratorPort` |
-| 事务边界 | project、backlog、audit、outbox、projection stale、idempotency complete 同一 UoW |
+| 事务边界 | project、backlog、audit、outbox、projection stale、command result save、idempotency complete 同一 UoW |
 | 错误映射 | 缺 idempotency -> `InvalidRequest`;id 生成失败 -> `TemporarilyUnavailable`;domain reject -> `DomainRejected`;repo fail -> rollback |
 | 状态 / 事件 | Project = `Active`;Backlog = `Open`;enqueue `ProjectChanged`;mark project board / facts stale |
-| 测试切口 | success creates project+backlog;duplicate returns same result;owner missing reject;outbox and trace written |
+| 测试切口 | success creates project+backlog;stored command result saved before idempotency complete;duplicate loads same result from `CommandResultRepository`;owner missing reject;outbox and trace written |
 
 #### 8.2 `UpdateProjectLifecycleFlow`
 
@@ -282,9 +308,9 @@ finalize_command(change, project_version, ProjectCommandResult::from_project).aw
      -> ProjectRepository.get(project_ref)
      -> ProjectLifecyclePolicy.assert_lifecycle_transition_allowed(...)
      -> Project.transition_lifecycle(target, reason, actor)
-     -> if Archived: BacklogRepository.get_by_project + Backlog.archive_with_project(...)
+     -> if Archived: BacklogRepository.get_by_project_with_version + Backlog.archive_with_project(...)
      -> ProjectRepository.save(project, expected_version, &uow)
-     -> optional BacklogRepository.save(backlog, expected_version, &uow)
+     -> optional BacklogRepository.save(backlog, current_backlog_version, &uow)
      -> trace + ProjectChanged outbox + stale views + complete
 ```
 
@@ -294,7 +320,10 @@ let mut project = project_repo.get(request.project_ref).await?.ok_or(Application
 ProjectLifecyclePolicy::assert_lifecycle_transition_allowed(&project, request.target, request.reason, actor)?;
 project.transition_lifecycle(request.target, request.reason, actor)?;
 if request.target.is_archived() {
-    let mut backlog = backlog_repo.get_by_project(request.project_ref).await?.ok_or(ApplicationError::NotFound)?;
+    let (mut backlog, current_backlog_version) = backlog_repo
+        .get_by_project_with_version(request.project_ref)
+        .await?
+        .ok_or(ApplicationError::NotFound)?;
     backlog.archive_with_project(request.project_ref, actor)?;
     backlog_repo.save(backlog, current_backlog_version, &uow).await?;
 }
@@ -307,6 +336,7 @@ let version = project_repo.save(project, request.expected_version, &uow).await?;
 | 事务边界 | project save、archive 联动 backlog、audit、outbox、stale、idempotency complete 同一 UoW |
 | 错误映射 | project missing -> `NotFound`;version mismatch -> `VersionConflict`;Archived 后普通写 reject |
 | 状态 / 事件 | Project lifecycle 迁移;archive path 联动 Backlog `Archived`;enqueue `ProjectChanged` |
+| Backlog version 来源 | archive 联动是 service 内部级联写路径,不要求 public request 携带 `expected_backlog_version`;`current_backlog_version` 必须来自 `BacklogRepository.get_by_project_with_version(project_ref)` |
 | 测试切口 | valid transition;invalid transition;archive cascades backlog;version conflict rollback |
 
 #### 8.3 `UpdateBacklogAvailabilityFlow`
@@ -558,9 +588,9 @@ let version = promote_repo.create(result, &uow).await?;
 | 项 | 口径 |
 |---|---|
 | DTO -> Domain | `SourceWorkRef` resolver 成功后才构造 `PromoteResult`;generated `PromoteResultId` |
-| 事务边界 | promote create、audit、outbox、idempotency complete 同一 UoW |
+| 事务边界 | promote create、audit、outbox、command result save、idempotency complete 同一 UoW;当前 P0 无 promote/intake public projection,不 mark projection stale |
 | 错误映射 | source unresolved -> `ExternalReferenceUnresolved`;existing open promote -> `DomainRejected`;resolver body leak -> `DomainRejected` |
-| 状态 / 事件 | PromoteResult `PendingReview`;enqueue `PromoteResultRecorded` |
+| 状态 / 事件 | PromoteResult `PendingReview`;enqueue `PromoteResultRecorded`;不标记不存在的 promote / intake projection stale |
 | 测试切口 | request promote;duplicate source reject;source unresolved;idempotency duplicate |
 
 #### 8.10 `ReviewWorkPromotionFlow`
@@ -584,6 +614,7 @@ let version = promote_repo.create(result, &uow).await?;
      -> PromoteRepository.save(result, expected_version, &uow)
      -> PromoteDecisionRecord::from_result(decision_id, result, actor)
      -> append decision + trace + outbox
+     -> if Accept created formal work: mark existing work views stale
 ```
 
 ```rust
@@ -601,7 +632,12 @@ match request.decision {
         backlog_repo.add_formal_work(backlog.backlog_ref(), work.formal_ref(), &uow).await?;
         result.accept(work.formal_ref(), actor)?;
     }
-    PromoteReviewDecision::Reject(reason) => result.reject(reason, actor)?,
+    PromoteReviewDecision::Reject(reason) => {
+        if request.accepted_work_intent.is_some() {
+            return Err(ApplicationError::InvalidRequest);
+        }
+        result.reject(reason, actor)?;
+    }
 }
 let version = promote_repo.save(result, request.expected_version, &uow).await?;
 let decision_id = ids.next_promote_decision_id()?;
@@ -611,10 +647,10 @@ promote_repo.append_decision(decision, &uow).await?;
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | accept path 必须有 `accepted_work_intent`;reject path 不创建 work |
-| 事务边界 | promote save、optional work create、backlog membership、decision history、audit、outbox、idempotency complete 同一 UoW |
-| 错误映射 | promote missing -> `NotFound`;accept without intent -> `InvalidRequest`;invalid transition -> `DomainRejected`;version conflict -> `VersionConflict` |
-| 状态 / 事件 | PromoteResult `Accepted` / `Rejected`;accept path WorkItem `Formalized`;enqueue promote + work events |
+| DTO -> Domain | accept path 必须有 `accepted_work_intent`;reject path 从 `PromoteReviewDecision::Reject(reason)` 取得 `PromoteRejectReason`,且不得携带 `accepted_work_intent`;reject path 不创建 work |
+| 事务边界 | promote save、optional work create、backlog membership、decision history、audit、outbox、command result save、idempotency complete 同一 UoW;accept 创建 / 绑定 formal work 时同步 mark 既有 work views stale;reject path 不 mark projection stale |
+| 错误映射 | promote missing -> `NotFound`;accept without intent -> `InvalidRequest`;reject with accepted intent -> `InvalidRequest`;invalid transition -> `DomainRejected`;version conflict -> `VersionConflict` |
+| 状态 / 事件 | PromoteResult `Accepted` / `Rejected`;accept path WorkItem `Formalized`;enqueue promote + optional work events;只有 accept 影响 `ProjectBoardView` / `MemberWorkView` / `WorkSearchResult` 等既有 public views |
 | 测试切口 | accept creates work;reject no work;accept missing intent reject;decision history appended |
 
 #### 8.11 `LinkWorkDependencyFlow`
@@ -625,11 +661,13 @@ promote_repo.append_decision(decision, &uow).await?;
      -> reserve idempotency in UoW
      -> WorkItemRepository.get_formal_work(upstream)
      -> WorkItemRepository.get_formal_work(downstream)
-     -> DependencyRepository.load_graph_snapshot(project_ref)
-     -> DependencyGraphPolicy.assert_can_link(upstream, downstream)
+     -> WorkItemRepository.get_formal_work_scope(downstream)
+     -> DependencyRepository.load_graph_snapshot(scope.project_ref)
+     -> DependencyGraphPolicy.assert_can_link(graph, upstream, downstream)
      -> IdGeneratorPort.next_work_dependency_id()
      -> WorkDependency::link(dependency_id, upstream, downstream, reason)
-     -> WorkDependency.activate(actor, reason)
+     -> DependencyChangeReason::from_link_reason(reason)
+     -> WorkDependency.activate(actor, activation_reason)
      -> DependencyRepository.create_dependency(...)
      -> DependencyChangeRecord::from_dependency_change(...)
      -> audit + WorkDependencyChanged outbox + stale
@@ -639,23 +677,28 @@ promote_repo.append_decision(decision, &uow).await?;
 // DependencyBlockerService::link_dependency(WorkCommandEnvelope<LinkWorkDependencyRequest> envelope)
 ensure_formal_work_exists(request.upstream_work_ref).await?;
 ensure_formal_work_exists(request.downstream_work_ref).await?;
-let graph = dependency_repo.load_graph_snapshot(project_ref_from(request.downstream_work_ref)).await?;
-DependencyGraphPolicy::assert_can_link(request.upstream_work_ref, request.downstream_work_ref)?;
+let downstream_scope = work_repo.get_formal_work_scope(request.downstream_work_ref).await?.ok_or(ApplicationError::NotFound)?;
+let graph = dependency_repo.load_graph_snapshot(downstream_scope.project_ref).await?;
+ensure_graph_scope(&graph, downstream_scope.project_ref)?;
+DependencyGraphPolicy::assert_can_link(&graph, request.upstream_work_ref, request.downstream_work_ref)?;
 let dependency_id = ids.next_work_dependency_id()?;
-let mut dependency = WorkDependency::link(dependency_id, request.upstream_work_ref, request.downstream_work_ref, request.reason)?;
-dependency.activate(actor, request.reason)?;
+let link_reason = request.reason;
+let activation_reason = DependencyChangeReason::from_link_reason(link_reason.clone());
+let mut dependency = WorkDependency::link(dependency_id, request.upstream_work_ref, request.downstream_work_ref, link_reason)?;
+dependency.activate(actor, activation_reason.clone())?;
 let version = dependency_repo.create_dependency(dependency, &uow).await?;
 let change_id = ids.next_dependency_change_id()?;
-let history = DependencyChangeRecord::from_dependency_change(change_id, dependency, request.reason.into())?;
+let history = DependencyChangeRecord::from_dependency_change(change_id, dependency, activation_reason)?;
 dependency_repo.append_change(history, &uow).await?;
+projection_repo.mark_stale(affected_relation_views(&downstream_scope), current_cursor(), &uow).await?;
 ```
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | upstream/downstream 必须是不同正式工作;graph snapshot 只用于 policy |
+| DTO -> Domain | upstream/downstream 必须是不同正式工作;graph snapshot project scope 只能来自 `WorkItemRepository.get_formal_work_scope(downstream)`;`graph.project_ref` 必须匹配 downstream scope;不得实现 `project_ref_from(FormalWorkRef)` |
 | 事务边界 | dependency create、history、audit、outbox、stale、idempotency complete 同一 UoW |
 | 错误映射 | work missing -> `NotFound`;cycle/orphan -> `DomainRejected` |
-| 状态 / 事件 | Dependency `Active`;enqueue `WorkDependencyChanged` |
+| 状态 / 事件 | Dependency `Active`;enqueue `WorkDependencyChanged`;stale views = `project-board:{downstream_scope.project_ref}` plus `member-work:{downstream_scope.assignee_ref}` when `assignee_ref` is known;dependency / blocker relation 不进入 `WorkSearchProjection`,不得为本 flow 伪造 `work-search:*` |
 | 测试切口 | link success;self dependency reject;cycle reject;missing work reject |
 
 #### 8.12 `UpdateWorkDependencyStateFlow`
@@ -665,8 +708,9 @@ dependency_repo.append_change(history, &uow).await?;
   -> DependencyBlockerService.update_dependency_state(envelope)
      -> reserve idempotency in UoW
      -> DependencyRepository.get_dependency(dependency_ref)
+     -> WorkItemRepository.get_formal_work_scope(dependency.downstream_work_ref)
      -> optional EvidenceResolverPort.resolve_evidence(evidence_ref)
-     -> WorkDependency.mark_satisfied(...) / waive(...) / cancel(...)
+     -> WorkDependency.activate(...) / mark_satisfied(...) / waive(...) / cancel(...)
      -> DependencyRepository.save_dependency(dependency, expected_version, &uow)
      -> append DependencyChangeRecord
      -> audit + WorkDependencyChanged outbox + stale
@@ -675,26 +719,45 @@ dependency_repo.append_change(history, &uow).await?;
 ```rust
 // DependencyBlockerService::update_dependency_state(WorkCommandEnvelope<UpdateWorkDependencyStateRequest> envelope)
 let mut dependency = dependency_repo.get_dependency(request.dependency_ref).await?.ok_or(ApplicationError::NotFound)?;
+let downstream_scope = work_repo.get_formal_work_scope(dependency.downstream_work_ref).await?.ok_or(ApplicationError::NotFound)?;
+let change_reason = request.reason;
 match request.target {
+    DependencyTarget::Active => {
+        ensure_reason_kind(&change_reason, DependencyChangeReasonKind::Activated)?;
+        ensure_formal_work_exists(dependency.upstream_work_ref).await?;
+        ensure_formal_work_exists(dependency.downstream_work_ref).await?;
+        dependency.activate(actor, change_reason.clone())?;
+    }
     DependencyTarget::Satisfied => {
+        ensure_reason_kind(&change_reason, DependencyChangeReasonKind::SatisfiedByEvidence)?;
         let evidence_ref = request.evidence_ref.ok_or(ApplicationError::InvalidRequest)?;
         let evidence = evidence_resolver.resolve_evidence(evidence_ref).await?;
         CompletionEvidencePolicy::assert_completion_evidence(dependency.downstream_work_ref, evidence.evidence_ref)?;
         dependency.mark_satisfied(evidence_ref, actor)?;
     }
-    DependencyTarget::Waived => dependency.waive(request.reason, actor)?,
-    DependencyTarget::Cancelled => dependency.cancel(request.reason, actor)?,
+    DependencyTarget::Waived => {
+        ensure_reason_kind(&change_reason, DependencyChangeReasonKind::Waived)?;
+        dependency.waive(change_reason.clone(), actor)?;
+    }
+    DependencyTarget::Cancelled => {
+        ensure_reason_kind(&change_reason, DependencyChangeReasonKind::Cancelled)?;
+        dependency.cancel(change_reason.clone(), actor)?;
+    }
 }
 let version = dependency_repo.save_dependency(dependency, request.expected_version, &uow).await?;
+let change_id = ids.next_dependency_change_id()?;
+let history = DependencyChangeRecord::from_dependency_change(change_id, dependency, change_reason)?;
+dependency_repo.append_change(history, &uow).await?;
+projection_repo.mark_stale(affected_relation_views(&downstream_scope), current_cursor(), &uow).await?;
 ```
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | `target` 决定 domain transition;Satisfied 必须有 verified evidence |
+| DTO -> Domain | `target` 决定 domain transition;`Active` 只允许 `Proposed -> Active` 且 `reason.kind = Activated`;`Satisfied` 必须有 verified evidence;terminal target 的 `reason.kind` 必须与 target 同族匹配;stale scope 来自 dependency.downstream 的 `FormalWorkScope` |
 | 事务边界 | dependency save、history、audit、outbox、stale、idempotency complete 同一 UoW |
-| 错误映射 | dependency missing -> `NotFound`;evidence unresolved -> `ExternalReferenceUnresolved`;invalid transition -> `DomainRejected` |
-| 状态 / 事件 | Dependency `Satisfied` / `Waived` / `Cancelled`;enqueue `WorkDependencyChanged` |
-| 测试切口 | satisfied requires evidence;waive;cancel;version conflict |
+| 错误映射 | dependency missing -> `NotFound`;reason kind mismatch -> `InvalidRequest`;evidence unresolved -> `ExternalReferenceUnresolved`;invalid transition -> `DomainRejected` |
+| 状态 / 事件 | Dependency `Active` / `Satisfied` / `Waived` / `Cancelled`;enqueue `WorkDependencyChanged`;stale views = downstream project-board + resolvable downstream member-work only |
+| 测试切口 | activate from Proposed;satisfied requires evidence;waive;cancel;terminal reopen reject;version conflict |
 
 #### 8.13 `OpenWorkBlockerFlow`
 
@@ -703,6 +766,7 @@ let version = dependency_repo.save_dependency(dependency, request.expected_versi
   -> DependencyBlockerService.open_blocker(envelope)
      -> reserve idempotency in UoW
      -> WorkItemRepository.get_formal_work(blocked_work_ref)
+     -> WorkItemRepository.get_formal_work_scope(blocked_work_ref)
      -> IdGeneratorPort.next_work_blocker_id()
      -> WorkBlocker::open(blocker_id, blocked_work_ref, cause_ref, actor)
      -> DependencyRepository.create_blocker(blocker, &uow)
@@ -713,6 +777,7 @@ let version = dependency_repo.save_dependency(dependency, request.expected_versi
 ```rust
 // DependencyBlockerService::open_blocker(WorkCommandEnvelope<OpenWorkBlockerRequest> envelope)
 ensure_formal_work_exists(request.blocked_work_ref).await?;
+let blocked_scope = work_repo.get_formal_work_scope(request.blocked_work_ref).await?.ok_or(ApplicationError::NotFound)?;
 let blocker_id = ids.next_work_blocker_id()?;
 let blocker = WorkBlocker::open(blocker_id, request.blocked_work_ref, request.cause_ref, actor)?;
 let version = dependency_repo.create_blocker(blocker, &uow).await?;
@@ -720,14 +785,15 @@ let change_id = ids.next_dependency_change_id()?;
 let reason = DependencyChangeReason::from_blocker_cause(request.cause_ref);
 let history = DependencyChangeRecord::from_blocker_change(change_id, blocker, reason)?;
 dependency_repo.append_change(history, &uow).await?;
+projection_repo.mark_stale(affected_relation_views(&blocked_scope), current_cursor(), &uow).await?;
 ```
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | `blocked_work_ref` must exist;`cause_ref` remains external ref / summary pointer only |
+| DTO -> Domain | `blocked_work_ref` must exist;`cause_ref` remains external ref / summary pointer only;stale scope 来自 `WorkItemRepository.get_formal_work_scope(blocked_work_ref)` |
 | 事务边界 | blocker create、history、audit、outbox、stale、idempotency complete 同一 UoW |
 | 错误映射 | blocked work missing -> `NotFound`;invalid cause -> `DomainRejected` |
-| 状态 / 事件 | Blocker `Open`;enqueue `WorkBlockerChanged` |
+| 状态 / 事件 | Blocker `Open`;enqueue `WorkBlockerChanged`;stale views = blocked project-board + resolvable blocked member-work only |
 | 测试切口 | open blocker;missing work reject;external body not stored;duplicate |
 
 #### 8.14 `ResolveWorkBlockerFlow`
@@ -737,6 +803,7 @@ dependency_repo.append_change(history, &uow).await?;
   -> DependencyBlockerService.resolve_blocker(envelope)
      -> reserve idempotency in UoW
      -> DependencyRepository.get_blocker(blocker_ref)
+     -> WorkItemRepository.get_formal_work_scope(blocker.blocked_work_ref)
      -> EvidenceResolverPort.resolve_evidence(evidence_ref)
      -> WorkBlocker.resolve(evidence_ref, actor)
      -> DependencyRepository.save_blocker(blocker, expected_version, &uow)
@@ -747,19 +814,36 @@ dependency_repo.append_change(history, &uow).await?;
 ```rust
 // DependencyBlockerService::resolve_blocker(WorkCommandEnvelope<ResolveWorkBlockerRequest> envelope)
 let mut blocker = dependency_repo.get_blocker(request.blocker_ref).await?.ok_or(ApplicationError::NotFound)?;
+let blocked_scope = work_repo.get_formal_work_scope(blocker.blocked_work_ref).await?.ok_or(ApplicationError::NotFound)?;
 let evidence = evidence_resolver.resolve_evidence(request.evidence_ref).await?;
 CompletionEvidencePolicy::assert_completion_evidence(blocker.blocked_work_ref, evidence.evidence_ref)?;
 blocker.resolve(request.evidence_ref, actor)?;
+assert_eq!(blocker.resolved_evidence_ref, Some(request.evidence_ref));
 let version = dependency_repo.save_blocker(blocker, request.expected_version, &uow).await?;
+projection_repo.mark_stale(affected_relation_views(&blocked_scope), current_cursor(), &uow).await?;
 ```
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | `evidence_ref` 必填且 verified;blocker must be open/mitigating |
+| DTO -> Domain | `evidence_ref` 必填且 verified;blocker must be open/mitigating;stale scope 来自 blocker.blocked_work_ref 的 `FormalWorkScope` |
 | 事务边界 | blocker save、history、audit、outbox、stale、idempotency complete 同一 UoW |
 | 错误映射 | blocker missing -> `NotFound`;evidence unresolved -> `ExternalReferenceUnresolved`;closed blocker reject |
-| 状态 / 事件 | Blocker `Resolved`;enqueue `WorkBlockerChanged` |
+| 状态 / 事件 | Blocker `Resolved`;`resolved_evidence_ref = Some(evidence_ref)`;enqueue `WorkBlockerChanged`;stale views = blocked project-board + resolvable blocked member-work only |
 | 测试切口 | resolve success;unverified evidence reject;closed blocker reject;version conflict |
+
+Dependency / blocker relation stale helper:
+
+```rust
+fn affected_relation_views(scope: &FormalWorkScope) -> Vec<DerivedWorkViewRef> {
+    let mut views = vec![project_board_view_ref(scope.project_ref.clone())];
+    if let Some(member_ref) = scope.assignee_ref.clone() {
+        views.push(member_work_view_ref(member_ref));
+    }
+    views
+}
+```
+
+`affected_relation_views(...)` 只能返回 Step 8 §9.2 已定义的 public view ref。Dependency / blocker relation summary 不进入 `WorkSearchProjection` 字段,所以当前 P0 不标记 `work-search:{project_id}:{criteria_digest}`。若后续 search projection 增加 relation filter / relation state 字段,必须先在 Step 8 补对应 criteria / projection schema 和 stable key 规则,再把 search view 加入该 helper。
 
 #### 8.15 `OpenIterationFlow`
 
@@ -875,8 +959,8 @@ iteration_repo.append_change(history, &uow).await?;
      -> reserve idempotency in UoW
      -> IterationRepository.get_iteration(iteration_ref)
      -> if Close: IterationRepository.get_commitment(iteration_ref)
-     -> Iteration.start(reason, actor) / close(reason, actor) / cancel(reason, actor)
-     -> if Close: IterationCommitment.close(reason, actor)
+     -> Iteration.start(change_reason, actor) / close(close_reason, actor) / cancel(change_reason, actor)
+     -> if Close: IterationCommitment.close(close_reason, actor)
      -> save iteration + optional commitment
      -> append IterationChangeRecord
      -> audit + IterationChanged outbox + stale
@@ -886,23 +970,30 @@ iteration_repo.append_change(history, &uow).await?;
 // IterationCommandService::update_iteration_lifecycle(WorkCommandEnvelope<UpdateIterationLifecycleRequest> envelope)
 let mut iteration = iteration_repo.get_iteration(request.iteration_ref).await?.ok_or(ApplicationError::NotFound)?;
 match request.target {
-    IterationLifecycleTarget::Start => iteration.start(request.reason, actor)?,
-    IterationLifecycleTarget::Close => {
+    IterationLifecycleTarget::InProgress => {
+        let reason = require_change_reason(request.change_reason, request.close_reason)?;
+        iteration.start(reason, actor)?;
+    }
+    IterationLifecycleTarget::Closed => {
+        let reason = require_close_reason(request.close_reason, request.change_reason)?;
         let mut commitment = iteration_repo.get_commitment(request.iteration_ref).await?.ok_or(ApplicationError::NotFound)?;
-        iteration.close(request.reason.into_close_reason(), actor)?;
-        commitment.close(request.reason, actor)?;
+        iteration.close(reason.clone(), actor)?;
+        commitment.close(reason, actor)?;
         iteration_repo.save_commitment(commitment, Some(current_commitment_version), &uow).await?;
     }
-    IterationLifecycleTarget::Cancel => iteration.cancel(request.reason, actor)?,
+    IterationLifecycleTarget::Cancelled => {
+        let reason = require_change_reason(request.change_reason, request.close_reason)?;
+        iteration.cancel(reason, actor)?;
+    }
 }
 let version = iteration_repo.save_iteration(iteration, request.expected_version, &uow).await?;
 ```
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | `target` 映射到 start/close/cancel;close path 必须加载 commitment |
+| DTO -> Domain | `target = InProgress` / `Cancelled` 必须提供 `change_reason` 且禁止 `close_reason`;`target = Closed` 必须提供 `close_reason` 且禁止 `change_reason`;close path 必须加载 commitment |
 | 事务边界 | iteration save、optional commitment save、history、audit、outbox、stale、idempotency complete 同一 UoW |
-| 错误映射 | iteration missing -> `NotFound`;close without commitment -> `DomainRejected`;invalid transition -> `DomainRejected`;version conflict |
+| 错误映射 | iteration missing -> `NotFound`;target/reason 组合非法 -> `InvalidInput`;close without commitment -> `DomainRejected`;invalid transition -> `DomainRejected`;version conflict |
 | 状态 / 事件 | Iteration `InProgress` / `Closed` / `Cancelled`;close path Commitment `Closed`;enqueue `IterationChanged` |
 | 测试切口 | start;close closes commitment;cancel;invalid transition;duplicate |
 
@@ -1222,7 +1313,7 @@ projection_repo.mark_stale(affected_method_views(envelope.payload.definition_ref
      -> ReferenceResolutionState::unresolved(ExternalReferenceRef::from_source_work(source_ref))
      -> optionally mark_resolved when digest matches source_digest contract
      -> save reference state / pending source marker
-     -> mark affected promote intake views stale
+     -> mark affected existing public work views stale when source_ref already participates in board/member/search projections;otherwise no projection stale
 ```
 
 ```rust
@@ -1233,16 +1324,19 @@ if digest_matches(envelope.payload.source_ref.source_digest, envelope.payload.so
     state.mark_resolved(envelope.occurred_at)?;
 }
 reference_repo.save_reference_state(state, None, &uow).await?;
-projection_repo.mark_stale(affected_source_views(envelope.payload.source_ref), truth_cursor_from_event(&envelope), &uow).await?;
+let affected = affected_existing_source_work_views(envelope.payload.source_ref)?;
+if !affected.is_empty() {
+    projection_repo.mark_stale(affected, truth_cursor_from_event(&envelope), &uow).await?;
+}
 ```
 
 | 项 | 口径 |
 |---|---|
 | Event -> Domain | `SourceWorkRef` 只保存 ref/digest,不保存 conversation body |
-| 事务边界 | reference state、pending source marker、stale、idempotency complete 同一 UoW |
+| 事务边界 | reference state、pending source marker、projection stale only when existing public work views are affected、idempotency complete 同一 UoW |
 | 错误映射 | missing source -> `DeadLetter`;digest mismatch -> unresolved state,不创建 Work truth |
-| 状态 / 事件 | source reference unresolved/resolved marker;不创建 PromoteResult |
-| 测试切口 | source marker;digest mismatch;missing source dead-letter;duplicate |
+| 状态 / 事件 | source reference unresolved/resolved marker;不创建 PromoteResult;不创建 promote / intake projection identity |
+| 测试切口 | source marker;digest mismatch;missing source dead-letter;duplicate;no ad hoc promote/intake view ref |
 
 #### 10.4 `ConsumeProcessTimingChangedFlow`
 
@@ -1371,9 +1465,9 @@ promote_repo.save_pending_intake(intake, &uow).await?;
 | 项 | 口径 |
 |---|---|
 | Event -> Domain | runtime source request 形成 pending intake,不调用 `PromoteResult::evaluate` |
-| 事务边界 | reference state、pending intake marker、idempotency complete 同一 UoW |
+| 事务边界 | reference state、pending intake marker、idempotency complete 同一 UoW;pending intake 无 public projection identity,不 mark projection stale |
 | 错误映射 | missing source/reason -> `DeadLetter`;source unresolved -> unresolved / retry by consumer policy |
-| 状态 / 事件 | no Work truth change;不 enqueue `PromoteResultRecorded` |
+| 状态 / 事件 | no Work truth change;不 enqueue `PromoteResultRecorded`;不创建 promote / intake projection identity |
 | 测试切口 | pending intake;source unresolved;missing reason dead-letter;no promote truth created |
 
 ### 11. Outbound Event 发布流
@@ -1396,6 +1490,7 @@ promote_repo.save_pending_intake(intake, &uow).await?;
 // WorkOutboxPublishService::publish_one(WorkOutboxRecord record)
 let publication = match record.event_kind {
     WorkOutboxEventKind::ProjectChanged => publish_project_changed(record).await,
+    WorkOutboxEventKind::BacklogChanged => publish_backlog_changed(record).await,
     WorkOutboxEventKind::ProjectMemberChanged => publish_project_member_changed(record).await,
     WorkOutboxEventKind::WorkItemChanged => publish_work_item_changed(record).await,
     WorkOutboxEventKind::PromoteResultRecorded => publish_promote_result_recorded(record).await,
@@ -1413,11 +1508,12 @@ mark_publication_result(record, publication).await?;
 | Event | Payload builder | Topic | Source object | Failure behavior | 测试切口 |
 |---|---|---|---|---|---|
 | `ProjectChanged` | `ProjectChangedEvent::from_project(project, reason)` | `work.project.changed.v1` | `Project` truth loaded by outbox ref | mark failed,do not rollback truth | payload fields,topic,mark published |
+| `BacklogChanged` | `BacklogChangedEvent::from_backlog(backlog, reason)` | `work.backlog.changed.v1` | `Backlog` truth loaded by outbox ref | mark failed,do not rollback truth | payload fields,topic,mark published |
 | `ProjectMemberChanged` | `ProjectMemberChangedEvent::from_member(member)` | `work.project_member.changed.v1` | `ProjectMember` truth | mark failed | payload member/global distinction |
 | `WorkItemChanged` | `WorkItemChangedEvent::from_formal_work(record)` | `work.formal_work.changed.v1` | `FormalWorkRecord` | mark failed | root/child payload |
 | `PromoteResultRecorded` | `PromoteResultRecordedEvent::from_result(result)` | `work.promote_result.recorded.v1` | `PromoteResult` | mark failed | accepted/rejected payload |
 | `WorkDependencyChanged` | `WorkDependencyChangedEvent::from_dependency(dependency)` | `work.dependency.changed.v1` | `WorkDependency` | mark failed | upstream/downstream/state |
-| `WorkBlockerChanged` | `WorkBlockerChangedEvent::from_blocker(blocker)` | `work.blocker.changed.v1` | `WorkBlocker` | mark failed | resolved evidence optional |
+| `WorkBlockerChanged` | `WorkBlockerChangedEvent::from_blocker(blocker)` | `work.blocker.changed.v1` | `WorkBlocker` | mark failed | `evidence_ref` 从 `WorkBlocker.resolved_evidence_ref` 派生,不读取 evidence body |
 | `IterationChanged` | `IterationChangedEvent::from_iteration(iteration, commitment)` | `work.iteration.changed.v1` | `Iteration` / `IterationCommitment` | mark failed | commitment optional |
 | `WorkTraceAvailable` | `WorkTraceAvailableEvent::from_trace(trace, handoff_ref)` | `work.trace.available.v1` | `WorkTraceRecord` / handoff marker | mark failed | handoff optional |
 | `DerivedWorkViewChanged` | `DerivedWorkViewChangedEvent::from_state(state)` | `work.derived_view.changed.v1` | `DerivedWorkViewState` | mark failed | freshness/cursor payload |
@@ -1617,7 +1713,7 @@ let report = ReconciliationReport::from_gaps(input.scope_ref, truth_cursor, proj
 // WorkTraceHandoffService::prepare_work_trace_handoff(PrepareWorkTraceHandoffJobInput input)
 let records = audit_repo.list_trace_records(input.subject_ref, handoff_page()).await?;
 for record in records.items {
-    let intent = record.prepare_handoff(input.target_ref.into_archive_ref())?;
+    let intent = record.prepare_handoff(input.target_ref)?;
     let handoff_ref = trace_handoff.prepare_trace_handoff(intent).await?;
     let marker = TraceHandoffMarker::from_trace(record.trace_id, handoff_ref)?;
     audit_repo.save_trace_handoff_marker(marker, &uow).await?;
@@ -1668,7 +1764,7 @@ audit_repo.save_archive_handoff_marker(marker, &uow).await?;
 |---|---|---|---|---|---|---|
 | envelope / metadata 缺失 | handler / runner | `InvalidRequest` | `InvalidRequest` | `DeadLetter` | 不适用 | `InvalidRequest` |
 | idempotency key 缺失 | handler / runner | `InvalidRequest` | 不适用 | `DeadLetter` / reject | 不适用 | `InvalidRequest` |
-| idempotency duplicate | service | 返回既有 result | 不适用 | ack duplicate | skip publish duplicate marker | 返回既有 report |
+| idempotency duplicate | service | 通过 `CommandResultRepository.get_result` 返回既有 result | 不适用 | ack duplicate | skip publish duplicate marker | 返回既有 report |
 | idempotency conflict | service | rollback + `IdempotencyConflict` | 不适用 | dead-letter / conflict marker | 不适用 | rollback + reject |
 | repository none | service | `NotFound` | `Missing` surface | unresolved / failed marker | mark failed if payload source missing | failed report |
 | domain reject | domain method / policy | rollback + `DomainRejected` | 不适用 | unresolved / dead-letter by consumer policy | mark failed | failed report |

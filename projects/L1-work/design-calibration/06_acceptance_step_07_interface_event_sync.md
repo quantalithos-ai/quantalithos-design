@@ -24,7 +24,7 @@
 已确认结论:
 
 ```text
-P0 接口验收必须覆盖 18 Command、8 Query、7 Inbound Event Consumer、9 Outbound Event 和 6 Operations Job。
+P0 接口验收必须覆盖 18 Command、8 Query、7 Inbound Event Consumer、10 Outbound Event 和 6 Operations Job。
 除 core-contracts 外,跨仓协作不得要求源码或 package 直接依赖。
 下游仓未就绪时,用 fake adapter、controlled replay、event dump、handoff marker 和 report evidence 验接缝,不得伪装成真实下游验收通过。
 ```
@@ -164,10 +164,10 @@ Operations Job 必须证明:
 | `IF-WORK-CMD-008` | `UpdateWorkItemLifecycle` | `[runtime] artifact / evidence resolver` | API -> evidence policy -> domain state transition | work lifecycle 合法推进,完成依据 ref 可接受 | missing / rejected evidence 仍完成;保存 evidence body | `TC-WORK-DEP-005`;`TC-WORK-FORMAL-*`;`EV-WORK-DEP-005`;`EV-WORK-FORMAL-*` |
 | `IF-WORK-CMD-009` | `RequestWorkPromotion` | `[runtime] conversation / runtime source resolver` | API -> promote service -> repository | `PromoteResultState::PendingReview`,不创建 Work truth | request 阶段创建 WorkItem;保存 runtime / ImplementationPlan 正文 | `TC-WORK-PROMOTE-001`;`TC-WORK-PROMOTE-004`;`EV-WORK-PROMOTE-001`;`EV-WORK-PROMOTE-004` |
 | `IF-WORK-CMD-010` | `ReviewWorkPromotion` | `[runtime] source resolver` | API -> promote review -> optional work creation | accept / reject 显式记录;accept 后创建或绑定 WorkItem;并发 single-winner | reject 创建 WorkItem;并发 review 多赢家;正文入仓 | `TC-WORK-PROMOTE-002`;`TC-WORK-PROMOTE-003`;`TC-WORK-PROMOTE-005`;`EV-WORK-PROMOTE-*` |
-| `IF-WORK-CMD-011` | `LinkWorkDependency` | 本仓 runtime | API -> dependency graph policy -> repository | dependency 连接正式 Work,history / trace / outbox 成立 | cycle 成功;非 formal work 成为 dependency endpoint | `TC-WORK-DEP-001`;`TC-WORK-DEP-002`;`EV-WORK-DEP-001`;`EV-WORK-DEP-002` |
-| `IF-WORK-CMD-012` | `UpdateWorkDependencyState` | `[runtime] evidence resolver` | API -> dependency state transition | dependency 状态合法推进,terminal 后不可 reopen | terminal reopen 成功;缺 evidence / reason 仍满足 | `TC-WORK-DEP-003`;`EV-WORK-DEP-003` |
-| `IF-WORK-CMD-013` | `OpenWorkBlocker` | 本仓 runtime + optional governance ref | API -> blocker policy -> repository | blocker ref、cause ref、history、trace、outbox 成立 | blocker 替代 governance decision truth;缺 cause 成功 | `TC-WORK-DEP-004`;`EV-WORK-DEP-004` |
-| `IF-WORK-CMD-014` | `ResolveWorkBlocker` | `[runtime] artifact / governance evidence resolver` | API -> evidence policy -> state transition | verified evidence ref 后 resolve,可追溯 | missing / rejected evidence resolve 成功;保存 evidence body | `TC-WORK-DEP-005`;`EV-WORK-DEP-005` |
+| `IF-WORK-CMD-011` | `LinkWorkDependency` | 本仓 runtime | API -> formal work scope resolver -> dependency graph policy -> repository | dependency 连接正式 Work,history / trace / outbox 成立;graph project scope 来自 `get_formal_work_scope(downstream)`;标脏 downstream project-board / member-work | cycle 成功;非 formal work 成为 dependency endpoint;从 `FormalWorkRef` 字符串私自推 project | `TC-WORK-DEP-001`;`TC-WORK-DEP-002`;`EV-WORK-DEP-001`;`EV-WORK-DEP-002` |
+| `IF-WORK-CMD-012` | `UpdateWorkDependencyState` | `[runtime] evidence resolver` | API -> formal work scope resolver -> dependency state transition | `DependencyTarget::Active` 推进 `Proposed -> Active`;terminal targets 推进 `Active -> Satisfied / Waived / Cancelled`;terminal 后不可 reopen;downstream relation views stale | Active target 未覆盖;terminal reopen 成功;缺 evidence / reason 或 reason kind mismatch 仍满足;未解析 stale scope | `TC-WORK-DEP-003`;`EV-WORK-DEP-003` |
+| `IF-WORK-CMD-013` | `OpenWorkBlocker` | 本仓 runtime + optional governance ref | API -> formal work scope resolver -> blocker policy -> repository | blocker ref、cause ref、history、trace、outbox 成立;blocked project-board / member-work stale | blocker 替代 governance decision truth;缺 cause 成功;未解析 blocked work scope | `TC-WORK-DEP-004`;`EV-WORK-DEP-004` |
+| `IF-WORK-CMD-014` | `ResolveWorkBlocker` | `[runtime] artifact / governance evidence resolver` | API -> formal work scope resolver -> evidence policy -> state transition | verified evidence ref 后 resolve,可追溯;blocked relation views stale | missing / rejected evidence resolve 成功;保存 evidence body;未解析 blocked work scope | `TC-WORK-DEP-005`;`EV-WORK-DEP-005` |
 | `IF-WORK-CMD-015` | `OpenIteration` | `[runtime] process timebox resolver` | API -> iteration policy -> repository | Iteration Planning,保存 timebox ref,不改 process truth | process timing 直接打开 Iteration;缺 ref 仍成功 | `TC-WORK-ITER-001`;`EV-WORK-ITER-001` |
 | `IF-WORK-CMD-016` | `CommitIterationScope` | 本仓 runtime | API -> commitment policy -> repository | candidates 均来自 formal work,iteration / commitment / work marks 同 UoW | 非 formal candidate commit 成功;partial truth 写入 | `TC-WORK-ITER-002`;`TC-WORK-ITER-003`;`EV-WORK-ITER-002`;`EV-WORK-ITER-003` |
 | `IF-WORK-CMD-017` | `UpdateIterationCommitment` | 本仓 runtime | API -> commitment changeset -> repository | commitment change record、projection stale、version 匹配 | 调整原因缺失;version conflict 后写 truth | `TC-WORK-ITER-004`;`EV-WORK-ITER-004` |
@@ -208,14 +208,15 @@ Operations Job 必须证明:
 | 验收项 ID | 接口 / 事件 / 下游 | 全局依赖类型 | 协作方式 | 通过条件 | 失败条件 | 证据来源 |
 |---|---|---|---|---|---|---|
 | `IF-WORK-EVENT-001` | `ProjectChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | payload 来自 Project truth,可发布 / 失败标记 / 重放 | 携带 workspace / process 正文;发布失败回滚 truth | `TC-WORK-CORE-*`;`TC-WORK-OPS-001`;`EV-WORK-CORE-*`;`EV-WORK-OPS-001` |
-| `IF-WORK-EVENT-002` | `ProjectMemberChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | payload 只含 member ref、responsibility state、trace context | 改变 identity truth;携带 identity body | `TC-WORK-MEMBER-*`;`TC-WORK-OPS-001`;`EV-WORK-MEMBER-*`;`EV-WORK-OPS-001` |
-| `IF-WORK-EVENT-003` | `WorkItemChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | payload 只含 formal work ref、work state、source refs | 携带 plan / artifact / runtime body | `TC-WORK-FORMAL-*`;`TC-WORK-PROMOTE-*`;`TC-WORK-OPS-001`;`EV-WORK-FORMAL-*`;`EV-WORK-PROMOTE-*`;`EV-WORK-OPS-001` |
-| `IF-WORK-EVENT-004` | `PromoteResultRecorded` | `[event]` | outbox -> fake publisher -> replay / dump scan | promote result state、source ref、created work ref 可消费 / 可重放 | reject path 创建 WorkItem;携带 source body | `TC-WORK-PROMOTE-*`;`TC-WORK-OPS-001`;`EV-WORK-PROMOTE-*`;`EV-WORK-OPS-001` |
-| `IF-WORK-EVENT-005` | `WorkDependencyChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | relation ref / state / affected work refs 可消费 / 可重放 | 传播 governance body 或制造 dependency truth | `TC-WORK-DEP-*`;`TC-WORK-OPS-001`;`EV-WORK-DEP-*`;`EV-WORK-OPS-001` |
-| `IF-WORK-EVENT-006` | `WorkBlockerChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | blocker ref / state / evidence ref 可消费 / 可重放 | 携带 evidence body;缺 evidence 仍 resolve | `TC-WORK-DEP-004`;`TC-WORK-DEP-005`;`TC-WORK-OPS-001`;`EV-WORK-DEP-*`;`EV-WORK-OPS-001` |
-| `IF-WORK-EVENT-007` | `IterationChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | iteration ref / commitment summary / trace context 可消费 | 让 process 反写 commitment;携带 process body | `TC-WORK-ITER-*`;`TC-WORK-OPS-001`;`EV-WORK-ITER-*`;`EV-WORK-OPS-001` |
-| `IF-WORK-EVENT-008` | `WorkTraceAvailable` | `[event]` + handoff | outbox / handoff marker -> fake subscriber | trace subject ref、trace ref、handoff ref 可消费 / 可重放 | 替代全局 observability 或携带 raw log body | `TC-WORK-QUERY-007`;`TC-WORK-OPS-005`;`EV-WORK-QUERY-007`;`EV-WORK-OPS-005` |
-| `IF-WORK-EVENT-009` | `DerivedWorkViewChanged` | `[event]` | projection state -> outbox -> fake publisher | view ref、freshness state、cursor 可消费 / 可重放 | 派生变化被当作新 truth;query 触发 enqueue | `TC-WORK-QUERY-004`;`TC-WORK-QUERY-008`;`TC-WORK-OPS-002`;`EV-WORK-QUERY-*`;`EV-WORK-OPS-002` |
+| `IF-WORK-EVENT-002` | `BacklogChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | payload 来自 Backlog truth,包含 backlog ref、project ref、state 和 maintenance reason | 复用 ProjectChanged 导致 backlog reason/state 缺失;携带 workspace / process 正文 | `TC-WORK-CORE-*`;`TC-WORK-FORMAL-003`;`TC-WORK-OPS-001`;`EV-WORK-CORE-*`;`EV-WORK-FORMAL-003`;`EV-WORK-OPS-001` |
+| `IF-WORK-EVENT-003` | `ProjectMemberChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | payload 只含 member ref、responsibility state、trace context | 改变 identity truth;携带 identity body | `TC-WORK-MEMBER-*`;`TC-WORK-OPS-001`;`EV-WORK-MEMBER-*`;`EV-WORK-OPS-001` |
+| `IF-WORK-EVENT-004` | `WorkItemChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | payload 只含 formal work ref、work state、source refs | 携带 plan / artifact / runtime body | `TC-WORK-FORMAL-*`;`TC-WORK-PROMOTE-*`;`TC-WORK-OPS-001`;`EV-WORK-FORMAL-*`;`EV-WORK-PROMOTE-*`;`EV-WORK-OPS-001` |
+| `IF-WORK-EVENT-005` | `PromoteResultRecorded` | `[event]` | outbox -> fake publisher -> replay / dump scan | promote result state、source ref、created work ref 可消费 / 可重放 | reject path 创建 WorkItem;携带 source body | `TC-WORK-PROMOTE-*`;`TC-WORK-OPS-001`;`EV-WORK-PROMOTE-*`;`EV-WORK-OPS-001` |
+| `IF-WORK-EVENT-006` | `WorkDependencyChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | relation ref / state / affected work refs 可消费 / 可重放 | 传播 governance body 或制造 dependency truth | `TC-WORK-DEP-*`;`TC-WORK-OPS-001`;`EV-WORK-DEP-*`;`EV-WORK-OPS-001` |
+| `IF-WORK-EVENT-007` | `WorkBlockerChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | blocker ref / state / evidence ref 可消费 / 可重放 | 携带 evidence body;缺 evidence 仍 resolve | `TC-WORK-DEP-004`;`TC-WORK-DEP-005`;`TC-WORK-OPS-001`;`EV-WORK-DEP-*`;`EV-WORK-OPS-001` |
+| `IF-WORK-EVENT-008` | `IterationChanged` | `[event]` | outbox -> fake publisher -> replay / dump scan | iteration ref / commitment summary / trace context 可消费 | 让 process 反写 commitment;携带 process body | `TC-WORK-ITER-*`;`TC-WORK-OPS-001`;`EV-WORK-ITER-*`;`EV-WORK-OPS-001` |
+| `IF-WORK-EVENT-009` | `WorkTraceAvailable` | `[event]` + handoff | outbox / handoff marker -> fake subscriber | trace subject ref、trace ref、handoff ref 可消费 / 可重放 | 替代全局 observability 或携带 raw log body | `TC-WORK-QUERY-007`;`TC-WORK-OPS-005`;`EV-WORK-QUERY-007`;`EV-WORK-OPS-005` |
+| `IF-WORK-EVENT-010` | `DerivedWorkViewChanged` | `[event]` | projection state -> outbox -> fake publisher | view ref、freshness state、cursor 可消费 / 可重放 | 派生变化被当作新 truth;query 触发 enqueue | `TC-WORK-QUERY-004`;`TC-WORK-QUERY-008`;`TC-WORK-OPS-002`;`EV-WORK-QUERY-*`;`EV-WORK-OPS-002` |
 
 ### 7.5 Operations Job 验收表
 
@@ -259,7 +260,7 @@ Operations Job 必须证明:
 | Command / iteration | `OpenIteration`、`CommitIterationScope`、`UpdateIterationCommitment`、`UpdateIterationLifecycle` | `TC-WORK-ITER-*` | `EV-WORK-ITER-*` | `reports/runs/<run_id>/evidence-index.md` |
 | Query | 8 Query | `TC-WORK-QUERY-001`~`008` | `EV-WORK-QUERY-001`~`008` | `reports/runs/<run_id>/evidence-index.md` |
 | Inbound Consumer | 7 Consumer | `MEMBER` / `FORMAL` / `PROMOTE` / `DEP` / `ITER` / `QUERY` 相关用例 | 同族 `EV-WORK-*` | `reports/runs/<run_id>/evidence-index.md` |
-| Outbound Event | 9 Event | `CORE` / `MEMBER` / `FORMAL` / `PROMOTE` / `DEP` / `ITER` / `OPS` 相关用例 | 同族 `EV-WORK-*` + `EV-WORK-OPS-001` | `reports/runs/<run_id>/evidence-index.md` |
+| Outbound Event | 10 Event | `CORE` / `MEMBER` / `FORMAL` / `PROMOTE` / `DEP` / `ITER` / `OPS` 相关用例 | 同族 `EV-WORK-*` + `EV-WORK-OPS-001` | `reports/runs/<run_id>/evidence-index.md` |
 | Operations Job | 6 Job | `TC-WORK-OPS-001`~`006` | `EV-WORK-OPS-001`~`006` | `reports/runs/<run_id>/evidence-index.md` |
 
 ### 7.8 接口证据图
@@ -296,7 +297,7 @@ Cross-repo dependency
 
 | 验收结论 | 是否影响上游设计 / 测试 | 影响类型 | 回写位置 | 处理状态 |
 |---|---|---|---|---|
-| 确认 18 Command、8 Query、7 Consumer、9 Event、6 Job 均进入接口 / 事件 / 同步验收门禁 | 否 | 协议验收承接 | 无 | 无回写 |
+| 确认 18 Command、8 Query、7 Consumer、10 Event、6 Job 均进入接口 / 事件 / 同步验收门禁 | 否 | 协议验收承接 | 无 | 无回写 |
 | 确认跨仓验收按 `[compile]` / `[runtime]` / `[event]` / handoff 区分证据 | 否 | 依赖裁剪承接 | 无 | 无回写 |
 | 确认下游未就绪时使用 fake / replay / event dump / handoff report 验接缝 | 否 | 验收范围裁剪 | 无 | 无回写 |
 | 确认本步不新增协议字段、topic、job schema 或测试用例 | 否 | 文档边界 | 无 | 无回写 |
@@ -325,7 +326,7 @@ Cross-repo dependency
 正文草稿:
 
 ```text
-本章用于裁决 `L1-work` 的 public protocol、event 协作、operations job 和跨仓同步接缝是否成立。验收必须覆盖 `03-详细设计.md` §7 固定的 18 个 Command、8 个 Query、7 个 Inbound Event Consumer、9 个 Outbound Event 和 6 个 Operations Job。
+本章用于裁决 `L1-work` 的 public protocol、event 协作、operations job 和跨仓同步接缝是否成立。验收必须覆盖 `03-详细设计.md` §7 固定的 18 个 Command、8 个 Query、7 个 Inbound Event Consumer、10 个 Outbound Event 和 6 个 Operations Job。
 
 接口、事件与 job 验收不得使用详细设计未定义的字段、状态、topic 或 job schema。跨仓协作必须按依赖类型选择证据:编译期依赖只允许 `core-contracts`;运行期依赖验 resolver / adapter / handoff 接缝;事件协作依赖验 envelope、dedup、publish、failure、replay 和 projection 证据。下游未就绪时,本章只裁决接缝和证据,不要求下游仓完整实现。
 ```

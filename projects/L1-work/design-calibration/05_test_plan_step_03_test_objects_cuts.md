@@ -55,6 +55,7 @@
 |---|---|
 | truth repository | optimistic version、unique key、transaction rollback、page / list 稳定排序 |
 | `IdempotencyRepository` | same key same digest duplicate、same key different digest conflict、reserved in-flight、commit unknown 查询 |
+| `CommandResultRepository` | accepted command result save、duplicate result replay、missing / wrong kind result surface |
 | `UnitOfWork` fake / in-memory | truth、audit、outbox、projection stale、idempotency complete 同事务提交或回滚 |
 | projection repository | stale / rebuilding / failed marker、replace scope、older cursor 不覆盖 newer freshness |
 | reference snapshot repository | last good snapshot、unresolved / failed marker、refresh race |
@@ -73,7 +74,7 @@
 | Command | 18 | `CreateProject`、`UpdateProjectLifecycle`、`UpdateBacklogAvailability`、`AssignProjectMember`、`UpdateProjectMemberResponsibility`、`CreateWorkItem`、`CreateChildWorkItem`、`UpdateWorkItemLifecycle`、`RequestWorkPromotion`、`ReviewWorkPromotion`、`LinkWorkDependency`、`UpdateWorkDependencyState`、`OpenWorkBlocker`、`ResolveWorkBlocker`、`OpenIteration`、`CommitIterationScope`、`UpdateIterationCommitment`、`UpdateIterationLifecycle` | success、reject / error、duplicate / conflict |
 | Query | 8 | `GetProjectWorkFacts`、`GetBacklog`、`GetWorkItem`、`ListMemberWork`、`GetIterationSummary`、`SearchWork`、`GetWorkTrace`、`GetProjectBoardView` | hit、missing / not visible / degraded、no-write |
 | Inbound Event Consumer | 7 | `ConsumeIdentityMemberChanged`、`ConsumeMethodDefinitionChanged`、`ConsumeConversationWorkContextChanged`、`ConsumeProcessTimingChanged`、`ConsumeGovernanceDecisionChanged`、`ConsumeArtifactEvidenceChanged`、`ConsumeRuntimePromoteRequested` | accepted、duplicate、dead-letter / unresolved |
-| Outbound Event | 9 | `ProjectChanged`、`ProjectMemberChanged`、`WorkItemChanged`、`PromoteResultRecorded`、`WorkDependencyChanged`、`WorkBlockerChanged`、`IterationChanged`、`WorkTraceAvailable`、`DerivedWorkViewChanged` | payload schema、forbidden field absent、publish failure |
+| Outbound Event | 10 | `ProjectChanged`、`BacklogChanged`、`ProjectMemberChanged`、`WorkItemChanged`、`PromoteResultRecorded`、`WorkDependencyChanged`、`WorkBlockerChanged`、`IterationChanged`、`WorkTraceAvailable`、`DerivedWorkViewChanged` | payload schema、forbidden field absent、publish failure |
 | Operations Job | 6 | `PublishWorkOutbox`、`RebuildWorkProjections`、`RefreshExternalReferenceSnapshots`、`RunWorkReconciliation`、`PrepareWorkTraceHandoff`、`PrepareArchiveHandoff` | success、partial failure、rerun / idempotency |
 
 ### 3.5 哪些状态机、事务、一致性、幂等和恢复行为必须单列切口?
@@ -82,7 +83,7 @@
 |---|---|
 | 12 组状态机 | `ProjectLifecycleState`、`ProjectMemberResponsibilityState`、`BacklogState`、`WorkItemState`、`PromoteResultState`、`DependencyState`、`BlockerState`、`IterationState`、`CommitmentState`、`DerivedFreshnessState`、`ReferenceResolutionStatus`、`OutboxPublicationState` 的合法 / 非法转换 |
 | 事务 | accepted truth、history / trace、outbox、projection stale、idempotency result 同 UoW;outbox enqueue / repository failure rollback |
-| 幂等 | command duplicate / conflict、event redelivery / digest conflict、job rerun、commit unknown 先查 idempotency |
+| 幂等 | command duplicate / conflict、duplicate result store replay、event redelivery / digest conflict、job rerun、commit unknown 先查 idempotency |
 | 并发 | optimistic version conflict、unique create conflict、outbox dual publisher、projection rebuild race、reference refresh race |
 | 恢复 | resolver unresolved / failed marker、publisher failed marker、handoff failed marker、projection stale / failed surface、reconciliation read-only report |
 | no-write | Query、projection rebuild、reconciliation、report、search、workspace consumption 都不得改写业务 truth |
@@ -127,7 +128,7 @@
 
 | 文档 / 位置 | 当前问题 | 本步处理 |
 |---|---|---|
-| 旧 `05-测试方案.md` §1~§3 | 仍按旧草案列目标、策略和追溯,没有覆盖七模块、18 Command、8 Query、7 Consumer、9 Event、6 Job、12 状态机 | 本步降级旧内容,重建测试对象和切口 |
+| 旧 `05-测试方案.md` §1~§3 | 仍按旧草案列目标、策略和追溯,没有覆盖七模块、18 Command、8 Query、7 Consumer、10 Event、6 Job、12 状态机 | 本步降级旧内容,重建测试对象和切口 |
 | 旧 `05-测试方案.md` §6 | 只列 `TC-001` 等旧用例,没有回指正式协议和状态 | 本步先抽对象和切口,Step 6 再重新分配稳定用例 ID |
 | 旧 `05-测试方案.md` §9 | 旧性能阈值直接写硬指标 | 本步不纳入对象切口;Step 10 再作为非功能专项候选 |
 | `03-详细设计.md` §15 | 已给最小验证摘要,但仍需测试方案展开对象层次 | 本步把摘要展开为测试对象总表 |
@@ -251,7 +252,7 @@ External / publisher / handoff / projection failure
 
 | 测试结论 | 是否影响上游设计 | 影响类型 | 回写位置 | 处理状态 |
 |---|---|---|---|---|
-| P0 测试对象覆盖七模块、18 Command、8 Query、7 Consumer、9 Event、6 Job、12 状态机和配置 / 观测边界 | 否 | 测试对象抽取,无设计契约变化 | 无 | 无回写 |
+| P0 测试对象覆盖七模块、18 Command、8 Query、7 Consumer、10 Event、6 Job、12 状态机和配置 / 观测边界 | 否 | 测试对象抽取,无设计契约变化 | 无 | 无回写 |
 | DTO 构造失败、字段缺失、引用混同、forbidden body 和 no-write 被列为负向测试切口 | 否 | 测试覆盖要求,不新增字段或错误 | 无 | 无回写 |
 | 正式状态名必须使用 `03` 定义的 enum variant | 否 | 测试命名约束,不改变状态矩阵 | 无 | 无回写 |
 | P1/P2 真实生产依赖、remote config、hot reload、容量模型仍不进入 P0 对象清单 | 否 | 范围裁剪,与 Step 2 一致 | 无 | 无回写 |

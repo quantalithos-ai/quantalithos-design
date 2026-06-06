@@ -197,6 +197,9 @@ pub struct WorkAuditTrailId(pub String);
 /// Identifies a Work outbox record.
 pub struct WorkOutboxId(pub String);
 
+/// Identifies a stored application result surface.
+pub struct ResultId(pub String);
+
 /// Identifies an upstream source event.
 pub struct SourceEventId(pub String);
 
@@ -494,6 +497,8 @@ pub struct BlockerImpactExplanation {
 pub enum WorkOutboxEventKind {
     /// Project changed event.
     ProjectChanged,
+    /// Backlog availability changed event.
+    BacklogChanged,
     /// Project member changed event.
     ProjectMemberChanged,
     /// Work item changed event.
@@ -610,8 +615,8 @@ pub enum WorkLifecycleTarget {
 pub enum PromoteReviewDecision {
     /// Accept the source into formal Work.
     Accept,
-    /// Reject the source.
-    Reject,
+    /// Reject the source with an auditable reason.
+    Reject(PromoteRejectReason),
 }
 
 /// Target state requested for a dependency.
@@ -688,7 +693,7 @@ pub struct PromoteRejectReason {
     pub reason_ref: Option<ExternalEvidenceRef>,
 }
 
-/// Reason supplied when a dependency is linked or activated.
+/// Reason supplied when a dependency is linked.
 pub struct DependencyReason {
     /// Reason category.
     pub reason_kind: DependencyReasonKind,
@@ -696,7 +701,7 @@ pub struct DependencyReason {
     pub reason_ref: Option<ExternalEvidenceRef>,
 }
 
-/// Reason supplied when a dependency changes.
+/// Reason supplied when a dependency changes state.
 pub struct DependencyChangeReason {
     /// Reason category.
     pub reason_kind: DependencyChangeReasonKind,
@@ -755,11 +760,11 @@ pub struct CommitmentChangeReason {
 | `WorkLifecycleReason` | `reason_kind: WorkLifecycleReasonKind`;`superseding_ref: Option<FormalWorkRef>`;`reason_ref: Option<ExternalEvidenceRef>` | command body | work lifecycle audit | `Completed` 由 `evidence_ref` 支撑;`Superseded` 必须带 `superseding_ref` |
 | `PromoteReason` | `reason_kind: PromoteReasonKind`;`source_summary_ref: Option<SourceWorkRef>` | command / runtime event | promote policy input | 不代表 promote decision |
 | `PromoteRejectReason` | `reason_kind: PromoteRejectReasonKind`;`reason_ref: Option<ExternalEvidenceRef>` | review command | reject path | 必须可追溯 |
-| `DependencyReason` | `reason_kind: DependencyReasonKind`;`reason_ref: Option<ExternalEvidenceRef>` | command body | dependency creation / activation | 不得保存正文 |
-| `DependencyChangeReason` | `reason_kind: DependencyChangeReasonKind`;`reason_ref: Option<ExternalEvidenceRef>`;`blocker_cause_ref: Option<BlockerCauseRef>` | command / blocker cause | dependency history | `from_blocker_cause` 只填 `blocker_cause_ref` |
+| `DependencyReason` | `reason_kind: DependencyReasonKind`;`reason_ref: Option<ExternalEvidenceRef>` | `LinkWorkDependency` command body | dependency creation | 不得保存正文 |
+| `DependencyChangeReason` | `reason_kind: DependencyChangeReasonKind`;`reason_ref: Option<ExternalEvidenceRef>`;`blocker_cause_ref: Option<BlockerCauseRef>` | `UpdateWorkDependencyState` command / blocker cause / link activation helper | dependency state transition and history | `Activated` target 使用 `DependencyChangeReasonKind::Activated`;`from_link_reason` 生成 `Activated`、继承 link reason 的 `reason_ref`、`blocker_cause_ref = None`;`from_blocker_cause` 只填 `blocker_cause_ref` |
 | `BlockerMitigationReason` | `reason_kind: BlockerMitigationReasonKind`;`reason_ref: Option<ExternalEvidenceRef>` | future command / internal flow | blocker mitigating transition | P0 无 public command 时不得自行开放 API |
 | `BlockerCloseReason` | `reason_kind: BlockerCloseReasonKind`;`reason_ref: Option<ExternalEvidenceRef>` | future command / internal flow | blocker close transition | 只允许 resolved 后 close |
-| `IterationChangeReason` | `reason_kind: IterationChangeReasonKind`;`reason_ref: Option<ExternalEvidenceRef>` | command body / process event | iteration start / cancel / commitment change | 不保存 process body |
+| `IterationChangeReason` | `reason_kind: IterationChangeReasonKind`;`reason_ref: Option<ExternalEvidenceRef>` | command body / process event | iteration start / cancel / commitment change | 不保存 process body;不得用于 iteration close |
 | `IterationCloseReason` | `reason_kind: IterationCloseReasonKind`;`reason_ref: Option<ExternalEvidenceRef>` | command body | iteration close | close 必须保留 reason |
 | `CommitmentChangeReason` | `reason_kind: CommitmentChangeReasonKind`;`reason_ref: Option<ExternalEvidenceRef>` | command body | remove committed work | remove 必须保留 reason |
 
@@ -871,6 +876,22 @@ pub enum WorkTruthChange {
 | `ExternalSourceSummary` | source ref/kind/digest/body marker | forbidden-body guard | `has_external_body=true` 必须 reject |
 | `PromoteDecision` | `Allow` / `Reject` / `Duplicate` | promote policy output | service 必须把 decision 转成正式 result / error |
 | `WorkTruthChange` | typed truth change enum | trace / audit / outbox 统一输入 | 只能由已提交成功的 command / consumer flow 构造 |
+
+`WorkTruthChange` 到 `WorkOutboxEventKind` 的正式映射:
+
+| WorkTruthChange | WorkOutboxEventKind | outbound event payload |
+|---|---|---|
+| `ProjectCreated(ProjectRef)` | `ProjectChanged` | `ProjectChangedEvent` |
+| `ProjectLifecycleChanged(ProjectRef)` | `ProjectChanged` | `ProjectChangedEvent` |
+| `BacklogAvailabilityChanged(BacklogRef)` | `BacklogChanged` | `BacklogChangedEvent` |
+| `ProjectMemberChanged(ProjectMemberRef)` | `ProjectMemberChanged` | `ProjectMemberChangedEvent` |
+| `WorkItemChanged(FormalWorkRef)` | `WorkItemChanged` | `WorkItemChangedEvent` |
+| `PromoteResultRecorded(PromoteResultRef)` | `PromoteResultRecorded` | `PromoteResultRecordedEvent` |
+| `WorkRelationChanged(DependencyOrBlockerRef)` | `WorkDependencyChanged` 或 `WorkBlockerChanged` | `WorkDependencyChangedEvent` 或 `WorkBlockerChangedEvent` by typed ref variant |
+| `IterationChanged(IterationRef)` | `IterationChanged` | `IterationChangedEvent` |
+| `HandoffMarkerChanged(WorkTraceSubjectRef)` | `WorkTraceAvailable` | `WorkTraceAvailableEvent` |
+
+`WorkOutboxRecord::from_truth_change(...)` 必须使用上表映射。若新增 `WorkTruthChange` variant,必须同批补 `WorkOutboxEventKind`、outbound payload schema、publisher dispatch、测试和验收映射;不得让实现侧自行选择复用哪一种 event。
 
 ##### projection / reconciliation helper DTO
 
@@ -1368,6 +1389,8 @@ pub struct ChildWorkItem {
     pub source_ref: SourceWorkRef,
     /// Current child work lifecycle state.
     pub work_state: WorkItemState,
+    /// Completion evidence reference when the child work is completed.
+    pub completion_ref: Option<ExternalEvidenceRef>,
 }
 ```
 
@@ -1377,12 +1400,13 @@ pub struct ChildWorkItem {
 | `parent_work_item_id` | `WorkItemId` | 父工作 | 必须存在且未终止到禁止拆分状态 |
 | `source_ref` | `SourceWorkRef` | 来源引用 | 不保存 plan / runtime 正文 |
 | `work_state` | `WorkItemState` | 生命周期 | 与 WorkItem 共用状态集合 |
+| `completion_ref` | `Option<ExternalEvidenceRef>` | 完成依据 | `Completed` 必须有 verified evidence;不得保存 evidence body |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `attach_to_parent(&mut self, parent_id: WorkItemId, actor: ActorRef) -> Result<(), DomainError>` | 固定父子关系 | parent、actor | `Result<(), DomainError>` | 不形成多父 |
 | `promote_from_source(&mut self, source_ref: SourceWorkRef, actor: ActorRef) -> Result<(), DomainError>` | 标记显式 promote 来源 | source、actor | `Result<(), DomainError>` | 不保存来源正文 |
-| `transition_lifecycle(&mut self, target: WorkLifecycleTarget, reason: WorkLifecycleReason, evidence_ref: Option<ExternalEvidenceRef>, actor: ActorRef) -> Result<(), DomainError>` | 子工作生命周期迁移 | target、reason、evidence、actor | `Result<(), DomainError>` | 与 WorkItem 同约束 |
+| `transition_lifecycle(&mut self, target: WorkLifecycleTarget, reason: WorkLifecycleReason, evidence_ref: Option<ExternalEvidenceRef>, actor: ActorRef) -> Result<(), DomainError>` | 子工作生命周期迁移 | target、reason、evidence、actor | `Result<(), DomainError>` | 与 WorkItem 同约束;完成时写入 `completion_ref` |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -1420,7 +1444,7 @@ pub struct WorkDependency {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `activate(&mut self, actor: ActorRef, reason: DependencyReason) -> Result<(), DomainError>` | 激活依赖 | actor、reason | `Result<(), DomainError>` | 不允许孤儿依赖 |
+| `activate(&mut self, actor: ActorRef, reason: DependencyChangeReason) -> Result<(), DomainError>` | 激活依赖 | actor、state-change reason | `Result<(), DomainError>` | 只允许从 `Proposed` 进入 `Active`;reason.kind 必须为 `Activated`;不允许孤儿依赖 |
 | `mark_satisfied(&mut self, evidence_ref: ExternalEvidenceRef, actor: ActorRef) -> Result<(), DomainError>` | 满足依赖 | evidence、actor | `Result<(), DomainError>` | evidence 必须可接受 |
 | `waive(&mut self, reason: DependencyChangeReason, actor: ActorRef) -> Result<(), DomainError>` | 豁免依赖 | reason、actor | `Result<(), DomainError>` | 保留解释 |
 | `cancel(&mut self, reason: DependencyChangeReason, actor: ActorRef) -> Result<(), DomainError>` | 取消依赖 | reason、actor | `Result<(), DomainError>` | 不删除历史 |
@@ -1428,6 +1452,26 @@ pub struct WorkDependency {
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
 | `WorkDependency::link(dependency_id: WorkDependencyId, upstream: FormalWorkRef, downstream: FormalWorkRef, reason: DependencyReason) -> Result<Self, DomainError>` | 建立依赖 | dependency id、upstream、downstream、reason | `Result<Self, DomainError>` | `LinkWorkDependency`;`dependency_id` 由 application 通过 `IdGeneratorPort.next_work_dependency_id()` 生成 |
+
+##### `DependencyGraphSnapshot`
+
+```rust
+/// Project-scoped relation snapshot consumed by dependency graph policy.
+pub struct DependencyGraphSnapshot {
+    /// Project scope that produced this snapshot.
+    pub project_ref: ProjectRef,
+    /// Formal work dependency edges in this project.
+    pub dependency_edges: Vec<(FormalWorkRef, FormalWorkRef)>,
+    /// Currently active blockers by formal work.
+    pub active_blockers: Vec<(FormalWorkRef, WorkBlockerRef)>,
+}
+```
+
+| 字段 | 类型 | 作用 | 约束 |
+|---|---|---|---|
+| `project_ref` | `ProjectRef` | graph scope | 必须来自 `FormalWorkScope.project_ref` 或 explicit project command scope |
+| `dependency_edges` | `Vec<(FormalWorkRef, FormalWorkRef)>` | cycle / duplicate edge policy input | 只含同一 project formal work refs;不含外部正文 |
+| `active_blockers` | `Vec<(FormalWorkRef, WorkBlockerRef)>` | blocker-aware policy input | 只含 active blocker refs;不保存 cause / evidence body |
 
 ##### `WorkBlocker`
 
@@ -1442,6 +1486,8 @@ pub struct WorkBlocker {
     pub cause_ref: BlockerCauseRef,
     /// Current blocker lifecycle state.
     pub blocker_state: BlockerState,
+    /// Evidence that resolved the blocker, present only after successful resolution.
+    pub resolved_evidence_ref: Option<ExternalEvidenceRef>,
 }
 ```
 
@@ -1451,11 +1497,12 @@ pub struct WorkBlocker {
 | `blocked_work_ref` | `FormalWorkRef` | 被阻塞工作 | 必须存在 |
 | `cause_ref` | `BlockerCauseRef` | 阻塞原因引用 | 不保存 governance / artifact 正文 |
 | `blocker_state` | `BlockerState` | 阻塞状态 | close 必须在 resolved 后 |
+| `resolved_evidence_ref` | `Option<ExternalEvidenceRef>` | 解除阻塞依据引用 | `Open` / `Mitigating` 时为空;`resolve(...)` 成功后必须写入 verified evidence ref;不保存 evidence 正文 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `start_mitigation(&mut self, reason: BlockerMitigationReason, actor: ActorRef) -> Result<(), DomainError>` | 进入处理中 | reason、actor | `Result<(), DomainError>` | 保留阻塞解释 |
-| `resolve(&mut self, evidence_ref: ExternalEvidenceRef, actor: ActorRef) -> Result<(), DomainError>` | 解除阻塞 | evidence、actor | `Result<(), DomainError>` | evidence 必须可接受 |
+| `resolve(&mut self, evidence_ref: ExternalEvidenceRef, actor: ActorRef) -> Result<(), DomainError>` | 解除阻塞 | evidence、actor | `Result<(), DomainError>` | evidence 必须可接受;成功时 `blocker_state = Resolved` 且 `resolved_evidence_ref = Some(evidence_ref)` |
 | `close(&mut self, reason: BlockerCloseReason, actor: ActorRef) -> Result<(), DomainError>` | 关闭阻塞记录 | reason、actor | `Result<(), DomainError>` | 不删除历史 |
 | `explain_impact(&self) -> BlockerImpactExplanation` | 生成影响解释 | 无 | `BlockerImpactExplanation` | 只读 |
 
@@ -1527,7 +1574,7 @@ pub struct IterationCommitment {
 | `contains(&self, work_ref: FormalWorkRef) -> bool` | 判断是否包含工作 | work ref | `bool` | 只读 |
 | `apply_change(&mut self, change_set: IterationCommitmentChangeSet, reason: IterationChangeReason, actor: ActorRef) -> Result<(), DomainError>` | 调整承诺集合 | changes、reason、actor | `Result<(), DomainError>` | 版本只增不减 |
 | `remove(&mut self, work_ref: FormalWorkRef, reason: CommitmentChangeReason) -> Result<(), DomainError>` | 移出工作 | work、reason | `Result<(), DomainError>` | 必须记录原因 |
-| `close(&mut self, reason: IterationChangeReason, actor: ActorRef) -> Result<(), DomainError>` | 关闭集合 | reason、actor | `Result<(), DomainError>` | 随 iteration close |
+| `close(&mut self, reason: IterationCloseReason, actor: ActorRef) -> Result<(), DomainError>` | 关闭集合 | reason、actor | `Result<(), DomainError>` | 随 iteration close;reason 与 `Iteration::close(...)` 同源 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -1743,7 +1790,7 @@ pub struct WorkTraceRecord {
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `relates_to(&self, subject_ref: WorkTraceSubjectRef) -> bool` | 判断关联 | subject | `bool` | 只读 |
-| `prepare_handoff(&self, archive_ref: ArchiveHandoffRef) -> Result<TraceHandoffIntent, DomainError>` | 形成交接意图 | archive target | `Result<TraceHandoffIntent, DomainError>` | 不保存 archive 正文 |
+| `prepare_handoff(&self, target_ref: TraceHandoffTargetRef) -> Result<TraceHandoffIntent, DomainError>` | 形成 trace handoff 交接意图 | observability / archive / diagnostic target | `Result<TraceHandoffIntent, DomainError>` | 不保存 observability log body 或 archive 正文;`ArchiveHandoffRef` 是 archive handoff port 输出指针,不得作为 trace intent 输入 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -1857,7 +1904,7 @@ pub struct WorkOutboxRecord {
 | 对象 | 字段 | 函数 | 禁止事项 |
 |---|---|---|---|
 | `PromoteDecisionRecord` | `decision_id: PromoteDecisionId`;`source_ref: SourceWorkRef`;`result_ref: PromoteResultRef` | `from_result(decision_id: PromoteDecisionId, result: PromoteResult, actor: ActorRef) -> Result<Self, DomainError>` | 不修改已成立 PromoteResult;`decision_id` 由 application 通过 `IdGeneratorPort.next_promote_decision_id()` 生成 |
-| `DependencyChangeRecord` | `change_id: DependencyChangeId`;`relation_ref: DependencyOrBlockerRef`;`change_reason: DependencyChangeReason` | `from_dependency_change(change_id: DependencyChangeId, dependency: WorkDependency, reason: DependencyChangeReason) -> Result<Self, DomainError>`;`from_blocker_change(change_id: DependencyChangeId, blocker: WorkBlocker, reason: DependencyChangeReason) -> Result<Self, DomainError>`;`DependencyChangeReason::from_blocker_cause(cause_ref: BlockerCauseRef) -> Self` | 不替代当前 dependency / blocker truth;`change_id` 由 application 通过 `IdGeneratorPort.next_dependency_change_id()` 生成 |
+| `DependencyChangeRecord` | `change_id: DependencyChangeId`;`relation_ref: DependencyOrBlockerRef`;`change_reason: DependencyChangeReason` | `from_dependency_change(change_id: DependencyChangeId, dependency: WorkDependency, reason: DependencyChangeReason) -> Result<Self, DomainError>`;`from_blocker_change(change_id: DependencyChangeId, blocker: WorkBlocker, reason: DependencyChangeReason) -> Result<Self, DomainError>`;`DependencyChangeReason::from_link_reason(reason: DependencyReason) -> Self`;`DependencyChangeReason::from_blocker_cause(cause_ref: BlockerCauseRef) -> Self` | 不替代当前 dependency / blocker truth;`from_link_reason` 生成 `Activated` state-change reason,继承 `reason_ref` 且不设置 `blocker_cause_ref`;`change_id` 由 application 通过 `IdGeneratorPort.next_dependency_change_id()` 生成 |
 | `IterationChangeRecord` | `change_id: IterationChangeId`;`iteration_ref: IterationRef`;`changed_work_refs: FormalWorkRefSet` | `from_commitment(change_id: IterationChangeId, iteration: Iteration, commitment: IterationCommitment, actor: ActorRef) -> Result<Self, DomainError>` | 不替代当前 commitment truth;`change_id` 由 application 通过 `IdGeneratorPort.next_iteration_change_id()` 生成 |
 
 #### 7.11 `domain/policies.rs` object 契约
@@ -1899,7 +1946,7 @@ pub struct FormalWorkPolicy {
 | `FormalWorkPolicy` | `assert_formal_work(intent: FormalWorkIntent, source_ref: SourceWorkRef) -> Result<(), DomainError>` | intent、source | `Result<(), DomainError>` | 拒绝 personal checklist / runtime step |
 | `BacklogAvailabilityPolicy` | `assert_availability_transition_allowed(backlog: &Backlog, target: BacklogAvailabilityTarget, reason: BacklogMaintenanceReason, actor: ActorRef) -> Result<(), DomainError>` | backlog、target、reason、actor | `Result<(), DomainError>` | projection / job 不可隐式改状态 |
 | `PromotePolicy` | `can_promote(source_ref: SourceWorkRef, reason: PromoteReason) -> PromoteDecision` | source、reason | `PromoteDecision` | 不跳过 promote 创建 Work |
-| `DependencyGraphPolicy` | `assert_can_link(upstream: FormalWorkRef, downstream: FormalWorkRef) -> Result<(), DomainError>` | upstream、downstream | `Result<(), DomainError>` | 无孤儿、无不可解释循环 |
+| `DependencyGraphPolicy` | `assert_can_link(graph: &DependencyGraphSnapshot, upstream: FormalWorkRef, downstream: FormalWorkRef) -> Result<(), DomainError>` | graph snapshot、upstream、downstream | `Result<(), DomainError>` | 无孤儿、无不可解释循环;graph 由 `DependencyRepository.load_graph_snapshot(project_ref)` 读取 |
 | `IterationCommitmentPolicy` | `assert_commitment_allowed(iteration: &Iteration, candidates: FormalWorkRefSet) -> Result<(), DomainError>` | iteration、candidates | `Result<(), DomainError>` | candidates 必须来自 backlog |
 | `CompletionEvidencePolicy` | `assert_completion_evidence(work_ref: FormalWorkRef, evidence_ref: ExternalEvidenceRef) -> Result<(), DomainError>` | work、evidence | `Result<(), DomainError>` | evidence 必须 verified |
 | `DerivedWorkViewPolicy` | `assert_read_only_projection(view_ref: DerivedWorkViewRef) -> Result<(), DomainError>` | view ref | `Result<(), DomainError>` | projection 不生成业务事实 |
@@ -1957,7 +2004,8 @@ pub struct IdempotencyRecord {
 
 | Helper | 字段 | 约束 |
 |---|---|---|
-| `ApplicationResultRef` | `operation`、`result_id` | duplicate idempotency 必须返回同一 result ref |
+| `ResultId` | string newtype | 由 `IdGeneratorPort.next_result_id()` 生成;只用于 stored result surface |
+| `ApplicationResultRef` | `operation`、`result_id` | duplicate idempotency 必须返回同一 result ref;必须可由 `CommandResultRepository.get_result(...)` 读回原 result surface |
 | `IdempotencyRecord` | `idempotency_key`、`operation`、`request_digest`、`result_ref`、`status` | conflict 由 digest 不同判定 |
 | `RequestDigest` | canonical hash string | 由 Command / Job canonical payload 生成 |
 | `IdempotencyStatus` | `Reserved` / `Completed` / `Conflict` | `Completed` 不可回到 `Reserved` |
@@ -2218,7 +2266,9 @@ pub struct WorkRuntimeBuilder {
 | `ProjectMember` | `member_ref` | `GlobalMemberRef` | command input / identity event | `ProjectMember::assign(...)` | `AssignProjectMember.member_ref` | reject | `TC-WORK-MEMBER-*` |
 | `WorkItem` | `completion_ref` | `Option<ExternalEvidenceRef>` | lifecycle command / evidence event | `WorkItem::mark_completed(...)` | `UpdateWorkItemLifecycle.evidence_ref` | reject completed without evidence | `TC-WORK-ITEM-*` |
 | `ChildWorkItem` | `source_ref` | `SourceWorkRef` | command / promote result | `ChildWorkItem::create_child(...)` | `CreateChildWorkItem.source_ref` | reject | `TC-WORK-PROMOTE-*` |
+| `ChildWorkItem` | `completion_ref` | `Option<ExternalEvidenceRef>` | lifecycle command / evidence event | `ChildWorkItem::transition_lifecycle(...)` | `UpdateWorkItemLifecycle.evidence_ref` | reject completed without evidence | `TC-WORK-ITEM-*` |
 | `WorkDependency` | `upstream_work_ref` | `FormalWorkRef` | command input | `WorkDependency::link(...)` | `LinkWorkDependency.upstream` | reject missing / same as downstream | `TC-WORK-DEP-*` |
+| `WorkBlocker` | `resolved_evidence_ref` | `Option<ExternalEvidenceRef>` | resolve command + evidence resolver | `WorkBlocker::resolve(...)` | `ResolveWorkBlocker.evidence_ref`;`WorkBlockerChanged.evidence_ref` | reject missing / unverified evidence;unresolved blocker event uses `None` | `TC-WORK-DEP-*`;`WorkBlockerChanged_event_schema` |
 | `IterationCommitment` | `committed_work_refs` | `FormalWorkRefSet` | command input + work repo lookup | `IterationCommitment::from_candidates(...)` | `CommitIterationScope.candidates` | reject non-formal work | `TC-WORK-ITER-*` |
 | `PromoteResult` | `created_work_ref` | `Option<FormalWorkRef>` | review accept path | `PromoteResult::accept(...)` | `ReviewWorkPromotion.decision` | absent for rejected | `TC-WORK-PROMOTE-*` |
 | `DerivedWorkViewState` | `freshness_state` | `DerivedFreshnessState` | truth change / rebuild job | `DerivedWorkViewState::for_view(...)` | query / job marker | missing -> stale marker | `TC-WORK-DERIVED-*` |

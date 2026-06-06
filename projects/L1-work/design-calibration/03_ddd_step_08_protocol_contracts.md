@@ -34,7 +34,7 @@
 
 1. 本轮需要定义哪些 API / Command / Query / Event / Job?
 
-   回答:本轮定义 18 个 Command、8 个 Query、7 个 Inbound Event Consumer、9 个 Outbound Event、6 个 Operations Job。协议清单来自概要 Step 7,不新增额外业务入口。
+   回答:本轮定义 18 个 Command、8 个 Query、7 个 Inbound Event Consumer、10 个 Outbound Event、6 个 Operations Job。协议清单来自概要 Step 7,不新增额外业务入口。
 
 2. 每个协议的调用方、处理方、传输方式是什么?
 
@@ -202,6 +202,8 @@ pub enum IdempotencyResultView {
 | `outbox_record_refs` | `Vec<WorkOutboxId>` | `WorkOutboxRepository.enqueue` | Query 不产生 |
 | `applied_version` | `Option<Version>` | primary repository save / create | 多对象变更时代表主对象版本 |
 
+`ApplicationResultRef` 必须指向 `CommandResultRepository` 中同 UoW 保存的 command result surface。success path 保存的 receipt 使用 `IdempotencyResultView::Applied`;duplicate replay 读取该 stored result 后只把返回给调用方的 receipt `idempotency` overlay 为 `Duplicate`,不得改变 `result_ref`、primary ref、state、`trace_ref`、`outbox_record_refs` 或 `applied_version`。若 `ApplicationResultRef` 无法读回对应 result surface,handler 映射 `ApplicationError::DuplicateResultMissing` 为 `WorkProtocolError::TemporarilyUnavailable`。
+
 #### 6.4 page / projection / query response surface
 
 ```rust
@@ -310,6 +312,7 @@ pub enum QuerySurface {
 | `ConsumeArtifactEvidenceChanged` | Inbound Event | `L1-artifact` | `worker::WorkInboundConsumers` | topic `artifact.evidence.changed.v1` | 是 |
 | `ConsumeRuntimePromoteRequested` | Inbound Event | `L2-runtime` | `worker::WorkInboundConsumers` | topic `runtime.work_promote.requested.v1` | 是 |
 | `ProjectChanged` | Outbound Event | `WorkOutboxPublisher` | SDK / workspace / process / archive | topic `work.project.changed.v1` | 是 |
+| `BacklogChanged` | Outbound Event | `WorkOutboxPublisher` | SDK / workspace / process / archive | topic `work.backlog.changed.v1` | 是 |
 | `ProjectMemberChanged` | Outbound Event | `WorkOutboxPublisher` | member-service / runtime / workspace | topic `work.project_member.changed.v1` | 是 |
 | `WorkItemChanged` | Outbound Event | `WorkOutboxPublisher` | process / governance / artifact / workspace | topic `work.formal_work.changed.v1` | 是 |
 | `PromoteResultRecorded` | Outbound Event | `WorkOutboxPublisher` | runtime / conversation / artifact | topic `work.promote_result.recorded.v1` | 是 |
@@ -481,6 +484,8 @@ pub struct IterationCommandResult {
 | `DependencyCommandResult` | `dependency_ref` | `dependency_state` | command operation name | 返回既有 dependency result |
 | `BlockerCommandResult` | `blocker_ref` | `blocker_state` | command operation name | 返回既有 blocker result |
 | `IterationCommandResult` | `iteration_ref` | `iteration_state` / `commitment_state` | command operation name | 返回既有 iteration result |
+
+所有 command result DTO 都必须能被 application-local `StoredCommandResult` enum 承载并按 `ApplicationResultRef` 持久化。duplicate 口径中的“返回既有 result”是读取 stored DTO,不是从当前 truth repository 重新组装。
 
 #### 8.3 `CreateProject`
 
@@ -770,8 +775,8 @@ pub struct ReviewWorkPromotionRequest {
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `promote_result_ref` | `PromoteResultRef` | repository key | route / body一致 | reject mismatch |
-| `decision` | `PromoteReviewDecision` | `PromoteResult.result_state` | request body | reject |
-| `accepted_work_intent` | `Option<FormalWorkIntent>` | accepted path work creation | request body | accept decision 缺失 reject |
+| `decision` | `PromoteReviewDecision` | `PromoteResult.result_state`;reject path `PromoteRejectReason` | request body | reject;`Reject(reason)` reason 缺失 reject |
+| `accepted_work_intent` | `Option<FormalWorkIntent>` | accepted path work creation | request body | accept decision 缺失 reject;reject decision 出现时 reject |
 | `expected_version` | `Version` | optimistic lock | request body | reject |
 | generated | `WorkItemId` / `ChildWorkItemId` | accepted work id | `IdGeneratorPort` | accept path generator failed -> reject |
 
@@ -795,6 +800,11 @@ pub struct UpdateWorkDependencyStateRequest {
     /// Target dependency state.
     pub target: DependencyTarget,
     /// Reason for the state change.
+    ///
+    /// `target = Active` requires `reason.reason_kind = Activated`.
+    /// `target = Satisfied` requires `reason.reason_kind = SatisfiedByEvidence`.
+    /// `target = Waived` requires `reason.reason_kind = Waived`.
+    /// `target = Cancelled` requires `reason.reason_kind = Cancelled`.
     pub reason: DependencyChangeReason,
     /// Evidence when required by target.
     pub evidence_ref: Option<ExternalEvidenceRef>,
@@ -824,7 +834,7 @@ pub struct ResolveWorkBlockerRequest {
 | Command | route | result | 必填字段 | 派生 / lookup | 缺失处理 |
 |---|---|---|---|---|---|
 | `LinkWorkDependency` | `POST /work/v1/dependencies` | `DependencyCommandResult` | upstream、downstream、reason | graph snapshot、`WorkDependencyId` | reject |
-| `UpdateWorkDependencyState` | `PATCH /work/v1/dependencies/{dependency_id}` | `DependencyCommandResult` | dependency ref、target、reason、version | evidence resolver when required | reject / resolver rejected |
+| `UpdateWorkDependencyState` | `PATCH /work/v1/dependencies/{dependency_id}` | `DependencyCommandResult` | dependency ref、target、reason、version | evidence resolver when target is `Satisfied`;reason kind must match target | reject / resolver rejected |
 | `OpenWorkBlocker` | `POST /work/v1/blockers` | `BlockerCommandResult` | blocked work、cause ref | `WorkBlockerId` | reject |
 | `ResolveWorkBlocker` | `PATCH /work/v1/blockers/{blocker_id}/resolve` | `BlockerCommandResult` | blocker ref、evidence、version | evidence resolver | reject / resolver rejected |
 
@@ -867,8 +877,10 @@ pub struct UpdateIterationLifecycleRequest {
     pub iteration_ref: IterationRef,
     /// Target iteration state.
     pub target: IterationLifecycleTarget,
-    /// Reason for the change.
-    pub reason: IterationChangeReason,
+    /// Required for `target = InProgress` and `target = Cancelled`; forbidden for `target = Closed`.
+    pub change_reason: Option<IterationChangeReason>,
+    /// Required for `target = Closed`; forbidden for `target = InProgress` and `target = Cancelled`.
+    pub close_reason: Option<IterationCloseReason>,
     /// Expected iteration version.
     pub expected_version: Version,
 }
@@ -879,7 +891,15 @@ pub struct UpdateIterationLifecycleRequest {
 | `OpenIteration` | `POST /work/v1/projects/{project_id}/iterations` | `IterationCommandResult` | project ref、timebox ref | process timebox resolver、`IterationId` | reject / resolver rejected |
 | `CommitIterationScope` | `POST /work/v1/iterations/{iteration_id}/commitments` | `IterationCommandResult` | iteration ref、candidate refs、version | work repo verifies candidates、`IterationCommitmentId` | empty candidates reject |
 | `UpdateIterationCommitment` | `PATCH /work/v1/iterations/{iteration_id}/commitments` | `IterationCommandResult` | iteration ref、change set、reason、version | work repo verifies added refs | empty change set reject |
-| `UpdateIterationLifecycle` | `PATCH /work/v1/iterations/{iteration_id}/lifecycle` | `IterationCommandResult` | iteration ref、target、reason、version | commitment lookup when closing | reject |
+| `UpdateIterationLifecycle` | `PATCH /work/v1/iterations/{iteration_id}/lifecycle` | `IterationCommandResult` | iteration ref、target、target-specific reason、version | `InProgress` / `Cancelled` use `change_reason`;`Closed` uses `close_reason`;commitment lookup when closing | reject invalid reason combination / close without commitment |
+
+`UpdateIterationLifecycleRequest` target / reason validation:
+
+| `target` | Required field | Forbidden field | Domain call |
+|---|---|---|---|
+| `InProgress` | `change_reason: IterationChangeReason` | `close_reason` | `Iteration::start(change_reason, actor)` |
+| `Closed` | `close_reason: IterationCloseReason` | `change_reason` | `Iteration::close(close_reason, actor)` and `IterationCommitment::close(close_reason, actor)` |
+| `Cancelled` | `change_reason: IterationChangeReason` | `close_reason` | `Iteration::cancel(change_reason, actor)` |
 
 #### 8.15 Command 到 Domain 构造闭环
 
@@ -891,8 +911,8 @@ pub struct UpdateIterationLifecycleRequest {
 | `CreateChildWorkItemRequest` | `ChildWorkItem` | 是 | `ChildWorkItemId`、parent lookup | parent root id != child id | reject |
 | `UpdateWorkItemLifecycleRequest` | `WorkItem` / `ChildWorkItem` | 是 | evidence resolver for completion | `ExternalEvidenceRef` != source ref | reject missing required evidence |
 | `RequestWorkPromotionRequest` | `PromoteResult` | 是 | `PromoteResultId`、source resolver | source ref != created work ref | reject |
-| `ReviewWorkPromotionRequest` | `PromoteResult`、optional `WorkItem` / `ChildWorkItem` | 是 | work id generated on accept | promote result ref != work ref | accept without intent reject |
-| dependency / blocker requests | `WorkDependency`、`WorkBlocker` | 是 | ids、graph snapshot、evidence resolver | dependency ref != blocker ref | reject |
+| `ReviewWorkPromotionRequest` | `PromoteResult`、optional `WorkItem` / `ChildWorkItem` | 是 | work id generated on accept;reject reason carried by `PromoteReviewDecision::Reject(PromoteRejectReason)` | promote result ref != work ref;reject reason != accepted work intent | accept without intent reject;reject with accepted intent reject |
+| dependency / blocker requests | `WorkDependency`、`WorkBlocker` | 是 | ids、graph snapshot、evidence resolver;`DependencyTarget::Active` uses `DependencyChangeReasonKind::Activated` | dependency ref != blocker ref;creation `DependencyReason` != state-change `DependencyChangeReason` | reject |
 | iteration requests | `Iteration`、`IterationCommitment` | 是 | ids、timebox resolver、work lookup | process timebox != iteration truth | reject |
 
 ### 9. Query 协议契约
@@ -983,6 +1003,8 @@ pub struct BacklogQueryFilter {
 | `SearchWork` / `WorkSearchResult` | `ProjectRef + WorkSearchCriteria` | `work-search:{project_id}:{criteria_digest}` | `DerivedWorkViewState.source_cursor` |
 | `GetProjectWorkFacts` | `ProjectRef` | 不要求 projection ref;truth read | repository truth cursor optional |
 | `GetWorkTrace` | `WorkTraceSubjectRef` | 不要求 projection ref;trace read | trace page cursor |
+
+P0 public derived view identity 只包含 `ProjectBoardView`、`MemberWorkView`、`IterationSummaryView` 和 `WorkSearchResult`。`PromoteResult` 通过 command result、truth repository 和 `PromoteResultRecorded` outbound event 暴露;`PendingPromoteIntake` 只是 runtime intake marker / operations inspection 数据,当前 P0 不提供 query surface。因此不得派生 `promote-result:*`、`promote-intake:*` 或同类临时 `DerivedWorkViewRef`。Promote 写路径只有在 accept path 创建 / 绑定 formal work 并影响上述既有 Work views 时,才标记这些既有 view stale。
 
 #### 9.3 Query response view schema
 
@@ -1337,6 +1359,18 @@ pub struct ProjectChangedEvent {
     pub reason: ProjectLifecycleReason,
 }
 
+/// Backlog availability change event payload.
+pub struct BacklogChangedEvent {
+    /// Changed backlog.
+    pub backlog_ref: BacklogRef,
+    /// Owning project.
+    pub project_ref: ProjectRef,
+    /// Current backlog availability state.
+    pub backlog_state: BacklogState,
+    /// Maintenance reason for lock / reopen availability transitions.
+    pub reason: BacklogMaintenanceReason,
+}
+
 /// Project member change event payload.
 pub struct ProjectMemberChangedEvent {
     /// Changed project member.
@@ -1395,7 +1429,7 @@ pub struct WorkBlockerChangedEvent {
     pub blocked_work_ref: FormalWorkRef,
     /// Current blocker state.
     pub blocker_state: BlockerState,
-    /// Evidence when resolved.
+    /// Evidence when resolved; sourced from WorkBlocker.resolved_evidence_ref.
     pub evidence_ref: Option<ExternalEvidenceRef>,
 }
 
@@ -1437,6 +1471,7 @@ pub struct DerivedWorkViewChangedEvent {
 | Event | topic | 发布方 | 消费方 | payload 字段来源 |
 |---|---|---|---|---|
 | `ProjectChanged` | `work.project.changed.v1` | outbox publisher | SDK / workspace / process / archive | `Project` + lifecycle reason |
+| `BacklogChanged` | `work.backlog.changed.v1` | outbox publisher | SDK / workspace / process / archive | `Backlog` + `BacklogMaintenanceReason` |
 | `ProjectMemberChanged` | `work.project_member.changed.v1` | outbox publisher | member-service / runtime / workspace | `ProjectMember` |
 | `WorkItemChanged` | `work.formal_work.changed.v1` | outbox publisher | process / governance / artifact / workspace | `WorkItem` / `ChildWorkItem` |
 | `PromoteResultRecorded` | `work.promote_result.recorded.v1` | outbox publisher | runtime / conversation / artifact | `PromoteResult` |
@@ -1771,7 +1806,7 @@ pub enum WorkProtocolError {
 | `CreateChildWorkItemRequest` | `ChildWorkItem` | 是 | id generator、parent lookup | child work != runtime step | reject | Step 9 |
 | `UpdateWorkItemLifecycleRequest` | `WorkItem` / `ChildWorkItem` | 是 | evidence resolver when required | evidence ref != source ref | reject | Step 9 |
 | `RequestWorkPromotionRequest` | `PromoteResult` | 是 | id generator、source resolver | promote result ref != created work ref | reject | Step 9 |
-| `ReviewWorkPromotionRequest` | `PromoteResult`、optional work truth | 是 | id generator on accept | accept decision requires intent | reject | Step 9 |
+| `ReviewWorkPromotionRequest` | `PromoteResult`、optional work truth | 是 | id generator on accept;reject reason from `PromoteReviewDecision::Reject(reason)` | accept decision requires intent;reject decision forbids accepted intent | reject | Step 9 |
 | dependency / blocker requests | `WorkDependency`、`WorkBlocker` | 是 | ids、graph snapshot、evidence resolver | dependency ref != blocker ref | reject | Step 9 |
 | iteration requests | `Iteration`、`IterationCommitment` | 是 | id generator、timebox resolver、work lookup | process timebox != iteration | reject | Step 9 |
 | query requests | public view DTO | 是 | repository / projection mapping | repository `Page<T>` != public page | surface marker | Step 9 |
@@ -1783,7 +1818,7 @@ pub enum WorkProtocolError {
 
 | 协议类别 | 幂等要求 | 审计 / trace | outbox | 备注 |
 |---|---|---|---|---|
-| Command | `CommandMetadata.request.idempotency_key` 必填 | 核心 truth 写成功必须写 trace / audit | truth changed 必须 enqueue | duplicate 返回既有 result |
+| Command | `CommandMetadata.request.idempotency_key` 必填 | 核心 truth 写成功必须写 trace / audit | truth changed 必须 enqueue | duplicate 通过 `CommandResultRepository` 返回既有 result |
 | Query | 不要求 idempotency | 不写 audit,可读 trace | 不写 outbox | 不触发 rebuild |
 | Inbound Event | `source_event_id + topic + source_ref` dedup | snapshot / pending 写入可写 trace | 仅必要时 enqueue derived changed | 不直接创建 WorkItem |
 | Outbound Event | outbox id 驱动 publication | 使用已有 trace_context_ref | publisher 只发布 | 失败 mark failed |

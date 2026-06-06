@@ -73,7 +73,7 @@
 - 18 个 Command 入口。
 - 8 个 Query 入口。
 - 7 个 Inbound Event Consumer。
-- 9 个 Outbound Event payload。
+- 10 个 Outbound Event payload。
 - 6 个 Operations Job。
 - repository / UnitOfWork / idempotency / resolver / publisher / handoff / projection / config / clock / id generator port。
 - in-memory repository、fake resolver、fake publisher、fake handoff、deterministic clock / id 和 configured adapter ref 校验。
@@ -198,7 +198,7 @@
 | 18 个 Command DTO 与 handler | code / api | `03` §7~§9、`06` `AC-WORK-006~013` | `crates/contracts/src/commands.rs`、`crates/api/src/command_handlers.rs`、application services | validation、idempotency、outbox、error mapping tests 通过 |
 | 8 个 Query DTO 与 handler | code / api | `03` §7~§9、`06` `AC-WORK-005/012` | `crates/contracts/src/queries.rs`、`crates/api/src/query_handlers.rs`、query service | no-write、visibility、stale / failed marker tests 通过 |
 | 7 个 Inbound Event Consumer | code / event | `03` §7~§9 | `crates/contracts/src/events.rs`、`crates/worker/src/event_consumers.rs`、consumer service | duplicate、dead-letter、snapshot / marker only tests 通过 |
-| 9 个 Outbound Event payload 与 publisher | code / event | `03` §7~§9 / §14 | `crates/contracts/src/events.rs`、`crates/worker/src/outbox_publisher.rs`、`crates/infra/src/publishers.rs` | event schema、payload body absent、publish failure evidence tests 通过 |
+| 10 个 Outbound Event payload 与 publisher | code / event | `03` §7~§9 / §14 | `crates/contracts/src/events.rs`、`crates/worker/src/outbox_publisher.rs`、`crates/infra/src/publishers.rs` | event schema、payload body absent、publish failure evidence tests 通过 |
 | 6 个 Operations Job runners | code / binary | `03` §7~§9、`06` `AC-WORK-013` | `crates/contracts/src/jobs.rs`、`crates/jobs/src/*` | item UoW、partial failure、rerun、report ref tests 通过 |
 | Domain truth objects and policies | code | `03` §5 / §6 / §9 / §10 | `crates/domain/src/{project,member,backlog,work_item,promote,dependency,iteration,reference,trace,outbox,errors}.rs` | CORE / MEMBER / FORMAL / PROMOTE / DEP / ITER domain tests 通过 |
 | Repository、UoW、idempotency 和 in-memory store | code | `03` §7 / §11~§13 | `crates/application/src/{ports,unit_of_work,idempotency}.rs`、`crates/infra/src/*stores*.rs` | rollback、duplicate、conflict、version conflict、commit unknown tests 通过 |
@@ -309,7 +309,7 @@ tests + scripts + artifacts/test/<run_id> + reports/
 
 本轮在 `/home/aris/Projects/quantalithos-work` 交付 Rust 2024 workspace,包含 `work-contracts`、`work-domain`、`work-application`、`work-infra`、`work-api`、`work-worker` 和 `work-jobs` 七个 workspace member。
 
-本轮交付范围包括 18 个 Command、8 个 Query、7 个 Inbound Event Consumer、9 个 Outbound Event、6 个 Operations Job、repository / UoW / idempotency / resolver / publisher / handoff / projection / config / clock / id generator port、in-memory / fake adapter、P0 config profile、automated suites、gate / report / check scripts、`artifacts/test/<run_id>` 和 `reports/` 证据结构。
+本轮交付范围包括 18 个 Command、8 个 Query、7 个 Inbound Event Consumer、10 个 Outbound Event、6 个 Operations Job、repository / UoW / idempotency / resolver / publisher / handoff / projection / config / clock / id generator port、in-memory / fake adapter、P0 config profile、automated suites、gate / report / check scripts、`artifacts/test/<run_id>` 和 `reports/` 证据结构。
 
 本轮不交付高级看板、多视图偏好、自动维护建议、容量趋势、工具治理协同、跨项目依赖理解、真实生产 DB / MQ / search / trace / archive adapter、config center、hot reload、admin override、secret provider、production SLO、deployment topology 或 on-call runbook。
 ````

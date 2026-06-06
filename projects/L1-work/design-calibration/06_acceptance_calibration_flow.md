@@ -88,7 +88,7 @@
 | Step 4 | 定义正式验收进入条件必须固定文档、实现、构建、环境、配置、数据、run_id 和证据路径;退出条件必须形成三值裁决、缺陷和风险闭环 | 否 | 验收门禁规则,无设计或测试契约变化 | 无 | 已确认 |
 | Step 5 | 定义 `AC-WORK-001`~`013` 的核心闭环和功能能力门禁,以 `FR-WORK-001`~`008`、`TC-WORK-*`、`EV-WORK-*` 为证据入口;外围增强只作 P1/P2 后置边界 | 否 | 功能验收门禁,无设计或测试契约变化 | 无 | 已确认 |
 | Step 6 | 定义 Work truth ownership、外部正文排除、query / projection / maintenance no-write、配置不可绕过核心边界和唯一编译期依赖等红线门禁 | 否 | 数据边界与架构红线门禁,无设计或测试契约变化 | 无 | 已确认 |
-| Step 7 | 定义 18 个 Command、8 个 Query、7 个 Inbound Consumer、9 个 Outbound Event、6 个 Operations Job 和跨仓依赖类型的接口 / 事件 / 同步验收门禁 | 否 | 接口、事件与跨仓同步门禁,无设计或测试契约变化 | 无 | 已确认 |
+| Step 7 | 定义 18 个 Command、8 个 Query、7 个 Inbound Consumer、10 个 Outbound Event、6 个 Operations Job 和跨仓依赖类型的接口 / 事件 / 同步验收门禁 | 否 | 接口、事件与跨仓同步门禁,无设计或测试契约变化 | 无 | 已确认 |
 | Step 8 | 定义业务 truth 状态、辅助状态、UoW、rollback、optimistic version、idempotency / dedup、commit unknown 和 job recovery 的一致性验收门禁 | 否 | 状态机、事务与一致性门禁,无设计或测试契约变化 | 无 | 已确认 |
 | Step 9 | 定义性能观察、运行边界阈值、可用性 / 降级、安全 / 授权、兼容性、容量、恢复和幂等一致性等非功能验收门禁 | 否 | 非功能验收门禁,无设计或测试契约变化 | 无 | 已确认 |
 | Step 10 | 定义 trace / audit / outbox / structured log / metric、EV 索引、gate results、redaction、acceptance handoff、veto checklist 和 risk acceptance 的证据门禁 | 否 | 可观测性、审计与证据门禁,无设计或测试契约变化 | 无 | 已确认 |

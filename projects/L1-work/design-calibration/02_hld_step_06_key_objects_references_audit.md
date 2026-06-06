@@ -132,7 +132,7 @@
 | 成员函数 | 作用 |
 |---|---|
 | `relates_to(WorkTraceSubjectRef subject_ref)` | 判断是否属于某对象 |
-| `prepare_handoff(ArchiveHandoffRef archive_ref)` | 形成归档交接意图 |
+| `prepare_handoff(TraceHandoffTargetRef target_ref)` | 形成 trace handoff 交接意图 |
 
 | 工厂函数 | 作用 |
 |---|---|

@@ -44,7 +44,7 @@
 
 4. 事务失败、并发冲突、重复请求、外部依赖失败如何处理?
 
-   回答:事务内失败 rollback,不得写 accepted truth / outbox / projection stale 成功副作用。version conflict 返回 `VersionConflict` 或 event retry。duplicate same digest 返回 stored result;different digest 返回 `IdempotencyConflict`。外部依赖 failure 不补造外部 truth:command reject / unresolved,consumer 保存 failed / unresolved marker 或 retry,job 写 failed_refs。
+   回答:事务内失败 rollback,不得写 accepted truth / outbox / projection stale 成功副作用。version conflict 返回 `VersionConflict` 或 event retry。duplicate same digest 通过 `CommandResultRepository.get_result` 返回 stored result;different digest 返回 `IdempotencyConflict`。外部依赖 failure 不补造外部 truth:command reject / unresolved,consumer 保存 failed / unresolved marker 或 retry,job 写 failed_refs。
 
 5. 哪些异常需要写审计、日志或事件?
 
@@ -132,7 +132,7 @@ api / worker / jobs handler
 | `ApplicationError::ExternalReferenceUnresolved` | application | resolver not found / rejected / required snapshot missing | 通常否;source 修复后可重试 | `WorkProtocolError::ExternalReferenceUnresolved` |
 | `ApplicationError::TemporarilyUnavailable` | application | repository / port / UoW temporary failure | 是 | `WorkProtocolError::TemporarilyUnavailable` |
 | `ApplicationError::CommitStatusUnknown` | application | UoW commit failure after possible partial durable commit | 需人工 / reconciliation | `WorkProtocolError::TemporarilyUnavailable` |
-| `ApplicationError::DuplicateResultMissing` | application idempotency | duplicate reservation points to missing result_ref | 需人工 / reconciliation | `WorkProtocolError::TemporarilyUnavailable` |
+| `ApplicationError::DuplicateResultMissing` | application idempotency | duplicate reservation points to missing result_ref,or `CommandResultRepository.get_result(result_ref)` returns none / wrong result kind | 需人工 / reconciliation | `WorkProtocolError::TemporarilyUnavailable` |
 
 ##### Infrastructure and port errors
 
@@ -297,7 +297,7 @@ L1-work 错误模型采用分层错误边界。Domain 层只返回 `DomainError`
 |---|---|
 | request / metadata / visibility / domain policy 错误 | 调用方修正输入或权限,不可自动原样重试 |
 | version conflict | reload latest version,用同一业务意图重试 |
-| idempotency duplicate | 返回 stored result,不得重放 domain transition |
+| idempotency duplicate | 通过 `CommandResultRepository.get_result` 返回 stored result,不得重放 domain transition |
 | idempotency conflict | reject,调用方更换 key |
 | external reference unresolved | 等待 upstream / resolver 恢复或写 failed / unresolved marker |
 | store / publisher / handoff temporary unavailable | bounded retry;保留 failed marker / report |

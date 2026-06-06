@@ -172,18 +172,18 @@
 
 | 字段 | 类型 | 作用 |
 |---|---|---|
-| `graph_snapshot` | `WorkDependencyGraphSnapshot` | 当前依赖图摘要 |
+| `graph_snapshot` | `DependencyGraphSnapshot` | 当前依赖图摘要 |
 | `project_id` | `ProjectId` | 图所在项目 |
 
 | 成员函数 | 作用 |
 |---|---|
-| `assert_can_link(FormalWorkRef upstream, FormalWorkRef downstream)` | 校验依赖可建立 |
+| `assert_can_link(DependencyGraphSnapshot graph, FormalWorkRef upstream, FormalWorkRef downstream)` | 校验依赖可建立 |
 | `assert_dependency_state_transition_allowed(WorkDependency dependency, DependencyTarget target, DependencyChangeReason reason, Option<ExternalEvidenceRef> evidence_ref)` | 校验满足、豁免或取消依赖是否允许 |
 | `assert_can_resolve(WorkDependency dependency, ExternalEvidenceRef evidence_ref)` | 校验解除依据 |
 
 | 工厂函数 | 作用 |
 |---|---|
-| `from_graph(ProjectId project_id, WorkDependencyGraphSnapshot graph_snapshot)` | 从依赖图摘要形成策略 |
+| `from_graph(ProjectId project_id, DependencyGraphSnapshot graph_snapshot)` | 从依赖图摘要形成策略 |
 
 禁止事项:不得产生孤儿依赖或不可解释循环。
 

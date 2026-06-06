@@ -244,7 +244,7 @@ Co-Authored-By: Codex <noreply@openai.com>
 | `commit-07-c` | `query` | search、trace、board view and query handlers | `TC-WORK-QUERY-006~008`;`api-contract-fast` selected |
 | `commit-08-a` | `event` | inbound / outbound event DTO、job DTO、receipt and report schema | event / job contract tests |
 | `commit-08-b` | `consumer` | 7 consumer flows、dedup、quarantine and markers | consumer selected tests;redaction selected |
-| `commit-08-c` | `outbox` | outbox publisher、9 outbound events and retry / failed marker | `TC-WORK-OPS-001`;consumer-outbox selected |
+| `commit-08-c` | `outbox` | outbox publisher、10 outbound events and retry / failed marker | `TC-WORK-OPS-001`;consumer-outbox selected |
 | `commit-08-d` | `jobs` | projection rebuild、reference refresh and reconciliation jobs | `TC-WORK-OPS-002~004`;no-write checks |
 | `commit-08-e` | `jobs` | trace / archive handoff jobs、rerun and redaction | `TC-WORK-OPS-005~006`;redaction selected |
 | `commit-09-a` | `release` | release gates、evidence pack、veto checklist and acceptance handoff | release gates;evidence pack;path check |

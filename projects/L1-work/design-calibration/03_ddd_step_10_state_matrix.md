@@ -44,7 +44,7 @@
 
 4. 每个转换的前置条件、副作用和错误是什么?
 
-   回答:§7.4~§7.15 给出每个状态机的转换矩阵。核心写路径的共同副作用是 truth save、history / audit trace、outbox enqueue、affected projection stale、idempotency complete;非法 transition 在 domain method 返回 `DomainError::InvalidStateTransition`,由 application 映射 `ApplicationError::DomainRejected`,再由 handler 映射 `WorkProtocolError::DomainRejected`。
+   回答:§7.4~§7.15 给出每个状态机的转换矩阵。核心写路径的共同副作用是 truth save、history / audit trace、outbox enqueue、idempotency complete,以及有正式 public view identity 时的 affected projection stale;非法 transition 在 domain method 返回 `DomainError::InvalidStateTransition`,由 application 映射 `ApplicationError::DomainRejected`,再由 handler 映射 `WorkProtocolError::DomainRejected`。
 
 5. 非法转换应该返回什么错误,是否写审计?
 
@@ -91,7 +91,7 @@
 | `WorkItemState` | `WorkItem` / `ChildWorkItem` / `WorkItemRepository` | `work_state` | `CreateWorkItemFlow`、`CreateChildWorkItemFlow`、`UpdateWorkItemLifecycleFlow`、`CommitIterationScopeFlow`、promote accept path | 是 | `Completed`、`Cancelled`、`Superseded` |
 | `PromoteResultState` | `PromoteResult` / `PromoteRepository` | `PromoteResult.result_state` | `RequestWorkPromotionFlow`、`ReviewWorkPromotionFlow` | 是 | `Superseded` |
 | `DependencyState` | `WorkDependency` / `DependencyRepository` | `WorkDependency.dependency_state` | `LinkWorkDependencyFlow`、`UpdateWorkDependencyStateFlow` | 是 | `Satisfied`、`Waived`、`Cancelled` |
-| `BlockerState` | `WorkBlocker` / `BlockerRepository` | `WorkBlocker.blocker_state` | `OpenWorkBlockerFlow`、`ResolveWorkBlockerFlow`、future mitigation / close command | 是 | `Closed` |
+| `BlockerState` | `WorkBlocker` / `BlockerRepository` | `WorkBlocker.blocker_state`;`WorkBlocker.resolved_evidence_ref` | `OpenWorkBlockerFlow`、`ResolveWorkBlockerFlow`、future mitigation / close command | 是 | `Closed` |
 | `IterationState` | `Iteration` / `IterationRepository` | `Iteration.iteration_state` | `OpenIterationFlow`、`CommitIterationScopeFlow`、`UpdateIterationLifecycleFlow` | 是 | `Closed`、`Cancelled` |
 | `CommitmentState` | `IterationCommitment` / `IterationRepository` | `IterationCommitment.commitment_state` | `CommitIterationScopeFlow`、`UpdateIterationCommitmentFlow`、iteration close path | 是 | `Closed` |
 | `DerivedFreshnessState` | `DerivedWorkViewState` / `ProjectionRepository` | `freshness_state` | truth command、inbound consumer、`RebuildWorkProjectionsFlow` | 否 | 无 |
@@ -332,26 +332,26 @@ Pending --> Published
 | `Committed` | `InProgress` | `WorkItem::transition_lifecycle(...)` via `UpdateWorkItemLifecycleFlow` | target = `InProgress`;iteration gate 允许 | save work;trace;outbox;projection stale | 同上 |
 | `Committed` | `Cancelled` | `WorkItem::transition_lifecycle(...)` via `UpdateWorkItemLifecycleFlow` | cancellation reason 存在 | save work;trace;outbox;projection stale | 同上 |
 | `Committed` | `Superseded` | `WorkItem::transition_lifecycle(...)` via `UpdateWorkItemLifecycleFlow` | superseding reason 存在 | save work;trace;outbox;projection stale | 同上 |
-| `InProgress` | `Completed` | `WorkItem::mark_completed(evidence_ref, actor)` or `transition_lifecycle(Completed, ..., Some(evidence_ref), actor)` via `UpdateWorkItemLifecycleFlow` | `evidence_ref.verified_state = Verified`;completion evidence 存在 | save work with `completion_ref`;trace;outbox;projection stale | 同上 |
+| `InProgress` | `Completed` | `WorkItem::mark_completed(evidence_ref, actor)` or `WorkItem::transition_lifecycle(Completed, ..., Some(evidence_ref), actor)` or `ChildWorkItem::transition_lifecycle(Completed, ..., Some(evidence_ref), actor)` via `UpdateWorkItemLifecycleFlow` | `evidence_ref.verified_state = Verified`;completion evidence 存在 | save root / child work with `completion_ref`;trace;outbox;projection stale | 同上 |
 | `InProgress` | `Superseded` | `WorkItem::transition_lifecycle(...)` via `UpdateWorkItemLifecycleFlow` | superseding reason 存在 | save work;trace;outbox;projection stale | 同上 |
 
 ##### `PromoteResultState`
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| create | `PendingReview` | `PromoteResult::evaluate(promote_result_id, source_ref, reason, actor)` via `RequestWorkPromotionFlow` | source ref 可追溯;reason / actor 存在 | save PromoteResult;trace;enqueue `PromoteResultRecorded`;projection stale | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
-| `PendingReview` | `Accepted` | `PromoteResult::accept(work_ref, actor)` via `ReviewWorkPromotionFlow` | accept path 同时创建 / 绑定 formal work;work ref 存在 | save PromoteResult;save work if created;trace;outbox;projection stale | 同上 |
-| `PendingReview` | `Rejected` | `PromoteResult::reject(reason, actor)` via `ReviewWorkPromotionFlow` | reject reason 存在 | save PromoteResult;decision record;outbox;projection stale | 同上 |
-| `PendingReview` | `Superseded` | supersede path via future review / cleanup flow | later decision ref 存在 | save PromoteResult;trace;outbox;projection stale | 同上 |
-| `Accepted` | `Superseded` | supersede path via future review / cleanup flow | later accepted / rejected decision 存在 | save PromoteResult;trace;outbox;projection stale | 同上 |
-| `Rejected` | `Superseded` | supersede path via future review / cleanup flow | later decision ref 存在 | save PromoteResult;trace;outbox;projection stale | 同上 |
+| create | `PendingReview` | `PromoteResult::evaluate(promote_result_id, source_ref, reason, actor)` via `RequestWorkPromotionFlow` | source ref 可追溯;reason / actor 存在 | save PromoteResult;trace;enqueue `PromoteResultRecorded`;no projection stale because no P0 promote/intake public view identity | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
+| `PendingReview` | `Accepted` | `PromoteResult::accept(work_ref, actor)` via `ReviewWorkPromotionFlow` | accept path 同时创建 / 绑定 formal work;work ref 存在 | save PromoteResult;save work if created;trace;outbox;mark existing work views stale when formal work is created / bound | 同上 |
+| `PendingReview` | `Rejected` | `PromoteResult::reject(reason, actor)` via `ReviewWorkPromotionFlow` | reject reason 存在 | save PromoteResult;decision record;outbox;no projection stale because no P0 promote/intake public view identity | 同上 |
+| `PendingReview` | `Superseded` | supersede path via future review / cleanup flow | later decision ref 存在 | future flow must define affected public views before marking stale;current P0 no projection stale | 同上 |
+| `Accepted` | `Superseded` | supersede path via future review / cleanup flow | later accepted / rejected decision 存在 | future flow must define affected public views before marking stale;current P0 no projection stale | 同上 |
+| `Rejected` | `Superseded` | supersede path via future review / cleanup flow | later decision ref 存在 | future flow must define affected public views before marking stale;current P0 no projection stale | 同上 |
 
 ##### `DependencyState`
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| create | `Proposed` | `WorkDependency::link(dependency_id, upstream, downstream, reason)` via `LinkWorkDependencyFlow` | upstream / downstream 都是 formal work;不同 work;dependency graph policy 通过 | save dependency;history;trace;enqueue `WorkDependencyChanged`;projection stale | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
-| `Proposed` | `Active` | `WorkDependency::activate(actor, reason)` via `LinkWorkDependencyFlow` or `UpdateWorkDependencyStateFlow` | dependency graph 仍合法;reason / actor 存在 | save dependency;history;outbox;projection stale | 同上 |
+| create | `Proposed` | `WorkDependency::link(dependency_id, upstream, downstream, reason)` via `LinkWorkDependencyFlow` | upstream / downstream 都是 formal work;不同 work;downstream `FormalWorkScope` 解析成功;dependency graph policy 通过 | save dependency;history;trace;enqueue `WorkDependencyChanged`;mark downstream project-board and resolvable member-work stale | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
+| `Proposed` | `Active` | `WorkDependency::activate(actor, reason)` via `LinkWorkDependencyFlow` or `UpdateWorkDependencyStateFlow` | state-change reason.kind = `Activated`;actor 存在;Update flow 重新确认 upstream / downstream formal work 仍存在;downstream `FormalWorkScope` 解析成功 | save dependency;history;outbox;mark downstream project-board and resolvable member-work stale | 同上 |
 | `Proposed` | `Cancelled` | `WorkDependency::cancel(reason, actor)` via `UpdateWorkDependencyStateFlow` | reason / actor 存在 | save dependency;history;outbox;projection stale | 同上 |
 | `Active` | `Satisfied` | `WorkDependency::mark_satisfied(evidence_ref, actor)` via `UpdateWorkDependencyStateFlow` | evidence verified;upstream completion / policy 通过 | save dependency;history;outbox;projection stale | 同上 |
 | `Active` | `Waived` | `WorkDependency::waive(reason, actor)` via `UpdateWorkDependencyStateFlow` | waiver reason / actor 存在 | save dependency;history;outbox;projection stale | 同上 |
@@ -361,13 +361,15 @@ Pending --> Published
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| create | `Open` | `WorkBlocker::open(blocker_id, work_ref, cause_ref, actor)` via `OpenWorkBlockerFlow` | formal work 存在;cause ref 可追溯;actor 存在 | save blocker;history;trace;enqueue `WorkBlockerChanged`;projection stale | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
+| create | `Open` | `WorkBlocker::open(blocker_id, work_ref, cause_ref, actor)` via `OpenWorkBlockerFlow` | formal work 存在;`FormalWorkScope` 解析成功;cause ref 可追溯;actor 存在 | save blocker with `resolved_evidence_ref = None`;history;trace;enqueue `WorkBlockerChanged`;mark blocked project-board and resolvable member-work stale | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
 | `Open` | `Mitigating` | `WorkBlocker::start_mitigation(reason, actor)` via future command / internal service | mitigation reason / actor 存在 | save blocker;history;outbox;projection stale | 同上 |
-| `Open` | `Resolved` | `WorkBlocker::resolve(evidence_ref, actor)` via `ResolveWorkBlockerFlow` | evidence verified;actor 存在 | save blocker;history;enqueue `WorkBlockerChanged`;projection stale | 同上 |
-| `Mitigating` | `Resolved` | `WorkBlocker::resolve(evidence_ref, actor)` via `ResolveWorkBlockerFlow` | evidence verified;actor 存在 | save blocker;history;outbox;projection stale | 同上 |
+| `Open` | `Resolved` | `WorkBlocker::resolve(evidence_ref, actor)` via `ResolveWorkBlockerFlow` | evidence verified;actor 存在;blocked work `FormalWorkScope` 解析成功 | save blocker with `resolved_evidence_ref = Some(evidence_ref)`;history;enqueue `WorkBlockerChanged`;mark blocked project-board and resolvable member-work stale | 同上 |
+| `Mitigating` | `Resolved` | `WorkBlocker::resolve(evidence_ref, actor)` via `ResolveWorkBlockerFlow` | evidence verified;actor 存在 | save blocker with `resolved_evidence_ref = Some(evidence_ref)`;history;outbox;projection stale | 同上 |
 | `Resolved` | `Closed` | `WorkBlocker::close(reason, actor)` via future command / cleanup flow | close reason / actor 存在 | save blocker;history;outbox;projection stale | 同上 |
 
 说明:`start_mitigation` 和 `close` 已在 Step 6 object contract 中定义,但 Step 8 / Step 9 当前 P0 协议只显式覆盖 `OpenWorkBlockerFlow` 和 `ResolveWorkBlockerFlow`。若实施边界需要开放 mitigation / close,必须在 Step 8 / Step 9 补对应协议和处理流后才能落码。
+
+Dependency / blocker 的 projection stale scope 不得从 `FormalWorkRef` 字符串或 id 形态推断。所有 accepted path 必须通过 `WorkItemRepository.get_formal_work_scope(...)` 得到 project / backlog / optional assignee。当前 P0 relation 变化只标记 project-board 与可解析的 member-work;`WorkSearchProjection` 不含 relation 字段,不因 dependency / blocker 变化标脏。
 
 ##### `IterationState`
 
@@ -387,8 +389,8 @@ Pending --> Published
 | create | `Candidate` | `IterationCommitment::from_candidates(commitment_id, iteration_id, candidates, actor)` within `CommitIterationScopeFlow` | candidates 非空且均为 formal work | build commitment candidate before iteration commit | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
 | `Candidate` | `Committed` | `Iteration::commit(commitment, actor)` via `CommitIterationScopeFlow` | owning iteration = `Planning`;candidate set policy 通过 | save commitment;iteration `Committed`;work `Committed`;outbox;projection stale | 同上 |
 | `Committed` | `Changed` | `IterationCommitment::apply_change(change_set, reason, actor)` via `UpdateIterationCommitmentFlow` | owning iteration 未 closed / cancelled;change set 合法 | save commitment;iteration change record;outbox;projection stale | 同上 |
-| `Committed` | `Closed` | `IterationCommitment::close(reason, actor)` via `UpdateIterationLifecycleFlow` close path | owning iteration closing | save commitment;outbox;projection stale | 同上 |
-| `Changed` | `Closed` | `IterationCommitment::close(reason, actor)` via `UpdateIterationLifecycleFlow` close path | owning iteration closing | save commitment;outbox;projection stale | 同上 |
+| `Committed` | `Closed` | `IterationCommitment::close(close_reason, actor)` via `UpdateIterationLifecycleFlow` close path | owning iteration closing;close reason 与 `Iteration::close(...)` 同源 | save commitment;outbox;projection stale | 同上 |
+| `Changed` | `Closed` | `IterationCommitment::close(close_reason, actor)` via `UpdateIterationLifecycleFlow` close path | owning iteration closing;close reason 与 `Iteration::close(...)` 同源 | save commitment;outbox;projection stale | 同上 |
 
 #### 8.5 辅助状态转换矩阵
 
@@ -442,13 +444,13 @@ Pending --> Published
 | `UpdateProjectMemberResponsibilityFlow` | ProjectMember state transition | derived views -> `Stale` | ProjectMember、trace、outbox、projection stale | 不删除 member history |
 | `CreateWorkItemFlow` / `CreateChildWorkItemFlow` | WorkItem / ChildWorkItem -> `Formalized` | derived views -> `Stale` | Work truth、trace、outbox、projection stale | 不复制 source body |
 | `UpdateWorkItemLifecycleFlow` | WorkItemState transition | completion path writes `completion_ref`;derived views -> `Stale` | Work truth、trace、outbox、projection stale | `Completed` 不得无 verified evidence |
-| `ReviewWorkPromotionFlow` | PromoteResult -> `Accepted` / `Rejected` | accept path may create WorkItem `Formalized`;derived views -> `Stale` | PromoteResult、optional WorkItem、decision record、trace、outbox、projection stale | inbound runtime event 不得直接创建 PromoteResult |
+| `ReviewWorkPromotionFlow` | PromoteResult -> `Accepted` / `Rejected` | accept path may create WorkItem `Formalized`;accept path affected existing work views -> `Stale`;reject path no projection stale | PromoteResult、optional WorkItem、decision record、trace、outbox、projection stale only for accept-created / bound WorkItem views | inbound runtime event 不得直接创建 PromoteResult |
 | `LinkWorkDependencyFlow` / `UpdateWorkDependencyStateFlow` | DependencyState transition | dependency history;derived views -> `Stale` | Dependency、history、trace、outbox、projection stale | 不允许 orphan / self dependency |
-| `OpenWorkBlockerFlow` / `ResolveWorkBlockerFlow` | BlockerState transition | dependency / blocker history;derived views -> `Stale` | Blocker、history、trace、outbox、projection stale | 不把 blocker cause body 写入 Work |
+| `OpenWorkBlockerFlow` / `ResolveWorkBlockerFlow` | BlockerState transition | dependency / blocker history;derived views -> `Stale`;resolve path writes `resolved_evidence_ref` | Blocker、history、trace、outbox、projection stale | 不把 blocker cause body 或 evidence body 写入 Work |
 | `CommitIterationScopeFlow` | Iteration -> `Committed`;Commitment -> `Committed`;Work -> `Committed` | derived views -> `Stale` | Iteration、Commitment、Work marks、history、trace、outbox、projection stale | 不允许 non-formal work 入 commitment |
 | `UpdateIterationCommitmentFlow` | Commitment -> `Changed` | iteration/member views -> `Stale` | Commitment、change record、trace、outbox、projection stale | 不修改 closed commitment |
 | `UpdateIterationLifecycleFlow` | Iteration -> `InProgress` / `Closed` / `Cancelled` | close path Commitment -> `Closed`;derived views -> `Stale` | Iteration、Commitment when applicable、trace、outbox、projection stale | 不改 process timebox truth |
-| Inbound consumer flows | ReferenceResolutionStatus -> `Resolved` / `Stale` / `Unresolved` | affected derived views -> `Stale` | reference state / snapshot、projection stale、idempotency complete | 不创建 Work business truth |
+| Inbound consumer flows | ReferenceResolutionStatus -> `Resolved` / `Stale` / `Unresolved` | affected public derived views -> `Stale` only when a formal view identity exists;runtime pending promote intake has no projection stale | reference state / snapshot、projection stale when applicable、idempotency complete | 不创建 Work business truth |
 | `PublishWorkOutboxFlow` | OutboxPublicationState -> `Published` / `Failed` | 无业务 truth 联动 | outbox publication marker only | 不回滚或改写 source truth |
 | `RebuildWorkProjectionsFlow` | DerivedFreshnessState -> `Rebuilding` / `Fresh` / `Failed` | optional `DerivedWorkViewChanged` outbox | projection replace、freshness marker、idempotency complete | 不从旧 projection 反推 truth |
 | `RefreshExternalReferenceSnapshotsFlow` | ReferenceResolutionStatus -> `Resolved` / `Failed` | affected derived views -> `Stale` | reference state / snapshot、projection stale、idempotency complete | 不修复业务 truth |
@@ -461,7 +463,7 @@ Pending --> Published
 | 终态再次迁移 | Step 6 domain method | 同上 | 否 | 否 | 否 | rollback |
 | 缺少 required reason / actor | handler / application service / domain method | `ApplicationError::InvalidRequest` 或 `DomainError::InvalidStateTransition` | 否 | 否 | 否 | reserve 前发现则不写幂等;reserve 后 rollback |
 | `Completed` 缺 verified evidence | domain method / evidence policy | `DomainError::InvalidStateTransition` / `DomainError::PolicyRejected` -> `ApplicationError::DomainRejected` | 否 | 否 | 否 | rollback |
-| dependency orphan / self-loop / forbidden cycle | `DependencyGraphPolicy.assert_can_link(...)` | `DomainError::PolicyRejected` -> `ApplicationError::DomainRejected` | 否 | 否 | 否 | rollback |
+| dependency orphan / self-loop / forbidden cycle | `DependencyGraphPolicy.assert_can_link(graph, upstream, downstream)` | `DomainError::PolicyRejected` -> `ApplicationError::DomainRejected` | 否 | 否 | 否 | rollback |
 | commitment 含 non-formal work | `IterationCommitment::from_candidates(...)` / service lookup | `ApplicationError::InvalidRequest` or `DomainError::PolicyRejected` | 否 | 否 | 否 | rollback |
 | stale / failed projection 被 query 读取 | query service | no error;surface = `Stale` / `Failed` / `Rebuilding` | 否 | 否 | 否 | query no idempotency |
 | reference resolver temporary failure | consumer / refresh job | retry / job report failed;state may become `Failed` if marker contract closed | 不写业务 truth | 否 | 可 mark stale | consumer / job dedup complete only if failure policy accepts marker |
@@ -478,7 +480,7 @@ Pending --> Published
 | `BacklogState` | `TC-WORK-BACKLOG-001` | Open <-> LockedForMaintenance;Archived only via project archive |
 | `WorkItemState` | `TC-WORK-ITEM-001/002/003` | Formalized -> Committed/InProgress;Completed requires verified evidence;terminal rejects |
 | `PromoteResultState` | `TC-WORK-PROMOTE-001/002` | PendingReview accept/reject;accept path binds formal work;rejected has reason |
-| `DependencyState` | `TC-WORK-DEP-001/002` | Proposed -> Active;Active -> Satisfied/Waived/Cancelled;terminal rejects |
+| `DependencyState` | `TC-WORK-DEP-001/003` | Proposed -> Active via Link or Update;Active -> Satisfied/Waived/Cancelled;terminal rejects |
 | `BlockerState` | `TC-WORK-BLOCKER-001/002` | Open -> Resolved;future mitigation / close boundary explicit |
 | `IterationState` / `CommitmentState` | `TC-WORK-ITER-001..004` | commit links iteration + commitment + work marks;close closes commitment |
 | `DerivedFreshnessState` | `TC-WORK-PROJECTION-*` | truth change marks stale;rebuild success marks fresh;failed marker visible |
@@ -495,7 +497,7 @@ Pending --> Published
 
 #### 5.9 状态机与转换矩阵
 
-L1-work 详细设计将状态机分为业务 truth 状态和辅助状态。业务 truth 状态由 domain object method 修改,并经 application command flow 在同一 UnitOfWork 内保存 truth、history / audit、outbox、projection stale marker 和 idempotency result。辅助状态包括 derived projection freshness、external reference resolution 和 outbox publication,它们不得反向修改业务 truth。
+L1-work 详细设计将状态机分为业务 truth 状态和辅助状态。业务 truth 状态由 domain object method 修改,并经 application command flow 在同一 UnitOfWork 内保存 truth、history / audit、outbox、idempotency result,以及有正式 public view identity 时的 projection stale marker。没有 query / projection identity 的 truth 或 marker 不得临时派生 `DerivedWorkViewRef`。辅助状态包括 derived projection freshness、external reference resolution 和 outbox publication,它们不得反向修改业务 truth。
 
 正式状态机如下:
 
@@ -507,7 +509,7 @@ L1-work 详细设计将状态机分为业务 truth 状态和辅助状态。业�
 | `WorkItemState` | `WorkItem` / `ChildWorkItem` | `work_state` | work create / lifecycle / iteration / promote flows |
 | `PromoteResultState` | `PromoteResult` | `result_state` | `RequestWorkPromotionFlow`、`ReviewWorkPromotionFlow` |
 | `DependencyState` | `WorkDependency` | `dependency_state` | `LinkWorkDependencyFlow`、`UpdateWorkDependencyStateFlow` |
-| `BlockerState` | `WorkBlocker` | `blocker_state` | `OpenWorkBlockerFlow`、`ResolveWorkBlockerFlow` |
+| `BlockerState` | `WorkBlocker` | `blocker_state`;`resolved_evidence_ref` | `OpenWorkBlockerFlow`、`ResolveWorkBlockerFlow` |
 | `IterationState` | `Iteration` | `iteration_state` | `OpenIterationFlow`、`CommitIterationScopeFlow`、`UpdateIterationLifecycleFlow` |
 | `CommitmentState` | `IterationCommitment` | `commitment_state` | `CommitIterationScopeFlow`、`UpdateIterationCommitmentFlow`、iteration close path |
 | `DerivedFreshnessState` | `DerivedWorkViewState` | `freshness_state` | truth change / consumer stale mark / rebuild job |

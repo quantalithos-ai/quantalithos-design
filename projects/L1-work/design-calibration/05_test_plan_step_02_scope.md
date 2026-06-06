@@ -37,7 +37,7 @@ P0 测试必须证明 `L1-work` 的五个核心能力闭环成立,并覆盖 `03-
 | 依赖、阻塞和完成依据可解释 | 正式工作依赖、阻塞、解除依据和完成依据可追溯,外部正文不入仓 | `AC-WORK-010` / `AC-WORK-019` / `AC-WORK-020`~`AC-WORK-023` |
 | Iteration 承诺子集成立 | Iteration 从正式工作全集形成承诺范围,不等同于 Backlog 全集或 process planning | `AC-WORK-004` / `AC-WORK-011` |
 | 项目工作事实可消费可追溯 | Query / projection / snapshot / report / audit 能授权消费和追溯,但不得反写真相 | `AC-WORK-005` / `AC-WORK-012` / `AC-WORK-013` |
-| 详细设计最小验证清单成立 | 七模块、18 Command、8 Query、7 Inbound Event、9 Outbound Event、6 Job、12 组状态机、事务、幂等、并发、错误恢复、配置边界和观测字段边界均有测试切口 | `03` §15 |
+| 详细设计最小验证清单成立 | 七模块、18 Command、8 Query、7 Inbound Event、10 Outbound Event、6 Job、12 组状态机、事务、幂等、并发、错误恢复、配置边界和观测字段边界均有测试切口 | `03` §15 |
 | 配置默认可验证路径成立 | `local-dev`、`ci-test`、`integration-like`、`operations-replay` profile 的配置加载、失败、敏感输出和证据边界可测试 | `04` §6 / §12 |
 
 ### 3.2 P1/P2 是否只做边界验证或延后?

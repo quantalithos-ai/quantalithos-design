@@ -18,7 +18,7 @@
 | `05_test_plan_step_01_input_boundary.md` | 确认新版 `00/01/02/03/04` 为测试主输入 |
 | `05_test_plan_step_02_scope.md` | 确认 P0/P1/P2 测试范围、非范围和下游接缝边界 |
 | `05_test_plan_step_03_test_objects_cuts.md` | 提供 P0 测试对象、协议、状态、一致性、配置和观测切口 |
-| `03-详细设计.md` §15 | 提供最小验证清单:七模块、18 Command、8 Query、7 Consumer、9 Event、6 Job、12 状态机和一致性边界 |
+| `03-详细设计.md` §15 | 提供最小验证清单:七模块、18 Command、8 Query、7 Consumer、10 Event、6 Job、12 状态机和一致性边界 |
 | `04-配置设计.md` §6~§12 | 提供 profile、配置项、敏感输出、加载校验、失效模式和测试承接 |
 | `测试方案讨论流程_SOP.md` Step 4 | 本步问题、期望产物和进入下一步条件 |
 | `测试方案书写规范.md` §5.4 | 正式测试分层图和分层表格式 |
@@ -45,9 +45,9 @@ service 层负责验证 application service 对 domain、repository port、UnitO
 
 | 风险 | service 层验证方式 | 失败语义 |
 |---|---|---|
-| accepted command 半提交 | command service 断言 truth、trace / audit、outbox、projection stale、idempotency complete 同一 UoW | 阻断 PR / CI |
+| accepted command 半提交 | command service 断言 truth、trace / audit、outbox、projection stale、command result save、idempotency complete 同一 UoW | 阻断 PR / CI |
 | reject 后仍写副作用 | metadata reject、domain reject、version conflict、resolver unresolved 后断言无 accepted truth / outbox / business audit | 阻断 PR / CI |
-| command duplicate / conflict 错误 | same key same digest 返回旧 result;same key different digest 返回 conflict | 阻断 PR / CI |
+| command duplicate / conflict 错误 | same key same digest 从 `CommandResultRepository` 返回旧 result;same key different digest 返回 conflict | 阻断 PR / CI |
 | query no-write 破坏 | 8 个 Query service 断言不打开写 UoW、不写 audit / outbox / idempotency / marker | 阻断 PR / CI |
 | projection stale / failed surface 错误 | query service 映射 stale、rebuilding、failed、not visible,不触发 rebuild 写入 | 阻断 PR / CI |
 | inbound consumer 编排错误 | event service 处理 envelope、dedup、resolver、snapshot / marker 和 dead-letter | 阻断 CI |
@@ -144,7 +144,7 @@ P0 相关失败默认阻断。P1/P2 专项在当前阶段只记录风险,除非�
 原因:
 
 - `L1-work` 的高风险主要来自 truth 边界、状态、幂等、事务、配置和 forbidden body,这些风险应在 unit / service / integration 层提前失败。
-- E2E 更适合证明少量跨模块闭环,不适合穷举 18 Command、8 Query、7 Consumer、9 Event、6 Job 和 12 状态机。
+- E2E 更适合证明少量跨模块闭环,不适合穷举 18 Command、8 Query、7 Consumer、10 Event、6 Job 和 12 状态机。
 - 配置设计已经把 production-like、remote config、hot reload 和完整运维后移,测试分层必须保持 P0 可执行。
 
 ## 7. 结构化中间产物
@@ -205,7 +205,7 @@ P0 相关失败默认阻断。P1/P2 专项在当前阶段只记录风险,除非�
 | Outbound events / outbox | event payload helper | outbox enqueue decision | publisher / outbox worker | event schema | propagation smoke |
 | Operations jobs | job DTO helper | job item orchestration | job runner / report store | job input / report contract | release sample |
 | State matrix | legal / illegal transition | rejected flow side effects | not required by default | selected error mapping | not exhaustive |
-| Transaction / idempotency / concurrency | digest pure function | duplicate / conflict / rollback | UoW / idempotency store | duplicate error surface | selected commit unknown smoke |
+| Transaction / idempotency / concurrency | digest pure function | duplicate / conflict / rollback | UoW / idempotency / command result store | duplicate error surface | selected commit unknown smoke |
 | Configuration | typed value helper | runtime builder behavior where applicable | loader / validator / profile / redaction | protocol rejects config-created invalid request | config redline gate |
 | Observability / audit | allowed field list | audit / trace side effects | log / report scan | event / error field surface | evidence archive |
 

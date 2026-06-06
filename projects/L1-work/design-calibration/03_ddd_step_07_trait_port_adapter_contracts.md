@@ -92,6 +92,7 @@
 | `ProjectionRepository` | projection port | `application/src/ports.rs` | `infra/src/projection_stores.rs` | public read view 与 freshness state | `get_board_view`、`replace_project_views`、`mark_stale` |
 | `ReferenceSnapshotRepository` | repository trait | `application/src/ports.rs` | `infra/src/reference_stores.rs` | 本地 external snapshot / resolution state | `save_member_snapshot`、`get_reference_state` |
 | `IdempotencyRepository` | technical repository | `application/src/idempotency.rs` | `infra/src/idempotency_store.rs` | command / event / job 幂等保护 | `reserve`、`complete`、`mark_conflict` |
+| `CommandResultRepository` | technical repository | `application/src/results.rs` | `infra/src/command_result_store.rs` | command duplicate result replay | `save_result`、`get_result` |
 | `UnitOfWork` / `UnitOfWorkHandle` | technical port | `application/src/unit_of_work.rs` | `infra/src/repositories.rs` | 本地事务边界 | `begin`、`commit`、`rollback` |
 | `IdGeneratorPort` | technical port | `application/src/ports.rs` | `infra/src/clock_id.rs` | Work-owned id 生成 | `next_project_id`、`next_work_item_id` 等 |
 | `ClockPort` | technical port | `application/src/ports.rs` | `infra/src/clock_id.rs` | 时间戳来源 | `now` |
@@ -176,6 +177,7 @@ pub enum PortError {
 | 实现位置 | fake / durable adapter 实现在 `infra` 对应文件 |
 | 事务参数 | create / save / append / enqueue / replace / mark 等写函数必须接收 `&UnitOfWorkHandle` |
 | 乐观锁 | 更新既有 truth 的 save 函数必须接收 `expected_version: Version`;创建函数使用 `Version` 返回值表达初始版本 |
+| 版本读取闭环 | 任一 flow 调用 `save(..., expected_version, &uow)` 时,`expected_version` 来源必须在同一设计中闭合:来自 public request、前置 create 返回值,或 repository 带 version 的读取函数;service 内部级联更新不得使用未定义的临时 version |
 | 查询分页 | repository 内部分页使用 `Page<T>` 和 core `PageRequest` / `PageToken`;public query page DTO 留给 Step 8 |
 | 错误类型 | repository 不返回 `ApplicationError`;由 application service 做错误映射 |
 | 外部正文 | repository 不保存 identity / conversation / method / process / governance / artifact / runtime 正文 |
@@ -284,6 +286,12 @@ pub trait BacklogRepository {
         project_ref: ProjectRef,
     ) -> Result<Option<Backlog>, RepositoryError>;
 
+    /// Loads the project backlog with its optimistic version for internal linked updates.
+    async fn get_by_project_with_version(
+        &self,
+        project_ref: ProjectRef,
+    ) -> Result<Option<(Backlog, Version)>, RepositoryError>;
+
     /// Checks whether a formal work ref belongs to the backlog.
     async fn contains_formal_work(
         &self,
@@ -319,6 +327,7 @@ pub trait BacklogRepository {
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
 | `get_by_project` | `ProjectRef` | `Option<Backlog>` | `RepositoryError` | create work / query | Project 不存在由 service 判定 |
+| `get_by_project_with_version` | `ProjectRef` | `Option<(Backlog, Version)>` | `RepositoryError` | project archive linked update | 仅供需要立即 `save(backlog, expected_version, &uow)` 的内部级联写路径;返回 version 是 optimistic save 的唯一正式来源 |
 | `contains_formal_work` | `BacklogRef`、`FormalWorkRef` | `bool` | `RepositoryError` | iteration / dependency policy | 只查 membership,不查外部 plan |
 | `add_formal_work` | `BacklogRef`、`FormalWorkRef`、UoW | `()` | `RepositoryError` | create work / promote accept | 必须与 work truth 创建同 UoW |
 
@@ -332,6 +341,12 @@ pub trait WorkItemRepository {
         &self,
         work_ref: FormalWorkRef,
     ) -> Result<Option<FormalWorkRecord>, RepositoryError>;
+
+    /// Loads the project and projection scope for a formal work reference.
+    async fn get_formal_work_scope(
+        &self,
+        work_ref: FormalWorkRef,
+    ) -> Result<Option<FormalWorkScope>, RepositoryError>;
 
     /// Loads a root work item.
     async fn get_work_item(
@@ -382,11 +397,24 @@ pub enum FormalWorkRecord {
     /// A child work item record.
     ChildWorkItem(ChildWorkItem),
 }
+
+/// Repository-derived scope for relation policy and projection invalidation.
+pub struct FormalWorkScope {
+    /// Formal work reference that was resolved.
+    pub work_ref: FormalWorkRef,
+    /// Project that owns the formal work through backlog membership.
+    pub project_ref: ProjectRef,
+    /// Owning backlog.
+    pub backlog_ref: BacklogRef,
+    /// Assignee whose member-work view is affected, when known.
+    pub assignee_ref: Option<ProjectMemberRef>,
+}
 ```
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
 | `get_formal_work` | `FormalWorkRef` | `Option<FormalWorkRecord>` | `RepositoryError` | lifecycle / dependency / iteration / query | 统一 root / child 读取 |
+| `get_formal_work_scope` | `FormalWorkRef` | `Option<FormalWorkScope>` | `RepositoryError` | dependency / blocker command、projection stale 构造 | 只读 scope 解析;不得从 `FormalWorkRef` 字符串推断 project;root work 由 backlog membership 得到 project / backlog / assignee;child work 必须经 parent root / membership 得到 project / backlog,无法稳定得到 assignee 时返回 `assignee_ref = None` |
 | `list_by_backlog` | `BacklogRef`、`PageRequest` | `Page<FormalWorkRef>` | `RepositoryError` | query / projection rebuild | 只返回正式工作引用 |
 | `create_*` | work truth、UoW | `Version` | `RepositoryError` | create / promote accept | 不保存 source body |
 | `save_formal_work` | `FormalWorkRecord`、version、UoW | `Version` | `RepositoryError` | lifecycle command | 必须按实际 variant 保存 |
@@ -513,13 +541,7 @@ pub trait DependencyRepository {
     ) -> Result<(), RepositoryError>;
 }
 
-/// Snapshot of dependency edges used by graph policy.
-pub struct DependencyGraphSnapshot {
-    /// Formal work edges in the project.
-    pub dependency_edges: Vec<(FormalWorkRef, FormalWorkRef)>,
-    /// Currently active blockers by formal work.
-    pub active_blockers: Vec<(FormalWorkRef, WorkBlockerRef)>,
-}
+// DependencyGraphSnapshot is domain-owned; see Step 6 `domain/dependency.rs`.
 ```
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
@@ -829,6 +851,8 @@ pub struct ProjectProjectionBatch {
 | `replace_project_views` | `ProjectProjectionBatch`、cursor、UoW | `()` | `RepositoryError` | rebuild job | 只能从 committed truth 构造 |
 | `mark_stale` | affected views、cursor、UoW | `()` | `RepositoryError` | command / consumer service | stale 不代表新 truth |
 | `mark_rebuilding` / `mark_failed` | affected views、cursor、reason、UoW | `()` | `RepositoryError` | rebuild job | failed / rebuilding marker 不反写真相 |
+
+`mark_stale(...)` 的 `affected` 只能包含 Step 8 §9.2 已正式定义的 public `DerivedWorkViewRef`。当前 P0 只有 project board、member work、iteration summary、work search 四类 derived view identity。PromoteResult 和 PendingPromoteIntake 没有 public query / projection identity,不得临时派生 `promote-*` 或 `intake-*` view ref。
 
 #### 8.11 `ReferenceSnapshotRepository`
 
@@ -1214,12 +1238,16 @@ pub trait IdGeneratorPort {
 
     /// Generates a trace id.
     fn next_trace_id(&self) -> Result<WorkTraceId, PortError>;
+
+    /// Generates an application result id.
+    fn next_result_id(&self) -> Result<ResultId, PortError>;
 }
 ```
 
 | 函数族 | 返回 | 调用方 | 约束 |
 |---|---|---|---|
 | `next_*_id` | Work-owned id | command / consumer / job service | domain 不访问随机数或系统 ID |
+| `next_result_id` | `ResultId` | command / job service before result store save | result id 只用于 `ApplicationResultRef`;不得作为业务 truth id 或 optimistic version |
 
 #### 10.3 `ClockPort`
 
@@ -1312,6 +1340,59 @@ pub enum IdempotencyError {
 | `complete` | reservation、result ref、UoW | `()` | `IdempotencyError` | service success path | duplicate 必须返回同一 result ref |
 | `mark_conflict` | conflict、UoW | `()` | `IdempotencyError` | conflict path | 不执行 business truth 写入 |
 
+#### 10.5 `CommandResultRepository`
+
+```rust
+/// Stores public command result surfaces for idempotency duplicate replay.
+pub trait CommandResultRepository {
+    /// Saves the command result surface under its stable application result ref.
+    async fn save_result(
+        &self,
+        result_ref: ApplicationResultRef,
+        result: StoredCommandResult,
+        uow: &UnitOfWorkHandle,
+    ) -> Result<(), RepositoryError>;
+
+    /// Loads a previously saved command result surface by result ref.
+    async fn get_result(
+        &self,
+        result_ref: ApplicationResultRef,
+    ) -> Result<Option<StoredCommandResult>, RepositoryError>;
+}
+
+/// Application-local union of public command result DTOs.
+pub enum StoredCommandResult {
+    /// Stored result for Project command operations.
+    Project(ProjectCommandResult),
+    /// Stored result for Backlog command operations.
+    Backlog(BacklogCommandResult),
+    /// Stored result for ProjectMember command operations.
+    ProjectMember(ProjectMemberCommandResult),
+    /// Stored result for WorkItem and ChildWorkItem command operations.
+    WorkItem(WorkItemCommandResult),
+    /// Stored result for Promote command operations.
+    Promote(PromoteCommandResult),
+    /// Stored result for Dependency command operations.
+    Dependency(DependencyCommandResult),
+    /// Stored result for Blocker command operations.
+    Blocker(BlockerCommandResult),
+    /// Stored result for Iteration command operations.
+    Iteration(IterationCommandResult),
+}
+```
+
+| 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
+|---|---|---|---|---|---|
+| `save_result` | result ref、stored command result、UoW | `()` | `RepositoryError` | command success path | 必须与 truth / trace / outbox / stale marker 和 `IdempotencyRepository.complete(...)` 同一 UoW;必须先于 idempotency complete 调用 |
+| `get_result` | result ref | `Option<StoredCommandResult>` | `RepositoryError` | command duplicate replay / commit-status audit | read-only;不得重建 truth;不得重放 domain transition |
+
+正式口径:
+
+- `ApplicationResultRef` 是指向 `CommandResultRepository` 中 stored result surface 的稳定指针;`IdempotencyRepository` 只保存这个指针,不保存完整 result DTO。
+- `StoredCommandResult` 保存的是成功写路径原始 `Applied` result surface。duplicate replay 读取后只把返回 receipt 的 `idempotency` surface 改为 `Duplicate`,必须保留原 `result_ref`、primary ref、state、`trace_ref`、`outbox_record_refs` 和 `applied_version`。
+- service 必须按当前 operation 匹配期望 variant。`ApplicationResultRef.operation` 与 variant / command 不匹配,或 `get_result(result_ref)` 返回 `None`,均映射 `ApplicationError::DuplicateResultMissing`。
+- duplicate replay 禁止从当前 Project / Backlog / Work truth 重新构造 result,也禁止再次调用 domain factory / transition。
+
 ### 11. Infra Adapter 契约
 
 #### 11.1 adapter 实现总表
@@ -1330,6 +1411,7 @@ pub enum IdempotencyError {
 | `InMemoryProjectionRepository` | `infra/src/projection_stores.rs` | `ProjectionRepository`、`WorkTruthSnapshotRepository` | P0 fake | replace 只能由 service 调用 |
 | `InMemoryReferenceSnapshotRepository` | `infra/src/reference_stores.rs` | `ReferenceSnapshotRepository` | P0 fake | stale refs 可分页 |
 | `InMemoryIdempotencyRepository` | `infra/src/idempotency_store.rs` | `IdempotencyRepository` | P0 fake | duplicate / conflict 按 digest 判定 |
+| `InMemoryCommandResultRepository` | `infra/src/command_result_store.rs` | `CommandResultRepository` | P0 fake | 按 `ApplicationResultRef` 保存 / 读取 stored result surface;支持 missing 注入 |
 | `InMemoryUnitOfWork` | `infra/src/repositories.rs` | `UnitOfWork` | P0 fake | 测试可断言 commit / rollback |
 | `DeterministicWorkIdGenerator` | `infra/src/clock_id.rs` | `IdGeneratorPort` | P0 fake | fixture 可预测 |
 | `FixedClock` | `infra/src/clock_id.rs` | `ClockPort` | P0 fake | fixture 可预测 |
@@ -1359,6 +1441,7 @@ pub enum IdempotencyError {
 | 本地 truth store | repository trait | application 直接访问 DB client | 保持 application 与 infra 解耦 |
 | projection store | `ProjectionRepository` | query handler 直接访问 projection adapter | query no-write 和 stale surface 由 service 统一处理 |
 | idempotency store | `IdempotencyRepository` | handler 自行判重 | duplicate / conflict 必须覆盖 command、event、job |
+| command result store | `CommandResultRepository` | service 从当前 truth 现算 duplicate result | duplicate 必须返回已保存 result surface,不得重放 domain transition |
 | transaction boundary | `UnitOfWork` | repository 隐式开启不可见事务 | 多 repository / outbox / audit 同 UoW |
 | event bus | `WorkOutboxPublisherPort` | domain 直接 publish | truth commit 与 publish failure 解耦 |
 | identity | `MemberReferencePort` / event consumer snapshot | Cargo 依赖 identity crate | L1-work 不拥有 GlobalMember truth |
@@ -1374,19 +1457,19 @@ pub enum IdempotencyError {
 
 | 处理流 | 必需 repository / port | 写入 UoW | 外部 port | outbox / projection / handoff |
 |---|---|---|---|---|
-| `CreateProject` | `ProjectRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`IdempotencyRepository` | 是 | `IdGeneratorPort`、`ClockPort` | enqueue `ProjectChanged`;mark project views stale |
-| `UpdateProjectLifecycle` | `ProjectRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository` | 是 | `ClockPort` | enqueue `ProjectChanged`;archive 联动 backlog |
-| `UpdateBacklogAvailability` | `BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository` | 是 | `ClockPort` | enqueue backlog / project view changed |
-| `AssignProjectMember` | `ProjectRepository`、`ProjectMemberRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository` | 是 | `MemberReferencePort`、`IdGeneratorPort`、`ClockPort` | enqueue `ProjectMemberChanged`;mark member views stale |
-| `CreateWorkItem` | `ProjectRepository`、`BacklogRepository`、`WorkItemRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository` | 是 | `SourceWorkResolverPort`、`MethodDefinitionResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `WorkItemChanged`;mark board / search stale |
-| `CreateChildWorkItem` | `WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository` | 是 | `SourceWorkResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `WorkItemChanged` |
-| `UpdateWorkItemLifecycle` | `WorkItemRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository` | 是 | `EvidenceResolverPort`、`ClockPort` | enqueue `WorkItemChanged`;mark views stale |
-| `RequestWorkPromotion` | `PromoteRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository` | 是 | `SourceWorkResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `PromoteResultRecorded` |
-| `ReviewWorkPromotion` | `PromoteRepository`、`WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository` | 是 | `SourceWorkResolverPort`、`IdGeneratorPort`、`ClockPort` | accepted path enqueue promote + work events |
-| `LinkWorkDependency` | `DependencyRepository`、`WorkItemRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository` | 是 | `IdGeneratorPort`、`ClockPort` | enqueue `WorkDependencyChanged` |
-| `OpenWorkBlocker` / `ResolveWorkBlocker` | `DependencyRepository`、`WorkItemRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository` | 是 | `EvidenceResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `WorkBlockerChanged` |
-| `OpenIteration` | `ProjectRepository`、`IterationRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository` | 是 | `ProcessTimeboxResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `IterationChanged` |
-| `CommitIterationScope` / `UpdateIterationCommitment` | `IterationRepository`、`WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository` | 是 | `ClockPort` | enqueue `IterationChanged`;mark iteration / member views stale |
+| `CreateProject` | `ProjectRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `IdGeneratorPort`、`ClockPort` | enqueue `ProjectChanged`;mark project views stale |
+| `UpdateProjectLifecycle` | `ProjectRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ClockPort` | enqueue `ProjectChanged`;archive 联动 backlog |
+| `UpdateBacklogAvailability` | `BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ClockPort` | enqueue backlog / project view changed |
+| `AssignProjectMember` | `ProjectRepository`、`ProjectMemberRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `MemberReferencePort`、`IdGeneratorPort`、`ClockPort` | enqueue `ProjectMemberChanged`;mark member views stale |
+| `CreateWorkItem` | `ProjectRepository`、`BacklogRepository`、`WorkItemRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `SourceWorkResolverPort`、`MethodDefinitionResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `WorkItemChanged`;mark board / search stale |
+| `CreateChildWorkItem` | `WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `SourceWorkResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `WorkItemChanged` |
+| `UpdateWorkItemLifecycle` | `WorkItemRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `EvidenceResolverPort`、`ClockPort` | enqueue `WorkItemChanged`;mark views stale |
+| `RequestWorkPromotion` | `PromoteRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `SourceWorkResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `PromoteResultRecorded`;no projection stale |
+| `ReviewWorkPromotion` | `PromoteRepository`、`WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `SourceWorkResolverPort`、`IdGeneratorPort`、`ClockPort` | accepted path enqueue promote + work events;accept-created / bound formal work marks existing work views stale;reject no projection stale |
+| `LinkWorkDependency` | `DependencyRepository`、`WorkItemRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `IdGeneratorPort`、`ClockPort` | enqueue `WorkDependencyChanged`;`WorkItemRepository.get_formal_work_scope(downstream)` 提供 graph project scope;mark downstream project-board + resolvable member-work stale |
+| `OpenWorkBlocker` / `ResolveWorkBlocker` | `DependencyRepository`、`WorkItemRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `EvidenceResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `WorkBlockerChanged`;`WorkItemRepository.get_formal_work_scope(blocked_work_ref)` 提供 stale project / member scope |
+| `OpenIteration` | `ProjectRepository`、`IterationRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ProcessTimeboxResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `IterationChanged` |
+| `CommitIterationScope` / `UpdateIterationCommitment` | `IterationRepository`、`WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ClockPort` | enqueue `IterationChanged`;mark iteration / member views stale |
 | `GetProjectBoardView` / `SearchWork` | `ProjectionRepository`、可选 truth repository | 否 | 无 | query 不触发 rebuild |
 | `ConsumeIdentityMemberChanged` | `ReferenceSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | mark affected views stale |
 | `ConsumeRuntimePromoteRequested` | `ReferenceSnapshotRepository`、`PromoteRepository`、`IdempotencyRepository` | 是 | `SourceWorkResolverPort`、`ClockPort` | 只形成 pending intake / reference state |
@@ -1403,7 +1486,9 @@ pub enum IdempotencyError {
 | `crates/application/src/ports.rs` | repository / resolver / publisher / handoff / id / clock trait、`Page<T>`、`PageInfo`、`RepositoryError`、`PortError` | concrete adapter、DB client、HTTP client、bus client |
 | `crates/application/src/unit_of_work.rs` | `UnitOfWork`、`UnitOfWorkHandle`、`UnitOfWorkError` | durable transaction implementation |
 | `crates/application/src/idempotency.rs` | `IdempotencyRepository`、`IdempotencyReservation`、`IdempotencyConflict`、`RequestDigest` | concrete store |
+| `crates/application/src/results.rs` | `CommandResultRepository`、`StoredCommandResult`、duplicate receipt overlay helper | concrete store、truth reconstruction |
 | `crates/infra/src/repositories.rs` | truth repository fake / durable adapters、`InMemoryUnitOfWork` | application service business flow |
+| `crates/infra/src/command_result_store.rs` | command result store fake / durable adapter | domain transition、truth repository ownership |
 | `crates/infra/src/projection_stores.rs` | projection adapter | domain policy |
 | `crates/infra/src/reference_stores.rs` | snapshot / reference adapter | external resolver logic |
 | `crates/infra/src/source_resolvers.rs` | fake / durable resolver adapter | Cargo dependency to sibling business crates unless later design explicitly permits |

@@ -44,7 +44,7 @@ Step 17 只回答“详细设计交给实施计划什么”,不写开发排期�
 
 1. 哪些实现契约已经足够进入实施计划?
 
-   回答:Step 1~16 已收稳上游边界、P0 范围、Rust / repo 约束、workspace 布局、七模块主轴、对象契约、trait / port / adapter、18 Command、8 Query、7 Inbound Event、9 Outbound Event、6 Job、逐接口 flow、12 组状态机、事务一致性、错误恢复、幂等并发、配置绑定、可观测性和最小测试切口。它们足够作为 `07-实施计划.md` 的输入。
+   回答:Step 1~16 已收稳上游边界、P0 范围、Rust / repo 约束、workspace 布局、七模块主轴、对象契约、trait / port / adapter、18 Command、8 Query、7 Inbound Event、10 Outbound Event、6 Job、逐接口 flow、12 组状态机、事务一致性、错误恢复、幂等并发、配置绑定、可观测性和最小测试切口。它们足够作为 `07-实施计划.md` 的输入。
 
 2. 实施者需要先阅读哪些文档?
 
@@ -215,7 +215,7 @@ Step 17 只回答“详细设计交给实施计划什么”,不写开发排期�
 | `ProjectMember` | `member_ref` / `responsibility_spec` | `GlobalMemberRef` / `ProjectResponsibilitySpec` | Command body + resolver | `ProjectMember::assign(...)` | `AssignProjectMemberRequest.*` | resolver unresolved -> reject | `AssignProjectMember_contract` | 后续 `06` |
 | `WorkItem` / `ChildWorkItem` | `work_intent` / `source_ref` | `FormalWorkIntent` / `SourceWorkRef` | Command body + resolver | `WorkItem::formalize(...)` | `CreateWorkItemRequest.*` | source unresolved -> reject | `CreateWorkItem_contract` | 后续 `06` |
 | `PromoteResult` | `source_ref` / `reason` | `SourceWorkRef` / `PromoteReason` | Command / Event | `PromoteResult::request(...)` | `RequestWorkPromotionRequest.*` / runtime event | reject / dead-letter | `RequestWorkPromotion_contract` | 后续 `06` |
-| `WorkDependency` / `WorkBlocker` | relation / cause / evidence refs | typed refs | Command body + resolver | dependency / blocker factory | dependency / blocker requests | graph cycle / unresolved -> reject | dependency / blocker contract tests | 后续 `06` |
+| `WorkDependency` / `WorkBlocker` | relation / cause / resolved evidence refs | typed refs + `FormalWorkScope` | Command body + resolver + `WorkItemRepository.get_formal_work_scope(...)` | dependency / blocker factory;`WorkBlocker::resolve(...)` writes `resolved_evidence_ref`;graph / stale scope from formal work scope | dependency / blocker requests;`WorkBlockerChanged.evidence_ref` from blocker truth;downstream / blocked project-board + member-work stale | graph cycle / unresolved -> reject;missing scope -> `NotFound` | dependency / blocker contract tests;`WorkBlockerChanged_event_schema`;relation stale assertions | 后续 `06` |
 | `Iteration` / `IterationCommitment` | `timebox_ref` / `changed_work_refs` | refs | Command body + process resolver / repo lookup | iteration factory / commitment factory | iteration requests | unresolved / version conflict | iteration contract tests | 后续 `06` |
 | `WorkTraceRecord` | `trace_id` / `trace_context_ref` | `WorkTraceId` / `WorkTraceContextRef` | id generator / core metadata | `from_truth_change(...)` | metadata | missing metadata -> reject | `domain_audit_outbox_records` | 后续 `06` |
 | `WorkOutboxRecord` | `outbox_id` / `event_kind` | `WorkOutboxId` / `WorkOutboxEventKind` | id generator / truth change | `from_truth_change(...)` | generated / derived | generator failed -> reject | `accepted_truth_and_outbox_same_uow` | 后续 `06` |
@@ -226,7 +226,7 @@ Step 17 只回答“详细设计交给实施计划什么”,不写开发排期�
 |---|---|---|---|---|---|---|
 | 18 个 Command | 对应 Project / Member / Work / Promote / Dependency / Blocker / Iteration truth | 是 | id generator、clock、repository lookup、resolver | command idempotency key != business id | reject / not found / resolver reject | Step 9 Command flows |
 | 7 个 Inbound Event | snapshot / reference state / pending intake | 是 | source event envelope、clock、resolver | source_event_id != WorkOutboxId | retry / dead-letter / unresolved marker | Step 9 Consumer flows |
-| 9 个 Outbound Event | event payload from `WorkOutboxRecord` + committed truth | 是 | outbox record、truth repository、trace context、clock | bus event id != WorkOutboxId | mark publish failed | Step 9 Outbound flows |
+| 10 个 Outbound Event | event payload from `WorkOutboxRecord` + committed truth | 是 | outbox record、truth repository、trace context、clock | bus event id != WorkOutboxId | mark publish failed | Step 9 Outbound flows |
 | 6 个 Operations Job | projection / reference / outbox / handoff marker / report | 是 | job metadata、repository page、port result | job_run_id != idempotency key | reject / report failed / retry | Step 9 Job flows |
 
 #### 8.8 Query response / view 闭环表
@@ -251,8 +251,8 @@ Step 17 只回答“详细设计交给实施计划什么”,不写开发排期�
 | `BacklogState` | `Open / LockedForMaintenance / Archived` | backlog methods | Open <-> LockedForMaintenance -> Archived | Archived -> Open | `backlog_state_transitions` | 后续 `06` |
 | `WorkItemState` | `Formalized / Committed / InProgress / Completed / Cancelled / Superseded` | work lifecycle methods | Formalized -> Committed -> InProgress -> Completed | terminal -> active | `work_item_state_transitions` | 后续 `06` |
 | `PromoteResultState` | `PendingReview / Accepted / Rejected / Superseded` | promote review methods | PendingReview -> Accepted / Rejected -> Superseded | Superseded -> Accepted | `promote_result_transitions` | 后续 `06` |
-| `DependencyState` | `Proposed / Active / Satisfied / Waived / Cancelled` | dependency methods | Proposed -> Active -> terminal | terminal reopen | `dependency_state_transitions` | 后续 `06` |
-| `BlockerState` | `Open / Mitigating / Resolved / Closed` | blocker methods | Open -> Mitigating -> Resolved -> Closed | Closed -> Open | `blocker_state_transitions` | 后续 `06` |
+| `DependencyState` | `Proposed / Active / Satisfied / Waived / Cancelled` | dependency methods | Proposed -> Active via Link or Update;Active -> terminal | terminal reopen;reason kind mismatch | `dependency_state_transitions`;`UpdateWorkDependencyState_contract` | 后续 `06` |
+| `BlockerState` | `Open / Mitigating / Resolved / Closed` | blocker methods + `resolved_evidence_ref` | Open -> Mitigating -> Resolved with evidence -> Closed | Closed -> Open;Resolved without evidence | `blocker_state_transitions`;`WorkBlockerChanged_event_schema` | 后续 `06` |
 | `IterationState` | `Planning / Committed / InProgress / Closed / Cancelled` | iteration methods | Planning -> Committed -> InProgress -> Closed | Closed -> InProgress | `iteration_state_transitions` | 后续 `06` |
 | `CommitmentState` | `Candidate / Committed / Changed / Closed` | commitment methods | Candidate -> Committed -> Changed -> Closed | Closed -> Changed | `commitment_state_transitions` | 后续 `06` |
 | `DerivedFreshnessState` | `Fresh / Stale / Rebuilding / Failed` | projection service | Fresh -> Stale -> Rebuilding -> Fresh / Failed | Query repairs fresh | `derived_freshness_transitions` | 后续 `06` |

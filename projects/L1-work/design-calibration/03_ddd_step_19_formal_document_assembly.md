@@ -78,7 +78,7 @@
 | 文件路径明确 | 通过 | 正式 `03` §4 输出目录、package、crate、binary 和 path dependency |
 | 对象字段有类型和注释 | 通过 | 正式 `03` §5 / §6 引用 Step 6 完整对象字段、函数和 enum variant 注释 |
 | 函数签名有参数类型和返回类型 | 通过 | 正式 `03` §5 / §7 / §8 引用 Step 7~9 完整签名和处理流 |
-| 每个关键协议有处理流 | 通过 | 正式 `03` §7 / §8 覆盖 18 Command、8 Query、7 Inbound Event、9 Outbound Event、6 Job |
+| 每个关键协议有处理流 | 通过 | 正式 `03` §7 / §8 覆盖 18 Command、8 Query、7 Inbound Event、10 Outbound Event、6 Job |
 | 状态机和事务边界明确 | 通过 | 正式 `03` §9 / §10 摘录状态机、事务边界和一致性规则 |
 | 字段闭环和 DTO 构造闭环通过 | 通过 | 正式 `03` §16 引用 Step 17 §8.5~§8.8 |
 | 状态、测试、验收和实施 phase 使用同一套正式名称 | 通过 | 正式 `03` §9 / §15 / §16 / §17 统一引用 Step 10 / Step 16 / Step 17 |

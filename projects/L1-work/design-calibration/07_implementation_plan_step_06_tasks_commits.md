@@ -77,7 +77,7 @@
 | 14. 哪些高风险逻辑必须单独批次 | 状态机、事务 / UoW、幂等 / dedup、optimistic version、authorization、redaction、outbox retry、projection no-write、reconciliation read-only、configured adapter fail-fast 必须单独批次或单独门禁。 |
 | 15. 每批完成后执行哪些门禁 | 每批至少执行 `cargo fmt`、对应 `cargo check` 和目标 suite 的最小可用切片;高风险批次必须加跑对应 `TC-WORK-*` 或 redaction / no-write / evidence check。 |
 | 16. 代码批次与提交边界的关系 | 一个 commit boundary 可以包含一个或少数几个强相关批次;批次通过后再判断是否达到提交边界,不得为每个文件单独提交。 |
-| 17. phase / commit boundary 开工前复核什么 | 复核字段、DTO / Event / Job 构造、状态、ref identity、validation truth、metadata / idempotency、projection rebuild、artifact materialization 和 phase boundary。 |
+| 17. phase / commit boundary 开工前复核什么 | 复核字段、DTO / Event / Job 构造、状态、ref identity、ref-scope 解析、validation truth、metadata / idempotency、projection rebuild、artifact materialization 和 phase boundary。 |
 | 18. 发现上游冲突如何处理 | 暂停当前 boundary,记录 blocker 并回写设计真相源;不得在实现仓自行补字段、选状态名、改变 phase scope 或造第二真相。 |
 
 ## 4. 当前文档问题诊断
@@ -85,7 +85,7 @@
 | 问题 | 表现 | 风险 | 本步处理 |
 |---|---|---|---|
 | Step 5 只有阶段顺序 | PH-01~PH-09 已排序,但没有阶段内任务和提交边界 | 实施者仍可能按对象或 crate 随意编码 | 本步补任务、批次和 commit boundary |
-| Work P0 对象跨度大 | 18 Command、8 Query、7 Consumer、9 Event、6 Job 横跨七个 crate | 单阶段大提交不可 review | 按功能纵切与风险隔离点拆 22 个 boundary |
+| Work P0 对象跨度大 | 18 Command、8 Query、7 Consumer、10 Event、6 Job 横跨七个 crate | 单阶段大提交不可 review | 按功能纵切与风险隔离点拆 22 个 boundary |
 | Query / Operations 容易后置 | 查询、projection、outbox、reconciliation 和 reports 是验收面 | 最后才发现 no-write 或 evidence 不闭合 | PH-07 / PH-08 独立拆分,PH-09 只做 release 收口 |
 | 配置和证据易散落 | `04/05/06` 均要求 config、artifact、report、redaction | 最终验收证据不可复核 | PH-01 建骨架,PH-09 收口,中间阶段按 boundary 产最小证据 |
 | 设计缺口处理方式未落到 commit | 详细设计已强调不得自行补设计 | 实现 agent 可能遇缺口时临时落码 | 本步给每个 boundary 固定开工前设计闭环复核 |
@@ -138,6 +138,7 @@
 | DTO 构造闭环 | Command / Query / Event / Job 输入能构造目标对象、result、receipt、view、page 或 marker | 暂停并回写协议契约 |
 | 状态闭环 | 状态 enum、转换矩阵、测试断言和验收口径使用同一正式状态名 | 回写状态矩阵或测试 / 验收口径 |
 | ref identity 闭环 | id / ref / cursor / page token / projection key 有正式类型、归属和查找规则 | 暂停并补 shared ref 或 repository key |
+| ref-scope 解析闭环 | 从 public ref 推导 project / member / backlog / graph / projection scope 的 flow 有正式 scope DTO、repository / resolver 函数和错误映射 | 暂停并补 scope resolver / repository 读取口径 |
 | validation truth 闭环 | 校验所需 truth、snapshot、policy、resolver 或 config source 已定义 | 暂停并补 truth source / port |
 | metadata / idempotency 闭环 | metadata authority、idempotency key、canonical digest、result ref、duplicate result 和 UoW 顺序闭合 | 暂停并补幂等 / 事务契约 |
 | projection rebuild 闭环 | projection / search / board / trace 的 committed truth、replay source、stale / failed marker 已定义 | 暂停并补 projection truth source |
@@ -172,7 +173,7 @@
 | IMPL-07-03 | PH-07 | 3 | 实现 search、trace page、board view、stale / failed / rebuilding marker 和 handlers | `03` §7~§15 | query handlers、search / trace / board tests | `TC-WORK-QUERY-006~008` 和 no-write tests 通过 |
 | IMPL-08-01 | PH-08 | 1 | 定义 inbound / outbound event DTO、job DTO、receipt / report 和 fixtures | `03` §7 / §8、`05` `OPS` | event / job contracts、fixtures | event / job contract tests 通过 |
 | IMPL-08-02 | PH-08 | 2 | 实现 7 Consumer、dedup、reference snapshot / marker、dead-letter / quarantine | `03` §8 / §12 / §13 | consumer services、dedup store、tests | 同族 consumer tests 和 redaction scan 通过 |
-| IMPL-08-03 | PH-08 | 3 | 实现 outbox publisher、9 outbound events、publication retry / failed marker | `03` §7~§13 | publisher fake、outbox service、tests | `TC-WORK-OPS-001` 和 event tests 通过 |
+| IMPL-08-03 | PH-08 | 3 | 实现 outbox publisher、10 outbound events、publication retry / failed marker | `03` §7~§13 | publisher fake、outbox service、tests | `TC-WORK-OPS-001` 和 event tests 通过 |
 | IMPL-08-04 | PH-08 | 4 | 实现 projection rebuild、reference refresh、reconciliation、trace / archive handoff jobs | `03` §8 / §11~§15 | job runners、reports、handoff fake | `TC-WORK-OPS-002~006` 切片通过 |
 | IMPL-09-01 | PH-09 | 1 | 执行 release gate scripts、evidence index、redaction report 和 acceptance handoff | `05` §9 / §13、`06` §10 / §11 | release reports、evidence pack、veto checklist | release gates 和 evidence checks 通过 |
 | IMPL-09-02 | PH-09 | 2 | 整理 residual risks、open issues、handoff summary 和 final verification note | `06` §12~§14 | `reports/acceptance/handoff.md`、risk notes | P0 S/A blocker 为 0,VETO 均有结论 |
@@ -185,7 +186,7 @@
 | BATCH-01-02 | config、script、artifact、report skeleton 可检查 | IMPL-01-03 | config fixture、runtime shell、script `--help`、path README | 100~300 行 | config smoke;script help;path check | commit-01-b |
 | BATCH-02-01 | Project / Backlog contracts 和 fixtures 稳定 | IMPL-02-01 | command DTO、result、fixtures、contract tests | 100~300 行 | DTO roundtrip / validation | commit-02-a |
 | BATCH-02-02 | Project / Backlog domain 和 lifecycle 成立 | IMPL-02-02 | domain state、trace / audit / outbox intent helpers、unit tests | 100~300 行 | `unit-contract-domain` selected CORE | commit-02-a |
-| BATCH-02-03 | Project / Backlog 最小写路径闭环 | IMPL-02-03 | service、UoW、idempotency、repo、handler tests | 需拆分;每批不超过 300 行 | `service-core` selected CORE | commit-02-b |
+| BATCH-02-03 | Project / Backlog 最小写路径闭环 | IMPL-02-03 | service、UoW、idempotency、command result store、repo、handler tests | 需拆分;每批不超过 300 行 | `service-core` selected CORE | commit-02-b |
 | BATCH-03-01 | ProjectMember contracts、fixtures 和 domain 成立 | IMPL-03-01~02 | DTO、resolver fixture、member domain、policy tests | 100~300 行 | member contract / domain tests | commit-03-a |
 | BATCH-03-02 | identity seam 和 member service 闭环 | IMPL-03-03 | resolver port / fake、service、repo、handler tests | 需拆分;每批不超过 300 行 | `service-core` selected MEMBER | commit-03-b |
 | BATCH-04-01 | Backlog / WorkItem / ChildWorkItem contracts 和 domain 成立 | IMPL-04-01~02 | DTO、formal work domain、body guard tests | 需拆分;每批不超过 300 行 | FORMAL contract / domain tests | commit-04-a |
@@ -200,7 +201,7 @@
 | BATCH-07-03 | search、trace、board 和 query handlers 闭环 | IMPL-07-03 | handlers、search refs、trace page、board view tests | 需拆分;每批不超过 300 行 | `api-contract-fast`;`integration-p0` selected QUERY | commit-07-c |
 | BATCH-08-01 | event / job contracts、receipt 和 report schema 稳定 | IMPL-08-01 | inbound / outbound event DTO、job DTO、fixtures | 需拆分;每批不超过 300 行 | `worker-job-contract` schema selected | commit-08-a |
 | BATCH-08-02 | 7 consumer dedup、snapshot / marker 和 quarantine 闭环 | IMPL-08-02 | consumer services、dedup store、dead-letter tests | 需拆分;每批不超过 300 行 | `consumer-outbox` selected consumers | commit-08-b |
-| BATCH-08-03 | outbox publish 和 9 outbound events 闭环 | IMPL-08-03 | outbox publisher、publisher fake、retry / failed tests | 需拆分;每批不超过 300 行 | `TC-WORK-OPS-001`;event tests | commit-08-c |
+| BATCH-08-03 | outbox publish 和 10 outbound events 闭环 | IMPL-08-03 | outbox publisher、publisher fake、retry / failed tests | 需拆分;每批不超过 300 行 | `TC-WORK-OPS-001`;event tests | commit-08-c |
 | BATCH-08-04 | projection rebuild、reference refresh 和 reconciliation 闭环 | IMPL-08-04 | job runners、report marker、read-only tests | 需拆分;每批不超过 300 行 | `TC-WORK-OPS-002~004`;no-write tests | commit-08-d |
 | BATCH-08-05 | trace / archive handoff jobs 闭环 | IMPL-08-04 | handoff fake、handoff markers、rerun tests | 需拆分;每批不超过 300 行 | `TC-WORK-OPS-005~006`;redaction selected | commit-08-e |
 | BATCH-09-01 | release gates、evidence index 和 redaction report 可复核 | IMPL-09-01 | gate results、evidence index、redaction report、veto checklist | 100~300 行脚本 / report glue | release gates selected | commit-09-a |
@@ -213,7 +214,7 @@
 | commit-01-a | workspace、crate skeleton 和 `core-contracts` dependency 可编译后 | root workspace、`crates/*` skeleton、path dependency、dependency check | 业务 DTO、domain、API route、production adapter | `cargo fmt`;`cargo check`;dependency grep |
 | commit-01-b | config / script / evidence skeleton 可检查后 | config fixture、runtime shell、gate / report / check script skeleton、artifact / report roots | 业务测试实现、release report 内容、真实外部依赖 | config smoke;script `--help`;path check |
 | commit-02-a | Project / Backlog DTO、domain 和 lifecycle tests 通过后 | Project / Backlog contracts、domain、fixtures、trace / audit / outbox intent helpers | application service、API handler、member、work item | contract / domain CORE tests |
-| commit-02-b | Project / Backlog 写路径和 duplicate tests 通过后 | command service、UoW、idempotency、in-memory repo、minimal handler | member、formal work、query、production store | `TC-WORK-CORE-001~004` selected |
+| commit-02-b | Project / Backlog 写路径和 duplicate tests 通过后 | command service、UoW、idempotency、command result store/fake、in-memory repo、minimal handler | member、formal work、query、production store | `TC-WORK-CORE-001~004` selected |
 | commit-03-a | ProjectMember contracts、domain 和 identity boundary tests 通过后 | member DTO、resolver fixture、member domain、responsibility policy | resolver runtime wiring、member handler、formal work | member contract / domain tests |
 | commit-03-b | ProjectMember service、resolver fake 和 unresolved handling tests 通过后 | resolver port / fake、member service、repository、handler、unresolved surface | work item、dependency、production identity adapter | `TC-WORK-MEMBER-001~004` selected |
 | commit-04-a | formal work contracts、domain、body guard tests 通过后 | Backlog / WorkItem / ChildWorkItem DTO、domain、maintenance lock、forbidden body tests | application write service、promotion, dependency | FORMAL contract / domain / redaction selected |
@@ -228,7 +229,7 @@
 | commit-07-c | search、trace、board view 和 query handler tests 通过后 | search refs、trace page、board view、query handlers、no-write evidence | outbox publish, consumer, jobs | `TC-WORK-QUERY-006~008`;`api-contract-fast` selected |
 | commit-08-a | event / job DTO、receipt 和 report schema tests 通过后 | inbound / outbound event DTO、job DTO、receipt / report fixtures | consumer services、outbox publisher、job runners | event / job contract tests |
 | commit-08-b | 7 consumer dedup / quarantine / marker tests 通过后 | consumer services、dedup store、reference snapshot / marker、dead-letter / quarantine | outbox publish, operations jobs, production external adapters | consumer selected tests;redaction selected |
-| commit-08-c | outbox publish、outbound events、retry / failed tests 通过后 | outbox publisher、publisher fake、9 outbound events、publication state tests | projection rebuild, handoff jobs, real bus adapter | `TC-WORK-OPS-001`;consumer-outbox selected |
+| commit-08-c | outbox publish、outbound events、retry / failed tests 通过后 | outbox publisher、publisher fake、10 outbound events、publication state tests | projection rebuild, handoff jobs, real bus adapter | `TC-WORK-OPS-001`;consumer-outbox selected |
 | commit-08-d | projection rebuild、reference refresh、reconciliation tests 通过后 | rebuild job、reference refresh job、reconciliation report、read-only guards | trace / archive handoff, release pack | `TC-WORK-OPS-002~004`;no-write checks |
 | commit-08-e | trace / archive handoff rerun and redaction tests 通过后 | handoff jobs、fake handoff adapters、failed markers、rerun evidence | real observability / archive integration, release summary | `TC-WORK-OPS-005~006`;redaction selected |
 | commit-09-a | release gates、evidence pack、veto checklist 和 acceptance handoff 可复核后 | release gate scripts, evidence index, redaction report, acceptance handoff, residual risk note | 新功能、production adapter、验收裁决 | `release-main-smoke`;`release-config-redline`;`release-evidence-pack`;path check |
@@ -301,7 +302,7 @@
 > 延伸阅读:
 > - 建议继续阅读上述中间产物的“全局编写顺序规则”“开工前设计闭环复核模板”“阶段任务表”“代码实现批次表”“提交边界表”和“提交前检查清单”小节,了解实施任务如何按可验证功能增量和提交边界收敛。
 
-每个 phase / commit boundary 开工前必须先完成设计闭环复核。复核至少覆盖字段闭环、DTO / Event / Job 构造闭环、状态闭环、ref identity、validation truth、metadata / idempotency、projection rebuild、artifact materialization 和 phase boundary。任一适用项未通过时,暂停当前 boundary 并回报设计缺口,不得在实现仓自行补设计。
+每个 phase / commit boundary 开工前必须先完成设计闭环复核。复核至少覆盖字段闭环、DTO / Event / Job 构造闭环、状态闭环、ref identity、ref-scope 解析、validation truth、metadata / idempotency、projection rebuild、artifact materialization 和 phase boundary。任一适用项未通过时,暂停当前 boundary 并回报设计缺口,不得在实现仓自行补设计。
 
 本轮实施按 PH-01~PH-09 推进。阶段内先锁定 public contract、fixture 和测试切口,再实现 domain / application,再接 infra / entry,最后运行门禁并按提交边界提交。
 

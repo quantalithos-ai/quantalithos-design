@@ -46,7 +46,7 @@
 
 4. 哪些处理流需要事务,事务内必须完成哪些写入?
 
-   回答:所有 Command、Inbound Event Consumer 和 Operations Job 写路径需要本地 UoW。核心 truth Command 必须在同一 UoW 内完成 truth save、history / trace、outbox enqueue、projection stale marker 和 idempotency complete。Query 不开写事务、不写 audit、不触发 rebuild。
+   回答:所有 Command、Inbound Event Consumer 和 Operations Job 写路径需要本地 UoW。核心 truth Command 必须在同一 UoW 内完成 truth save、history / trace、outbox enqueue、idempotency complete,以及有正式 public view identity 时的 projection stale marker。Query 不开写事务、不写 audit、不触发 rebuild。
 
 5. 是否需要乐观锁、行锁、版本号、outbox 或 projection?
 
@@ -105,6 +105,7 @@
 | `DerivedWorkViewState` / read projections | `domain/projection.rs` + `contracts/views.rs` / `ProjectionRepository` | command / consumer stale mark、rebuild job | query service、reconciliation | projection 可 stale / failed;只从 committed truth rebuild |
 | `ReferenceResolutionState` / snapshots | `domain/reference.rs` / `ReferenceSnapshotRepository` | inbound consumers、reference refresh job | command policy、query、projection rebuild | 保存引用 / 快照摘要;不保存外部正文 |
 | `IdempotencyRecord` | `application/idempotency.rs` / `IdempotencyRepository` | command / consumer / job service | same service duplicate handling | reserve / complete 与业务写入同 UoW;digest 冲突不得执行业务写 |
+| `StoredCommandResult` | `application/results.rs` / `CommandResultRepository` | command service success path | same command service duplicate replay | command result save 必须与 accepted truth 和 idempotency complete 同 UoW;duplicate 不得从当前 truth 重建 |
 | handoff markers | `domain/audit.rs` / `AuditRepository` | trace / archive handoff jobs | jobs、reconciliation | 只保存 handoff ref / marker,不接管 archive / observability 正文 |
 
 #### 8.2 表 / collection / projection 契约表
@@ -118,11 +119,11 @@
 | `backlogs` | Project formal work universe | PK `backlog_id`;unique `project_id` | `project_id`、`backlog_state` | `version` |
 | `backlog_formal_work` | Backlog membership | PK `(backlog_id, formal_work_ref)` | `formal_work_ref`、`backlog_id` | no independent version;owned by UoW write |
 | `work_items` | Root WorkItem truth | PK `work_item_id`;unique formal ref variant | `backlog_id`、`assignee_ref`、`work_state` | `version` |
-| `child_work_items` | ChildWorkItem truth | PK `child_work_item_id`;unique formal ref variant | `parent_work_item_id`、`work_state`、`source_ref` | `version` |
+| `child_work_items` | ChildWorkItem truth | PK `child_work_item_id`;unique formal ref variant | `parent_work_item_id`、`work_state`、`source_ref`、`completion_ref` | `version` |
 | `promote_results` | Promote decision truth | PK `promote_result_id`;latest by `source_ref` | `source_ref`、`result_state`、`created_work_ref` | `version` |
 | `pending_promote_intakes` | Runtime promote intake marker | PK `source_event_id`;unique `source_ref` optional by policy | `source_ref` | no independent version or `version` for durable adapter |
 | `work_dependencies` | Dependency truth | PK `dependency_id`;unique `(upstream_work_ref, downstream_work_ref)` for active relation | `upstream_work_ref`、`downstream_work_ref`、`dependency_state` | `version` |
-| `work_blockers` | Blocker truth | PK `blocker_id` | `blocked_work_ref`、`blocker_state`、`cause_ref` | `version` |
+| `work_blockers` | Blocker truth | PK `blocker_id` | `blocked_work_ref`、`blocker_state`、`cause_ref`、`resolved_evidence_ref` | `version` |
 | `iterations` | Iteration truth | PK `iteration_id` | `project_id`、`timebox_ref`、`iteration_state` | `version` |
 | `iteration_commitments` | Iteration commitment truth | PK `commitment_id`;unique active `iteration_id` | `iteration_id`、`commitment_state` | `version` |
 | `promote_decision_records` | Promote history | PK `decision_id` | `result_ref`、`source_ref` | append-only, no overwrite |
@@ -139,6 +140,7 @@
 | `reference_resolution_states` | External reference resolution | PK `reference_ref` | `resolution_state`、`last_resolved_at` | `version` |
 | `member_capability_snapshots` | Identity member snapshot | PK `member_ref` | snapshot state / updated cursor | `version` |
 | `method_definition_snapshots` | Method definition snapshot | PK `definition_ref` | definition kind / updated cursor | `version` |
+| `command_result_records` | Command duplicate replay result surface | PK `ApplicationResultRef`;unique `(operation,result_id)` | `operation`、`result_kind`、`created_at` | append-only;no optimistic update |
 | `idempotency_records` | Command / event / job dedup | PK `(operation, idempotency_key)` | `request_digest`、`status`、`result_ref` | state version or atomic reservation |
 | `trace_handoff_markers` | Observability handoff marker | PK `handoff_ref` or `trace_id` | handoff state / target | `version` optional |
 | `archive_handoff_markers` | Archive handoff marker | PK `handoff_ref` | project / iteration / trace scope | `version` optional |
@@ -156,11 +158,13 @@
 | `ProjectMemberRepository.create(project_member, &uow)` | 创建承担记录 | UoW;unique current `(project_id, member_ref)` | `Version` | conflict / unavailable |
 | `ProjectMemberRepository.save(project_member, expected_version, &uow)` | 保存责任状态 | UoW + optimistic version | `Version` | version conflict |
 | `BacklogRepository.get_by_project(project_ref)` | 找 Project backlog | read-only;unique project index | `Option<Backlog>` | `RepositoryError` |
+| `BacklogRepository.get_by_project_with_version(project_ref)` | 找 Project backlog 并读取 optimistic version | read-only;unique project index;用于紧随其后的 linked save | `Option<(Backlog, Version)>` | `RepositoryError` |
 | `BacklogRepository.contains_formal_work(backlog_ref, work_ref)` | 检查 formal work membership | read-only;membership index | `bool` | `RepositoryError` |
 | `BacklogRepository.create(backlog, &uow)` | 创建 backlog | same UoW as Project create | `Version` | conflict |
 | `BacklogRepository.save(backlog, expected_version, &uow)` | 保存 availability | UoW + optimistic version | `Version` | version conflict |
 | `BacklogRepository.add_formal_work(backlog_ref, work_ref, &uow)` | 添加正式工作 membership | same UoW as work create / promote accept | `()` | duplicate membership may be idempotent only in duplicate replay path |
 | `WorkItemRepository.get_formal_work(work_ref)` | 统一读取 root / child work | read-only | `Option<FormalWorkRecord>` | `RepositoryError` |
+| `WorkItemRepository.get_formal_work_scope(work_ref)` | 读取 formal work 所属 project / backlog / assignee scope | read-only;must use backlog membership / parent root relation,not string parsing | `Option<FormalWorkScope>` | `RepositoryError` |
 | `WorkItemRepository.list_by_backlog(backlog_ref, page)` | 列 formal work refs | read-only, page stable order | `Page<FormalWorkRef>` | `RepositoryError` |
 | `WorkItemRepository.create_work_item(work_item, &uow)` | 创建 root work | UoW;PK unique | `Version` | conflict |
 | `WorkItemRepository.create_child_work_item(child, &uow)` | 创建 child work | UoW;PK unique;parent existence checked by service | `Version` | conflict |
@@ -203,6 +207,8 @@
 | `ReferenceSnapshotRepository.list_stale_references(page)` | 列待刷新 refs | read-only;stable order | `Page<ExternalReferenceRef>` | `RepositoryError` |
 | `WorkTruthSnapshotRepository.load_project_truth_snapshot(project_ref)` | 读取 committed truth rebuild snapshot | read-only;no projection fallback | `ProjectWorkTruthSnapshot` | `RepositoryError` |
 | `WorkTruthSnapshotRepository.load_truth_cursor(project_ref)` | 读取 truth cursor | read-only;cursor != optimistic version | `WorkTruthCursor` | `RepositoryError` |
+| `CommandResultRepository.save_result(result_ref, stored_result, &uow)` | 保存 public command result surface | same UoW as accepted command truth;must precede idempotency complete | `()` | `RepositoryError` |
+| `CommandResultRepository.get_result(result_ref)` | 读取 duplicate replay result surface | read-only;no UoW;no truth reconstruction | `Option<StoredCommandResult>` | `RepositoryError` |
 | `IdempotencyRepository.get(key, operation)` | 读取幂等记录用于 duplicate recovery / commit-status audit | read-only;no UoW | `Option<IdempotencyRecord>` | `IdempotencyError` |
 | `IdempotencyRepository.reserve(key, operation, digest, &uow)` | reserve dedup key | same UoW as protected write | `IdempotencyReservation` | `IdempotencyError` |
 | `IdempotencyRepository.complete(reservation, result_ref, &uow)` | 保存成功 result ref | same UoW as accepted writes | `()` | `IdempotencyError` |
@@ -216,35 +222,38 @@
 | create uniqueness | create 函数必须在 UoW 内原子检查 PK / unique key;冲突不得覆盖 | all `create_*` |
 | append-only history | history / trace record 不允许 update;duplicate id 是 conflict | promote / dependency / iteration history、trace |
 | formal work identity | `FormalWorkRef::WorkItem(id)` 和 `FormalWorkRef::ChildWorkItem(id)` 共享查询面,但 durable storage 可分表 | work repository |
+| formal work scope closure | 任何 flow 需要从 `FormalWorkRef` 得到 `ProjectRef` / `BacklogRef` / `ProjectMemberRef` 以读取 graph、校验 scope 或构造 projection stale 时,必须调用 `WorkItemRepository.get_formal_work_scope(...)`;不得实现 `project_ref_from(FormalWorkRef)`、解析 id 字符串或私自读取 storage join | WorkItemRepository / application services |
 | backlog membership | membership 与 work truth 创建同 UoW;不得先加入 membership 后 create work 失败 | Backlog + WorkItem |
 | source ref uniqueness | runtime intake 以 `source_event_id` dedup;promote result 以 `source_ref` 可查 latest,不强制唯一历史 | PromoteRepository |
 | dependency graph index | active dependency edge `(upstream, downstream)` 不得重复;graph snapshot 只含 formal work refs | DependencyRepository |
 | iteration active commitment | 一个 iteration 当前只能有一个 active commitment set;history 用 change record 追溯 | IterationRepository |
 | outbox retry | `Failed -> Pending` 必须通过 `mark_pending_for_retry(...)` 或 adapter 等价 retry transaction,不得由 `list_pending` 静默改状态 | WorkOutboxRepository |
 | projection cursor monotonicity | `mark_stale` 不能把 view cursor 倒退;older cursor no-op or version-safe ignore | ProjectionRepository |
+| projection view identity closure | `mark_stale` 的 affected views 必须来自 Step 8 §9.2 已定义的 public `DerivedWorkViewRef`;没有 query / projection identity 的 truth 或 marker 不得临时派生 view ref | ProjectionRepository / function flows |
 | projection rebuild replace | `replace_project_views` 必须以 committed truth snapshot + cursor 为输入;不得从旧 projection 推导 | ProjectionRepository |
 | reference failed marker | failed marker 保留 last successful snapshot;不得删除 snapshot body summary | ReferenceSnapshotRepository |
-| idempotency digest | `(operation, key)` unique;相同 digest duplicate 返回 stored result;不同 digest conflict | IdempotencyRepository |
+| idempotency digest | `(operation, key)` unique;相同 digest duplicate 先返回 `ApplicationResultRef`;不同 digest conflict | IdempotencyRepository |
+| command result identity | `ApplicationResultRef` 必须能读回 `StoredCommandResult`;stored result variant 必须匹配 operation | CommandResultRepository |
 | page ordering | `Page<T>` 必须有稳定排序和 next token;不得依赖 map iteration order | all list / search funcs |
 
 #### 8.5 事务边界表
 
 | 场景 | 开始位置 | 提交位置 | 回滚条件 | 同事务内必须完成 |
 |---|---|---|---|---|
-| `CreateProjectFlow` | application service reserve idempotency 前后同一 UoW | Project、Backlog、trace、outbox、projection stale、idempotency complete 后 | id generation failure、domain reject、repository error、idempotency conflict、outbox enqueue failure、projection stale failure | idempotency reserve;Project create;Backlog create;trace append;outbox enqueue;projection stale;idempotency complete |
-| Project lifecycle update | service load + domain transition 后开启 / 使用 UoW | Project save、optional Backlog archive、trace、outbox、stale、idempotency complete 后 | version conflict、illegal transition、Backlog archive failure、outbox failure、projection stale failure | Project save;archive path Backlog save;trace;outbox;projection stale;idempotency complete |
-| Backlog availability update | service after request digest / reserve | Backlog save + side effects 后 | illegal transition、version conflict、repository failure | Backlog save;trace;outbox;projection stale;idempotency complete |
-| ProjectMember assign / update | service reserve idempotency | member create / save + side effects 后 | member duplicate、snapshot unresolved、domain reject、version conflict | ProjectMember write;optional reference state;trace;outbox;projection stale;idempotency complete |
-| WorkItem / ChildWorkItem create | service reserve idempotency | work create + membership + side effects 后 | source / method unresolved、backlog closed、domain reject、membership failure | Work create;Backlog membership add;trace;outbox;projection stale;idempotency complete |
-| WorkItem lifecycle update | service reserve idempotency | work save + side effects 后 | evidence unresolved/rejected、illegal state、version conflict | Work save;trace;outbox;projection stale;idempotency complete |
-| Request promote | service reserve idempotency | PromoteResult create + side effects 后 | source invalid、duplicate conflict、domain reject | PromoteResult create;trace;outbox;projection stale;idempotency complete |
-| Review promote | service reserve idempotency | PromoteResult save + optional work create + decision record + side effects 后 | source invalid、accept work create failure、version conflict | PromoteResult save;optional WorkItem create;Backlog membership;decision record;trace;outbox;projection stale;idempotency complete |
-| Dependency / blocker command | service reserve idempotency | relation save + history + side effects 后 | graph policy reject、evidence reject、version conflict | dependency/blocker write;history;trace;outbox;projection stale;idempotency complete |
-| Iteration open | service reserve idempotency | Iteration create + side effects 后 | timebox unresolved、project gate reject | Iteration create;reference state when applicable;trace;outbox;projection stale;idempotency complete |
-| Commit iteration scope | service reserve idempotency | iteration + commitment + work marks + side effects 后 | non-formal candidate、dependency gate reject、version conflict | Iteration save;Commitment save;Work marks;IterationChangeRecord;trace;outbox;projection stale;idempotency complete |
-| Update iteration commitment | service reserve idempotency | commitment save + history + side effects 后 | closed commitment、invalid change set、version conflict | Commitment save;IterationChangeRecord;trace;outbox;projection stale;idempotency complete |
-| Update iteration lifecycle | service reserve idempotency | iteration save + optional commitment close + side effects 后 | illegal state、commitment close failure、version conflict | Iteration save;optional Commitment save;history;trace;outbox;projection stale;idempotency complete |
-| Inbound event consumer | consumer service after dedup key build | reference / snapshot / pending intake + stale + idempotency complete 后 | missing envelope -> no UoW accepted;unsupported version dead-letter;repo failure rollback | idempotency reserve;reference / snapshot / intake writes;projection stale;idempotency complete |
+| `CreateProjectFlow` | application service reserve idempotency 前后同一 UoW | Project、Backlog、trace、outbox、projection stale、command result save、idempotency complete 后 | id generation failure、domain reject、repository error、idempotency conflict、outbox enqueue failure、projection stale failure、command result save failure | idempotency reserve;Project create;Backlog create;trace append;outbox enqueue;projection stale;command result save;idempotency complete |
+| Project lifecycle update | service load + domain transition 后开启 / 使用 UoW | Project save、optional Backlog archive、trace、outbox、stale、command result save、idempotency complete 后 | version conflict、illegal transition、Backlog archive failure、outbox failure、projection stale failure、command result save failure | Project save;archive path Backlog save;trace;outbox;projection stale;command result save;idempotency complete |
+| Backlog availability update | service after request digest / reserve | Backlog save + side effects + command result 后 | illegal transition、version conflict、repository failure、command result save failure | Backlog save;trace;outbox;projection stale;command result save;idempotency complete |
+| ProjectMember assign / update | service reserve idempotency | member create / save + side effects + command result 后 | member duplicate、snapshot unresolved、domain reject、version conflict、command result save failure | ProjectMember write;optional reference state;trace;outbox;projection stale;command result save;idempotency complete |
+| WorkItem / ChildWorkItem create | service reserve idempotency | work create + membership + side effects + command result 后 | source / method unresolved、backlog closed、domain reject、membership failure、command result save failure | Work create;Backlog membership add;trace;outbox;projection stale;command result save;idempotency complete |
+| WorkItem lifecycle update | service reserve idempotency | work save + side effects + command result 后 | evidence unresolved/rejected、illegal state、version conflict、command result save failure | Work save;trace;outbox;projection stale;command result save;idempotency complete |
+| Request promote | service reserve idempotency | PromoteResult create + side effects + command result 后 | source invalid、duplicate conflict、domain reject、command result save failure | PromoteResult create;trace;outbox;command result save;idempotency complete;no projection stale because no P0 promote/intake public view identity |
+| Review promote | service reserve idempotency | PromoteResult save + optional work create + decision record + side effects + command result 后 | source invalid、accept work create failure、version conflict、command result save failure、accept-created work view stale failure | PromoteResult save;optional WorkItem create;Backlog membership;decision record;trace;outbox;command result save;idempotency complete;accept path marks existing work views stale when formal work is created / bound;reject path no projection stale |
+| Dependency / blocker command | service reserve idempotency | relation save + history + side effects + command result 后 | graph policy reject、evidence reject、version conflict、command result save failure | dependency/blocker write;resolve path persists `resolved_evidence_ref`;history;trace;outbox;projection stale;command result save;idempotency complete |
+| Iteration open | service reserve idempotency | Iteration create + side effects + command result 后 | timebox unresolved、project gate reject、command result save failure | Iteration create;reference state when applicable;trace;outbox;projection stale;command result save;idempotency complete |
+| Commit iteration scope | service reserve idempotency | iteration + commitment + work marks + side effects + command result 后 | non-formal candidate、dependency gate reject、version conflict、command result save failure | Iteration save;Commitment save;Work marks;IterationChangeRecord;trace;outbox;projection stale;command result save;idempotency complete |
+| Update iteration commitment | service reserve idempotency | commitment save + history + side effects + command result 后 | closed commitment、invalid change set、version conflict、command result save failure | Commitment save;IterationChangeRecord;trace;outbox;projection stale;command result save;idempotency complete |
+| Update iteration lifecycle | service reserve idempotency | iteration save + optional commitment close + side effects + command result 后 | illegal state、commitment close failure、version conflict、command result save failure | Iteration save;optional Commitment save;history;trace;outbox;projection stale;command result save;idempotency complete |
+| Inbound event consumer | consumer service after dedup key build | reference / snapshot / pending intake + stale when public view exists + idempotency complete 后 | missing envelope -> no UoW accepted;unsupported version dead-letter;repo failure rollback | idempotency reserve;reference / snapshot / intake writes;projection stale only for formally defined public `DerivedWorkViewRef`;idempotency complete |
 | Publish outbox one record | publish service per record | mark published / failed 后 | outbox version conflict、repository failure | publication state update only;job report item result |
 | Rebuild projections | job service after idempotency reserve and truth snapshot load | mark rebuilding + replace views + fresh marker + idempotency complete 后 | truth snapshot missing、build failure、replace failure、version conflict | idempotency reserve;mark rebuilding;replace projection batch;fresh marker;optional outbox;idempotency complete |
 | Rebuild projection failure marker | failure handling UoW | mark failed + job result 后 | failed marker write failure | mark failed marker;job report failed |
@@ -264,7 +273,8 @@
 | Iteration commit + Commitment + Work marks | 强一致 | any mark failure rollback whole commit | Iteration Committed while work not Committed |
 | Dependency / blocker state + history | 强一致 | history append failure rollback state change | relation changed without change record |
 | truth + trace + outbox | 强一致 on accepted truth command | outbox enqueue failure rollback truth | accepted truth without trace/outbox |
-| truth + projection stale | 强一致 marker on command / consumer write | stale marker failure rollback command;consumer may retry | accepted write hidden from stale tracking |
+| truth + projection stale | 强一致 marker on command / consumer write when an affected public view identity exists | stale marker failure rollback command;consumer may retry | mark stale for undefined / ad hoc view identity |
+| command result surface + idempotency complete | 强一致 on accepted command | result save failure rollback truth;complete 后必须可 duplicate replay | completed idempotency pointing to missing result surface |
 | outbox publication | 最终一致 | publish failure -> `Failed`;retry -> `Pending`;no truth rollback | publisher failure deleting truth or outbox |
 | projection rebuild | 最终一致 from committed truth | rebuild failure -> `Failed`;query exposes failed/stale | projection write modifies truth |
 | reference snapshot | 最终一致 from upstream refs | resolver failure -> failed marker / stale old snapshot | external body copied into Work truth |
@@ -280,12 +290,14 @@
 | repository version conflict | 无新业务写入 | rollback;return `VersionConflict` | caller reloads current version |
 | outbox enqueue failure inside command | 无 accepted truth commit | rollback whole command | retry command with same idempotency key |
 | projection stale marker failure inside command | 无 accepted truth commit | rollback whole command | retry command;adapter issue fixed |
+| command result save failure inside command | 无 accepted truth commit | rollback whole command;do not complete idempotency | retry command with same idempotency key |
 | publisher failure after truth committed | truth + outbox pending already committed | mark outbox `Failed` | retry publish via `mark_pending_for_retry` |
 | projection rebuild build failure | truth unchanged | mark affected views `Failed`;job report failed | fix builder / data issue, rerun rebuild |
 | projection replace failure | truth unchanged;old projection remains | rollback rebuild UoW;mark failed in failure UoW if possible | rerun rebuild |
 | reference resolver failure | old snapshot remains | mark reference failed;job failed_refs | retry refresh |
 | inbound event unsupported version | no business write | dead-letter / no accepted UoW | design / adapter upgrade |
-| idempotency duplicate same digest | previous result exists | return stored result | no new write |
+| idempotency duplicate same digest | previous `ApplicationResultRef` exists | load `StoredCommandResult` via `CommandResultRepository`;overlay duplicate receipt | no new write |
+| idempotency duplicate missing result surface | completed idempotency points to missing / wrong result | return `DuplicateResultMissing` -> temporarily unavailable;raise reconciliation | operator repair result store or investigate partial durable failure |
 | idempotency conflict different digest | no business write | mark conflict;return conflict | caller changes key |
 | UnitOfWork commit failure | adapter-specific unknown | surface `TemporarilyUnavailable`;do not publish side effects outside repository | reconciliation / idempotency audit required by Step 12 / 13 |
 
@@ -354,7 +366,7 @@ IdempotencyRepository.reserve(...)
   -> save truth with expected_version
   -> append history / trace
   -> WorkOutboxRepository.enqueue(...)
-  -> ProjectionRepository.mark_stale(...)
+  -> ProjectionRepository.mark_stale(...) when affected public DerivedWorkViewRef exists
   -> IdempotencyRepository.complete(...)
   -> UnitOfWork.commit()
 ```

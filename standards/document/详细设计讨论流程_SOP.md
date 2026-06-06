@@ -21,6 +21,7 @@
 | v0.8 | 2026-06-03 | Query view 可落码性讨论门禁 | 在 Step 8 / Step 17 增加 query response view、page、projection marker 和 read-model identity 闭环检查 |
 | v0.9 | 2026-06-03 | Query view 传递类型闭环门禁 | 在 Step 7 / Step 8 增加 view 字段引用类型归属和 repository page helper schema 检查 |
 | v0.10 | 2026-06-04 | Public protocol 传递类型闭环门禁 | 在 Step 8 增加 command result、event envelope / receipt、outbound payload 和 job I/O 的二级公开类型 schema 检查 |
+| v0.11 | 2026-06-06 | 详细设计到实现交付审计承接 | 明确 Step 17 只完成详细设计到 07 的承接,正式实现移交前仍需由 07 按 phase / commit boundary 做整体可落码闭环审计 |
 
 ---
 
@@ -1482,6 +1483,7 @@ let tx = unit_of_work.begin().await?;
 9. 哪些字段、状态、函数、用例或证据仍有旧名、口语名或别名漂移？
 10. 哪些内容仍待确认，不能进入实施？
 11. 实施计划应该如何引用本文，而不是重复本文？
+12. 本文是否给 07 按 phase / commit boundary 执行交付实现前闭环审计提供了足够对象、协议、flow、状态、持久化、测试切口和验收映射输入？
 ```
 
 #### 期望产出
@@ -1506,6 +1508,7 @@ let tx = unit_of_work.begin().await?;
 - 必须包含提交规范、git config 用户、Rust 编码规范、注释规范。
 - 必须完成 `设计文档讨论中间产物规范.md` 5.10 中定义的跨文档一致性复核。
 - 未通过字段闭环、query response 闭环、状态闭环或 phase boundary 复核的内容不得交给实施者自行取舍。
+- Step 17 的承接清单不是最终实现移交通过结论;正式移交实现前,07 仍必须按 phase / commit boundary 对正式 `03/05/06/07` 执行整体可落码闭环审计。
 - 不写开发排期。
 - 不写任务拆分。
 
@@ -1596,6 +1599,7 @@ let tx = unit_of_work.begin().await?;
 4. 字段闭环、DTO 构造闭环、状态闭环和 phase boundary 是否通过复核？
 5. 其他 agent 是否可以按本文 1:1 实现代码？
 6. 是否有内容误放到测试方案、实施计划、配置设计或运维手册？
+7. 本文是否明确提供给 07 交付实现前整体审计所需的边界、schema、flow、状态、持久化和测试切口输入？
 ```
 
 #### 期望产出
@@ -1614,6 +1618,7 @@ let tx = unit_of_work.begin().await?;
 - [ ] 字段闭环和 DTO 构造闭环通过
 - [ ] 状态、测试、验收和实施 phase 使用同一套正式名称
 - [ ] phase boundary 没有引用后续 phase 才定义的对象或证据
+- [ ] 已为 07 按 phase / commit boundary 执行交付实现前闭环审计提供足够输入
 - [ ] 测试切口明确
 ```
 

@@ -17,7 +17,7 @@
 |---|---|
 | `05_test_plan_step_05_traceability_coverage.md` | 用例编号族、证据编号族、FR / BR / AC 覆盖关系 |
 | `03-详细设计.md` §7~§15 | 协议、处理流、状态、事务、错误、幂等、配置、观测和最小验证清单 |
-| `03_ddd_step_08_protocol_contracts.md` | 18 Command、8 Query、7 Consumer、9 Event、6 Job 的正式协议名和 DTO / response surface |
+| `03_ddd_step_08_protocol_contracts.md` | 18 Command、8 Query、7 Consumer、10 Event、6 Job 的正式协议名和 DTO / response surface |
 | `03_ddd_step_09_function_flows.md` | 每个 flow 的加载、校验、状态副作用、UoW 和错误映射 |
 | `03_ddd_step_10_state_matrix.md` | 正式状态机、合法转换、非法转换和跨对象副作用 |
 | `03_ddd_step_11_persistence_transaction_consistency.md` | UoW、rollback、outbox、trace、projection stale 和 no-write 规则 |
@@ -32,7 +32,7 @@
 | 每个 P0 正向主线怎么执行? | 按 `CORE`、`MEMBER`、`FORMAL`、`PROMOTE`、`DEP`、`ITER`、`QUERY`、`OPS`、`CFG`、`NFR` 十个用例族展开;每个正向用例都指定入口、前置条件、输入 / 操作、预期结果和断言点。 |
 | 每个关键反向和边界场景如何触发? | 在同一族内保留 reject / not visible / unresolved / dead-letter / failed marker / fail-fast 场景,不用“人工确认”替代自动化。 |
 | 每个状态非法迁移如何断言? | 统一断言 `DomainError::InvalidStateTransition` 经 application 映射为 `ApplicationError::DomainRejected`,handler surface 为 `WorkProtocolError::DomainRejected`,且不写 truth、outbox 或 projection stale marker。 |
-| 每个事务回滚和副作用如何验证? | 写路径断言 Project / Work / dependency / iteration truth、trace、audit、outbox、projection stale、idempotency complete 同 UoW;失败路径断言 rollback 后无 accepted truth / trace / outbox。 |
+| 每个事务回滚和副作用如何验证? | 写路径断言 Project / Work / dependency / iteration truth、trace、audit、outbox、projection stale、command result save、idempotency complete 同 UoW;失败路径断言 rollback 后无 accepted truth / trace / outbox。 |
 | 每个恢复场景如何复现? | 通过 duplicate request、same key different digest、publisher failure、resolver failure、projection rebuild failure、handoff failure、commit unknown 查询幂等记录和 job rerun 复现。 |
 | 每个用例预期结果引用了哪些正式字段、状态、错误或事件? | 用例矩阵中的预期结果和断言点只引用 `ProjectLifecycleState`、`WorkItemState`、`PromoteResultState`、`DerivedFreshnessState`、`ReferenceResolutionStatus`、`OutboxPublicationState`、`ApplicationError::*`、`WorkProtocolError::*` 和正式 outbound event 名。 |
 | 是否存在把后续 phase 状态或证据提前写入当前用例的问题? | 不提前写 production-like、config center、admin override、hot reload、secret provider、真实 MQ / durable store、外围增强 `FR-WORK-E01`~`E05` 或 `06` 的验收裁决。 |
@@ -41,7 +41,7 @@
 
 | 文档 / 位置 | 当前问题 | 本步处理 |
 |---|---|---|
-| 旧 `05-测试方案.md` | 旧用例不能覆盖新版 18 Command、8 Query、7 Consumer、9 Event、6 Job 和配置矩阵 | 本步重新生成新版用例矩阵,不直接修改正式文档 |
+| 旧 `05-测试方案.md` | 旧用例不能覆盖新版 18 Command、8 Query、7 Consumer、10 Event、6 Job 和配置矩阵 | 本步重新生成新版用例矩阵,不直接修改正式文档 |
 | Step 5 | 只有覆盖族和证据族,没有执行步骤和断言点 | 本步把 `TC-WORK-*` 展开为可执行骨架 |
 | `03-详细设计.md` §15 | 最小验证清单是切口级,不是用例级 | 本步把切口落到 `TC-WORK-*` |
 | `04-配置设计.md` §12 | 已列配置测试承接,但还没有统一用例 ID | 本步用 `CFG` 和 `NFR` 族承接 profile、loader、sensitive、adapter、replay 和 no hot reload |
@@ -78,10 +78,10 @@
 
 | 用例 ID | 场景 | 优先级 | 前置条件 | 输入 / 操作 | 预期结果 | 断言点 | 自动化候选 |
 |---|---|---|---|---|---|---|---|
-| `TC-WORK-CORE-001` | 显式创建 Project 和 Backlog | P0 | actor 合法;`CommandMetadata.request.idempotency_key` 存在;project id 未复用 | 调用 `CreateProject` | `Project.lifecycle_state = ProjectLifecycleState::Active`;`Backlog.backlog_state = BacklogState::Open`;enqueue `ProjectChanged` | Project、Backlog、`WorkTraceRecord`、`WorkAuditTrail`、`WorkOutboxRecord`、derived views `Stale`、idempotency complete 同 UoW | 是 |
+| `TC-WORK-CORE-001` | 显式创建 Project 和 Backlog | P0 | actor 合法;`CommandMetadata.request.idempotency_key` 存在;project id 未复用 | 调用 `CreateProject` | `Project.lifecycle_state = ProjectLifecycleState::Active`;`Backlog.backlog_state = BacklogState::Open`;enqueue `ProjectChanged` | Project、Backlog、`WorkTraceRecord`、`WorkAuditTrail`、`WorkOutboxRecord`、derived views `Stale`、command result save、idempotency complete 同 UoW | 是 |
 | `TC-WORK-CORE-002` | 隐式创建 Project 被拒绝 | P0 | 仅存在外部 owner / query ref,本地无 Project truth | 通过 Query 或相邻 ref 访问不存在 project,不调用 `CreateProject` | 返回 `Missing` 或 `NotFound`;不创建 Project / Backlog | ProjectRepository、BacklogRepository、outbox、trace 均无新增;不产生 `ProjectChanged` | 是 |
 | `TC-WORK-CORE-003` | Project lifecycle 关闭和归档 | P0 | Project `Active` 或 `Closed`;Backlog `Open`;expected version 正确 | 调用 `UpdateProjectLifecycle` 到 `Closed` / `Archived` | Project lifecycle 转换;archive path 联动 Backlog `Archived`;enqueue `ProjectChanged` | `ProjectLifecycleState::Closed / Archived`;`BacklogState::Archived`;projection stale;version 匹配 | 是 |
-| `TC-WORK-CORE-004` | CreateProject 幂等 duplicate | P0 | `TC-WORK-CORE-001` 已完成;保存 idempotency record | 同 operation、same key、same digest 重放 `CreateProject` | 返回既有 `ProjectCommandResult` / `ApplicationResultRef` | 无新 Project、Backlog、trace、audit、outbox;idempotency duplicate 日志可见 | 是 |
+| `TC-WORK-CORE-004` | CreateProject 幂等 duplicate | P0 | `TC-WORK-CORE-001` 已完成;保存 idempotency record 和 command result surface | 同 operation、same key、same digest 重放 `CreateProject` | 通过 `CommandResultRepository.get_result` 返回既有 `ProjectCommandResult` / `ApplicationResultRef`;receipt 标记 duplicate | 无新 Project、Backlog、trace、audit、outbox;idempotency duplicate 日志可见 | 是 |
 | `TC-WORK-MEMBER-001` | AssignProjectMember 成功 | P0 | Project `Active`;identity member 可解析;capability snapshot 支持 responsibility spec | 调用 `AssignProjectMember` | 保存 `ProjectMember`;responsibility 为 `Proposed` 或 `Active`;enqueue `ProjectMemberChanged` | `ProjectMember.member_ref` 不等于 `ProjectMemberRef`;snapshot ref 保存;member / project views stale | 是 |
 | `TC-WORK-MEMBER-002` | identity resolver unavailable / unresolved | P0 | Project 存在;identity adapter 返回 unresolved 或 unavailable | 调用 `AssignProjectMember` | 返回 `ExternalReferenceUnresolved` 或 retry surface;不保存 accepted member truth | 无 `ProjectMemberChanged`;无业务 trace / outbox;resolver failure metric 可见 | 是 |
 | `TC-WORK-MEMBER-003` | 拒绝接管 identity truth / body | P0 | 输入包含 GlobalMemberRef 以外的 identity 正文或企图改 identity 生命周期 | 调用 `AssignProjectMember` 或 consumer contract | `WorkTruthPolicy` reject;不保存 identity body | `MemberCapabilitySnapshot` 只含 safe capability refs;log / audit / report 无 raw identity body | 是 |
@@ -98,9 +98,9 @@
 | `TC-WORK-PROMOTE-005` | 并发 review 版本冲突 | P0 | 同一 PromoteResult `PendingReview`;两个 expected version | 并发调用 accept / reject | 只有一个成功;另一个 `VersionConflict` | losing path 无 trace / outbox / WorkItem;idempotency 不误判为 duplicate | 是 |
 | `TC-WORK-DEP-001` | LinkWorkDependency 成功 | P0 | upstream / downstream 都是 formal work;graph 无环 | 调用 `LinkWorkDependency` | `DependencyState::Proposed` 或 `Active`;enqueue `WorkDependencyChanged` | dependency edge、history、trace、audit、outbox、projection stale | 是 |
 | `TC-WORK-DEP-002` | dependency cycle reject | P0 | 现有 graph 中新增 edge 会形成环 | 调用 `LinkWorkDependency` | `DomainRejected` | 无 dependency、history、trace、outbox;cycle diagnostics 不进入 outbound payload | 是 |
-| `TC-WORK-DEP-003` | UpdateWorkDependencyState | P0 | Dependency `Active`;evidence 或 waiver reason 合法 | 调用 `UpdateWorkDependencyState` 到 `Satisfied` / `Waived` / `Cancelled` | `DependencyState` 转换;enqueue `WorkDependencyChanged` | `Satisfied` 要求 verified evidence;terminal 后不能 reopen | 是 |
+| `TC-WORK-DEP-003` | UpdateWorkDependencyState | P0 | 一组 Dependency `Proposed`;一组 Dependency `Active`;evidence 或 change reason 合法 | 调用 `UpdateWorkDependencyState` 到 `Active` / `Satisfied` / `Waived` / `Cancelled` | `Proposed -> Active` 和 `Active -> terminal` 转换;enqueue `WorkDependencyChanged` | `Active` 要求 `DependencyChangeReasonKind::Activated`;`Satisfied` 要求 verified evidence;reason kind mismatch reject;terminal 后不能 reopen | 是 |
 | `TC-WORK-DEP-004` | OpenWorkBlocker 成功 | P0 | blocked formal work 存在;cause ref 可追溯 | 调用 `OpenWorkBlocker` | `BlockerState::Open`;enqueue `WorkBlockerChanged` | blocker ref、cause ref、history、trace、outbox、projection stale | 是 |
-| `TC-WORK-DEP-005` | ResolveWorkBlocker 与 evidence reject | P0 | Blocker `Open`;一组 verified evidence 和一组 missing / rejected evidence | 调用 `ResolveWorkBlocker` | verified evidence -> `BlockerState::Resolved`;missing / rejected -> `InvalidRequest` / `ExternalReferenceUnresolved` | success enqueue `WorkBlockerChanged`;failure 无 truth / outbox;no evidence body | 是 |
+| `TC-WORK-DEP-005` | ResolveWorkBlocker 与 evidence reject | P0 | Blocker `Open`;一组 verified evidence 和一组 missing / rejected evidence | 调用 `ResolveWorkBlocker` | verified evidence -> `BlockerState::Resolved` 且 `resolved_evidence_ref = Some(evidence_ref)`;missing / rejected -> `InvalidRequest` / `ExternalReferenceUnresolved` | success enqueue `WorkBlockerChanged`,event evidence from blocker truth;failure 无 truth / outbox;no evidence body | 是 |
 | `TC-WORK-ITER-001` | OpenIteration 成功 | P0 | Project 可接受 iteration;process timebox ref 可追溯 | 调用 `OpenIteration` | `IterationState::Planning`;enqueue `IterationChanged` | timebox ref 只作为外部 ref;不改 process truth;projection stale | 是 |
 | `TC-WORK-ITER-002` | CommitIterationScope 成功 | P0 | Iteration `Planning`;candidate work 均 `Formalized`;dependency gate 通过 | 调用 `CommitIterationScope` | `IterationState::Committed`;`CommitmentState::Committed`;work `Committed` | iteration、commitment、work marks、history、trace、outbox 同 UoW | 是 |
 | `TC-WORK-ITER-003` | 非 formal candidate 拒绝 commit | P0 | candidate 中包含不存在、terminal 或非 formal work | 调用 `CommitIterationScope` | `ApplicationError::DomainRejected` 或 `InvalidRequest` | Iteration 仍 `Planning`;无 commitment、work mark、outbox | 是 |
@@ -134,11 +134,12 @@ Consumer 和 outbound event 不新增独立编号族;它们必须被既有 `TC-W
 | `ConsumeArtifactEvidenceChanged` | `TC-WORK-DEP-005` / `FORMAL-004` | artifact evidence event | evidence `Verified` -> resolved;`Rejected` -> stale / failed marker | 不直接 complete work;不保存 evidence body |
 | `ConsumeRuntimePromoteRequested` | `TC-WORK-PROMOTE-001` / `PROMOTE-004` | runtime promote requested event | 保存 source reference 和 pending promote intake | 不调用 `PromoteResult::evaluate`;不 enqueue `PromoteResultRecorded` |
 | `ProjectChanged` | `TC-WORK-CORE-001` / `003` | Project command enqueue 后 publish | topic `work.project.changed.v1`;payload from Project truth | payload 含 `ProjectLifecycleState`;无 workspace 正文 |
+| `BacklogChanged` | `TC-WORK-CORE-003` / `FORMAL-003` | backlog availability command 或 project archive 联动后 publish | topic `work.backlog.changed.v1`;payload from Backlog truth | payload 含 `BacklogRef`、`ProjectRef`、`BacklogState`、`BacklogMaintenanceReason`;无 workspace / process 正文 |
 | `ProjectMemberChanged` | `TC-WORK-MEMBER-001` | member command enqueue 后 publish | topic `work.project_member.changed.v1` | payload 含 responsibility state;无 capability body |
 | `WorkItemChanged` | `TC-WORK-FORMAL-001` / `ITER-002` | work create / commit / lifecycle enqueue 后 publish | topic `work.formal_work.changed.v1` | payload 含 `FormalWorkRef`、`WorkItemState`、source / evidence ref |
 | `PromoteResultRecorded` | `TC-WORK-PROMOTE-001`~`003` | promote command enqueue 后 publish | topic `work.promote_result.recorded.v1` | payload 含 result state、source ref、optional created work ref |
 | `WorkDependencyChanged` | `TC-WORK-DEP-001` / `003` | dependency command enqueue 后 publish | topic `work.dependency.changed.v1` | payload 含 upstream / downstream / dependency state;无 cycle diagnostics |
-| `WorkBlockerChanged` | `TC-WORK-DEP-004` / `005` | blocker command enqueue 后 publish | topic `work.blocker.changed.v1` | payload 含 blocker ref、state、optional evidence ref;无 evidence body |
+| `WorkBlockerChanged` | `TC-WORK-DEP-004` / `005` | blocker command enqueue 后 publish | topic `work.blocker.changed.v1` | payload 含 blocker ref、state、optional evidence ref from `WorkBlocker.resolved_evidence_ref`;无 evidence body |
 | `IterationChanged` | `TC-WORK-ITER-001` / `002` / `005` | iteration command enqueue 后 publish | topic `work.iteration.changed.v1` | payload 含 iteration / commitment refs;无 work body copy |
 | `WorkTraceAvailable` | `TC-WORK-OPS-005` / `006` | handoff marker 生成后 optional enqueue | topic `work.trace.available.v1` | payload 只含 trace subject / handoff ref;无 observability body |
 | `DerivedWorkViewChanged` | `TC-WORK-OPS-002` | projection rebuild 成功后 optional enqueue | topic `work.derived_view.changed.v1` | payload 含 view ref、freshness、source cursor;无 projection body dump |
@@ -206,7 +207,7 @@ Consumer 和 outbound event 不新增独立编号族;它们必须被既有 `TC-W
 
 | 测试用例 | 设计契约 | 字段 / 状态断言 | 负向条件 | 证据 ID |
 |---|---|---|---|---|
-| `TC-WORK-CORE-004` | `IdempotencyRepository.reserve / complete / get` | same key same digest 返回既有 `ApplicationResultRef`;无新 truth / trace / outbox | duplicate request | `EV-WORK-CORE-004` |
+| `TC-WORK-CORE-004` | `IdempotencyRepository.reserve / complete / get` + `CommandResultRepository.get_result` | same key same digest 返回既有 `ApplicationResultRef` / result surface;无新 truth / trace / outbox | duplicate request | `EV-WORK-CORE-004` |
 | `TC-WORK-NFR-004` | same key different digest conflict | `IdempotencyConflict`;idempotency conflict marker / safe log | key reuse with changed request | `EV-WORK-NFR-004` |
 | `TC-WORK-PROMOTE-005` | optimistic `Version` | losing request 返回 `VersionConflict` | concurrent accept / reject | `EV-WORK-PROMOTE-005` |
 | `TC-WORK-ITER-002` | same UoW multi-object write | Iteration、Commitment、Work marks、outbox、trace、idempotency complete 一起提交 | dependency gate failure | `EV-WORK-ITER-002` |

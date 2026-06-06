@@ -185,7 +185,8 @@
 |        v                                                          |
 | load both formal work refs + dependency graph snapshot             |
 |        v                                                          |
-| DependencyGraphPolicy::assert_can_link(FormalWorkRef upstream,    |
+| DependencyGraphPolicy::assert_can_link(DependencyGraphSnapshot,   |
+|                                        FormalWorkRef upstream,    |
 |                                        FormalWorkRef downstream)  |
 |        v                                                          |
 | WorkDependency::link(FormalWorkRef upstream, FormalWorkRef down,  |
@@ -195,7 +196,7 @@
 +=================================================================+
 ```
 
-关键设计点:`UpdateWorkDependencyState`、`OpenWorkBlocker` 和 `ResolveWorkBlocker` 使用同一关系变更骨架;满足 / 解除路径必须额外经过 `CompletionEvidencePolicy` 校验依据。
+关键设计点:`UpdateWorkDependencyState`、`OpenWorkBlocker` 和 `ResolveWorkBlocker` 使用同一关系变更骨架;`UpdateWorkDependencyState` 必须覆盖 `DependencyTarget::Active` 的 proposed activation 分支;满足 / 解除路径必须额外经过 `CompletionEvidencePolicy` 校验依据。
 
 #### CommitIterationScope 处理流
 
@@ -239,7 +240,7 @@
 
 ```text
 +====================== UpdateIterationLifecycle ==================+
-| command: IterationRef + IterationLifecycleTarget + reason          |
+| command: IterationRef + IterationLifecycleTarget + target reason   |
 |        v                                                          |
 | load Iteration + current commitment state                          |
 |        v                                                          |

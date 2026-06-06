@@ -11,7 +11,7 @@
 | 输入 | 内容 | 本步使用方式 |
 |---|---|---|
 | `03_ddd_step_05_module_contracts.md` | `contracts` / `domain` / `application` / `infra` / `api` / `worker` / `jobs` 七个模块主轴 | 固定模块测试切口 |
-| `03_ddd_step_08_protocol_contracts.md` | 18 个 Command、8 个 Query、7 个 Inbound Event、9 个 Outbound Event、6 个 Operations Job | 固定接口测试切口 |
+| `03_ddd_step_08_protocol_contracts.md` | 18 个 Command、8 个 Query、7 个 Inbound Event、10 个 Outbound Event、6 个 Operations Job | 固定接口测试切口 |
 | `03_ddd_step_09_function_flows.md` | 逐接口 flow、UoW、outbox、audit、projection、handoff 副作用 | 固定正向 / 异常验证路径 |
 | `03_ddd_step_10_state_matrix.md` | 12 组正式状态机、合法转换、非法转换 | 固定状态机测试切口 |
 | `03_ddd_step_11_persistence_transaction_consistency.md` | repository、UnitOfWork、version、outbox、projection、reference、handoff 一致性 | 固定事务测试切口 |
@@ -57,7 +57,7 @@
 | 位置 | 当前问题 | 本步处理 |
 |---|---|---|
 | Step 5 | 只有模块测试职责预告 | 本 Step 固定每个模块最小测试切口 |
-| Step 8 / 9 | 每个协议和 flow 已有测试提示,但分散 | 本 Step 汇总 18 Command、8 Query、7 Consumer、9 Event、6 Job |
+| Step 8 / 9 | 每个协议和 flow 已有测试提示,但分散 | 本 Step 汇总 18 Command、8 Query、7 Consumer、10 Event、6 Job |
 | Step 10 | 状态矩阵完整,但没有测试反查表 | 本 Step 为 12 组状态机补合法 / 非法测试入口 |
 | Step 11 / 12 / 13 | 事务、错误、幂等、并发分散 | 本 Step 汇总一致性、恢复、重入测试入口 |
 | Step 15 | 观测和字段边界已定义 | 本 Step 增加日志 / 指标 / 审计 / forbidden field 验证入口 |
@@ -119,7 +119,7 @@ Step 15 observability
 | `domain_policy_accept_reject` | Step 6 policy | lifecycle、responsibility、formal work、promote、dependency、iteration policy accept / reject | domain unit |
 | `domain_state_machine_transitions` | Step 10 状态矩阵 | 12 组状态机合法 / 非法转换 | domain unit |
 | `domain_audit_outbox_records` | Step 6 audit / outbox | `WorkTraceRecord`、`WorkAuditTrail`、`WorkOutboxRecord` 只从 accepted truth change 形成 | domain unit |
-| `application_command_orchestration` | Step 9 command template | UoW、idempotency、repository、audit、outbox、projection stale 调用顺序 | application service |
+| `application_command_orchestration` | Step 9 command template | UoW、idempotency、command result store、repository、audit、outbox、projection stale 调用顺序 | application service |
 | `application_query_no_write` | Step 9 query template | Query 不开启写 UoW、不写 audit / outbox / idempotency / marker | application service |
 | `application_error_mapping` | Step 12 错误模型 | domain / repository / resolver / publisher / handoff / UoW error 映射 | application service |
 | `infra_repository_semantics` | Step 7 / 11 repository | in-memory repository 的 version、unique key、transaction rollback、page 行为 | repository test |
@@ -144,14 +144,14 @@ Step 15 observability
 | `UpdateWorkItemLifecycle_contract` | `UpdateWorkItemLifecycleFlow` | work lifecycle transition;completion evidence required、terminal transition reject | API + application |
 | `RequestWorkPromotion_contract` | `RequestWorkPromotionFlow` | promote result pending review;source unresolved、duplicate、outbox rollback | API + application |
 | `ReviewWorkPromotion_contract` | `ReviewWorkPromotionFlow` | accept / reject;accept path optional WorkItem;concurrent review version conflict | API + application |
-| `LinkWorkDependency_contract` | `LinkWorkDependencyFlow` | dependency proposed / active;cycle rejected、duplicate edge、outbox rollback | API + application |
-| `UpdateWorkDependencyState_contract` | `UpdateWorkDependencyStateFlow` | Active -> Satisfied / Waived / Cancelled;terminal reject、version conflict | API + application |
-| `OpenWorkBlocker_contract` | `OpenWorkBlockerFlow` | blocker open + history + outbox;evidence unresolved、duplicate blocker | API + application |
-| `ResolveWorkBlocker_contract` | `ResolveWorkBlockerFlow` | blocker resolved / closed path;evidence missing、closed reject、version conflict | API + application |
+| `LinkWorkDependency_contract` | `LinkWorkDependencyFlow` | dependency proposed / active;graph scope comes from `get_formal_work_scope(downstream)`;cycle rejected、duplicate edge、outbox rollback;project-board + resolvable member-work stale | API + application |
+| `UpdateWorkDependencyState_contract` | `UpdateWorkDependencyStateFlow` | Proposed -> Active with `DependencyChangeReasonKind::Activated`;Active -> Satisfied / Waived / Cancelled;reason kind mismatch reject;terminal reject、version conflict;downstream relation views stale | API + application |
+| `OpenWorkBlocker_contract` | `OpenWorkBlockerFlow` | blocker open + history + outbox;blocked work scope resolved;evidence unresolved、duplicate blocker;blocked project-board + resolvable member-work stale | API + application |
+| `ResolveWorkBlocker_contract` | `ResolveWorkBlockerFlow` | blocker resolved path writes `resolved_evidence_ref`;evidence missing、closed reject、version conflict;blocked relation views stale | API + application |
 | `OpenIteration_contract` | `OpenIterationFlow` | iteration planning;timebox unresolved、project closed, duplicate | API + application |
 | `CommitIterationScope_contract` | `CommitIterationScopeFlow` | iteration + commitment + work marks same UoW;scope invalid、work version conflict | API + application |
 | `UpdateIterationCommitment_contract` | `UpdateIterationCommitmentFlow` | commitment changed;closed commitment reject、work membership conflict | API + application |
-| `UpdateIterationLifecycle_contract` | `UpdateIterationLifecycleFlow` | Planning / Committed / InProgress / Closed / Cancelled;illegal target reject | API + application |
+| `UpdateIterationLifecycle_contract` | `UpdateIterationLifecycleFlow` | Planning / Committed / InProgress / Closed / Cancelled;`InProgress` / `Cancelled` require `change_reason`;`Closed` requires `close_reason`;wrong reason field reject;illegal target reject | API + application |
 
 #### 8.4 Query / Event / Job 接口测试切口汇总表
 
@@ -173,11 +173,12 @@ Step 15 observability
 | `ConsumeArtifactEvidenceChanged_contract` | artifact event consumer | evidence reference state saved;missing evidence, digest mismatch | consumer |
 | `ConsumeRuntimePromoteRequested_contract` | runtime promote consumer | pending promote intake saved;missing source / reason dead-letter | consumer |
 | `ProjectChanged_event_schema` | outbound `ProjectChanged` | payload from Project + reason;no uncommitted truth;publish failure marker | contract + publisher |
+| `BacklogChanged_event_schema` | outbound `BacklogChanged` | payload from Backlog + maintenance reason;no ProjectChanged reuse;publish failure marker | contract + publisher |
 | `ProjectMemberChanged_event_schema` | outbound `ProjectMemberChanged` | project member refs and responsibility;no capability body | contract + publisher |
 | `WorkItemChanged_event_schema` | outbound `WorkItemChanged` | work ref/state/source/evidence refs;no external body | contract + publisher |
 | `PromoteResultRecorded_event_schema` | outbound `PromoteResultRecorded` | promote result / source / created work ref;publish failure marker | contract + publisher |
 | `WorkDependencyChanged_event_schema` | outbound `WorkDependencyChanged` | dependency edge refs and state;cycle diagnostics absent | contract + publisher |
-| `WorkBlockerChanged_event_schema` | outbound `WorkBlockerChanged` | blocker ref / evidence ref;no evidence body | contract + publisher |
+| `WorkBlockerChanged_event_schema` | outbound `WorkBlockerChanged` | blocker ref / evidence ref sourced from `WorkBlocker.resolved_evidence_ref`;no evidence body | contract + publisher |
 | `IterationChanged_event_schema` | outbound `IterationChanged` | iteration / commitment / affected refs;no work body copy | contract + publisher |
 | `WorkTraceAvailable_event_schema` | outbound `WorkTraceAvailable` | trace id / subject / optional handoff ref;no observability body | contract + publisher |
 | `DerivedWorkViewChanged_event_schema` | outbound `DerivedWorkViewChanged` | view ref / freshness / source cursor;no projection body dump | contract + publisher |
@@ -197,7 +198,7 @@ Step 15 observability
 | `backlog_state_transitions` | `BacklogState` | `Open <-> LockedForMaintenance -> Archived`;`Archived -> Open` 拒绝 | domain unit |
 | `work_item_state_transitions` | `WorkItemState` | `Formalized -> Committed -> InProgress -> Completed`;terminal -> active 拒绝 | domain unit |
 | `promote_result_transitions` | `PromoteResultState` | `PendingReview -> Accepted / Rejected -> Superseded`;`Superseded -> Accepted` 拒绝 | domain unit |
-| `dependency_state_transitions` | `DependencyState` | `Proposed -> Active -> Satisfied / Waived / Cancelled`;terminal reopen 拒绝 | domain unit |
+| `dependency_state_transitions` | `DependencyState` | `Proposed -> Active -> Satisfied / Waived / Cancelled`;`activate` only accepts `Activated` reason;terminal reopen 拒绝 | domain unit |
 | `blocker_state_transitions` | `BlockerState` | `Open -> Mitigating -> Resolved -> Closed`;`Closed -> Open` 拒绝 | domain unit |
 | `iteration_state_transitions` | `IterationState` | `Planning -> Committed -> InProgress -> Closed`;`Closed -> InProgress` 拒绝 | domain unit |
 | `commitment_state_transitions` | `CommitmentState` | `Candidate -> Committed -> Changed -> Closed`;`Closed -> Changed` 拒绝 | domain unit |
@@ -209,11 +210,12 @@ Step 15 observability
 
 | 测试切口 | 对应契约 | 验证内容 | 建议测试类型 |
 |---|---|---|---|
-| `command_same_key_same_digest_replays_result` | Step 13 duplicate success | second request 返回同 result_ref,无新 truth / trace / outbox | application |
+| `command_same_key_same_digest_replays_result` | Step 13 duplicate success | second request 通过 `CommandResultRepository.get_result` 返回同 result_ref,receipt 标记 duplicate,无新 truth / trace / outbox | application |
 | `command_same_key_different_digest_conflicts` | Step 13 conflict | same key + different digest 返回 `IdempotencyConflict`,不得写业务 truth | application |
 | `command_reserved_inflight_returns_unavailable` | Step 13 in-flight | reserved same digest 返回 temporarily unavailable,不重放 domain | idempotency fake |
+| `command_duplicate_missing_result_surface` | Step 12 / 13 duplicate missing | completed idempotency 指向 missing / wrong stored result 时返回 temporarily unavailable,无业务写 | application + result store fake |
 | `digest_excludes_volatile_metadata` | Step 13 digest 排除 | request_id / trace / requested_at 变化不改变 digest | contract unit |
-| `accepted_truth_and_outbox_same_uow` | Step 11 UoW | truth、trace、audit、outbox、projection stale、idempotency complete 同事务 | repository + service |
+| `accepted_truth_and_outbox_same_uow` | Step 11 UoW | truth、trace、audit、outbox、projection stale、command result save、idempotency complete 同事务 | repository + service |
 | `outbox_enqueue_failure_rolls_back_truth` | Step 11 rollback | outbox enqueue failure 时 truth / audit 不提交 | repository + service |
 | `version_conflict_rolls_back_side_effects` | Step 11 / 12 | stale expected_version 返回 `VersionConflict`,无 trace / outbox | application |
 | `unique_create_conflict_does_not_replay_result` | Step 13 unique key | business unique conflict 不等同 idempotency duplicate | repository fake |
@@ -277,7 +279,7 @@ Step 15 observability
 
 L1-work 详细设计只定义最小测试入口,不替代 `05-测试方案.md`。完整测试矩阵、优先级、覆盖率目标、fixture 组织、CI 分层、真实 durable store / broker / sibling repo 联调和执行排期由测试方案继续展开。
 
-最小验证必须覆盖七个模块、18 个 Command、8 个 Query、7 个 Inbound Event、9 个 Outbound Event、6 个 Operations Job、12 组状态机,以及事务、幂等、并发、错误恢复、配置边界和观测字段边界。
+最小验证必须覆盖七个模块、18 个 Command、8 个 Query、7 个 Inbound Event、10 个 Outbound Event、6 个 Operations Job、12 组状态机,以及事务、幂等、并发、错误恢复、配置边界和观测字段边界。
 
 每个 Command 至少覆盖 success、reject / error 和 duplicate / conflict;每个 Query 至少覆盖 hit、missing / not visible / degraded 和 no-write;每个 Event / Job 至少覆盖 success、failure / dead-letter / partial failure 和 rerun / duplicate。状态机必须同时覆盖合法转换和非法转换。
 
@@ -292,7 +294,7 @@ L1-work 详细设计只定义最小测试入口,不替代 `05-测试方案.md`�
 ### 12. 进入下一步条件
 
 - [x] 模块测试切口覆盖 `contracts`、`domain`、`application`、`infra`、`api`、`worker`、`jobs`。
-- [x] 接口测试切口覆盖 18 个 Command、8 个 Query、7 个 Inbound Event、9 个 Outbound Event、6 个 Operations Job。
+- [x] 接口测试切口覆盖 18 个 Command、8 个 Query、7 个 Inbound Event、10 个 Outbound Event、6 个 Operations Job。
 - [x] 状态机测试切口覆盖 12 组正式状态机的合法和非法转换。
 - [x] 一致性 / 幂等 / 并发测试切口覆盖 duplicate、conflict、version conflict、outbox、projection、reference、handoff、commit unknown。
 - [x] 错误 / 配置 / 观测测试切口覆盖 no-write、forbidden field、low-cardinality metric 和 boundary config。

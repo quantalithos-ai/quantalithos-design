@@ -19,6 +19,7 @@
 | `blocked_work_ref` | `FormalWorkRef` | 被阻塞正式工作 |
 | `cause_ref` | `BlockerCauseRef` | 阻塞原因引用 |
 | `blocker_state` | `BlockerState` | 阻塞生命周期 |
+| `resolved_evidence_ref` | `Option<ExternalEvidenceRef>` | 解除阻塞依据引用,仅 resolved 后有值 |
 
 | 状态 | 作用 |
 |---|---|
@@ -27,7 +28,7 @@
 | 成员函数 | 作用 |
 |---|---|
 | `start_mitigation(BlockerMitigationReason reason, ActorRef actor)` | 记录阻塞进入处理中 |
-| `resolve(ExternalEvidenceRef evidence_ref, ActorRef actor)` | 记录解除依据 |
+| `resolve(ExternalEvidenceRef evidence_ref, ActorRef actor)` | 记录解除依据,并写入 `resolved_evidence_ref` |
 | `close(BlockerCloseReason reason, ActorRef actor)` | 在解除后关闭阻塞记录 |
 | `explain_impact()` | 生成影响解释边界 |
 
@@ -97,7 +98,7 @@
 | `contains(FormalWorkRef work_ref)` | 判断工作是否在承诺范围 |
 | `apply_change(IterationCommitmentChangeSet change_set, IterationChangeReason reason, ActorRef actor)` | 显式调整承诺集合并进入 Changed |
 | `remove(FormalWorkRef work_ref, CommitmentChangeReason reason)` | 显式移出承诺范围 |
-| `close(IterationChangeReason reason, ActorRef actor)` | 随 Iteration 关闭承诺集合 |
+| `close(IterationCloseReason reason, ActorRef actor)` | 随 Iteration 关闭承诺集合 |
 
 | 工厂函数 | 作用 |
 |---|---|

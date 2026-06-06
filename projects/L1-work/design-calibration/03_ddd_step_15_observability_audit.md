@@ -171,7 +171,7 @@
 | `WorkItemLifecycleChangedAudit` | `UpdateWorkItemLifecycleFlow` 提交后 | `trace_id`、`trace_context_ref`、`actor_ref`、`formal_work_ref`、`from_state`、`to_state`、`reason_ref`、`evidence_ref` | trace query / downstream |
 | `WorkPromotionRequestedAudit` | `RequestWorkPromotionFlow` 提交后 | `trace_id`、`trace_context_ref`、`actor_ref`、`promote_result_ref`、`source_ref`、`reason_ref`、`outbox_id` | runtime / trace query |
 | `WorkPromotionReviewedAudit` | `ReviewWorkPromotionFlow` 提交后 | `trace_id`、`trace_context_ref`、`actor_ref`、`promote_result_ref`、`decision_state`、`created_work_ref`、`outbox_id` | runtime / archive / trace query |
-| `WorkDependencyChangedAudit` | `LinkWorkDependencyFlow` / `UpdateWorkDependencyStateFlow` 提交后 | `trace_id`、`trace_context_ref`、`actor_ref`、`dependency_ref`、`from_state`、`to_state`、`change_id`、`outbox_id` | trace query / governance |
+| `WorkDependencyChangedAudit` | `LinkWorkDependencyFlow` / `UpdateWorkDependencyStateFlow` 提交后 | `trace_id`、`trace_context_ref`、`actor_ref`、`dependency_ref`、`from_state`、`to_state`、`change_id`、`change_reason_kind`、`outbox_id` | trace query / governance |
 | `WorkBlockerChangedAudit` | `OpenWorkBlockerFlow` / `ResolveWorkBlockerFlow` 提交后 | `trace_id`、`trace_context_ref`、`actor_ref`、`blocker_ref`、`from_state`、`to_state`、`cause_ref`、`outbox_id` | trace query / governance |
 | `IterationOpenedAudit` | `OpenIterationFlow` 提交后 | `trace_id`、`trace_context_ref`、`actor_ref`、`iteration_ref`、`timebox_ref`、`from_state`、`to_state`、`outbox_id` | process / trace query |
 | `IterationCommitmentChangedAudit` | `CommitIterationScopeFlow` / `UpdateIterationCommitmentFlow` 提交后 | `trace_id`、`trace_context_ref`、`actor_ref`、`iteration_ref`、`commitment_ref`、`changed_work_refs`、`change_id` | process / trace query |

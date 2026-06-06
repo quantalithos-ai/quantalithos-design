@@ -56,13 +56,13 @@
 | `RequestWorkPromotion` | `SourceWorkRef` + `PromoteReason` + context | `PromoteCommandResult` | `PromoteResult`、`WorkAuditTrail`、`WorkOutboxRecord` | 创建待审 promote 结果;来源只可引用或摘要,不得保存正文 |
 | `ReviewWorkPromotion` | `PromoteResultRef` + `PromoteReviewDecision` + context | `PromoteCommandResult` | `PromoteResult`、`PromoteDecisionRecord`、可选 `WorkItem` / `ChildWorkItem`、`WorkOutboxRecord` | 接受后才可创建正式工作;拒绝也必须记录理由 |
 | `LinkWorkDependency` | `FormalWorkRef upstream` + `FormalWorkRef downstream` + `DependencyReason` + context | `DependencyCommandResult` | `WorkDependency`、`DependencyChangeRecord`、`WorkOutboxRecord` | 依赖必须连接正式工作且可解释 |
-| `UpdateWorkDependencyState` | `WorkDependencyRef` + `DependencyTarget` + `DependencyChangeReason` + `Option<ExternalEvidenceRef>` + context | `DependencyCommandResult` | `WorkDependency`、`DependencyChangeRecord`、`WorkOutboxRecord` | 满足、豁免或取消依赖必须有 evidence 或 reason |
+| `UpdateWorkDependencyState` | `WorkDependencyRef` + `DependencyTarget` + `DependencyChangeReason` + `Option<ExternalEvidenceRef>` + context | `DependencyCommandResult` | `WorkDependency`、`DependencyChangeRecord`、`WorkOutboxRecord` | `Active` target 激活 proposed dependency;满足、豁免或取消依赖必须有 evidence 或同族 reason |
 | `OpenWorkBlocker` | `FormalWorkRef blocked` + `BlockerCauseRef` + context | `BlockerCommandResult` | `WorkBlocker`、`DependencyChangeRecord`、`WorkOutboxRecord` | blocker 不替代 governance 裁决 |
-| `ResolveWorkBlocker` | `WorkBlockerRef` + `ExternalEvidenceRef` + context | `BlockerCommandResult` | `WorkBlocker`、`DependencyChangeRecord`、`WorkOutboxRecord` | 解除必须有可接受依据引用 |
+| `ResolveWorkBlocker` | `WorkBlockerRef` + `ExternalEvidenceRef` + context | `BlockerCommandResult` | `WorkBlocker`、`DependencyChangeRecord`、`WorkOutboxRecord` | 解除必须有可接受依据引用,并写入 blocker 的 `resolved_evidence_ref` |
 | `OpenIteration` | `ProjectRef` + `ProcessTimeboxRef` + context | `IterationCommandResult` | `Iteration`、`IterationChangeRecord`、`WorkOutboxRecord` | process 只提供节奏引用,不拥有 Iteration |
 | `CommitIterationScope` | `IterationRef` + `FormalWorkRefSet candidates` + context | `IterationCommandResult` | `IterationCommitment`、`IterationChangeRecord`、`WorkOutboxRecord` | 候选必须来自正式工作全集 |
 | `UpdateIterationCommitment` | `IterationRef` + `IterationCommitmentChangeSet` + `IterationChangeReason` + context | `IterationCommandResult` | `IterationCommitment`、`IterationChangeRecord`、`WorkOutboxRecord` | 调整承诺集合必须显式记录变化原因 |
-| `UpdateIterationLifecycle` | `IterationRef` + `IterationLifecycleTarget` + `IterationChangeReason` + context | `IterationCommandResult` | `Iteration`、`IterationChangeRecord`、`WorkOutboxRecord` | start / close / cancel 只改变 Work 的承诺窗口状态,不改变 process truth |
+| `UpdateIterationLifecycle` | `IterationRef` + `IterationLifecycleTarget` + target-specific reason + context | `IterationCommandResult` | `Iteration`、`IterationChangeRecord`、`WorkOutboxRecord` | start / cancel 使用 `IterationChangeReason`;close 使用 `IterationCloseReason`;不改变 process truth |
 
 ---
 
@@ -106,11 +106,12 @@ Outbound Event 只能从已成立 truth 变化、维护状态变化或交接意�
 | Event | 触发来源 | 输出骨架 | 消费方 | 边界 |
 |---|---|---|---|---|
 | `ProjectChanged` | `Project` lifecycle change | project ref + change kind + trace context | SDK / workspace / process / archive | 不携带 workspace 正文 |
+| `BacklogChanged` | `Backlog` availability change | backlog ref + project ref + backlog state + maintenance reason + trace context | SDK / workspace / process / archive | 不复用 ProjectChanged;不携带 workspace / process 正文 |
 | `ProjectMemberChanged` | `ProjectMember` change | project member ref + responsibility state + trace context | member-service / runtime / workspace | 不改变 identity truth |
 | `WorkItemChanged` | `WorkItem` / `ChildWorkItem` change | formal work ref + work state + source refs | process / governance / artifact / workspace | 不携带计划或 artifact 正文 |
 | `PromoteResultRecorded` | `PromoteResult` | source ref + result state + created work ref | runtime / conversation / artifact | 只回传 promote 结果 |
 | `WorkDependencyChanged` | `WorkDependency` | relation ref + relation state + affected work refs | workspace / process / governance | 只传播关系摘要 |
-| `WorkBlockerChanged` | `WorkBlocker` | blocker ref + blocker state + evidence ref | workspace / governance / artifact | 不携带 evidence 正文 |
+| `WorkBlockerChanged` | `WorkBlocker` | blocker ref + blocker state + evidence ref from `resolved_evidence_ref` | workspace / governance / artifact | 不携带 evidence 正文 |
 | `IterationChanged` | `Iteration` / `IterationCommitment` | iteration ref + commitment summary + trace context | process / workspace / runtime | 不让 process 反写承诺 |
 | `WorkTraceAvailable` | `WorkTraceRecord` | trace subject ref + trace ref + handoff ref | observability / archive | 不替代全局日志 |
 | `DerivedWorkViewChanged` | `DerivedWorkViewState` | view ref + freshness state + cursor | workspace / SDK | 派生变化不代表新 truth |

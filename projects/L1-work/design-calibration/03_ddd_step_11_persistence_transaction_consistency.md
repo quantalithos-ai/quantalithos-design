@@ -142,7 +142,7 @@
 | `method_definition_snapshots` | Method definition snapshot | PK `definition_ref` | definition kind / updated cursor | `version` |
 | `command_result_records` | Command duplicate replay result surface | PK `ApplicationResultRef`;unique `(operation,result_id)` | `operation`、`result_kind`、`created_at` | append-only;no optimistic update |
 | `idempotency_records` | Command / event / job dedup | PK `(operation, idempotency_key)` | `request_digest`、`status`、`result_ref` | state version or atomic reservation |
-| `trace_handoff_markers` | Observability handoff marker | PK `handoff_ref` or `trace_id` | handoff state / target | `version` optional |
+| `trace_handoff_markers` | Observability handoff marker | PK `handoff_ref`;unique `trace_id` | handoff state / target | `version` optional;`handoff_ref` 支撑 query visibility 反查 trace |
 | `archive_handoff_markers` | Archive handoff marker | PK `handoff_ref` | project / iteration / trace scope | `version` optional |
 
 #### 8.3 Repository 函数表
@@ -189,6 +189,8 @@
 | `AuditRepository.append_trace(record, &uow)` | 写 trace record | same UoW as accepted truth | `()` | conflict / unavailable |
 | `AuditRepository.save_audit_trail(audit_trail, expected_version, &uow)` | 更新 audit summary | UoW + optional optimistic version | `Version` | version conflict |
 | `AuditRepository.list_trace_records(subject_ref, page)` | 分页读 trace | read-only | `Page<WorkTraceRecord>` | `RepositoryError` |
+| `AuditRepository.get_trace_record(trace_id)` | 读取单条 trace metadata | read-only;用于 handoff trace visibility scope 解析 | `Option<WorkTraceRecord>` | `RepositoryError` |
+| `AuditRepository.get_trace_handoff_marker(handoff_ref)` | 读取 handoff marker | read-only;用于 `WorkTraceSubjectRef::Handoff` 可见性解析 | `Option<TraceHandoffMarker>` | `RepositoryError` |
 | `AuditRepository.save_trace_handoff_marker(marker, &uow)` | 保存 observability handoff marker | job UoW;does not write observability body | `()` | conflict / unavailable |
 | `AuditRepository.save_archive_handoff_marker(marker, &uow)` | 保存 archive handoff marker | job UoW;does not write archive body | `()` | conflict / unavailable |
 | `WorkOutboxRepository.enqueue(record, &uow)` | 写待发布 outbox | same UoW as accepted truth | `()` | conflict / unavailable |

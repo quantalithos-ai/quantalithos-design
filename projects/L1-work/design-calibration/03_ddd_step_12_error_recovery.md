@@ -125,7 +125,7 @@ api / worker / jobs handler
 |---|---|---|---|---|
 | `ApplicationError::InvalidRequest` | application | metadata / actor / idempotency / required DTO field 缺失,route/body 不一致 | 否 | `WorkProtocolError::InvalidRequest` |
 | `ApplicationError::NotFound` | application | Work-owned truth repository 返回 `None` | 否,除非调用方随后创建 | `WorkProtocolError::NotFound` / query `Missing` |
-| `ApplicationError::NotVisible` | application authorization | actor 不可见或不可修改目标 scope | 否 | `WorkProtocolError::NotVisible` / query `NotVisible` |
+| `ApplicationError::NotVisible` | application authorization | query actor 通过 `ActorMemberResolverPort` 解析时返回 not found / rejected;actor 在目标 project 内没有 `Active` / `Paused` ProjectMember;target member 为 `Proposed` / `Released`;formal work / iteration / relation / trace subject scope 无法解析到可见 project;或 command actor 不可修改目标 scope | 否 | `WorkProtocolError::NotVisible` / query `NotVisible` |
 | `ApplicationError::DomainRejected` | application | `DomainError::InvalidStateTransition` / `PolicyRejected` / `ExternalBodyRejected` | 否 | `WorkProtocolError::DomainRejected` |
 | `ApplicationError::VersionConflict` | application | `RepositoryError::VersionConflict` | 可 reload 后重试 | `WorkProtocolError::VersionConflict` |
 | `ApplicationError::IdempotencyConflict` | application | same key + different digest | 否,需换 key | `WorkProtocolError::IdempotencyConflict` |
@@ -178,7 +178,7 @@ api / worker / jobs handler
 |---|---|---|---|
 | authorized projection exists and fresh | `Visible` | none | consume data |
 | authorized but no data exists | `Empty` or `Missing` per Step 8 DTO | none | show empty / missing |
-| authorization denied | `NotVisible` | none | hide data, do not leak existence |
+| authorization denied by actor-member / ProjectMember visibility policy | `NotVisible` | none | hide data, do not leak existence |
 | projection stale | `Stale` with marker | none | display stale marker;operations may trigger rebuild separately |
 | projection rebuilding | `Rebuilding` | none | retry later or show pending |
 | projection failed | `Failed` | none | show degraded / operations inspect |

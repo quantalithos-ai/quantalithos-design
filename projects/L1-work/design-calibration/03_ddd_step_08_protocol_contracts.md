@@ -168,6 +168,8 @@ pub struct WorkInboundEventEnvelope<T> {
 | `WorkQueryEnvelope<T>` | core `ActorContext` + `QueryMetadata` | 不要求 idempotency key | 缺 actor / metadata -> reject |
 | `WorkInboundEventEnvelope<T>` | event source envelope | `source_event_id` + topic + source ref 作为 dedup key | 缺 envelope / event id -> dead-letter |
 
+Query authorization 不从 query DTO 携带额外权限字段。`ActorContext` 只提供可信主体上下文;`AuthorizedWorkQueryService` 必须通过 `ActorMemberResolverPort.resolve_actor_member(actor)` 得到 `QueryActorMemberRef.member_ref: GlobalMemberRef`,再用 `ProjectMemberRepository.get_by_member(project_ref, member_ref)` 判断 Work-owned ProjectMember responsibility。`Active` / `Paused` 可读,`Proposed` / `Released`、actor-member not found / rejected、scope unresolved 均返回 `QuerySurface::NotVisible` 且 `data = None`;actor-member resolver temporary unavailable 映射 `TemporarilyUnavailable`。P0 不允许使用 `role_refs`、`ActorKind::System`、`ActorKind::Integration` 或 `ProjectOwnerRef` 绕过该 membership 规则。
+
 #### 6.3 command result / receipt
 
 ```rust

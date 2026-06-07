@@ -96,6 +96,7 @@
 | `UnitOfWork` / `UnitOfWorkHandle` | technical port | `application/src/unit_of_work.rs` | `infra/src/repositories.rs` | 本地事务边界 | `begin`、`commit`、`rollback` |
 | `IdGeneratorPort` | technical port | `application/src/ports.rs` | `infra/src/clock_id.rs` | Work-owned id 生成 | `next_project_id`、`next_work_item_id` 等 |
 | `ClockPort` | technical port | `application/src/ports.rs` | `infra/src/clock_id.rs` | 时间戳来源 | `now` |
+| `ActorMemberResolverPort` | external resolver port | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | query actor 到 identity member ref 的安全解析 | `resolve_actor_member` |
 | `MemberReferencePort` | external resolver port | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | identity member capability summary | `resolve_member_capability` |
 | `MethodDefinitionResolverPort` | external resolver port | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | method definition snapshot | `resolve_definition` |
 | `SourceWorkResolverPort` | external resolver port | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | conversation / runtime / artifact / governance 来源摘要 | `resolve_source_work` |
@@ -476,6 +477,7 @@ pub trait PromoteRepository {
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
+| `get` | `PromoteResultRef` | `Option<PromoteResult>` | `RepositoryError` | review promote / trace visibility | 不读取 source body;query visibility 对 missing / pending promote fail-closed |
 | `find_latest_by_source` | `SourceWorkRef` | `Option<PromoteResult>` | `RepositoryError` | request promote / dedup semantic check | 不读取 source body |
 | `append_decision` | `PromoteDecisionRecord`、UoW | `()` | `RepositoryError` | review promote | 与 result save / work create 同 UoW |
 | `save_pending_intake` | `PendingPromoteIntake`、UoW | `()` | `RepositoryError` | runtime promote consumer | 不创建 `PromoteResult`,不 enqueue promote result event |
@@ -553,6 +555,7 @@ pub trait DependencyRepository {
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
+| `get_dependency` / `get_blocker` | relation ref | `Option<WorkDependency>` / `Option<WorkBlocker>` | `RepositoryError` | update relation / trace visibility | query visibility 只读取 formal work refs,不得暴露 cause / evidence body |
 | `load_graph_snapshot` | `ProjectRef` | `DependencyGraphSnapshot` | `RepositoryError` | dependency graph policy | 不含 governance 正文 |
 | `append_change` | `DependencyChangeRecord`、UoW | `()` | `RepositoryError` | dependency / blocker command | 不替代当前 truth |
 
@@ -658,6 +661,18 @@ pub trait AuditRepository {
         page: PageRequest,
     ) -> Result<Page<WorkTraceRecord>, RepositoryError>;
 
+    /// Loads one trace record by Work trace id for handoff visibility resolution.
+    async fn get_trace_record(
+        &self,
+        trace_id: WorkTraceId,
+    ) -> Result<Option<WorkTraceRecord>, RepositoryError>;
+
+    /// Loads a trace handoff marker by external handoff ref for trace query visibility.
+    async fn get_trace_handoff_marker(
+        &self,
+        handoff_ref: TraceHandoffRef,
+    ) -> Result<Option<TraceHandoffMarker>, RepositoryError>;
+
     /// Saves a trace handoff marker inside the current unit of work.
     async fn save_trace_handoff_marker(
         &self,
@@ -679,6 +694,8 @@ pub trait AuditRepository {
 | `append_trace` | `WorkTraceRecord`、UoW | `()` | `RepositoryError` | command / consumer / handoff job | 不写 observability 正文 |
 | `save_audit_trail` | `WorkAuditTrail`、`Option<Version>`、UoW | `Version` | `RepositoryError` | command / consumer | `None` 只用于新 subject |
 | `list_trace_records` | `WorkTraceSubjectRef`、`PageRequest` | `Page<WorkTraceRecord>` | `RepositoryError` | query / handoff job | page helper 非 public DTO |
+| `get_trace_record` | `WorkTraceId` | `Option<WorkTraceRecord>` | `RepositoryError` | trace visibility / handoff job | 只读 trace metadata;不得返回 observability log body |
+| `get_trace_handoff_marker` | `TraceHandoffRef` | `Option<TraceHandoffMarker>` | `RepositoryError` | trace visibility | 只读 marker;marker missing 在 query 授权中映射 `NotVisible` |
 | `save_trace_handoff_marker` | `TraceHandoffMarker`、UoW | `()` | `RepositoryError` | trace handoff job | 只保存 handoff ref,不写 observability 正文 |
 | `save_archive_handoff_marker` | `ArchiveHandoffMarker`、UoW | `()` | `RepositoryError` | archive handoff job | 只保存 archive handoff ref,不写 archive 长期正文 |
 
@@ -981,7 +998,24 @@ pub trait WorkTruthSnapshotRepository {
 | 错误类型 | `PortError` |
 | 写入职责 | resolver 不写 repository;consumer / service 在 UoW 内保存 snapshot / reference state |
 
-#### 9.2 `MemberReferencePort`
+#### 9.2 `ActorMemberResolverPort`
+
+```rust
+/// Resolves the current query actor into an identity member ref without exposing identity body.
+pub trait ActorMemberResolverPort {
+    /// Resolves a trusted gateway actor context to the GlobalMemberRef used by Work visibility checks.
+    async fn resolve_actor_member(
+        &self,
+        actor: &ActorContext,
+    ) -> Result<QueryActorMemberRef, PortError>;
+}
+```
+
+| 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
+|---|---|---|---|---|---|
+| `resolve_actor_member` | `ActorContext` | `QueryActorMemberRef` | `PortError` | `AuthorizedWorkQueryService` | 只返回 `ActorRef` + `GlobalMemberRef`;不得返回 identity / role / credential body;query path 的 `PortError::NotFound` / `Rejected` 映射 `NotVisible`,`PortError::Unavailable` 映射 `TemporarilyUnavailable` |
+
+#### 9.3 `MemberReferencePort`
 
 ```rust
 /// Resolves identity member capability summaries without owning identity truth.
@@ -1006,7 +1040,7 @@ pub struct MemberCapabilitySnapshotInput {
 |---|---|---|---|---|---|
 | `resolve_member_capability` | `GlobalMemberRef` | `MemberCapabilitySnapshotInput` | `PortError` | assign / resume / refresh job | 不返回 GlobalMember body |
 
-#### 9.3 `MethodDefinitionResolverPort`
+#### 9.4 `MethodDefinitionResolverPort`
 
 ```rust
 /// Resolves method-library definition summaries for formal work policy.
@@ -1031,7 +1065,7 @@ pub struct MethodDefinitionSnapshotInput {
 |---|---|---|---|---|---|
 | `resolve_definition` | `MethodDefinitionRef` | `MethodDefinitionSnapshotInput` | `PortError` | formalize / method consumer / refresh job | 不保存 method definition body |
 
-#### 9.4 `SourceWorkResolverPort`
+#### 9.5 `SourceWorkResolverPort`
 
 ```rust
 /// Resolves external work sources into safe summaries.
@@ -1058,7 +1092,7 @@ pub struct SourceWorkResolution {
 |---|---|---|---|---|---|
 | `resolve_source_work` | `SourceWorkRef` | `SourceWorkResolution` | `PortError` | create work / promote / runtime promote consumer / refresh job | conversation / runtime / artifact 正文不得进入 Work truth |
 
-#### 9.5 `EvidenceResolverPort`
+#### 9.6 `EvidenceResolverPort`
 
 ```rust
 /// Resolves external evidence references for completion and blocker decisions.
@@ -1085,7 +1119,7 @@ pub struct EvidenceResolution {
 |---|---|---|---|---|---|
 | `resolve_evidence` | `ExternalEvidenceRef` | `EvidenceResolution` | `PortError` | complete work / resolve blocker / dependency satisfied / artifact consumer | 不下载 artifact / evidence body |
 
-#### 9.6 `ProcessTimeboxResolverPort`
+#### 9.7 `ProcessTimeboxResolverPort`
 
 ```rust
 /// Resolves process timebox references for Work-owned iterations.
@@ -1119,7 +1153,7 @@ pub struct ProcessTimeboxResolution {
 
 该 summary 在 `OpenIterationFlow` 中只作为 validation input,不得保存到 `Iteration` truth,不得包含 Process timebox 正文、planning body、stage body 或 execution body。Process timebox 的 `ReferenceResolutionState` 只能由 `ConsumeProcessTimingChangedFlow` 或 `RefreshExternalReferenceSnapshotsJob` 按 reference / snapshot 口径写入;`OpenIterationFlow` 不写 reference state。
 
-#### 9.7 `WorkOutboxPublisherPort`
+#### 9.8 `WorkOutboxPublisherPort`
 
 ```rust
 /// Publishes committed Work outbox records through a runtime publisher boundary.
@@ -1136,7 +1170,7 @@ pub trait WorkOutboxPublisherPort {
 |---|---|---|---|---|---|
 | `publish` | `WorkOutboxRecord` | `OutboxPublicationRef` | `PortError` | `PublishWorkOutbox` worker / job | publisher 不修改 repository;mark 由 service 调 outbox repo |
 
-#### 9.8 `TraceHandoffPort`
+#### 9.9 `TraceHandoffPort`
 
 ```rust
 /// Prepares Work trace records for observability handoff.
@@ -1153,7 +1187,7 @@ pub trait TraceHandoffPort {
 |---|---|---|---|---|---|
 | `prepare_trace_handoff` | `TraceHandoffIntent` | `TraceHandoffRef` | `PortError` | `PrepareWorkTraceHandoff` job | 不替代 global observability log |
 
-#### 9.9 `ArchiveHandoffPort`
+#### 9.10 `ArchiveHandoffPort`
 
 ```rust
 /// Prepares Work archive handoff markers without owning archive storage.
@@ -1436,6 +1470,7 @@ pub enum StoredCommandResult {
 | `InMemoryUnitOfWork` | `infra/src/repositories.rs` | `UnitOfWork` | P0 fake | 测试可断言 commit / rollback |
 | `DeterministicWorkIdGenerator` | `infra/src/clock_id.rs` | `IdGeneratorPort` | P0 fake | fixture 可预测 |
 | `FixedClock` | `infra/src/clock_id.rs` | `ClockPort` | P0 fake | fixture 可预测 |
+| `FakeActorMemberResolverPort` | `infra/src/source_resolvers.rs` | `ActorMemberResolverPort` | P0 fake | 可配置 actor -> `GlobalMemberRef` 映射和 denied / unavailable |
 | `FakeMemberReferencePort` | `infra/src/source_resolvers.rs` | `MemberReferencePort` | P0 fake | 返回 safe input |
 | `FakeMethodDefinitionResolverPort` | `infra/src/source_resolvers.rs` | `MethodDefinitionResolverPort` | P0 fake | 返回 safe input |
 | `FakeSourceWorkResolverPort` | `infra/src/source_resolvers.rs` | `SourceWorkResolverPort` | P0 fake | 可模拟 unresolved / rejected |
@@ -1465,7 +1500,7 @@ pub enum StoredCommandResult {
 | command result store | `CommandResultRepository` | service 从当前 truth 现算 duplicate result | duplicate 必须返回已保存 result surface,不得重放 domain transition |
 | transaction boundary | `UnitOfWork` | repository 隐式开启不可见事务 | 多 repository / outbox / audit 同 UoW |
 | event bus | `WorkOutboxPublisherPort` | domain 直接 publish | truth commit 与 publish failure 解耦 |
-| identity | `MemberReferencePort` / event consumer snapshot | Cargo 依赖 identity crate | L1-work 不拥有 GlobalMember truth |
+| identity | `ActorMemberResolverPort` / `MemberReferencePort` / event consumer snapshot | Cargo 依赖 identity crate 或解释 role / credential body | L1-work 不拥有 GlobalMember truth;query 只消费 actor -> `GlobalMemberRef` 安全映射和 ProjectMember responsibility |
 | method-library | `MethodDefinitionResolverPort` / snapshot | Cargo 依赖 method crate | L1-work 不保存 method definition body |
 | conversation / runtime / artifact / governance source | `SourceWorkResolverPort` / inbound event | Cargo 依赖 sibling crate 或保存正文 | promote 必须从 ref / summary 开始 |
 | artifact / governance evidence | `EvidenceResolverPort` | 直接下载 evidence body | completion / blocker 只持 evidence ref |
@@ -1491,7 +1526,7 @@ pub enum StoredCommandResult {
 | `OpenWorkBlocker` / `ResolveWorkBlocker` | `DependencyRepository`、`WorkItemRepository`、`ReferenceSnapshotRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `EvidenceResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `WorkBlockerChanged`;`WorkItemRepository.get_formal_work_scope(blocked_work_ref)` 提供 stale project / member scope |
 | `OpenIteration` | `ProjectRepository`、`IterationRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ProcessTimeboxResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `IterationChanged`;resolver summary validation only;does not write process timebox reference state |
 | `CommitIterationScope` / `UpdateIterationCommitment` | `IterationRepository`、`WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ClockPort` | enqueue `IterationChanged`;mark iteration / member views stale |
-| `GetProjectBoardView` / `SearchWork` | `ProjectionRepository`、可选 truth repository | 否 | 无 | query 不触发 rebuild |
+| `GetProjectWorkFacts` / `GetBacklog` / `GetWorkItem` / `ListMemberWork` / `GetIterationSummary` / `SearchWork` / `GetWorkTrace` / `GetProjectBoardView` | project / member / backlog / work / promote / dependency / iteration / audit repo、`ProjectionRepository` when view-backed | 否 | `ActorMemberResolverPort` | query 不触发 rebuild;visibility 先 resolve actor member,再按 ProjectMember `Active` / `Paused` 判定;denied -> `NotVisible` |
 | `ConsumeIdentityMemberChanged` | `ReferenceSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | mark affected views stale |
 | `ConsumeRuntimePromoteRequested` | `ReferenceSnapshotRepository`、`PromoteRepository`、`IdempotencyRepository` | 是 | `SourceWorkResolverPort`、`ClockPort` | 只形成 pending intake / reference state |
 | `PublishWorkOutbox` | `WorkOutboxRepository`、`IdempotencyRepository` | 是 | `WorkOutboxPublisherPort`、`ClockPort` | mark published / failed |

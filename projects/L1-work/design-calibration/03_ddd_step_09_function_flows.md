@@ -1009,6 +1009,25 @@ let version = iteration_repo.save_iteration(iteration, request.expected_version,
 
 ### 9. Query 函数级处理流
 
+#### 9.0 Query authorization / visibility helpers
+
+所有 query authorization 均在 `AuthorizedWorkQueryService` 内执行,只读 repository / resolver port,不 begin UoW,不写 audit、outbox、idempotency、projection freshness 或 reference state。
+
+| helper | 正式输入 | 读取来源 | 通过条件 | denied surface |
+|---|---|---|---|---|
+| `resolve_query_actor_member` | `ActorContext` | `ActorMemberResolverPort.resolve_actor_member(actor)` | actor 可解析到 `GlobalMemberRef` | not found / rejected -> `NotVisible`;unavailable -> `TemporarilyUnavailable` |
+| `authorize_project_read` | `ActorContext`、`ProjectRef` | actor-member resolver + `ProjectMemberRepository.get_by_member(project_ref, member_ref)` | 对应 ProjectMember 为 `Active` 或 `Paused` | `NotVisible` |
+| `authorize_work_read` | `ActorContext`、`FormalWorkScope` | `FormalWorkScope.project_ref` + project read helper | owning project 可见 | `NotVisible` |
+| `authorize_member_work_read` | `ActorContext`、target `ProjectMember` | target `project_id` + project read helper | actor 可见 target 所属 project,且 target member 为 `Active` 或 `Paused` | `NotVisible` |
+| `authorize_iteration_read` | `ActorContext`、`Iteration` | `Iteration.project_id` + project read helper | iteration 所属 project 可见 | `NotVisible` |
+| `authorize_trace_read` | `ActorContext`、`WorkTraceSubjectRef`、`TraceVisibilityDeps` | Step 6 trace subject scope 解析表 + project read helper | trace subject 可解析到 actor 可见 project | `NotVisible` |
+
+可见性规则:
+
+- `ProjectMemberResponsibilityState::Active` 和 `Paused` 可以读取该 project 范围 query;`Paused` 不表示可承担新 work。
+- `Proposed`、`Released`、actor-member not found / rejected、subject scope unresolved 均 fail-closed 为 `ApplicationError::NotVisible` / `QuerySurface::NotVisible`;actor-member resolver temporary unavailable 映射 `ApplicationError::TemporarilyUnavailable`。
+- P0 不允许 query path 使用 `ActorContext.role_refs`、`ActorKind::System`、`ActorKind::Integration` 或 `ProjectOwnerRef` 绕过 ProjectMember membership。
+
 #### 9.1 `GetProjectWorkFactsFlow`
 
 ```text
@@ -1016,6 +1035,7 @@ let version = iteration_repo.save_iteration(iteration, request.expected_version,
   -> AuthorizedWorkQueryService.get_project_work_facts(envelope)
      -> validate actor + QueryMetadata
      -> ProjectRepository.get(project_ref)
+     -> authorize_project_read(actor, project_ref)
      -> ProjectMemberRepository.list_by_project(project_ref, page=default bounded)
      -> BacklogRepository.get_by_project(project_ref)
      -> WorkItemRepository.list_by_backlog(backlog_ref, page=default bounded)
@@ -1027,7 +1047,7 @@ let version = iteration_repo.save_iteration(iteration, request.expected_version,
 // AuthorizedWorkQueryService::get_project_work_facts(WorkQueryEnvelope<GetProjectWorkFactsRequest> envelope)
 let project = project_repo.get(request.project_ref).await?;
 let Some(project) = project else { return Ok(WorkQueryResponse::missing()); };
-authorize_project_read(&envelope.actor, project.project_ref())?;
+authorize_project_read(&envelope.actor, project.project_ref(), &actor_member_resolver, &member_repo).await?;
 let members = member_repo.list_by_project(project.project_ref(), default_page()).await?;
 let backlog = backlog_repo.get_by_project(project.project_ref()).await?;
 let formal_work = list_visible_work_summaries(backlog, &envelope.actor).await?;
@@ -1050,6 +1070,7 @@ Ok(WorkQueryResponse::visible(ProjectWorkFactsView::from_truth(project, members,
   -> AuthorizedWorkQueryService.get_backlog(envelope)
      -> validate page from QueryMetadata
      -> ProjectRepository.get(project_ref)
+     -> authorize_project_read(actor, project_ref)
      -> BacklogRepository.get_by_project(project_ref)
      -> WorkItemRepository.list_by_backlog(backlog_ref, metadata.page)
      -> map Page<FormalWorkRef> -> BacklogView.items + PublicPageInfo
@@ -1059,7 +1080,7 @@ Ok(WorkQueryResponse::visible(ProjectWorkFactsView::from_truth(project, members,
 // AuthorizedWorkQueryService::get_backlog(WorkQueryEnvelope<GetBacklogRequest> envelope)
 let project = project_repo.get(request.project_ref).await?;
 let Some(project) = project else { return Ok(WorkQueryResponse::missing()); };
-authorize_project_read(&envelope.actor, project.project_ref())?;
+authorize_project_read(&envelope.actor, project.project_ref(), &actor_member_resolver, &member_repo).await?;
 let backlog = backlog_repo.get_by_project(project.project_ref()).await?;
 let Some(backlog) = backlog else { return Ok(WorkQueryResponse::missing()); };
 let refs_page = work_repo.list_by_backlog(backlog.backlog_ref(), envelope.metadata.page).await?;
@@ -1081,7 +1102,8 @@ Ok(WorkQueryResponse::visible(BacklogView::from_parts(backlog, items, refs_page.
 [api.handle_get_work_item]
   -> AuthorizedWorkQueryService.get_work_item(envelope)
      -> WorkItemRepository.get_formal_work(work_ref)
-     -> authorize formal work read
+     -> WorkItemRepository.get_formal_work_scope(work_ref)
+     -> authorize formal work read by scope
      -> DependencyRepository.list_active_for_work(work_ref, page=bounded)
      -> map FormalWorkRecord + relations -> WorkItemView
 ```
@@ -1090,7 +1112,9 @@ Ok(WorkQueryResponse::visible(BacklogView::from_parts(backlog, items, refs_page.
 // AuthorizedWorkQueryService::get_work_item(WorkQueryEnvelope<GetWorkItemRequest> envelope)
 let record = work_repo.get_formal_work(request.work_ref).await?;
 let Some(record) = record else { return Ok(WorkQueryResponse::missing()); };
-authorize_work_read(&envelope.actor, record.formal_ref())?;
+let scope = work_repo.get_formal_work_scope(record.formal_ref()).await?;
+let Some(scope) = scope else { return Ok(WorkQueryResponse::not_visible()); };
+authorize_work_read(&envelope.actor, &scope, &actor_member_resolver, &member_repo).await?;
 let relations = dependency_repo.list_active_for_work(record.formal_ref(), default_page()).await?;
 Ok(WorkQueryResponse::visible(WorkItemView::from_record(record, relations.items)))
 ```
@@ -1109,6 +1133,7 @@ Ok(WorkQueryResponse::visible(WorkItemView::from_record(record, relations.items)
 [api.handle_list_member_work]
   -> AuthorizedWorkQueryService.list_member_work(envelope)
      -> ProjectMemberRepository.get(project_member_ref)
+     -> authorize_member_work_read(actor, member)
      -> ProjectionRepository.get_member_work_view(project_member_ref)
      -> map projection marker freshness -> QuerySurface
      -> apply work_state filter after projection read
@@ -1118,7 +1143,7 @@ Ok(WorkQueryResponse::visible(WorkItemView::from_record(record, relations.items)
 // AuthorizedWorkQueryService::list_member_work(WorkQueryEnvelope<ListMemberWorkRequest> envelope)
 let member = member_repo.get(request.project_member_ref).await?;
 let Some(member) = member else { return Ok(WorkQueryResponse::missing()); };
-authorize_member_work_read(&envelope.actor, member.project_member_ref())?;
+authorize_member_work_read(&envelope.actor, &member, &actor_member_resolver, &member_repo).await?;
 let projection = projection_repo.get_member_work_view(member.project_member_ref()).await?;
 let Some(projection) = projection else { return Ok(WorkQueryResponse::rebuilding_or_missing(member_work_view_ref(member.project_member_ref()))); };
 Ok(map_projection_to_query_response(projection, request.work_state, envelope.metadata.page))
@@ -1138,6 +1163,7 @@ Ok(map_projection_to_query_response(projection, request.work_state, envelope.met
 [api.handle_get_iteration_summary]
   -> AuthorizedWorkQueryService.get_iteration_summary(envelope)
      -> IterationRepository.get_iteration(iteration_ref)
+     -> authorize_iteration_read(actor, iteration)
      -> ProjectionRepository.get_iteration_summary_view(iteration_ref)
      -> map IterationSummaryView + ProjectionViewMarker
 ```
@@ -1146,7 +1172,7 @@ Ok(map_projection_to_query_response(projection, request.work_state, envelope.met
 // AuthorizedWorkQueryService::get_iteration_summary(WorkQueryEnvelope<GetIterationSummaryRequest> envelope)
 let iteration = iteration_repo.get_iteration(request.iteration_ref).await?;
 let Some(iteration) = iteration else { return Ok(WorkQueryResponse::missing()); };
-authorize_iteration_read(&envelope.actor, iteration.iteration_ref())?;
+authorize_iteration_read(&envelope.actor, &iteration, &actor_member_resolver, &member_repo).await?;
 let projection = projection_repo.get_iteration_summary_view(iteration.iteration_ref()).await?;
 let Some(projection) = projection else { return Ok(WorkQueryResponse::rebuilding_or_missing(iteration_summary_view_ref(iteration.iteration_ref()))); };
 Ok(map_projection_to_query_response(projection))
@@ -1166,6 +1192,7 @@ Ok(map_projection_to_query_response(projection))
 [api.handle_search_work]
   -> AuthorizedWorkQueryService.search_work(envelope)
      -> ProjectRepository.get(project_ref)
+     -> authorize_project_read(actor, project_ref)
      -> ProjectionRepository.search_work(project_ref, criteria, metadata.page)
      -> map Page<WorkSearchProjection> -> WorkSearchResult + PublicPageInfo
 ```
@@ -1174,7 +1201,7 @@ Ok(map_projection_to_query_response(projection))
 // AuthorizedWorkQueryService::search_work(WorkQueryEnvelope<SearchWorkRequest> envelope)
 let project = project_repo.get(request.project_ref).await?;
 let Some(project) = project else { return Ok(WorkQueryResponse::missing()); };
-authorize_project_read(&envelope.actor, project.project_ref())?;
+authorize_project_read(&envelope.actor, project.project_ref(), &actor_member_resolver, &member_repo).await?;
 let page = projection_repo.search_work(project.project_ref(), request.criteria, envelope.metadata.page).await?;
 Ok(WorkQueryResponse::visible(WorkSearchResult::from_page(project.project_ref(), request.criteria, page)))
 ```
@@ -1192,14 +1219,24 @@ Ok(WorkQueryResponse::visible(WorkSearchResult::from_page(project.project_ref(),
 ```text
 [api.handle_get_work_trace]
   -> AuthorizedWorkQueryService.get_work_trace(envelope)
-     -> authorize trace subject read
+     -> authorize trace subject read through `TraceVisibilityDeps`
      -> AuditRepository.list_trace_records(subject_ref, metadata.page)
      -> map Page<WorkTraceRecord> -> WorkTraceView
 ```
 
 ```rust
 // AuthorizedWorkQueryService::get_work_trace(WorkQueryEnvelope<GetWorkTraceRequest> envelope)
-authorize_trace_read(&envelope.actor, request.subject_ref)?;
+let deps = TraceVisibilityDeps {
+    actor_member_resolver: &actor_member_resolver,
+    member_repo: &member_repo,
+    backlog_repo: &backlog_repo,
+    work_repo: &work_repo,
+    promote_repo: &promote_repo,
+    dependency_repo: &dependency_repo,
+    iteration_repo: &iteration_repo,
+    audit_repo: &audit_repo,
+};
+authorize_trace_read(&envelope.actor, request.subject_ref, &deps).await?;
 let page = audit_repo.list_trace_records(request.subject_ref, envelope.metadata.page).await?;
 if page.items.is_empty() {
     return Ok(WorkQueryResponse::empty(WorkTraceView::empty(request.subject_ref, page.info.into_public())));
@@ -1221,6 +1258,7 @@ Ok(WorkQueryResponse::visible(WorkTraceView::from_page(request.subject_ref, page
 [api.handle_get_project_board_view]
   -> AuthorizedWorkQueryService.get_project_board_view(envelope)
      -> ProjectRepository.get(project_ref)
+     -> authorize_project_read(actor, project_ref)
      -> ProjectionRepository.get_project_board_view(project_ref)
      -> map ProjectionViewMarker -> QuerySurface
 ```
@@ -1229,7 +1267,7 @@ Ok(WorkQueryResponse::visible(WorkTraceView::from_page(request.subject_ref, page
 // AuthorizedWorkQueryService::get_project_board_view(WorkQueryEnvelope<GetProjectBoardViewRequest> envelope)
 let project = project_repo.get(request.project_ref).await?;
 let Some(project) = project else { return Ok(WorkQueryResponse::missing()); };
-authorize_project_read(&envelope.actor, project.project_ref())?;
+authorize_project_read(&envelope.actor, project.project_ref(), &actor_member_resolver, &member_repo).await?;
 let projection = projection_repo.get_project_board_view(project.project_ref()).await?;
 let Some(projection) = projection else { return Ok(WorkQueryResponse::rebuilding_or_missing(project_board_view_ref(project.project_ref()))); };
 Ok(map_projection_to_query_response(projection))

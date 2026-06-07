@@ -95,7 +95,7 @@
 | `domain` | reference / snapshot | `MemberCapabilitySnapshot`、`MethodDefinitionSnapshot`、`ReferenceResolutionState`、`PendingPromoteIntake` |
 | `domain` | audit / history / outbox | `WorkTraceRecord`、`WorkAuditTrail`、`WorkOutboxRecord`、`TraceHandoffMarker`、`ArchiveHandoffIntent`、`ArchiveHandoffMarker`、`PromoteDecisionRecord`、`DependencyChangeRecord`、`IterationChangeRecord` |
 | `domain` | policy | `WorkTruthPolicy`、`ProjectLifecyclePolicy`、`MemberResponsibilityPolicy`、`FormalWorkPolicy`、`BacklogAvailabilityPolicy`、`PromotePolicy`、`DependencyGraphPolicy`、`IterationCommitmentPolicy`、`CompletionEvidencePolicy`、`DerivedWorkViewPolicy` |
-| `application` | service object / helper | `ProjectCommandService`、`ProjectMemberCommandService`、`WorkItemCommandService`、`PromoteCommandService`、`DependencyBlockerService`、`IterationCommandService`、`AuthorizedWorkQueryService`、`WorkDerivedMaintenanceService`、`ApplicationResultRef`、`IdempotencyRecord` |
+| `application` | service object / helper | `ProjectCommandService`、`ProjectMemberCommandService`、`WorkItemCommandService`、`PromoteCommandService`、`DependencyBlockerService`、`IterationCommandService`、`AuthorizedWorkQueryService`、`WorkQueryVisibilityPolicy`、`QueryActorMemberRef`、`TraceVisibilityDeps`、`WorkDerivedMaintenanceService`、`ApplicationResultRef`、`IdempotencyRecord` |
 | `infra` | runtime / adapter state | `WorkRuntimeConfig`、`WorkRuntimeBuilder`、`InMemoryWorkStores` |
 | `api` / `worker` / `jobs` | entry object | `WorkCommandHandlers`、`WorkQueryHandlers`、`WorkInboundConsumers`、`WorkOperationsJobRunner` |
 
@@ -2007,6 +2007,29 @@ pub struct IdempotencyRecord {
     /// Current idempotency status.
     pub status: IdempotencyStatus,
 }
+
+/// Application helper for Work query visibility decisions.
+pub struct WorkQueryVisibilityPolicy;
+
+/// Application-local resolved identity for query visibility decisions.
+pub struct QueryActorMemberRef {
+    /// Current actor from core metadata.
+    pub actor_ref: ActorRef,
+    /// Identity member ref resolved by `ActorMemberResolverPort`.
+    pub member_ref: GlobalMemberRef,
+}
+
+/// Repository / port bundle used only by trace query visibility helpers.
+pub struct TraceVisibilityDeps<'a> {
+    pub actor_member_resolver: &'a dyn ActorMemberResolverPort,
+    pub member_repo: &'a dyn ProjectMemberRepository,
+    pub backlog_repo: &'a dyn BacklogRepository,
+    pub work_repo: &'a dyn WorkItemRepository,
+    pub promote_repo: &'a dyn PromoteRepository,
+    pub dependency_repo: &'a dyn DependencyRepository,
+    pub iteration_repo: &'a dyn IterationRepository,
+    pub audit_repo: &'a dyn AuditRepository,
+}
 ```
 
 | Service object | 责任 | 主要依赖 | 禁止事项 |
@@ -2017,7 +2040,7 @@ pub struct IdempotencyRecord {
 | `PromoteCommandService` | request / review promote | promote repo、source resolver、work repo | 不绕过 explicit promote |
 | `DependencyBlockerService` | dependency / blocker command | dependency repo、evidence resolver、graph policy | 不生成 governance decision |
 | `IterationCommandService` | open / commit / update iteration | iteration repo、work repo、member capacity resolver | 不改 process truth |
-| `AuthorizedWorkQueryService` | authorized facts / board / trace query | truth repo、projection store、visibility / member policy | query no-write |
+| `AuthorizedWorkQueryService` | authorized facts / board / trace query | project / member / backlog / work / promote / dependency / iteration / audit repo、projection store、`ActorMemberResolverPort`、`WorkQueryVisibilityPolicy` | query no-write;不得解释 `ActorContext.role_refs` 为权限;不得保存 identity / governance 正文 |
 | `WorkDerivedMaintenanceService` | projection rebuild / stale / reconciliation | truth repo、projection store、reference store | 不修复 business truth |
 
 | Helper | 字段 | 约束 |
@@ -2027,6 +2050,47 @@ pub struct IdempotencyRecord {
 | `IdempotencyRecord` | `idempotency_key`、`operation`、`request_digest`、`result_ref`、`status` | conflict 由 digest 不同判定 |
 | `RequestDigest` | canonical hash string | 由 Command / Job canonical payload 生成 |
 | `IdempotencyStatus` | `Reserved` / `Completed` / `Conflict` | `Completed` 不可回到 `Reserved` |
+| `WorkQueryVisibilityPolicy` | stateless application helper | 只承载 query visibility helper 函数;不进入 domain;不保存状态;不访问 concrete infra |
+| `QueryActorMemberRef` | `actor_ref`、`member_ref` | 只由 `ActorMemberResolverPort.resolve_actor_member(...)` 构造;用于 query 可见性裁决;不得把 `ActorRef.actor_id` 字符串强转为 `GlobalMemberRef` |
+| `TraceVisibilityDeps` | actor-member resolver + member / backlog / work / promote / dependency / iteration / audit repo | 只作为 application helper 参数分组;不进入 contracts;不得隐藏新增持久化依赖 |
+
+##### Authorized query visibility helper 契约
+
+`AuthorizedWorkQueryService` 的授权 helper 属于 application 层,不进入 domain policy,也不生成 public DTO。helper 只读 repository / resolver port,不 begin UoW,不写 audit、outbox、idempotency、projection freshness 或 reference state。
+
+| helper | 签名 | 读取来源 | 成功条件 | 失败映射 |
+|---|---|---|---|---|
+| `resolve_query_actor_member` | `async fn resolve_query_actor_member(actor: &ActorContext, actor_member_resolver: &dyn ActorMemberResolverPort) -> Result<QueryActorMemberRef, ApplicationError>` | `ActorMemberResolverPort.resolve_actor_member(actor)` | 外层可信 actor 可解析到 `GlobalMemberRef` | `PortError::NotFound` / `Rejected` -> `ApplicationError::NotVisible`;`PortError::Unavailable` -> `ApplicationError::TemporarilyUnavailable` |
+| `authorize_project_read` | `async fn authorize_project_read(actor: &ActorContext, project_ref: ProjectRef, actor_member_resolver: &dyn ActorMemberResolverPort, member_repo: &dyn ProjectMemberRepository) -> Result<ProjectMemberRef, ApplicationError>` | actor-member resolver + `ProjectMemberRepository.get_by_member(project_ref, member_ref)` | 找到同一 project 的 ProjectMember,且 `responsibility_state` 为 `Active` 或 `Paused` | actor 未解析、member 缺失、`Proposed` / `Released` -> `NotVisible`;repo unavailable -> `TemporarilyUnavailable` |
+| `authorize_work_read` | `async fn authorize_work_read(actor: &ActorContext, scope: &FormalWorkScope, actor_member_resolver: &dyn ActorMemberResolverPort, member_repo: &dyn ProjectMemberRepository) -> Result<ProjectMemberRef, ApplicationError>` | `FormalWorkScope.project_ref` + project read helper | formal work 所属 project 对 actor 可见 | 同 `authorize_project_read` |
+| `authorize_member_work_read` | `async fn authorize_member_work_read(actor: &ActorContext, target_member: &ProjectMember, actor_member_resolver: &dyn ActorMemberResolverPort, member_repo: &dyn ProjectMemberRepository) -> Result<ProjectMemberRef, ApplicationError>` | target `ProjectMember.project_id` + project read helper | actor 在 target member 所属 project 有 `Active` / `Paused` 承担;target member 自身为 `Active` / `Paused` 时才返回其 work projection | target `Proposed` / `Released` 或 actor 不可见 -> `NotVisible` |
+| `authorize_iteration_read` | `async fn authorize_iteration_read(actor: &ActorContext, iteration: &Iteration, actor_member_resolver: &dyn ActorMemberResolverPort, member_repo: &dyn ProjectMemberRepository) -> Result<ProjectMemberRef, ApplicationError>` | `Iteration.project_id` + project read helper | iteration 所属 project 对 actor 可见 | 同 `authorize_project_read` |
+| `authorize_trace_read` | `async fn authorize_trace_read(actor: &ActorContext, subject_ref: WorkTraceSubjectRef, deps: &TraceVisibilityDeps) -> Result<ProjectMemberRef, ApplicationError>` | subject scope 解析表 + project read helper | trace subject 可解析到 actor 可见 project | subject scope 缺失、未接受 promote、未知 handoff marker、actor 不可见 -> `NotVisible`;repo unavailable -> `TemporarilyUnavailable` |
+
+`ProjectMemberResponsibilityState` 的 query 可见性规则固定为:
+
+| state | query 可见性 |
+|---|---|
+| `Active` | 可读取该 project 范围的 Work query |
+| `Paused` | 可读取历史和当前 project 范围的 Work query,但不表示可承担新 work |
+| `Proposed` | 不可读取;返回 `NotVisible` |
+| `Released` | 不可读取;返回 `NotVisible` |
+
+`authorize_trace_read(...)` 的 subject scope 解析表:
+
+| `WorkTraceSubjectRef` variant | project scope 解析来源 | 缺失 / 不可解析 |
+|---|---|---|
+| `Project(project_ref)` | `project_ref` | project missing 时 query surface `Missing`;actor 不可见时 `NotVisible` |
+| `Backlog(backlog_ref)` | `BacklogRepository.get(backlog_ref).project_id` | `NotVisible` |
+| `ProjectMember(project_member_ref)` | `ProjectMemberRepository.get(project_member_ref).project_id` | `NotVisible` |
+| `FormalWork(work_ref)` | `WorkItemRepository.get_formal_work_scope(work_ref).project_ref` | `NotVisible` |
+| `PromoteResult(promote_result_ref)` | `PromoteRepository.get(promote_result_ref).created_work_ref` -> `WorkItemRepository.get_formal_work_scope(work_ref).project_ref` | result missing、`created_work_ref = None` 或 scope missing -> `NotVisible` |
+| `Relation(Dependency(ref))` | `DependencyRepository.get_dependency(ref).downstream_work_ref` -> `WorkItemRepository.get_formal_work_scope(work_ref).project_ref` | `NotVisible` |
+| `Relation(Blocker(ref))` | `DependencyRepository.get_blocker(ref).blocked_work_ref` -> `WorkItemRepository.get_formal_work_scope(work_ref).project_ref` | `NotVisible` |
+| `Iteration(iteration_ref)` | `IterationRepository.get_iteration(iteration_ref).project_id` | `NotVisible` |
+| `Handoff(handoff_ref)` | `AuditRepository.get_trace_handoff_marker(handoff_ref).trace_id` -> `AuditRepository.get_trace_record(trace_id).subject_ref` -> recursive subject scope | marker / trace missing or recursion cannot resolve -> `NotVisible` |
+
+P0 不允许 query path 使用 `ActorContext.role_refs`、`ActorKind::System`、`ActorKind::Integration` 或 project owner ref 绕过 membership 可见性。需要系统级或治理级读取时,必须在后续版本补正式 trusted source actor 例外、入口协议、non-bypass gates 和测试切口。
 
 #### 7.13 `infra` / entry module object 契约
 

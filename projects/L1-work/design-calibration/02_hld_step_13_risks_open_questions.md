@@ -44,7 +44,7 @@
 | archive / observability handoff 协议 | trace / handoff / operations | 当前只保留交接接缝;后续与对应仓设计收敛 |
 | storage、projection、search、cache、queue 产品和索引策略 | infra、config、test | 当前不选产品;详细设计和配置设计在约束内选择 |
 | idempotency / dedup record schema 和保留策略 | Command、Consumer、Operations | Step 7 / Step 10 定边界;详细设计和配置设计定实现 |
-| query authorization / visibility 的具体裁决来源 | query、security、identity / governance | 概要固定 ActorContext / ProjectMember 边界;详细设计定裁决机制 |
+| query authorization / visibility 的具体裁决来源 | query、security、identity / governance | 已由详细设计收口:`ActorMemberResolverPort` 解析 actor -> `GlobalMemberRef`;`ProjectMemberRepository.get_by_member` + `Active` / `Paused` responsibility 判定 project scope 可见;scope unresolved / unauthorized -> `NotVisible` |
 | 性能 / 容量目标是否升级为正式验收数值 | tests、acceptance、capacity | 当前只保留结构性口径;测试方案和验收标准基于证据收敛 |
 | 外围增强能力进入哪个版本主线 | advanced board、capacity、auto maintenance、cross-project | 当前不阻塞核心闭环;实施计划或后续版本再定 |
 

@@ -119,7 +119,7 @@
 | 两个 publisher 发布同一 outbox record | `Versioned<WorkOutboxRecord>.version`、`publication_state` | `list_pending(page)` / `get(outbox_id)` 提供 current version;`mark_published/mark_failed` 使用同一 item version | version conflict treated as already handled / report item conflict | `TC-WORK-OUTBOX-CONC-001` |
 | projection rebuild 与 command stale marker 并发 | `DerivedWorkViewState.version`、`source_cursor` | cursor monotonicity + optimistic marker update | older cursor no-op or `VersionConflict` retry | `TC-WORK-PROJ-CONC-001` |
 | 两个 rebuild job 同一 projection_set | `idempotency_records`、projection batch key、freshness version | job key dedup + replace batch atomic by project/projection_set | duplicate report / `VersionConflict` | `TC-WORK-PROJ-CONC-002` |
-| reference refresh 同一 external ref | `ReferenceResolutionState.version`、snapshot key | expected version;last successful snapshot preserved | `VersionConflict` / failed marker | `TC-WORK-REF-CONC-001` |
+| reference refresh 同一 external ref | `ReferenceResolutionState.version`、snapshot key | expected version 来自 `ReferenceSnapshotRepository.get_reference_state_with_version(...)`;snapshot 更新使用对应 `*_snapshot_with_version`;last successful snapshot preserved | `VersionConflict` / failed marker | `TC-WORK-REF-CONC-001` |
 | handoff job 并发处理同一 marker | handoff marker key/version | job idempotency + marker version | duplicate report / `VersionConflict` | `TC-WORK-HANDOFF-CONC-001` |
 
 #### 8.3 幂等键表

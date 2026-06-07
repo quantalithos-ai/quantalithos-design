@@ -90,7 +90,7 @@
 | `AuditRepository` | repository trait | `application/src/ports.rs` | `infra/src/repositories.rs` | trace / audit trail 持久化 | `append_trace`、`append_audit`、`list_trace_records` |
 | `WorkOutboxRepository` | repository trait | `application/src/ports.rs` | `infra/src/outbox_store.rs` | outbox record 存取和发布状态 | `enqueue`、`list_pending`、`mark_published` |
 | `ProjectionRepository` | projection port | `application/src/ports.rs` | `infra/src/projection_stores.rs` | public read view 与 freshness state | `get_board_view`、`replace_project_views`、`mark_stale` |
-| `ReferenceSnapshotRepository` | repository trait | `application/src/ports.rs` | `infra/src/reference_stores.rs` | 本地 external snapshot / resolution state | `save_member_snapshot`、`get_reference_state` |
+| `ReferenceSnapshotRepository` | repository trait | `application/src/ports.rs` | `infra/src/reference_stores.rs` | 本地 external snapshot / resolution state | `get_reference_state_with_version`、`save_member_snapshot` |
 | `IdempotencyRepository` | technical repository | `application/src/idempotency.rs` | `infra/src/idempotency_store.rs` | command / event / job 幂等保护 | `reserve`、`complete`、`mark_conflict` |
 | `CommandResultRepository` | technical repository | `application/src/results.rs` | `infra/src/command_result_store.rs` | command duplicate result replay | `save_result`、`get_result` |
 | `JobResultRepository` | technical repository | `application/src/results.rs` | `infra/src/job_result_store.rs` | operations job duplicate report replay | `save_report`、`get_report` |
@@ -827,6 +827,13 @@ pub trait ProjectionRepository {
         page: PageRequest,
     ) -> Result<Page<DerivedWorkViewRef>, RepositoryError>;
 
+    /// Lists already-existing public view refs whose projection source index depends on refreshed external refs.
+    async fn list_views_affected_by_references(
+        &self,
+        reference_refs: Vec<ExternalReferenceRef>,
+        page: PageRequest,
+    ) -> Result<Page<DerivedWorkViewRef>, RepositoryError>;
+
     /// Replaces project-scoped derived views after a rebuild from truth.
     async fn replace_project_views(
         &self,
@@ -907,11 +914,12 @@ pub struct ProjectProjectionBatch {
 | `list_freshness_states` | `WorkReconciliationScopeRef`、`PageRequest` | `Page<DerivedWorkViewState>` | `RepositoryError` | reconciliation job | 只读,不得修复 projection |
 | `list_views_affected_by_member` | `GlobalMemberRef`、`PageRequest` | `Page<DerivedWorkViewRef>` | `RepositoryError` | identity member consumer stale scope | 只返回已存在且属于 Step 8 §9.2 public identity 的 view refs;不得临时派生 ad hoc ref |
 | `list_views_affected_by_method` | `MethodDefinitionRef`、`PageRequest` | `Page<DerivedWorkViewRef>` | `RepositoryError` | method definition consumer stale scope | 只返回已存在且 source index 依赖该 definition 的 public view refs;空页表示无 view 可标脏 |
+| `list_views_affected_by_references` | `Vec<ExternalReferenceRef>`、`PageRequest` | `Page<DerivedWorkViewRef>` | `RepositoryError` | reference refresh job stale scope | repository 基于既有 public projection source index / reference dependency index 枚举 affected views;refs 先按 `ExternalReferenceRef` stable identity 去重并稳定排序;只返回 Step 8 §9.2 public view refs;空页表示只保存 reference state、不标脏 |
 | `replace_project_views` | `ProjectProjectionBatch`、cursor、UoW | `()` | `RepositoryError` | rebuild job | 只能接收由 Step 6 `ProjectWorkTruthSnapshot` body-free summaries 构造的 batch;不得从旧 projection 或 domain object 跨 port 构造 |
 | `mark_stale` | affected views、cursor、UoW | `()` | `RepositoryError` | command / consumer service | stale 不代表新 truth |
 | `mark_rebuilding` / `mark_failed` | affected views、cursor、reason、UoW | `()` | `RepositoryError` | rebuild job | failed / rebuilding marker 不反写真相 |
 
-`mark_stale(...)` 的 `affected` 只能包含 Step 8 §9.2 已正式定义的 public `DerivedWorkViewRef`。当前 P0 只有 project board、member work、iteration summary、work search 四类 derived view identity。PromoteResult 和 PendingPromoteIntake 没有 public query / projection identity,不得临时派生 `promote-*` 或 `intake-*` view ref。Consumer / refresh job 如果需要按外部 ref 标脏,必须先通过 `ProjectionRepository.list_views_affected_by_*` 或已定义 truth repository scope 读取面枚举 existing public view refs;枚举为空时只保存 reference / snapshot state,不得自行构造 view ref。
+`mark_stale(...)` 的 `affected` 只能包含 Step 8 §9.2 已正式定义的 public `DerivedWorkViewRef`。当前 P0 只有 project board、member work、iteration summary、work search 四类 derived view identity。PromoteResult 和 PendingPromoteIntake 没有 public query / projection identity,不得临时派生 `promote-*` 或 `intake-*` view ref。Consumer / refresh job 如果需要按外部 ref 标脏,必须先通过 `ProjectionRepository.list_views_affected_by_member(...)`、`list_views_affected_by_method(...)`、`list_views_affected_by_references(...)` 或已定义 truth repository scope 读取面枚举 existing public view refs;枚举为空时只保存 reference / snapshot state,不得自行构造 view ref。`list_views_affected_by_references(...)` 是 `RefreshExternalReferenceSnapshotsFlow` 的唯一 affected view 读取面;service 不组合 `affected_existing_source_work_views(...)`、`affected_process_views(...)`、`affected_governance_views(...)` 或 `affected_evidence_views(...)`。
 
 #### 8.11 `ReferenceSnapshotRepository`
 
@@ -923,6 +931,12 @@ pub trait ReferenceSnapshotRepository {
         &self,
         reference_ref: ExternalReferenceRef,
     ) -> Result<Option<ReferenceResolutionState>, RepositoryError>;
+
+    /// Loads resolution state together with its optimistic version.
+    async fn get_reference_state_with_version(
+        &self,
+        reference_ref: ExternalReferenceRef,
+    ) -> Result<Option<(ReferenceResolutionState, Version)>, RepositoryError>;
 
     /// Saves reference resolution state inside the current unit of work.
     async fn save_reference_state(
@@ -938,6 +952,12 @@ pub trait ReferenceSnapshotRepository {
         member_ref: GlobalMemberRef,
     ) -> Result<Option<MemberCapabilitySnapshot>, RepositoryError>;
 
+    /// Loads a member capability snapshot together with its optimistic version.
+    async fn get_member_snapshot_with_version(
+        &self,
+        member_ref: GlobalMemberRef,
+    ) -> Result<Option<(MemberCapabilitySnapshot, Version)>, RepositoryError>;
+
     /// Saves a member capability snapshot.
     async fn save_member_snapshot(
         &self,
@@ -951,6 +971,12 @@ pub trait ReferenceSnapshotRepository {
         &self,
         definition_ref: MethodDefinitionRef,
     ) -> Result<Option<MethodDefinitionSnapshot>, RepositoryError>;
+
+    /// Loads a method definition snapshot together with its optimistic version.
+    async fn get_method_snapshot_with_version(
+        &self,
+        definition_ref: MethodDefinitionRef,
+    ) -> Result<Option<(MethodDefinitionSnapshot, Version)>, RepositoryError>;
 
     /// Saves a method definition snapshot.
     async fn save_method_snapshot(
@@ -988,12 +1014,15 @@ pub trait ReferenceSnapshotRepository {
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
 | `get_reference_state` | `ExternalReferenceRef` | `Option<ReferenceResolutionState>` | `RepositoryError` | command / consumer / refresh job | 不解析外部正文 |
-| `save_reference_state` | state、version、UoW | `Version` | `RepositoryError` | consumer / refresh job | 与 snapshot save 同 UoW |
-| `get_member_snapshot` / `save_member_snapshot` | member snapshot | `Option` / `Version` | `RepositoryError` | assign / identity consumer | 不保存 identity body |
-| `get_method_snapshot` / `save_method_snapshot` | method snapshot | `Option` / `Version` | `RepositoryError` | formalize / method consumer | 不保存 method body |
+| `get_reference_state_with_version` | `ExternalReferenceRef` | `Option<(ReferenceResolutionState, Version)>` | `RepositoryError` | consumer / refresh job | 修改已有 reference state / failed marker 的唯一 version 读取面;missing 表示只能按 create/upsert 传 `None` |
+| `save_reference_state` | state、version、UoW | `Version` | `RepositoryError` | consumer / refresh job | 与 snapshot save 同 UoW;已有 state 必须使用 `get_reference_state_with_version(...)` 返回的 version |
+| `get_member_snapshot` | `GlobalMemberRef` | `Option<MemberCapabilitySnapshot>` | `RepositoryError` | assign / query / read-only policy | 不保存 identity body;只读路径可不取 version |
+| `get_member_snapshot_with_version` / `save_member_snapshot` | member snapshot | `Option<(MemberCapabilitySnapshot, Version)>` / `Version` | `RepositoryError` | identity consumer / refresh job | 修改已有 snapshot 必须使用 versioned read;missing 才能传 `None` |
+| `get_method_snapshot` | `MethodDefinitionRef` | `Option<MethodDefinitionSnapshot>` | `RepositoryError` | formalize / query / read-only policy | 不保存 method body;只读路径可不取 version |
+| `get_method_snapshot_with_version` / `save_method_snapshot` | method snapshot | `Option<(MethodDefinitionSnapshot, Version)>` / `Version` | `RepositoryError` | method consumer / refresh job | 修改已有 snapshot 必须使用 versioned read;missing 才能传 `None` |
 | `list_stale_references` | `PageRequest` | `Page<ExternalReferenceRef>` | `RepositoryError` | refresh job | 只驱动 resolver,不修 business truth |
 | `list_project_references` | `ProjectRef`、`PageRequest` | `Page<ExternalReferenceRef>` | `RepositoryError` | refresh job `ExternalReferenceScopeKind::Project` | 按 Step 6 `ExternalReferenceScope` project family 从 committed Work truth / local reference snapshot indexes 枚举 typed refs;先去重稳定排序再分页;不得从 projection 或字符串拼接 |
-| `mark_reference_failed` | reference、failure reason、timestamp、version、UoW | `Version` | `RepositoryError` | refresh job / consumer | 保留旧快照,只更新 resolution state |
+| `mark_reference_failed` | reference、failure reason、timestamp、version、UoW | `Version` | `RepositoryError` | refresh job / consumer | 保留旧快照,只更新 resolution state;已有 state 必须使用 `get_reference_state_with_version(...)` 返回的 version |
 
 #### 8.12 truth snapshot read helpers
 
@@ -1624,7 +1653,7 @@ pub enum StoredJobResult {
 | `ConsumeRuntimePromoteRequested` | `ReferenceSnapshotRepository`、`PromoteRepository`、`IdempotencyRepository` | 是 | `SourceWorkResolverPort`、`ClockPort` | 只形成 pending intake / reference state |
 | `PublishWorkOutbox` | `WorkOutboxRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `WorkOutboxPublisherPort`、`ClockPort` | mark published / failed;save `StoredJobResult::WorkJob` before idempotency complete |
 | `RebuildWorkProjections` | `WorkTruthSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `ClockPort` | replace views + mark fresh;save `StoredJobResult::WorkJob` before idempotency complete |
-| `RefreshExternalReferenceSnapshots` | `ReferenceSnapshotRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | resolver ports、`ClockPort` | `None` / `StaleOnly` 用 `list_stale_references`;`Project` 用 `list_project_references`;`ExplicitRefs` 用 request refs;save snapshots + mark affected views stale;save `StoredJobResult::WorkJob` before idempotency complete |
+| `RefreshExternalReferenceSnapshots` | `ReferenceSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | resolver ports、`ClockPort` | `None` / `StaleOnly` 用 `list_stale_references`;`Project` 用 `list_project_references`;`ExplicitRefs` 用 request refs;save snapshots;`ProjectionRepository.list_views_affected_by_references(...)` 枚举 affected public views 后 mark stale;save `StoredJobResult::WorkJob` before idempotency complete |
 | `RunWorkReconciliation` | truth / projection / outbox / reference repositories、`IdempotencyRepository`、`JobResultRepository` | 是 | `ClockPort` | save `StoredJobResult::Reconciliation` before idempotency complete;does not repair truth |
 | `PrepareWorkTraceHandoff` | `AuditRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `TraceHandoffPort`、`ClockPort` | save / enqueue handoff marker;save `StoredJobResult::WorkJob` before idempotency complete |
 | `PrepareArchiveHandoff` | truth repositories、`AuditRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `ArchiveHandoffPort`、`ClockPort` | save / enqueue archive handoff marker;save `StoredJobResult::WorkJob` before idempotency complete |

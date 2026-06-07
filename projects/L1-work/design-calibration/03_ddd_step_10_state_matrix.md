@@ -412,13 +412,13 @@ Dependency / blocker 的 projection stale scope 不得从 `FormalWorkRef` 字符
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | create | `Unresolved` | `ReferenceResolutionState::unresolved(reference_ref)` via inbound consumer / refresh job | external ref typed conversion 合法 | save reference state;不创建 Work truth | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
-| `Unresolved` | `Resolved` | `ReferenceResolutionState::mark_resolved(resolved_at)` via consumer / refresh resolver success | resolver 返回可接受 snapshot;timestamp 来自 clock / event | save snapshot + resolved state;mark affected views stale | 同上 |
+| `Unresolved` | `Resolved` | `ReferenceResolutionState::mark_resolved(resolved_at)` via consumer / refresh resolver success | resolver 返回可接受 snapshot;timestamp 来自 clock / event | save snapshot + resolved state;mark affected views stale only from formal affected-view repository read surface | 同上 |
 | `Unresolved` | `Failed` | failed marker via resolver failure path | resolver failure 可归因 | save failed state;job failed_refs / retry policy | 同上 |
-| `Resolved` | `Stale` | `ReferenceResolutionState::mark_stale(reason)` via upstream change / retention / evidence rejected | stale reason 存在 | save stale state;mark affected views stale | 同上 |
+| `Resolved` | `Stale` | `ReferenceResolutionState::mark_stale(reason)` via upstream change / retention / evidence rejected | stale reason 存在 | save stale state;mark affected views stale only from formal affected-view repository read surface | 同上 |
 | `Resolved` | `Failed` | failed marker via refresh failure | resolver failure 可归因 | save failed state;job report failed | 同上 |
-| `Stale` | `Resolved` | `mark_resolved(resolved_at)` via refresh success | resolver success | save snapshot + state;mark affected views stale | 同上 |
+| `Stale` | `Resolved` | `mark_resolved(resolved_at)` via refresh success | resolver success | save snapshot + state;mark affected views stale via `ProjectionRepository.list_views_affected_by_references(...)` | 同上 |
 | `Stale` | `Failed` | failed marker via refresh failure | resolver failure 可归因 | save failed state;job report failed | 同上 |
-| `Failed` | `Resolved` | `mark_resolved(resolved_at)` via refresh success | resolver success | save snapshot + state;mark affected views stale | 同上 |
+| `Failed` | `Resolved` | `mark_resolved(resolved_at)` via refresh success | resolver success | save snapshot + state;mark affected views stale via `ProjectionRepository.list_views_affected_by_references(...)` | 同上 |
 
 闭环状态:已在 Step 11 前序回填中补齐 `ReferenceResolutionState::mark_failed(...)` 和 `ReferenceSnapshotRepository.mark_reference_failed(...)`。
 
@@ -453,7 +453,7 @@ Dependency / blocker 的 projection stale scope 不得从 `FormalWorkRef` 字符
 | Inbound consumer flows | ReferenceResolutionStatus -> `Resolved` / `Stale` / `Unresolved` | affected public derived views -> `Stale` only when a formal view identity exists;runtime pending promote intake has no projection stale | reference state / snapshot、projection stale when applicable、idempotency complete | 不创建 Work business truth |
 | `PublishWorkOutboxFlow` | OutboxPublicationState -> `Published` / `Failed` | 无业务 truth 联动 | outbox publication marker only | 不回滚或改写 source truth |
 | `RebuildWorkProjectionsFlow` | DerivedFreshnessState -> `Rebuilding` / `Fresh` / `Failed` | optional `DerivedWorkViewChanged` outbox | projection replace、freshness marker、idempotency complete | 不从旧 projection 反推 truth |
-| `RefreshExternalReferenceSnapshotsFlow` | ReferenceResolutionStatus -> `Resolved` / `Failed` | affected derived views -> `Stale` | reference state / snapshot、projection stale、idempotency complete | 不修复业务 truth |
+| `RefreshExternalReferenceSnapshotsFlow` | ReferenceResolutionStatus -> `Resolved` / `Failed` | affected derived views -> `Stale` only from `ProjectionRepository.list_views_affected_by_references(...)` | reference state / snapshot、projection stale、idempotency complete | 不修复业务 truth;不临时拼 `DerivedWorkViewRef` |
 
 #### 8.7 非法转换处理表
 

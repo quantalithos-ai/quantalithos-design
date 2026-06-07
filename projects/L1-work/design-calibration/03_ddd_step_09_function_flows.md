@@ -1308,11 +1308,14 @@ Ok(map_projection_to_query_response(projection))
 let key = inbound_dedup_key(&envelope, "identity.member.changed.v1")?;
 let uow = unit_of_work.begin().await?;
 reserve_inbound(key, envelope.payload_digest(), &uow).await?;
-let mut state = ReferenceResolutionState::unresolved(ExternalReferenceRef::from_member(envelope.payload.member_ref));
+let reference_ref = ExternalReferenceRef::from_member(envelope.payload.member_ref);
+let expected_reference_version = reference_state_expected_version(reference_ref).await?;
+let expected_member_snapshot_version = member_snapshot_expected_version(envelope.payload.member_ref).await?;
+let mut state = ReferenceResolutionState::unresolved(reference_ref);
 state.mark_resolved(envelope.occurred_at)?;
 let snapshot = MemberCapabilitySnapshot::from_identity(envelope.payload.member_ref, envelope.payload.capability_refs)?;
-reference_repo.save_reference_state(state, None, &uow).await?;
-reference_repo.save_member_snapshot(snapshot, None, &uow).await?;
+reference_repo.save_reference_state(state, expected_reference_version, &uow).await?;
+reference_repo.save_member_snapshot(snapshot, expected_member_snapshot_version, &uow).await?;
 let affected_members_page: PageRequest = consumer_config.projection_stale_page();
 let affected_views_page: PageRequest = consumer_config.projection_stale_page();
 let affected_members = project_member_repo
@@ -1351,10 +1354,13 @@ if !affected_views.items.is_empty() {
 ```rust
 // WorkInboundConsumerService::consume_method_definition_changed(WorkInboundEventEnvelope<MethodDefinitionChangedPayload> envelope)
 let snapshot = MethodDefinitionSnapshot::from_method_library(envelope.payload.definition_ref, envelope.payload.definition_kind)?;
-let mut state = ReferenceResolutionState::unresolved(ExternalReferenceRef::from_method_definition(envelope.payload.definition_ref));
+let reference_ref = ExternalReferenceRef::from_method_definition(envelope.payload.definition_ref);
+let expected_reference_version = reference_state_expected_version(reference_ref).await?;
+let expected_method_snapshot_version = method_snapshot_expected_version(envelope.payload.definition_ref).await?;
+let mut state = ReferenceResolutionState::unresolved(reference_ref);
 state.mark_resolved(envelope.occurred_at)?;
-reference_repo.save_method_snapshot(snapshot, None, &uow).await?;
-reference_repo.save_reference_state(state, None, &uow).await?;
+reference_repo.save_method_snapshot(snapshot, expected_method_snapshot_version, &uow).await?;
+reference_repo.save_reference_state(state, expected_reference_version, &uow).await?;
 let affected_views_page: PageRequest = consumer_config.projection_stale_page();
 let affected_views = projection_repo
     .list_views_affected_by_method(envelope.payload.definition_ref, affected_views_page)
@@ -1374,6 +1380,8 @@ if !affected_views.items.is_empty() {
 
 `affected_members_page` / `affected_views_page` 是 consumer/service 依据配置 `PageLimit` 形成的 core `PageRequest`,不进入 public query DTO,也不进入 `DerivedWorkViewRef`。`affected_members` 只用于确认该 `GlobalMemberRef` 在 Work truth 中存在受影响 project responsibility,并为 fake / tests 提供可断言 scope;consumer 不得用它临时构造 project-board / member-work / work-search ref。所有进入 `mark_stale(...)` 的 affected views 必须来自 `ProjectionRepository.list_views_affected_by_member(...)` / `list_views_affected_by_method(...)` 返回的既有 public view refs。返回空页表示当前没有可标脏 public projection,不是错误。
 
+Inbound consumer 的 `reference_state_expected_version(...)`、`member_snapshot_expected_version(...)`、`method_snapshot_expected_version(...)` 与 refresh job 使用同一 version 来源规则:分别只能调用 `ReferenceSnapshotRepository.get_reference_state_with_version(...)`、`get_member_snapshot_with_version(...)`、`get_method_snapshot_with_version(...)`。返回 `Some((_, version))` 时必须把该 version 传给对应 `save_*`;返回 `None` 时仅表示 create/upsert 新 state / snapshot,不得把 `None` 用作覆盖已有记录的捷径。
+
 #### 10.3 `ConsumeConversationWorkContextChangedFlow`
 
 ```text
@@ -1390,11 +1398,12 @@ if !affected_views.items.is_empty() {
 ```rust
 // WorkInboundConsumerService::consume_conversation_work_context_changed(WorkInboundEventEnvelope<ConversationWorkContextChangedPayload> envelope)
 let reference_ref = ExternalReferenceRef::from_source_work(envelope.payload.source_ref);
+let expected_reference_version = reference_state_expected_version(reference_ref).await?;
 let mut state = ReferenceResolutionState::unresolved(reference_ref);
 if digest_matches(envelope.payload.source_ref.source_digest, envelope.payload.source_digest) {
     state.mark_resolved(envelope.occurred_at)?;
 }
-reference_repo.save_reference_state(state, None, &uow).await?;
+reference_repo.save_reference_state(state, expected_reference_version, &uow).await?;
 let affected = affected_existing_source_work_views(envelope.payload.source_ref)?;
 if !affected.is_empty() {
     projection_repo.mark_stale(affected, truth_cursor_from_event(&envelope), &uow).await?;
@@ -1423,9 +1432,11 @@ if !affected.is_empty() {
 
 ```rust
 // WorkInboundConsumerService::consume_process_timing_changed(WorkInboundEventEnvelope<ProcessTimingChangedPayload> envelope)
-let mut state = ReferenceResolutionState::unresolved(ExternalReferenceRef::from_process_timebox(envelope.payload.timebox_ref));
+let reference_ref = ExternalReferenceRef::from_process_timebox(envelope.payload.timebox_ref);
+let expected_reference_version = reference_state_expected_version(reference_ref).await?;
+let mut state = ReferenceResolutionState::unresolved(reference_ref);
 state.mark_resolved(envelope.occurred_at)?;
-reference_repo.save_reference_state(state, None, &uow).await?;
+reference_repo.save_reference_state(state, expected_reference_version, &uow).await?;
 if let Some(project_ref) = envelope.payload.project_ref {
     projection_repo.mark_stale(affected_process_views(project_ref), truth_cursor_from_event(&envelope), &uow).await?;
 }
@@ -1464,6 +1475,8 @@ if let Some(evidence_ref) = envelope.payload.evidence_ref {
 projection_repo.mark_stale(affected_governance_views(&envelope.payload), truth_cursor_from_event(&envelope), &uow).await?;
 ```
 
+`save_resolved_reference(reference_ref, occurred_at, &uow)` must load `ReferenceSnapshotRepository.get_reference_state_with_version(reference_ref)` before saving. Existing reference state uses the returned version;missing state may be created with `expected_version=None`.
+
 | 项 | 口径 |
 |---|---|
 | Event -> Domain | governance source/evidence 只形成 reference state |
@@ -1486,13 +1499,15 @@ projection_repo.mark_stale(affected_governance_views(&envelope.payload), truth_c
 
 ```rust
 // WorkInboundConsumerService::consume_artifact_evidence_changed(WorkInboundEventEnvelope<ArtifactEvidenceChangedPayload> envelope)
-let mut state = ReferenceResolutionState::unresolved(ExternalReferenceRef::from_evidence(envelope.payload.evidence_ref));
+let reference_ref = ExternalReferenceRef::from_evidence(envelope.payload.evidence_ref);
+let expected_reference_version = reference_state_expected_version(reference_ref).await?;
+let mut state = ReferenceResolutionState::unresolved(reference_ref);
 match envelope.payload.evidence_ref.verified_state {
     EvidenceVerifiedState::Verified => state.mark_resolved(envelope.occurred_at)?,
     EvidenceVerifiedState::Rejected => state.mark_stale(ReferenceStaleReason::rejected_evidence(envelope.payload.evidence_ref))?,
     EvidenceVerifiedState::Unverified => {}
 }
-reference_repo.save_reference_state(state, None, &uow).await?;
+reference_repo.save_reference_state(state, expected_reference_version, &uow).await?;
 projection_repo.mark_stale(affected_evidence_views(envelope.payload.evidence_ref), truth_cursor_from_event(&envelope), &uow).await?;
 ```
 
@@ -1522,9 +1537,11 @@ projection_repo.mark_stale(affected_evidence_views(envelope.payload.evidence_ref
 // WorkInboundConsumerService::consume_runtime_promote_requested(WorkInboundEventEnvelope<RuntimePromoteRequestedPayload> envelope)
 let source = source_resolver.resolve_source_work(envelope.payload.source_ref).await?;
 WorkTruthPolicy::assert_no_external_body(source.summary)?;
-let mut state = ReferenceResolutionState::unresolved(ExternalReferenceRef::from_source_work(envelope.payload.source_ref));
+let reference_ref = ExternalReferenceRef::from_source_work(envelope.payload.source_ref);
+let expected_reference_version = reference_state_expected_version(reference_ref).await?;
+let mut state = ReferenceResolutionState::unresolved(reference_ref);
 state.mark_resolved(envelope.occurred_at)?;
-reference_repo.save_reference_state(state, None, &uow).await?;
+reference_repo.save_reference_state(state, expected_reference_version, &uow).await?;
 let intake = PendingPromoteIntake::from_runtime_event(
     envelope.payload.source_ref,
     envelope.payload.promote_reason,
@@ -1734,30 +1751,41 @@ projection_repo.replace_project_views(batch, cursor, &uow).await?;
         - ExplicitRefs -> validate non-empty reference_refs, stable dedup and page request refs
      -> dispatch each ExternalReferenceRef to resolver port
      -> save snapshot / reference state
-     -> mark affected views stale
+     -> ProjectionRepository.list_views_affected_by_references(success refs, page)
+     -> mark returned affected views stale when not empty
      -> report scanned/changed/failed
 ```
 
 ```rust
 // WorkReferenceRefreshService::refresh_external_reference_snapshots(RefreshExternalReferenceSnapshotsJobInput input)
 let refs = load_refresh_refs(input.reference_scope, input.page).await?;
+let mut changed_refs = Vec::new();
 for reference_ref in refs.items {
     match resolve_reference(reference_ref).await {
-        Ok(snapshot_update) => save_snapshot_update(snapshot_update, &uow).await?,
+        Ok(snapshot_update) => {
+            save_snapshot_update(snapshot_update, &uow).await?;
+            changed_refs.push(reference_ref);
+        }
         Err(error) => {
             let failure_reason = ReferenceFailureReason::from_resolver_error(reference_ref, error.message());
+            let expected_version = reference_state_expected_version(reference_ref).await?;
             reference_repo.mark_reference_failed(
                 reference_ref,
                 failure_reason,
                 clock.now(),
-                current_reference_version(reference_ref).await?,
+                expected_version,
                 &uow,
             ).await?;
             failed_refs.push(reference_ref);
         }
     }
 }
-projection_repo.mark_stale(affected_reference_views(&refs.items), current_cursor(), &uow).await?;
+let affected_views = projection_repo
+    .list_views_affected_by_references(changed_refs, affected_views_page())
+    .await?;
+if !affected_views.items.is_empty() {
+    projection_repo.mark_stale(affected_views.items, current_cursor(), &uow).await?;
+}
 ```
 
 `load_refresh_refs(scope, page)` formal branch mapping:
@@ -1784,13 +1812,19 @@ match scope {
 
 `ReferenceSnapshotRepository.list_project_references(project_ref, page)` is the only formal owner of `Project` expansion. It returns typed `ExternalReferenceRef` values associated with the project through committed Work truth / local reference snapshot indexes: project member identity refs, method definition refs tied to formal work admission, project / work / promote source refs, work lifecycle / dependency / blocker evidence refs, and iteration process timebox refs. The repository deduplicates by `ExternalReferenceRef` stable identity, sorts by typed variant then canonical inner ref, and applies pagination after deduplication. Empty page is a valid no-op. The flow must not scan projection rows, parse ids, or use ad hoc `refs_for_project(...)` helpers.
 
+`ProjectionRepository.list_views_affected_by_references(changed_refs, affected_views_page)` is the only formal owner of refresh-success affected view expansion. It receives only refs whose snapshot / reference state was successfully refreshed in this job run. The repository uses its committed projection source index / reference dependency index to return already-existing public `DerivedWorkViewRef` values. It must deduplicate input refs and output views by stable identity, apply stable ordering before paging, and return an empty page when no public view depends on the refreshed refs. The refresh service must not combine consumer-local helpers such as `affected_existing_source_work_views(...)`, `affected_process_views(...)`, `affected_governance_views(...)`, or `affected_evidence_views(...)`, and must not construct project-board / member-work / iteration-summary / work-search refs from `ExternalReferenceRef` variants. Failed refs are reported and marked failed but are not included in `changed_refs` for projection stale.
+
+`reference_state_expected_version(reference_ref)` is a formal helper backed only by `ReferenceSnapshotRepository.get_reference_state_with_version(reference_ref)`. If the repository returns `Some((state, version))`, the flow must pass that `version` to `save_reference_state(...)` or `mark_reference_failed(...)`. If it returns `None`, the flow may pass `None` only for creating a previously missing `ReferenceResolutionState`. The service must not assume version `1`, inspect store internals, or derive a version from `ExternalReferenceRef`.
+
+`save_snapshot_update(snapshot_update, &uow)` uses the same rule for every object it updates. For `ReferenceResolutionState` it must first call `get_reference_state_with_version(...)`;for `MemberCapabilitySnapshot` it must first call `get_member_snapshot_with_version(...)`;for `MethodDefinitionSnapshot` it must first call `get_method_snapshot_with_version(...)`. Existing state / snapshot updates use the returned version. Missing state / snapshot create paths use `None`. Resolver success that changes both snapshot and reference state saves them in the same UoW with their own expected versions.
+
 | 项 | 口径 |
 |---|---|
 | DTO -> Job | `reference_scope=None` / `StaleOnly` 表示 list stale refs;`Project` 由 repository 展开 typed refs;`ExplicitRefs` 使用 request typed refs;typed ref variant 决定 resolver |
-| 事务边界 | snapshot/reference writes、stale、idempotency complete 同一 UoW;实现可按 page 分批 |
+| 事务边界 | snapshot/reference writes、affected public view stale、idempotency complete 同一 UoW;实现可按 page 分批 |
 | 错误映射 | resolver failure -> failed ref + state failed/stale;invalid scope -> `InvalidRequest` |
-| 状态 / 事件 | reference states refreshed;affected views stale |
-| 测试切口 | stale list path;project scope expansion;explicit scope;resolver failure;no refs;duplicate job |
+| 状态 / 事件 | reference states refreshed;successfully refreshed refs drive `ProjectionRepository.list_views_affected_by_references(...)`;returned affected views stale;empty affected views page is no-op |
+| 测试切口 | stale list path;project scope expansion;explicit scope;resolver failure;no refs;duplicate job;existing reference / snapshot update uses versioned read;version conflict preserves last good snapshot |
 
 #### 12.5 `RunWorkReconciliationFlow`
 

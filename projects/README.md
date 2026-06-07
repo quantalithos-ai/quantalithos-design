@@ -512,9 +512,68 @@ N{x} 开发中:
 ### 8.2 提交规范
 
 - 本 design 文档仓 Commit 信息格式:type 英文,主题正文中文
+- 推荐标题格式:`<type>(<scope>): <中文 subject>`。`scope` 使用项目或设计边界,例如 `l1-work`、`l1-process`、`l1-governance`、`standards`。
+- 设计闭环、SOP 收口、跨文件文档批次等非微小提交必须写 body。body 第一段说明本 commit 解决的设计边界,随后按子功能分组列出关键文件和改动目的。
 - 其他实现仓的代码 Commit message 使用英文;若目标仓有更严格规范,取更严格者
 - Co-Authored-By 固定为 `Co-Authored-By: Codex <noreply@openai.com>`
+- 多功能但同属一个设计闭环或 SOP boundary 时,保持一笔 commit,在 body 中按分组说明;若跨不同项目、不同 phase / commit boundary 或不同 SOP 步骤,拆成多笔提交。
+- 改写历史 commit message 时只能改提交元数据,不得改代码树。重写前后必须用 `git rev-parse HEAD^{tree}` 或等价方式确认 tree hash 一致。
 - 实现 agent 的项目永久记忆只允许从 `07-实施计划.md` 的种子表生成;不得把历史提交、当前对话或详细设计正文自由总结成永久规则
+
+正例:
+
+```text
+docs(l1-work): 闭合 reference refresh stale projection 口径
+
+补齐 L1-work reference refresh job 在刷新成功后的 projection stale 设计闭环。
+
+Reference refresh projection closure:
+- 03-详细设计.md: 明确 reference refresh 后的 affected view 读取责任。
+- 03_ddd_step_07_trait_port_adapter_contracts.md: 补 ProjectionRepository 受 reference 影响 view 的读取契约。
+- 03_ddd_step_09_function_flows.md: 对齐 RefreshExternalReferenceSnapshotsFlow stale 标记来源。
+
+Co-Authored-By: Codex <noreply@openai.com>
+```
+
+多功能同边界正例:
+
+```text
+docs(l1-process): 闭合 rhythm PH-05 schema 口径
+
+补齐 L1-process PH-05 rhythm / timing 边界所需的 schema、repository 与状态迁移口径。
+
+Schema and object contracts:
+- 03-详细设计.md: 补 ProcessStage、timebox binding 与 timing ref 的正式归属。
+- 03_ddd_step_06_object_contracts.md: 明确 rhythm domain object、reason 类型和 factory 输入。
+
+Flows and consistency:
+- 03_ddd_step_09_function_flows.md: 固定 PH-05 command flow。
+- 03_ddd_step_11_persistence_transaction_consistency.md: 明确写事务与 optimistic version 口径。
+
+Co-Authored-By: Codex <noreply@openai.com>
+```
+
+反例:
+
+```text
+docs: 修正问题
+```
+
+问题:没有 scope,主题过泛,没有 body,无法追溯设计边界。
+
+```text
+docs: 修正 L1-work handoff job 闭环
+```
+
+问题:标题虽能读懂,但缺少 scope 和 body;多文件设计闭环无法从 commit message 判断具体改了哪些契约、flow、测试口径。
+
+```text
+docs(l1-work): 修正多个问题
+
+修了 work、process 和 governance 的一些文档。
+```
+
+问题:跨项目混在一笔提交,subject 仍过泛,body 没有按子功能和文件说明。
 
 ### 8.3 评审频率
 

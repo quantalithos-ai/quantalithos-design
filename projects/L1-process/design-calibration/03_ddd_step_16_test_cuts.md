@@ -209,7 +209,7 @@ Step 15 observability and audit
 | `process_instance_state_transitions` | `ProcessInstanceState` | commit-03-a:`NotStarted -> Running -> Completed / Cancelled` running subset and terminal guard;PH-04:`Waiting` / `Recovering` / `Failed` paths | domain unit |
 | `activity_state_transitions` | `ActivityState` | `Planned -> Ready -> InProgress -> WaitingFeedback -> Completed`;consumer 不可 direct complete | domain unit |
 | `token_state_transitions` | `TokenState` | `Active -> Waiting -> Active -> Consumed`;terminated token 不可 resume | domain unit |
-| `gateway_state_transitions` | `GatewayState` | `PendingDecision -> RouteSelected` sets `selected_route_ref`;`RouteSelected -> Joined` retains selected route;invalid route -> `Invalid` clears it;joined 后拒绝改 route | domain unit |
+| `gateway_state_transitions` | `GatewayState` | `PendingDecision -> RouteSelected` sets `selected_route_ref`;`RouteSelected -> Joined` retains selected route;pure join factory -> `PendingJoin`;`PendingJoin -> Joined` keeps selected route empty;invalid route -> `Invalid` clears it;joined 后拒绝改 route | domain unit |
 | `waiting_gate_state_transitions` | `WaitingGateState` | `Waiting -> DecisionResolved -> Resumed`;cancel / expire path;consumer 不直接 resume | domain unit |
 | `checkpoint_state_transitions` | `CheckpointState` | `Available -> Superseded / Invalid / Expired`;expired checkpoint 不可 recovery | domain unit |
 | `recovery_attempt_state_transitions` | `RecoveryAttemptState` | `Pending -> Applied / Failed / Abandoned`;terminal attempt duplicate 不改变 state | domain unit |

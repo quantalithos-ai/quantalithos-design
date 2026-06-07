@@ -214,7 +214,7 @@
 
 | 状态 | 作用 |
 |---|---|
-| `PendingDecision` / `RouteSelected` / `Joined` / `Invalid` | 待选择、已选择、已合流和不可用 |
+| `PendingDecision` / `RouteSelected` / `PendingJoin` / `Joined` / `Invalid` | 待选择、已选择、待合流、已合流和不可用 |
 
 | 成员函数 | 作用 |
 |---|---|

@@ -812,12 +812,12 @@ pub struct Gateway {
 | `shape_node_ref` | `ShapeNodeRef` | runtime shape 节点 | 必填 |
 | `gateway_kind` | `GatewayKind` | 分支 / 合流类别 | 必须为正式 enum |
 | `gateway_state` | `GatewayState` | 路由状态 | 必须为正式 enum |
-| `selected_route_ref` | `Option<GatewayRouteRef>` | 已选择路线 | `PendingDecision` / `Invalid` 必须为 `None`;`RouteSelected` 必须为 `Some`;`Joined` 若由 route selection 而来则保留同一个 `Some` |
+| `selected_route_ref` | `Option<GatewayRouteRef>` | 已选择路线 | `PendingDecision` / `PendingJoin` / `Invalid` 必须为 `None`;`RouteSelected` 必须为 `Some`;`Joined` 若由 route selection 而来则保留同一个 `Some`,pure join 则为 `None` |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `pub fn select_route(&mut self, route_ref: GatewayRouteRef, reason: GatewayDecisionReason, actor: ActorRef) -> Result<(), DomainError>` | 选择路线 | route、原因、actor | `Result<(), DomainError>` | `PendingDecision` -> `RouteSelected`;设置 `selected_route_ref = Some(route_ref)` |
-| `pub fn join_tokens(&mut self, tokens: TokenSet) -> Result<(), DomainError>` | 合并 token | token set | `Result<(), DomainError>` | `RouteSelected` -> `Joined` 或待合流 -> `Joined`;若已有 `selected_route_ref` 必须保留 |
+| `pub fn join_tokens(&mut self, tokens: TokenSet) -> Result<(), DomainError>` | 合并 token | token set | `Result<(), DomainError>` | `PendingJoin` -> `Joined` 或 `RouteSelected` -> `Joined`;若已有 `selected_route_ref` 必须保留 |
 | `pub fn mark_invalid(&mut self, reason: GatewayInvalidReason) -> Result<(), DomainError>` | 标记不可用 | invalid reason | `Result<(), DomainError>` | 非终态 -> `Invalid`;清空 `selected_route_ref` |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
@@ -831,6 +831,8 @@ pub enum GatewayState {
     PendingDecision,
     /// A route was selected for this gateway.
     RouteSelected,
+    /// The gateway is waiting for required incoming tokens to join.
+    PendingJoin,
     /// The gateway joined all required incoming tokens.
     Joined,
     /// The gateway cannot be used because its shape or decision is invalid.
@@ -842,7 +844,8 @@ pub enum GatewayState {
 |---|---|---|---|---|
 | `PendingDecision` | `The gateway is waiting for a route decision.` | 待决策 | 工厂 | `RouteSelected` / `Invalid` |
 | `RouteSelected` | `A route was selected for this gateway.` | 已选路 | `PendingDecision` | `Joined` / `Invalid` |
-| `Joined` | `The gateway joined all required incoming tokens.` | 已合流 | `RouteSelected` / 工厂 | 无 |
+| `PendingJoin` | `The gateway is waiting for required incoming tokens to join.` | 待合流 | 工厂 | `Joined` / `Invalid` |
+| `Joined` | `The gateway joined all required incoming tokens.` | 已合流 | `PendingJoin` / `RouteSelected` | 无 |
 | `Invalid` | `The gateway cannot be used because its shape or decision is invalid.` | 不可用 | 任意非终态 | 无 |
 
 不变量与禁止事项:

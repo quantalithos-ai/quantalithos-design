@@ -381,7 +381,7 @@ Steps:
    - `ConsumeToken` -> load token and call `Token.consume()`.
    - `TerminateToken` -> load token and call `Token.terminate(reason)`.
    - `SelectGatewayRoute` -> load body-free `GatewayRouteSet` via `ProcessShapeRepository::get_gateway_route_set(gateway_ref)`,run `GatewayRoutingPolicy.assert_route_allowed(...)`,call `Gateway.select_route(route_ref, decision_reason, actor)`,then `Token.move_to(next_position_ref)`.
-   - `JoinGateway` -> build `TokenSet` from loaded tokens and owning instance `token_set_ref`,run `GatewayRoutingPolicy.assert_can_join(...)`,then `Gateway.join_tokens(token_set)`.
+   - `JoinGateway` -> build `TokenSet` from loaded tokens and owning instance `token_set_ref`,run `GatewayRoutingPolicy.assert_can_join(...)`,then `Gateway.join_tokens(token_set)`;loaded gateway must be `PendingJoin` for pure join gateway or `RouteSelected` for decision gateway after route selection.
 9. Call `ProcessInstance.advance(activity.ref(), actor)` only to update the instance current activity pointer;it returns `()` and must not construct `ActivityProgressionRecord`.
 10. Save changed objects and append `ActivityProgressionRecord` by calling `ActivityProgressionRecord::from_activity_transition(activity_outcome, changed_token_refs, changed_gateway)` after flow-control truth has been changed;record `token_refs` / `gateway_ref` / `selected_route_ref` from changed truth,where single-token variants put one ref,`JoinGateway` copies all joined token refs,and route selection copies committed `Gateway.selected_route_ref`.
 11. Append trace and outbox `ActivityProgressed`.

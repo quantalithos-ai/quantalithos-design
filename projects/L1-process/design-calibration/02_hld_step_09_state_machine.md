@@ -37,7 +37,7 @@
 | Instance lifecycle | `ProcessInstance` | `NotStarted` / `Running` / `Waiting` / `Recovering` / `Completed` / `Cancelled` / `Failed` | 一次过程运行是否已启动、可推进、等待、恢复或进入终态 |
 | Activity lifecycle / feedback | `Activity` | `Planned` / `Ready` / `InProgress` / `WaitingFeedback` / `Completed` / `Skipped` / `Failed` | 过程节点是否可执行、执行中、等待外部反馈或完成 / 失败 |
 | Token flow position | `Token` | `Active` / `Waiting` / `Consumed` / `Terminated` | 过程流控 token 是否可继续推进、等待、已消费或被终止 |
-| Gateway routing | `Gateway` | `PendingDecision` / `RouteSelected` / `Joined` / `Invalid` | 分支 / 合流节点是否已选择路线、已合流或不可用 |
+| Gateway routing | `Gateway` | `PendingDecision` / `RouteSelected` / `PendingJoin` / `Joined` / `Invalid` | 分支 / 合流节点是否已选择路线、等待合流、已合流或不可用 |
 
 ### 3.2 等待、恢复和节奏状态
 
@@ -137,7 +137,8 @@
 |                                                                  |
 | Gateway: PendingDecision --select_route--> RouteSelected          |
 | RouteSelected --join_tokens--> Joined                             |
-| PendingDecision / RouteSelected --invalid source--> Invalid       |
+| PendingJoin --join_tokens--> Joined                               |
+| PendingDecision / RouteSelected / PendingJoin --invalid source--> Invalid |
 +==================================================================+
 ```
 
@@ -242,7 +243,7 @@
 | Activity | `Ready / InProgress -> Skipped / Failed` | progression command with reason | progression record + derived stale |
 | Token | `Active -> Waiting -> Active -> Consumed` | gate open / resume / route completion | instance timeline stale |
 | Token | `Active / Waiting -> Terminated` | explicit termination reason | trace + derived stale |
-| Gateway | `PendingDecision -> RouteSelected -> Joined` | `AdvanceProcessActivity` route decision | progression record + outbox |
+| Gateway | `PendingDecision -> RouteSelected -> Joined`;`PendingJoin -> Joined` | `AdvanceProcessActivity` route decision / join gateway | progression record + outbox |
 | Waiting gate | `Waiting -> DecisionResolved -> Resumed` | governance marker + `ResumeWaitingGate` | waiting change record + outbox |
 | Waiting gate | `Waiting / DecisionResolved -> Cancelled / Expired` | explicit cancel / expiry policy | waiting change record + trace |
 | Checkpoint | `Available -> Superseded / Invalid / Expired` | checkpoint command / recovery policy | recovery history + trace |

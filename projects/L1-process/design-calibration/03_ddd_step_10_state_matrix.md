@@ -73,7 +73,7 @@
 | `ProcessInstanceState` | `ProcessInstance` | `NotStarted` / `Running` / `Waiting` / `Recovering` / `Completed` / `Cancelled` / `Failed` | instance / gate / recovery command | 是 |
 | `ActivityState` | `Activity` | `Planned` / `Ready` / `InProgress` / `WaitingFeedback` / `Completed` / `Skipped` / `Failed` | progression command、feedback command | 是 |
 | `TokenState` | `Token` | `Active` / `Waiting` / `Consumed` / `Terminated` | progression / gate command | 是 |
-| `GatewayState` | `Gateway` | `PendingDecision` / `RouteSelected` / `Joined` / `Invalid` | progression command | 是 |
+| `GatewayState` | `Gateway` | `PendingDecision` / `RouteSelected` / `PendingJoin` / `Joined` / `Invalid` | progression command | 是 |
 | `WaitingGateState` | `WaitingGate` | `Waiting` / `DecisionResolved` / `Resumed` / `Cancelled` / `Expired` | gate command、governance consumer、maintenance job | 是 |
 | `CheckpointState` | `ProcessCheckpoint` | `Available` / `Superseded` / `Invalid` / `Expired` | checkpoint command、maintenance job | 是 |
 | `RecoveryAttemptState` | `RecoveryAttempt` | `Pending` / `Applied` / `Failed` / `Abandoned` | recovery command、maintenance job | 是 |
@@ -307,6 +307,7 @@ Waiting --terminate--> Terminated
 |---|---|---|---|
 | `PendingDecision` | 等待路线选择 | 否 | `select_route`、`mark_invalid` |
 | `RouteSelected` | 已选路线 | 否 | `join_tokens`、`mark_invalid` |
+| `PendingJoin` | 等待合流 token | 否 | `join_tokens`、`mark_invalid` |
 | `Joined` | 已完成合流 | 是 | 无 |
 | `Invalid` | 不可用 | 是 | 无 |
 
@@ -316,7 +317,9 @@ Waiting --terminate--> Terminated
 factory -> PendingDecision --select_route--> RouteSelected --join_tokens--> Joined
                |                         |
                +--mark_invalid----------+--mark_invalid--> Invalid
-factory for pure join gateway ---------------------------> Joined
+factory -> PendingJoin ------------------join_tokens-----------------> Joined
+               |
+               +--mark_invalid--------------------------------------> Invalid
 ```
 
 #### 状态转换矩阵
@@ -324,10 +327,11 @@ factory for pure join gateway ---------------------------> Joined
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | factory | `PendingDecision` | `Gateway::from_shape_node(gateway_id, shape_node_ref, gateway_kind)` | gateway kind 需要 route decision | 创建 gateway | `DomainError::BoundaryViolation` |
-| factory | `Joined` | `Gateway::from_shape_node(...)` for already-joinable gateway | gateway kind 不需要显式 decision 且 tokens satisfied | 创建 joined marker | `DomainError::BoundaryViolation` |
+| factory | `PendingJoin` | `Gateway::from_shape_node(...)` for pure join gateway | gateway kind 不需要显式 decision,但需要等待 required incoming tokens | 创建可执行 join gateway;`selected_route_ref = None` | `DomainError::BoundaryViolation` |
 | `PendingDecision` | `RouteSelected` | `Gateway.select_route(GatewayRouteRef, GatewayDecisionReason, ActorRef)` | route 属于 gateway;decision reason 合法 | 设置 `Gateway.selected_route_ref = Some(route_ref)`;token 进入 next path | `DomainError::InvalidStateTransition` |
 | `RouteSelected` | `Joined` | `Gateway.join_tokens(TokenSet)` | required incoming tokens complete | 消费 / 合并 token;保留既有 `selected_route_ref` | `DomainError::InvalidStateTransition` |
-| `PendingDecision` / `RouteSelected` | `Invalid` | `Gateway.mark_invalid(GatewayInvalidReason)` | route / shape / decision invalid | 标记 invalid;清空 `selected_route_ref`;可触发 activity / instance failure policy | `DomainError::InvalidStateTransition` |
+| `PendingJoin` | `Joined` | `Gateway.join_tokens(TokenSet)` | required incoming tokens complete | 消费 / 合并 token;保持 `selected_route_ref = None` | `DomainError::InvalidStateTransition` |
+| `PendingDecision` / `RouteSelected` / `PendingJoin` | `Invalid` | `Gateway.mark_invalid(GatewayInvalidReason)` | route / shape / decision invalid | 标记 invalid;清空 `selected_route_ref`;可触发 activity / instance failure policy | `DomainError::InvalidStateTransition` |
 
 ---
 

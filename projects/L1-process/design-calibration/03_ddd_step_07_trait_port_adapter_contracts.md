@@ -89,7 +89,7 @@
 | `ProcessInstanceRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | instance truth | `get`、`save`、`list_by_profile` |
 | `ActivityRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | activity truth / progression | `get`、`save`、`list_by_instance` |
 | `TokenGatewayRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | token / gateway flow state | `get_token`、`save_token`、`get_gateway`、`save_gateway` |
-| `WaitingGateRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | waiting gate / pause context | `get_gate`、`save_gate`、`find_open_by_instance` |
+| `WaitingGateRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | waiting gate / pause context | `get_gate`、`get_pause_context`、`save_gate`、`find_open_by_instance` |
 | `CheckpointRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | checkpoint truth | `get`、`save`、`latest_for_instance` |
 | `RecoveryRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | recovery attempt / history | `get_attempt`、`save_attempt`、`append_history` |
 | `RhythmRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | stage / timebox binding | `get_stage`、`save_stage`、`get_binding`、`save_binding` |
@@ -573,6 +573,12 @@ pub trait WaitingGateRepository {
         page: PageRequest,
     ) -> Result<Page<Versioned<WaitingGate>>, RepositoryError>;
 
+    /// Loads the immutable pause context referenced by a waiting gate.
+    async fn get_pause_context(
+        &self,
+        pause_context_ref: PauseContextRef,
+    ) -> Result<Option<PauseContext>, RepositoryError>;
+
     /// Saves a waiting gate using optimistic concurrency.
     async fn save_gate(
         &self,
@@ -596,6 +602,15 @@ pub trait WaitingGateRepository {
     ) -> Result<(), RepositoryError>;
 }
 ```
+
+| 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
+|---|---|---|---|---|---|
+| `get_gate` | `WaitingGateRef` | `Option<Versioned<WaitingGate>>` | `RepositoryError` | resume command / query | command path 使用 gate version 保存;query path 只映射 view |
+| `find_open_by_instance` | `ProcessInstanceRef`、`PageRequest` | `Page<Versioned<WaitingGate>>` | `RepositoryError` | open gate guard / query | stable order;empty 表示无 open gate |
+| `get_pause_context` | `PauseContextRef` | `Option<PauseContext>` | `RepositoryError` | resume command / waiting gate query | pause context immutable;command missing -> domain rejected / invariant failure;query missing -> `ProcessViewStatus::Degraded` |
+| `save_gate` | gate、version、UoW | `StorageVersion` | `RepositoryError` | open / resume command | optimistic save |
+| `save_pause_context` | context、UoW | `()` | `RepositoryError` | open gate command | same UoW as gate create;immutable |
+| `append_change_record` | record、UoW | `()` | `RepositoryError` | open / resume / cancel / expire | append-only |
 
 ##### 7.6.7 `CheckpointRepository`
 
@@ -1172,7 +1187,7 @@ pub trait IdGeneratorPort {
 | `InMemoryProcessInstanceRepository` | `infra/src/repositories.rs` | `ProcessInstanceRepository` | instance map | list by profile / work context |
 | `InMemoryActivityRepository` | `infra/src/repositories.rs` | `ActivityRepository` | activity map + progression records | list by instance |
 | `InMemoryTokenGatewayRepository` | `infra/src/repositories.rs` | `TokenGatewayRepository` | token / gateway maps | flow state conflict |
-| `InMemoryWaitingGateRepository` | `infra/src/repositories.rs` | `WaitingGateRepository` | gate / pause / change maps | open gate lookup |
+| `InMemoryWaitingGateRepository` | `infra/src/repositories.rs` | `WaitingGateRepository` | gate / pause / change maps | open gate lookup;pause context lookup;missing pause context injection for query degraded tests |
 | `InMemoryCheckpointRepository` | `infra/src/repositories.rs` | `CheckpointRepository` | checkpoint map | latest checkpoint lookup |
 | `InMemoryRecoveryRepository` | `infra/src/repositories.rs` | `RecoveryRepository` | attempt / history maps | pending scope scan |
 | `InMemoryRhythmRepository` | `infra/src/repositories.rs` | `RhythmRepository` | stage / binding maps | active binding lookup |

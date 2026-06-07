@@ -1597,7 +1597,7 @@ pub struct WaitingGateView {
 }
 ```
 
-Repository key:`WaitingGateRef`;fallback source:`WaitingGateRepository::get_gate` + pause context lookup. Missing pause context returns `status = Degraded`.
+Repository key:`WaitingGateRef`;fallback source:`WaitingGateRepository::get_gate` + `WaitingGateRepository::get_pause_context(gate.pause_context_ref)`. Missing pause context returns `status = Degraded`.
 
 ##### 7.9.6 `RecoveryStatusView`
 
@@ -2901,7 +2901,7 @@ Rules:
 | `AdvanceProcessActivityRequest` | `Activity`、`Token`、`Gateway`、`ActivityProgressionRecord` | 是 | repository, policy | `expected_position_ref` vs storage version | conflict |
 | `RecordActivityFeedbackRequest` | `Activity`、`RuntimeFeedbackRef`、progression record | 是 | resolver / reference snapshot | feedback ref vs feedback summary | reject / retry |
 | `OpenWaitingGateRequest` | `WaitingGate`、`PauseContext`、change record | 是 | id generator、clock | pause reason vs resume requirement | reject |
-| `ResumeWaitingGateRequest` | `WaitingGate`、`Token`、change record | 是 | repository / resolver | decision ref vs resume reason | reject |
+| `ResumeWaitingGateRequest` | `WaitingGate`、`PauseContext`、`Token`、change record | 是 | `WaitingGateRepository::get_gate` / `get_pause_context`、repository / resolver | missing pause context;decision ref vs resume reason | reject |
 | `CreateProcessCheckpointRequest` | `ProcessCheckpoint`、trace / audit | 是 | id generator, repository | evidence ref vs checkpoint reason | reject |
 | `StartRecoveryAttemptRequest` | `RecoveryAttempt`、history record | 是 | checkpoint repository, id generator | checkpoint ref vs attempt ref | reject |
 | `CompleteRecoveryAttemptRequest` | `RecoveryAttempt`、history record、outbox | 是 | repository | outcome vs failure reason / abandon reason | invalid input |

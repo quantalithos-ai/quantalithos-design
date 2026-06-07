@@ -436,7 +436,7 @@ Tests:success;instance terminal;activity mismatch;duplicate;missing resume requi
 Steps:
 
 1. Reserve command idempotency.
-2. Load `WaitingGate`、`PauseContext`、`ProcessInstance`、waiting token.
+2. Load `WaitingGate` by `waiting_gate_ref`;load `PauseContext` via `WaitingGateRepository.get_pause_context(gate.pause_context_ref)`;load `ProcessInstance` and waiting token.
 3. Resolve / validate `GovernanceDecisionRef`.
 4. `WaitingGatePolicy.assert_decision_matches(gate, decision_ref)` and `assert_can_resume(gate)`.
 5. `WaitingGate.attach_decision(decision_ref, actor)` if not already attached.
@@ -445,7 +445,9 @@ Steps:
 8. Save all changed objects;append change record、trace、outbox `WaitingGateChanged`.
 9. Store `WaitingGateCommandResult`.
 
-Tests:success;decision mismatch;gate already resumed;token missing;duplicate.
+Tests:success;decision mismatch;gate already resumed;missing pause context;token missing;duplicate.
+
+Resume command missing pause context is not a degraded read model case. If `get_pause_context(gate.pause_context_ref)` returns `None`,map to command reject / invariant failure and do not resume gate,instance,or token;do not append success trace / outbox / result. Query degraded handling is limited to `GetWaitingGateFlow`.
 
 ##### 7.6.9 `CreateProcessCheckpointFlow`
 
@@ -584,7 +586,7 @@ Steps:
 3. Load primary truth object.
 4. Load secondary context:
    - activity status loads feedback reference state.
-   - waiting gate loads pause context and decision state.
+   - waiting gate loads pause context via `WaitingGateRepository.get_pause_context(gate.pause_context_ref)` and decision state.
    - recovery status loads checkpoint / recovery attempt / latest history.
 5. Map to Step 8 view DTO.
 6. If secondary context is missing or stale,return `Degraded` with marker.

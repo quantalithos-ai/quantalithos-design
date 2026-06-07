@@ -165,6 +165,7 @@ Step 15 observability
 | `SearchWork_contract` | `SearchWorkFlow` | search page hit;failed projection surface、visibility filter、no body copy | query handler |
 | `GetWorkTrace_contract` | `GetWorkTraceFlow` | trace records page;empty, not visible, no write side effect | query handler |
 | `GetProjectBoardView_contract` | `GetProjectBoardViewFlow` | board projection hit;missing -> rebuilding / missing, query no rebuild | query handler |
+| `EventSchemaVersion_contract` | inbound / outbound event envelopes | `EventSchemaVersion::v1()` roundtrip;outbound fixture uses `v1`;missing / unsupported inbound version dead-letters before business write | contract + consumer |
 | `ConsumeIdentityMemberChanged_contract` | identity event consumer | member snapshot + reference state saved;duplicate, missing capability dead-letter | consumer |
 | `ConsumeMethodDefinitionChanged_contract` | method event consumer | method snapshot saved;duplicate, missing definition dead-letter | consumer |
 | `ConsumeConversationWorkContextChanged_contract` | conversation event consumer | source reference / pending source saved;source missing, unresolved marker | consumer |

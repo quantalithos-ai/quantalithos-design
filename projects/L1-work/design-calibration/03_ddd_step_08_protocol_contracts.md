@@ -125,6 +125,17 @@
 Command / Query 不再额外定义顶层 `idempotency_key`、`trace_ref`、`page` 或 `consistency` 字段。
 
 ```rust
+/// Event schema version used by Work inbound and outbound event envelopes.
+pub struct EventSchemaVersion(pub String);
+```
+
+| 字段 / helper | 类型 | 来源 | validation / 处理 |
+|---|---|---|---|
+| `EventSchemaVersion.0` | `String` | event envelope / contracts fixture | 必填;P0 唯一支持值为 `v1`;格式为 `v<major>` 且 major 必须与 topic suffix 对齐 |
+| `EventSchemaVersion::v1()` | `EventSchemaVersion` | `crates/contracts/src/events.rs` 常量 / helper | outbound builder 和 fixtures 必须使用该 helper,不得写裸字符串 |
+| inbound parse | `EventSchemaVersion` | worker handler 读取 envelope | missing、parse failure、非 `v1`、或与 topic suffix major version 不一致 -> `ConsumerDisposition::DeadLetter`;不写 Work truth / snapshot / trace / outbox |
+
+```rust
 /// A synchronous Work command envelope.
 pub struct WorkCommandEnvelope<T> {
     /// Effective actor and entrypoint context.
@@ -166,7 +177,7 @@ pub struct WorkInboundEventEnvelope<T> {
 |---|---|---|---|
 | `WorkCommandEnvelope<T>` | core `ActorContext` + `CommandMetadata` | `metadata.request.idempotency_key` 必须为 `Some` | 缺 actor / metadata / key -> reject |
 | `WorkQueryEnvelope<T>` | core `ActorContext` + `QueryMetadata` | 不要求 idempotency key | 缺 actor / metadata -> reject |
-| `WorkInboundEventEnvelope<T>` | event source envelope | `source_event_id` + topic + source ref 作为 dedup key | 缺 envelope / event id -> dead-letter |
+| `WorkInboundEventEnvelope<T>` | event source envelope,`event_version` 按 `EventSchemaVersion` schema 解析 | `source_event_id` + topic + source ref 作为 dedup key | 缺 envelope / event id / event_version、unsupported version -> dead-letter |
 
 Query authorization 不从 query DTO 携带额外权限字段。`ActorContext` 只提供可信主体上下文;`AuthorizedWorkQueryService` 必须通过 `ActorMemberResolverPort.resolve_actor_member(actor)` 得到 `QueryActorMemberRef.member_ref: GlobalMemberRef`,再用 `ProjectMemberRepository.get_by_member(project_ref, member_ref)` 判断 Work-owned ProjectMember responsibility。`Active` / `Paused` 可读,`Proposed` / `Released`、actor-member not found / rejected、scope unresolved 均返回 `QuerySurface::NotVisible` 且 `data = None`;actor-member resolver temporary unavailable 映射 `TemporarilyUnavailable`。P0 不允许使用 `role_refs`、`ActorKind::System`、`ActorKind::Integration` 或 `ProjectOwnerRef` 绕过该 membership 规则。
 
@@ -1236,7 +1247,8 @@ pub struct GetProjectBoardViewRequest {
 | 项 | 正式口径 |
 |---|---|
 | topic 命名 | `<bounded-context>.<subject>.<verb>.v1` |
-| payload 版本 | `EventSchemaVersion` 字段必须与 topic major version 对齐 |
+| payload 版本 | `EventSchemaVersion` 是 `crates/contracts/src/events.rs` 中的字符串 newtype;P0 支持 `v1`;字段必须与 topic major version 对齐 |
+| fixture 版本 | event fixture 使用 `EventSchemaVersion::v1()`;unsupported-version fixture 显式构造非 `v1` 用于 dead-letter 测试 |
 | 兼容变更 | v1 只允许新增可选字段;删除 / 改名 / 语义变更必须升 v2 |
 | dedup | inbound 使用 `source_event_id + topic + source_ref` |
 | trace | inbound / outbound 均携带 `WorkTraceContextRef` |
@@ -1350,7 +1362,7 @@ pub struct WorkOutboundEventEnvelope<T> {
 | 字段 | 类型 | 来源 | 约束 |
 |---|---|---|---|
 | `outbox_id` | `WorkOutboxId` | `WorkOutboxRecord.outbox_id` | 不等于 bus event id |
-| `event_version` | `EventSchemaVersion` | event adapter / contracts constant | 与 topic major 版本一致 |
+| `event_version` | `EventSchemaVersion` | `EventSchemaVersion::v1()` contracts helper | 与 topic major 版本一致;P0 outbound 只发布 `v1` |
 | `trace_context_ref` | `WorkTraceContextRef` | `WorkTraceRecord` / metadata | 必填 |
 | `occurred_at` | `Timestamp` | `ClockPort.now()` or truth change time | 必填 |
 

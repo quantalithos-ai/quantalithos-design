@@ -201,7 +201,7 @@ Query path must not write audit, outbox, idempotency, freshness marker, or refer
 | 场景 | 检测位置 | Consumer disposition | 是否写本地状态 |
 |---|---|---|---|
 | missing envelope / event id / required ref | worker handler | `DeadLetter` | no business state |
-| unsupported event version | worker handler | `DeadLetter` | no business state |
+| unsupported event version | worker handler `EventSchemaVersion` parse / topic major check | `DeadLetter` | no business state |
 | duplicate same source event digest | idempotency service | `AckDuplicate` | no new state |
 | same event key different digest | idempotency service | `DeadLetter` / conflict marker | no business state |
 | external ref unresolved but event valid | consumer service | `AckWithMarker` or retry by source policy | save `ReferenceResolutionState::Unresolved` / failed marker when allowed |
@@ -240,7 +240,7 @@ Job-level reject does not produce business truth. Item-level failure is reported
 | publisher failure after committed truth | publisher | mark outbox `Failed`;job failed item | outbox failed marker only |
 | projection build / replace failure | rebuild job | mark view `Failed` where possible;job failed item | optional derived event only if marker committed |
 | reference refresh failure | refresh job / consumer | mark reference failed or retry | reference marker only |
-| unsupported inbound event version | worker handler | dead-letter | no business write |
+| unsupported inbound event version | worker handler `EventSchemaVersion` parse / topic major check | dead-letter | no business write |
 | handoff port failure | job service | failed report / marker by job policy | no business truth event |
 
 #### 8.8 恢复口径表

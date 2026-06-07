@@ -249,6 +249,13 @@ pub trait ProjectMemberRepository {
         page: PageRequest,
     ) -> Result<Page<ProjectMember>, RepositoryError>;
 
+    /// Lists all Work-owned project responsibilities for one identity member.
+    async fn list_by_member(
+        &self,
+        member_ref: GlobalMemberRef,
+        page: PageRequest,
+    ) -> Result<Page<ProjectMember>, RepositoryError>;
+
     /// Creates a responsibility record inside the current unit of work.
     async fn create(
         &self,
@@ -271,6 +278,7 @@ pub trait ProjectMemberRepository {
 | `get` | `ProjectMemberRef` | `Option<ProjectMember>` | `RepositoryError` | update responsibility / query | 不解析 identity 正文 |
 | `get_by_member` | `ProjectRef`、`GlobalMemberRef` | `Option<ProjectMember>` | `RepositoryError` | assign / authorization | 用于防重复承担 |
 | `list_by_project` | `ProjectRef`、`PageRequest` | `Page<ProjectMember>` | `RepositoryError` | query / projection rebuild | 可返回 released 历史,过滤口径 Step 8 |
+| `list_by_member` | `GlobalMemberRef`、`PageRequest` | `Page<ProjectMember>` | `RepositoryError` | identity member consumer stale scope | 只枚举 Work-owned ProjectMember truth;不得解析 identity 正文;稳定排序 |
 | `create` / `save` | truth、version / UoW | `Version` | `RepositoryError` | command service | 写入与 audit / outbox 同 UoW |
 
 #### 8.3 `BacklogRepository`
@@ -803,6 +811,20 @@ pub trait ProjectionRepository {
         page: PageRequest,
     ) -> Result<Page<DerivedWorkViewState>, RepositoryError>;
 
+    /// Lists already-existing public view refs whose projection source index depends on an identity member.
+    async fn list_views_affected_by_member(
+        &self,
+        member_ref: GlobalMemberRef,
+        page: PageRequest,
+    ) -> Result<Page<DerivedWorkViewRef>, RepositoryError>;
+
+    /// Lists already-existing public view refs whose projection source index depends on a method definition.
+    async fn list_views_affected_by_method(
+        &self,
+        definition_ref: MethodDefinitionRef,
+        page: PageRequest,
+    ) -> Result<Page<DerivedWorkViewRef>, RepositoryError>;
+
     /// Replaces project-scoped derived views after a rebuild from truth.
     async fn replace_project_views(
         &self,
@@ -879,11 +901,13 @@ pub struct ProjectProjectionBatch {
 | `get_*_view` | ref | `Option<*Projection>` | `RepositoryError` | query service | projection 不存在由 query 映射 empty / stale surface |
 | `search_work` | `ProjectRef`、criteria、page | `Page<WorkSearchProjection>` | `RepositoryError` | query service | 只读;不得触发 rebuild |
 | `list_freshness_states` | `WorkReconciliationScopeRef`、`PageRequest` | `Page<DerivedWorkViewState>` | `RepositoryError` | reconciliation job | 只读,不得修复 projection |
+| `list_views_affected_by_member` | `GlobalMemberRef`、`PageRequest` | `Page<DerivedWorkViewRef>` | `RepositoryError` | identity member consumer stale scope | 只返回已存在且属于 Step 8 §9.2 public identity 的 view refs;不得临时派生 ad hoc ref |
+| `list_views_affected_by_method` | `MethodDefinitionRef`、`PageRequest` | `Page<DerivedWorkViewRef>` | `RepositoryError` | method definition consumer stale scope | 只返回已存在且 source index 依赖该 definition 的 public view refs;空页表示无 view 可标脏 |
 | `replace_project_views` | `ProjectProjectionBatch`、cursor、UoW | `()` | `RepositoryError` | rebuild job | 只能从 committed truth 构造 |
 | `mark_stale` | affected views、cursor、UoW | `()` | `RepositoryError` | command / consumer service | stale 不代表新 truth |
 | `mark_rebuilding` / `mark_failed` | affected views、cursor、reason、UoW | `()` | `RepositoryError` | rebuild job | failed / rebuilding marker 不反写真相 |
 
-`mark_stale(...)` 的 `affected` 只能包含 Step 8 §9.2 已正式定义的 public `DerivedWorkViewRef`。当前 P0 只有 project board、member work、iteration summary、work search 四类 derived view identity。PromoteResult 和 PendingPromoteIntake 没有 public query / projection identity,不得临时派生 `promote-*` 或 `intake-*` view ref。
+`mark_stale(...)` 的 `affected` 只能包含 Step 8 §9.2 已正式定义的 public `DerivedWorkViewRef`。当前 P0 只有 project board、member work、iteration summary、work search 四类 derived view identity。PromoteResult 和 PendingPromoteIntake 没有 public query / projection identity,不得临时派生 `promote-*` 或 `intake-*` view ref。Consumer / refresh job 如果需要按外部 ref 标脏,必须先通过 `ProjectionRepository.list_views_affected_by_*` 或已定义 truth repository scope 读取面枚举 existing public view refs;枚举为空时只保存 reference / snapshot state,不得自行构造 view ref。
 
 #### 8.11 `ReferenceSnapshotRepository`
 
@@ -1527,7 +1551,8 @@ pub enum StoredCommandResult {
 | `OpenIteration` | `ProjectRepository`、`IterationRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ProcessTimeboxResolverPort`、`IdGeneratorPort`、`ClockPort` | enqueue `IterationChanged`;resolver summary validation only;does not write process timebox reference state |
 | `CommitIterationScope` / `UpdateIterationCommitment` | `IterationRepository`、`WorkItemRepository`、`BacklogRepository`、`AuditRepository`、`WorkOutboxRepository`、`ProjectionRepository`、`IdempotencyRepository`、`CommandResultRepository` | 是 | `ClockPort` | enqueue `IterationChanged`;mark iteration / member views stale |
 | `GetProjectWorkFacts` / `GetBacklog` / `GetWorkItem` / `ListMemberWork` / `GetIterationSummary` / `SearchWork` / `GetWorkTrace` / `GetProjectBoardView` | project / member / backlog / work / promote / dependency / iteration / audit repo、`ProjectionRepository` when view-backed | 否 | `ActorMemberResolverPort` | query 不触发 rebuild;visibility 先 resolve actor member,再按 ProjectMember `Active` / `Paused` 判定;denied -> `NotVisible` |
-| `ConsumeIdentityMemberChanged` | `ReferenceSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | mark affected views stale |
+| `ConsumeIdentityMemberChanged` | `ReferenceSnapshotRepository`、`ProjectMemberRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | `ProjectMemberRepository.list_by_member(...)` + `ProjectionRepository.list_views_affected_by_member(...)` 枚举 affected public views 后 mark stale |
+| `ConsumeMethodDefinitionChanged` | `ReferenceSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | `ProjectionRepository.list_views_affected_by_method(...)` 枚举 affected public views 后 mark stale |
 | `ConsumeRuntimePromoteRequested` | `ReferenceSnapshotRepository`、`PromoteRepository`、`IdempotencyRepository` | 是 | `SourceWorkResolverPort`、`ClockPort` | 只形成 pending intake / reference state |
 | `PublishWorkOutbox` | `WorkOutboxRepository`、`IdempotencyRepository` | 是 | `WorkOutboxPublisherPort`、`ClockPort` | mark published / failed |
 | `RebuildWorkProjections` | `WorkTruthSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | replace views + mark fresh |

@@ -1295,7 +1295,9 @@ Ok(map_projection_to_query_response(projection))
      -> ReferenceResolutionState.mark_resolved(occurred_at)
      -> ReferenceSnapshotRepository.save_member_snapshot(...)
      -> ReferenceSnapshotRepository.save_reference_state(...)
-     -> ProjectionRepository.mark_stale(affected member/project views, cursor, &uow)
+     -> ProjectMemberRepository.list_by_member(member_ref, page=bounded)
+     -> ProjectionRepository.list_views_affected_by_member(member_ref, page=bounded)
+     -> ProjectionRepository.mark_stale(affected public member/project views, cursor, &uow) when affected not empty
      -> idempotency complete + commit
 ```
 
@@ -1309,7 +1311,17 @@ state.mark_resolved(envelope.occurred_at)?;
 let snapshot = MemberCapabilitySnapshot::from_identity(envelope.payload.member_ref, envelope.payload.capability_refs)?;
 reference_repo.save_reference_state(state, None, &uow).await?;
 reference_repo.save_member_snapshot(snapshot, None, &uow).await?;
-projection_repo.mark_stale(affected_member_views(envelope.payload.member_ref), truth_cursor_from_event(&envelope), &uow).await?;
+let affected_members_page: PageRequest = consumer_config.projection_stale_page();
+let affected_views_page: PageRequest = consumer_config.projection_stale_page();
+let affected_members = project_member_repo
+    .list_by_member(envelope.payload.member_ref, affected_members_page)
+    .await?;
+let affected_views = projection_repo
+    .list_views_affected_by_member(envelope.payload.member_ref, affected_views_page)
+    .await?;
+if !affected_views.items.is_empty() {
+    projection_repo.mark_stale(affected_views.items, truth_cursor_from_event(&envelope), &uow).await?;
+}
 ```
 
 | 项 | 口径 |
@@ -1317,8 +1329,8 @@ projection_repo.mark_stale(affected_member_views(envelope.payload.member_ref), t
 | Event -> Domain | payload `member_ref` + `capability_refs` 构造 `MemberCapabilitySnapshot` |
 | 事务边界 | snapshot、reference state、projection stale、idempotency complete 同一 UoW |
 | 错误映射 | missing member/capabilities -> `DeadLetter`;version unsupported -> `DeadLetter`;repo failure -> retry |
-| 状态 / 事件 | reference `Resolved`;affected member/project views stale;不写 Work truth |
-| 测试切口 | consume success;duplicate event;missing member dead-letter;stale views marked |
+| 状态 / 事件 | reference `Resolved`;`ProjectMemberRepository.list_by_member(...)` 确认 Work-owned affected responsibilities;`ProjectionRepository.list_views_affected_by_member(...)` 返回既有 public `DerivedWorkViewRef`;affected member/project/search views stale;不写 Work truth |
+| 测试切口 | consume success;duplicate event;missing member dead-letter;stale views marked;no affected public views -> snapshot saved and no stale marker |
 
 #### 10.2 `ConsumeMethodDefinitionChangedFlow`
 
@@ -1330,7 +1342,8 @@ projection_repo.mark_stale(affected_member_views(envelope.payload.member_ref), t
      -> ReferenceResolutionState::unresolved(ExternalReferenceRef::from_method_definition(definition_ref))
      -> mark_resolved(occurred_at)
      -> save method snapshot + reference state
-     -> mark project/search views stale for affected method definition
+     -> ProjectionRepository.list_views_affected_by_method(definition_ref, page=bounded)
+     -> mark project/search views stale for affected method definition when affected not empty
 ```
 
 ```rust
@@ -1340,7 +1353,13 @@ let mut state = ReferenceResolutionState::unresolved(ExternalReferenceRef::from_
 state.mark_resolved(envelope.occurred_at)?;
 reference_repo.save_method_snapshot(snapshot, None, &uow).await?;
 reference_repo.save_reference_state(state, None, &uow).await?;
-projection_repo.mark_stale(affected_method_views(envelope.payload.definition_ref), truth_cursor_from_event(&envelope), &uow).await?;
+let affected_views_page: PageRequest = consumer_config.projection_stale_page();
+let affected_views = projection_repo
+    .list_views_affected_by_method(envelope.payload.definition_ref, affected_views_page)
+    .await?;
+if !affected_views.items.is_empty() {
+    projection_repo.mark_stale(affected_views.items, truth_cursor_from_event(&envelope), &uow).await?;
+}
 ```
 
 | 项 | 口径 |
@@ -1348,8 +1367,10 @@ projection_repo.mark_stale(affected_method_views(envelope.payload.definition_ref
 | Event -> Domain | definition ref/kind 构造 method snapshot |
 | 事务边界 | snapshot、reference state、projection stale、idempotency complete 同一 UoW |
 | 错误映射 | missing definition -> `DeadLetter`;repo failure -> retry |
-| 状态 / 事件 | reference `Resolved`;affected search/board views stale;不改 WorkItem truth |
-| 测试切口 | snapshot save;duplicate;missing ref dead-letter;affected views stale |
+| 状态 / 事件 | reference `Resolved`;`ProjectionRepository.list_views_affected_by_method(...)` 返回既有 public `DerivedWorkViewRef`;affected search/board views stale;不改 WorkItem truth |
+| 测试切口 | snapshot save;duplicate;missing ref dead-letter;affected views stale;no affected public views -> snapshot saved and no stale marker |
+
+`affected_members_page` / `affected_views_page` 是 consumer/service 依据配置 `PageLimit` 形成的 core `PageRequest`,不进入 public query DTO,也不进入 `DerivedWorkViewRef`。`affected_members` 只用于确认该 `GlobalMemberRef` 在 Work truth 中存在受影响 project responsibility,并为 fake / tests 提供可断言 scope;consumer 不得用它临时构造 project-board / member-work / work-search ref。所有进入 `mark_stale(...)` 的 affected views 必须来自 `ProjectionRepository.list_views_affected_by_member(...)` / `list_views_affected_by_method(...)` 返回的既有 public view refs。返回空页表示当前没有可标脏 public projection,不是错误。
 
 #### 10.3 `ConsumeConversationWorkContextChangedFlow`
 

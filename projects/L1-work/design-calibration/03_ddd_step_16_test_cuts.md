@@ -166,8 +166,8 @@ Step 15 observability
 | `GetWorkTrace_contract` | `GetWorkTraceFlow` | trace records page;empty, not visible, no write side effect | query handler |
 | `GetProjectBoardView_contract` | `GetProjectBoardViewFlow` | board projection hit;missing -> rebuilding / missing, query no rebuild | query handler |
 | `EventSchemaVersion_contract` | inbound / outbound event envelopes | `EventSchemaVersion::v1()` roundtrip;outbound fixture uses `v1`;missing / unsupported inbound version dead-letters before business write | contract + consumer |
-| `ConsumeIdentityMemberChanged_contract` | identity event consumer | member snapshot + reference state saved;duplicate, missing capability dead-letter | consumer |
-| `ConsumeMethodDefinitionChanged_contract` | method event consumer | method snapshot saved;duplicate, missing definition dead-letter | consumer |
+| `ConsumeIdentityMemberChanged_contract` | identity event consumer | member snapshot + reference state saved;duplicate, missing capability dead-letter;affected public views from repository are marked stale;empty affected view page writes no stale marker | consumer |
+| `ConsumeMethodDefinitionChanged_contract` | method event consumer | method snapshot saved;duplicate, missing definition dead-letter;affected public views from repository are marked stale;empty affected view page writes no stale marker | consumer |
 | `ConsumeConversationWorkContextChanged_contract` | conversation event consumer | source reference / pending source saved;source missing, unresolved marker | consumer |
 | `ConsumeProcessTimingChanged_contract` | process event consumer | timebox reference state saved;missing timebox, duplicate | consumer |
 | `ConsumeGovernanceDecisionChanged_contract` | governance event consumer | source / evidence reference state saved;missing both source/evidence dead-letter | consumer |

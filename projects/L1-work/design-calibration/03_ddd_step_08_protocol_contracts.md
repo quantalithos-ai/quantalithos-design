@@ -1341,6 +1341,8 @@ pub struct RuntimePromoteRequestedPayload {
 | `evidence_ref` | `ExternalEvidenceRef` snapshot | event payload | evidence ref != source ref | unresolved / rejected |
 | `timebox_ref` | process timing reference state | event payload | timebox ref != iteration ref | unresolved |
 
+Inbound consumer 如需标记 projection stale,affected views 必须来自正式 repository 读取面,不得从 event payload 或 external ref 临时拼接 `DerivedWorkViewRef`。`ConsumeIdentityMemberChanged` 使用 `ProjectMemberRepository.list_by_member(member_ref, page)` 确认 Work-owned responsibility scope,并使用 `ProjectionRepository.list_views_affected_by_member(member_ref, page)` 获得既有 public view refs。`ConsumeMethodDefinitionChanged` 使用 `ProjectionRepository.list_views_affected_by_method(definition_ref, page)` 获得既有 public view refs。上述列表为空时只保存 snapshot / reference state,不调用 `mark_stale(...)` 生成 ad hoc view ref。
+
 #### 10.3 Outbound Event shared schema
 
 ```rust

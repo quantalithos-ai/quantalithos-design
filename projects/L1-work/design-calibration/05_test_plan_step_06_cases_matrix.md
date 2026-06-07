@@ -126,8 +126,8 @@ Consumer 和 outbound event 不新增独立编号族;它们必须被既有 `TC-W
 
 | 协议对象 | 覆盖用例 | 触发方式 | 预期结果 | 断言点 |
 |---|---|---|---|---|
-| `ConsumeIdentityMemberChanged` | `TC-WORK-MEMBER-001` / `002` | identity member changed event | 保存 `MemberCapabilitySnapshot` / `ReferenceResolutionState` 或 dead-letter | duplicate 不重复 snapshot;missing capability dead-letter |
-| `ConsumeMethodDefinitionChanged` | `TC-WORK-FORMAL-002` / `QUERY-006` | method definition changed event | 保存 method snapshot / reference state,mark affected views stale | 不改 Work truth;missing definition dead-letter |
+| `ConsumeIdentityMemberChanged` | `TC-WORK-MEMBER-001` / `002` | identity member changed event | 保存 `MemberCapabilitySnapshot` / `ReferenceResolutionState` 或 dead-letter;正式 affected-view 读取面返回既有 public view 时 mark stale | duplicate 不重复 snapshot;missing capability dead-letter;no affected public views 不生成 stale marker |
+| `ConsumeMethodDefinitionChanged` | `TC-WORK-FORMAL-002` / `QUERY-006` | method definition changed event | 保存 method snapshot / reference state;正式 affected-view 读取面返回既有 public view 时 mark stale | 不改 Work truth;missing definition dead-letter;no affected public views 不生成 stale marker |
 | `ConsumeConversationWorkContextChanged` | `TC-WORK-FORMAL-002` / `PROMOTE-001` | conversation work context event | 保存 source reference / pending source marker | digest mismatch -> unresolved;不创建 Work truth |
 | `ConsumeProcessTimingChanged` | `TC-WORK-ITER-001` / `QUERY-005` | process timing event | 保存 timebox reference state;可 mark iteration views stale | 不 open / close Iteration;missing timebox dead-letter |
 | `ConsumeGovernanceDecisionChanged` | `TC-WORK-DEP-003` / `DEP-005` | governance decision event | 保存 source / evidence reference state | both missing -> dead-letter;不生成 governance truth |

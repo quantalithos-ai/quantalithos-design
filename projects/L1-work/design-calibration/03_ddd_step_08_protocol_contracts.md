@@ -1492,16 +1492,16 @@ pub struct DerivedWorkViewChangedEvent {
 
 | Event | topic | 发布方 | 消费方 | payload 字段来源 |
 |---|---|---|---|---|
-| `ProjectChanged` | `work.project.changed.v1` | outbox publisher | SDK / workspace / process / archive | `Project` + lifecycle reason |
-| `BacklogChanged` | `work.backlog.changed.v1` | outbox publisher | SDK / workspace / process / archive | `Backlog` + `BacklogMaintenanceReason` |
-| `ProjectMemberChanged` | `work.project_member.changed.v1` | outbox publisher | member-service / runtime / workspace | `ProjectMember` |
-| `WorkItemChanged` | `work.formal_work.changed.v1` | outbox publisher | process / governance / artifact / workspace | `WorkItem` / `ChildWorkItem` |
-| `PromoteResultRecorded` | `work.promote_result.recorded.v1` | outbox publisher | runtime / conversation / artifact | `PromoteResult` |
-| `WorkDependencyChanged` | `work.dependency.changed.v1` | outbox publisher | workspace / process / governance | `WorkDependency` |
-| `WorkBlockerChanged` | `work.blocker.changed.v1` | outbox publisher | workspace / governance / artifact | `WorkBlocker` |
-| `IterationChanged` | `work.iteration.changed.v1` | outbox publisher | process / workspace / runtime | `Iteration` / `IterationCommitment` |
-| `WorkTraceAvailable` | `work.trace.available.v1` | outbox publisher | observability / archive | `WorkTraceRecord` / handoff job |
-| `DerivedWorkViewChanged` | `work.derived_view.changed.v1` | outbox publisher | workspace / SDK | `DerivedWorkViewState` |
+| `ProjectChanged` | `work.project.changed.v1` | outbox publisher | SDK / workspace / process / archive | `WorkOutboxSourceRef::Project { project_ref, reason }` + committed `Project` |
+| `BacklogChanged` | `work.backlog.changed.v1` | outbox publisher | SDK / workspace / process / archive | `WorkOutboxSourceRef::Backlog { backlog_ref, reason }` + committed `Backlog` |
+| `ProjectMemberChanged` | `work.project_member.changed.v1` | outbox publisher | member-service / runtime / workspace | `WorkOutboxSourceRef::ProjectMember` + committed `ProjectMember` |
+| `WorkItemChanged` | `work.formal_work.changed.v1` | outbox publisher | process / governance / artifact / workspace | `WorkOutboxSourceRef::FormalWork` + committed `FormalWorkRecord` |
+| `PromoteResultRecorded` | `work.promote_result.recorded.v1` | outbox publisher | runtime / conversation / artifact | `WorkOutboxSourceRef::PromoteResult` + committed `PromoteResult` |
+| `WorkDependencyChanged` | `work.dependency.changed.v1` | outbox publisher | workspace / process / governance | `WorkOutboxSourceRef::Dependency` + committed `WorkDependency` |
+| `WorkBlockerChanged` | `work.blocker.changed.v1` | outbox publisher | workspace / governance / artifact | `WorkOutboxSourceRef::Blocker` + committed `WorkBlocker` |
+| `IterationChanged` | `work.iteration.changed.v1` | outbox publisher | process / workspace / runtime | `WorkOutboxSourceRef::Iteration` + committed `Iteration` / optional `IterationCommitment` |
+| `WorkTraceAvailable` | `work.trace.available.v1` | outbox publisher | observability / archive | `WorkOutboxSourceRef::TraceAvailable` + committed `WorkTraceRecord` |
+| `DerivedWorkViewChanged` | `work.derived_view.changed.v1` | outbox publisher | workspace / SDK | `WorkOutboxSourceRef::DerivedView` + committed `DerivedWorkViewState` |
 
 #### 10.5 Event 到对象闭环
 
@@ -1512,8 +1512,26 @@ pub struct DerivedWorkViewChangedEvent {
 | inbound conversation / runtime | `SourceWorkRef` reference state / pending promote | 是 | source resolver / clock | unresolved / dead-letter |
 | inbound process | process reference state | 是 | resolver / clock | unresolved |
 | inbound governance / artifact | `ExternalEvidenceRef` reference state | 是 when evidence present | evidence resolver / clock | unresolved / dead-letter |
-| outbound truth changed | `WorkOutboxRecord` -> event payload | 是 | `ClockPort` / trace context | publication failed -> mark failed |
-| outbound derived changed | `DerivedWorkViewState` -> event payload | 是 | projection rebuild / stale marker | publication failed -> mark failed |
+| outbound truth changed | `WorkOutboxRecord.source_ref` -> committed source object -> event payload | 是 | `WorkOutboxRecord.trace_context_ref` / `occurred_at` / safe reason or marker refs captured in `source_ref` | publication failed -> mark failed |
+
+#### 10.6 Outbound source identity 闭环
+
+`WorkOutboxRecord` 必须持久化 `source_ref: WorkOutboxSourceRef`。publisher 只能按该 typed source identity 回查 committed source object,不得从 `outbox_id`、字符串 id、latest state、topic 或 event kind 临时反推 source。
+
+| Event | Required `WorkOutboxSourceRef` | Source lookup | Payload supplement from outbox source | Missing / mismatch behavior |
+|---|---|---|---|---|
+| `ProjectChanged` | `Project { project_ref, reason }` | `ProjectRepository.get(project_ref)` | `reason` | mark outbox failed;do not publish partial event |
+| `BacklogChanged` | `Backlog { backlog_ref, reason }` | `BacklogRepository.get(backlog_ref)` | `reason` | mark outbox failed;do not publish partial event |
+| `ProjectMemberChanged` | `ProjectMember(project_member_ref)` | `ProjectMemberRepository.get(project_member_ref)` | none | mark outbox failed |
+| `WorkItemChanged` | `FormalWork(work_ref)` | `WorkItemRepository.get_formal_work(work_ref)` | none | mark outbox failed |
+| `PromoteResultRecorded` | `PromoteResult(promote_result_ref)` | `PromoteRepository.get(promote_result_ref)` | none | mark outbox failed |
+| `WorkDependencyChanged` | `Dependency(dependency_ref)` | `DependencyRepository.get_dependency(dependency_ref)` | none | mark outbox failed |
+| `WorkBlockerChanged` | `Blocker(blocker_ref)` | `DependencyRepository.get_blocker(blocker_ref)` | `evidence_ref` comes from committed `WorkBlocker.resolved_evidence_ref` | mark outbox failed |
+| `IterationChanged` | `Iteration(iteration_ref)` | `IterationRepository.get_iteration(iteration_ref)` + `IterationRepository.get_commitment(iteration_ref)` | optional commitment state and affected refs from commitment if present | mark outbox failed |
+| `WorkTraceAvailable` | `TraceAvailable { trace_id, handoff_ref }` | `AuditRepository.get_trace_record(trace_id)` | `handoff_ref` | mark outbox failed |
+| `DerivedWorkViewChanged` | `DerivedView(view_ref)` | `ProjectionRepository.get_freshness_state(view_ref)` | none | mark outbox failed |
+
+`WorkOutboundEventEnvelope<T>` 的 `outbox_id`、`trace_context_ref` 和 `occurred_at` 分别来自 `WorkOutboxRecord.outbox_id`、`record.trace_context_ref` 和 `record.occurred_at`;`event_version` 固定使用 `EventSchemaVersion::v1()`。这些 envelope 字段不得由 payload builder、publisher adapter 或 bus publication result 重新生成。
 
 ### 11. Operations Job 协议契约
 

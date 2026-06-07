@@ -131,7 +131,7 @@
 | `iteration_change_records` | Iteration commitment history | PK `change_id` | `iteration_ref` | append-only;只由 commitment scope / work set change 形成 |
 | `work_trace_records` | Work trace records | PK `trace_id` | `subject_ref`、`trace_context_ref` | append-only |
 | `work_audit_trails` | Subject audit summary | PK `subject_ref` | `latest_trace_id` | `version` |
-| `work_outbox_records` | Committed event publication | PK `outbox_id` | `publication_state`、`event_kind` | `version` |
+| `work_outbox_records` | Committed event publication | PK `outbox_id` | `publication_state`、`event_kind`、`source_ref`、`trace_context_ref`、`occurred_at` | `version` |
 | `derived_view_states` | Projection freshness | PK `view_ref` | `freshness_state`、`source_cursor` | `version` or cursor compare |
 | `project_board_views` | Project board projection | PK `project_ref` | `source_cursor` | replaced by rebuild batch |
 | `member_work_views` | Member work projection | PK `project_member_ref` | `project_id`、`source_cursor` | replaced by rebuild batch |

@@ -205,7 +205,7 @@ accepted truth change
   -> WorkTraceRecord::from_truth_change(...)
   -> AuditRepository.append_trace(...)
   -> WorkAuditTrail.append(...)
-  -> WorkOutboxRecord::from_truth_change(...)
+  -> WorkOutboxRecord::from_truth_change(..., trace_context_ref, occurred_at)
   -> WorkOutboxRepository.enqueue(...)
 
 trace handoff job

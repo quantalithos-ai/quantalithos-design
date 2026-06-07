@@ -426,7 +426,7 @@ Dependency / blocker 的 projection stale scope 不得从 `FormalWorkRef` 字符
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| create | `Pending` | `WorkOutboxRecord::from_truth_change(outbox_id, change)` inside command / consumer UoW | `change` 已由业务 truth 成立;outbox id 未复用 | enqueue outbox in same UoW as truth save | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
+| create | `Pending` | `WorkOutboxRecord::from_truth_change(outbox_id, change, trace_context_ref, occurred_at)` or `from_event_source(outbox_id, source_ref, trace_context_ref, occurred_at)` inside command / consumer / job UoW | `change` 或 explicit `source_ref` 已由正式 source 成立;outbox id 未复用;`event_kind` 与 `source_ref` 匹配 | enqueue outbox in same UoW as source write or marker write | `DomainError::InvalidStateTransition` / `ApplicationError::DomainRejected` |
 | `Pending` | `Published` | `WorkOutboxRecord::mark_published(publication_ref)` and `WorkOutboxRepository.mark_published(...)` via `PublishWorkOutboxFlow` | publisher 返回 publication ref;expected version 匹配 | save publication state;do not modify truth | 同上 |
 | `Pending` | `Failed` | `WorkOutboxRecord::mark_failed(reason)` and `WorkOutboxRepository.mark_failed(...)` via `PublishWorkOutboxFlow` | publisher failure reason 可记录 | save failed marker;job report failed | 同上 |
 | `Failed` | `Pending` | retry selection in `WorkOutboxRepository.list_pending(...)` / retry policy | retry delay / max attempts policy 允许 | record becomes eligible for publish retry | 同上 |

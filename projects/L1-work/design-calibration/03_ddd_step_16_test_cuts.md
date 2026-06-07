@@ -173,8 +173,8 @@ Step 15 observability
 | `ConsumeGovernanceDecisionChanged_contract` | governance event consumer | source / evidence reference state saved;missing both source/evidence dead-letter | consumer |
 | `ConsumeArtifactEvidenceChanged_contract` | artifact event consumer | evidence reference state saved;missing evidence, digest mismatch | consumer |
 | `ConsumeRuntimePromoteRequested_contract` | runtime promote consumer | pending promote intake saved;missing source / reason dead-letter | consumer |
-| `ProjectChanged_event_schema` | outbound `ProjectChanged` | payload from Project + reason;no uncommitted truth;publish failure marker | contract + publisher |
-| `BacklogChanged_event_schema` | outbound `BacklogChanged` | payload from Backlog + maintenance reason;no ProjectChanged reuse;publish failure marker | contract + publisher |
+| `ProjectChanged_event_schema` | outbound `ProjectChanged` | payload from `WorkOutboxSourceRef::Project` + committed Project + reason;no uncommitted truth;publish failure marker | contract + publisher |
+| `BacklogChanged_event_schema` | outbound `BacklogChanged` | payload from `WorkOutboxSourceRef::Backlog` + committed Backlog + maintenance reason;no ProjectChanged reuse;publish failure marker | contract + publisher |
 | `ProjectMemberChanged_event_schema` | outbound `ProjectMemberChanged` | project member refs and responsibility;no capability body | contract + publisher |
 | `WorkItemChanged_event_schema` | outbound `WorkItemChanged` | work ref/state/source/evidence refs;no external body | contract + publisher |
 | `PromoteResultRecorded_event_schema` | outbound `PromoteResultRecorded` | promote result / source / created work ref;publish failure marker | contract + publisher |
@@ -183,7 +183,7 @@ Step 15 observability
 | `IterationChanged_event_schema` | outbound `IterationChanged` | iteration / commitment / affected refs;no work body copy | contract + publisher |
 | `WorkTraceAvailable_event_schema` | outbound `WorkTraceAvailable` | trace id / subject / optional handoff ref;no observability body | contract + publisher |
 | `DerivedWorkViewChanged_event_schema` | outbound `DerivedWorkViewChanged` | view ref / freshness / source cursor;no projection body dump | contract + publisher |
-| `PublishWorkOutbox_contract` | `PublishWorkOutboxFlow` | pending batch publish;partial failure、version conflict、rerun | job runner |
+| `PublishWorkOutbox_contract` | `PublishWorkOutboxFlow` | pending batch publish from typed `WorkOutboxSourceRef`;source missing or event_kind/source mismatch marks failed without partial publish;partial failure、version conflict、rerun | job runner |
 | `RebuildWorkProjections_contract` | `RebuildWorkProjectionsFlow` | rebuild from committed truth;failed marker, query surface | job runner |
 | `RefreshExternalReferenceSnapshots_contract` | `RefreshExternalReferenceSnapshotsFlow` | stale refs refreshed;resolver unavailable, failed marker | job runner |
 | `RunWorkReconciliation_contract` | `RunWorkReconciliationFlow` | read-only report;drift detected, no automatic repair | job runner |
@@ -205,7 +205,7 @@ Step 15 observability
 | `commitment_state_transitions` | `CommitmentState` | `Candidate -> Committed -> Changed -> Closed`;`Closed -> Changed` 拒绝 | domain unit |
 | `derived_freshness_transitions` | `DerivedFreshnessState` | `Fresh -> Stale -> Rebuilding -> Fresh / Failed`;query 不可改 fresh | projection test |
 | `reference_resolution_transitions` | `ReferenceResolutionStatus` | `Unresolved -> Resolved -> Stale -> Resolved`;failed 保留 last good snapshot | reference test |
-| `outbox_publication_transitions` | `OutboxPublicationState` | `Pending -> Published / Failed -> Pending`;`Published -> Pending` 拒绝 | job / repository |
+| `outbox_publication_transitions` | `OutboxPublicationState` | `Pending -> Published / Failed -> Pending`;`Published -> Pending` 拒绝;`event_kind/source_ref` mismatch -> failed marker | job / repository |
 
 #### 8.6 一致性 / 幂等 / 并发测试切口表
 

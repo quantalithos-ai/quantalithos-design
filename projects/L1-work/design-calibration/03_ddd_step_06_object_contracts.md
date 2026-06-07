@@ -532,6 +532,45 @@ pub enum WorkOutboxEventKind {
     DerivedWorkViewChanged,
 }
 
+/// Typed source identity carried by a committed Work outbox record.
+pub enum WorkOutboxSourceRef {
+    /// Project changed source plus the reason needed by the outbound payload.
+    Project {
+        /// Changed project.
+        project_ref: ProjectRef,
+        /// Lifecycle reason captured when the truth changed.
+        reason: ProjectLifecycleReason,
+    },
+    /// Backlog changed source plus the maintenance reason needed by the outbound payload.
+    Backlog {
+        /// Changed backlog.
+        backlog_ref: BacklogRef,
+        /// Maintenance reason captured when the availability truth changed.
+        reason: BacklogMaintenanceReason,
+    },
+    /// Project member changed source.
+    ProjectMember(ProjectMemberRef),
+    /// Formal work changed source.
+    FormalWork(FormalWorkRef),
+    /// Promote result recorded source.
+    PromoteResult(PromoteResultRef),
+    /// Dependency changed source.
+    Dependency(WorkDependencyRef),
+    /// Blocker changed source.
+    Blocker(WorkBlockerRef),
+    /// Iteration changed source.
+    Iteration(IterationRef),
+    /// Trace availability source.
+    TraceAvailable {
+        /// Trace record that became available.
+        trace_id: WorkTraceId,
+        /// Optional handoff pointer returned by the handoff boundary.
+        handoff_ref: Option<TraceHandoffRef>,
+    },
+    /// Derived view changed source.
+    DerivedView(DerivedWorkViewRef),
+}
+
 /// Publication reference returned by the outbox publisher.
 pub struct OutboxPublicationRef(pub String);
 
@@ -568,7 +607,8 @@ pub enum OutboxFailureReasonKind {
 | `DependencyOrBlockerRef` | enum | relation union ref | 不得手写字符串合并 |
 | `BlockerCauseRef` | source/evidence refs | blocker cause | 不保存 governance / artifact 正文 |
 | `BlockerImpactExplanation` | blocker/work/summary | read-only explanation | 不作为 truth change |
-| `WorkOutboxEventKind` | enum | outbox event routing | 只能从 `WorkTruthChange` 派生 |
+| `WorkOutboxEventKind` | enum | outbox event routing | 必须与 `WorkOutboxSourceRef` 一一匹配 |
+| `WorkOutboxSourceRef` | typed enum | outbox payload source identity | 必须能让 publisher 回查 committed source object;允许携带 payload 所需 safe reason / marker refs;不得携带外部正文或 projection body |
 | `OutboxPublicationRef` | string ref | publish result pointer | 不保存 published payload |
 | `OutboxFailureReason` | kind + safe message | publish failure marker | 不含 stack trace / payload body |
 
@@ -786,7 +826,7 @@ pub struct CommitmentChangeReason {
 
 | enum | 变体 | Rustdoc 注释 |
 |---|---|---|
-| `ProjectLifecycleReasonKind` | `Policy`;`Maintenance`;`OwnerRequest`;`ArchivePrepared` | project lifecycle explanation category |
+| `ProjectLifecycleReasonKind` | `Created`;`Policy`;`Maintenance`;`OwnerRequest`;`ArchivePrepared` | project lifecycle explanation category |
 | `BacklogMaintenanceReasonKind` | `MaintenanceWindow`;`PolicyHold`;`ManualUnlock` | backlog availability explanation category |
 | `ProjectMemberReasonKind` | `Assigned`;`CapabilityChanged`;`Paused`;`Released` | project member responsibility explanation category |
 | `WorkLifecycleReasonKind` | `Start`;`CompletionEvidence`;`Cancellation`;`Superseded` | formal work lifecycle explanation category |
@@ -799,6 +839,10 @@ pub struct CommitmentChangeReason {
 | `IterationChangeReasonKind` | `CommitmentCreated`;`CommitmentChanged`;`Started`;`Cancelled`;`ProcessSignal` | iteration change category |
 | `IterationCloseReasonKind` | `Completed`;`Cancelled`;`TimeboxEnded`;`ManualClose` | iteration close category |
 | `CommitmentChangeReasonKind` | `ScopeReduced`;`ScopeExpanded`;`DependencyChanged`;`ManualAdjustment` | commitment change category |
+
+| helper | 用途 | 约束 |
+|---|---|---|
+| `ProjectLifecycleReason::created() -> Self` | `CreateProjectFlow` 生成 `ProjectChangedEvent.reason` 和 trace / outbox source reason | 返回 `ProjectLifecycleReasonKind::Created`,`reason_ref = None`;不得由 request body 传入 |
 
 ##### policy helper / truth summary value objects
 
@@ -864,11 +908,11 @@ pub enum PromoteDecision {
 /// Describes an accepted Work truth change for trace and outbox construction.
 pub enum WorkTruthChange {
     /// A project was created.
-    ProjectCreated(ProjectRef),
+    ProjectCreated(ProjectRef, ProjectLifecycleReason),
     /// A project lifecycle changed.
-    ProjectLifecycleChanged(ProjectRef),
+    ProjectLifecycleChanged(ProjectRef, ProjectLifecycleReason),
     /// A backlog availability state changed.
-    BacklogAvailabilityChanged(BacklogRef),
+    BacklogAvailabilityChanged(BacklogRef, BacklogMaintenanceReason),
     /// A project member responsibility changed.
     ProjectMemberChanged(ProjectMemberRef),
     /// A formal work item changed.
@@ -879,8 +923,6 @@ pub enum WorkTruthChange {
     WorkRelationChanged(DependencyOrBlockerRef),
     /// An iteration or commitment changed.
     IterationChanged(IterationRef),
-    /// A trace or archive handoff marker changed.
-    HandoffMarkerChanged(WorkTraceSubjectRef),
 }
 ```
 
@@ -897,17 +939,32 @@ pub enum WorkTruthChange {
 
 | WorkTruthChange | WorkOutboxEventKind | outbound event payload |
 |---|---|---|
-| `ProjectCreated(ProjectRef)` | `ProjectChanged` | `ProjectChangedEvent` |
-| `ProjectLifecycleChanged(ProjectRef)` | `ProjectChanged` | `ProjectChangedEvent` |
-| `BacklogAvailabilityChanged(BacklogRef)` | `BacklogChanged` | `BacklogChangedEvent` |
+| `ProjectCreated(ProjectRef, ProjectLifecycleReason)` | `ProjectChanged` | `ProjectChangedEvent` |
+| `ProjectLifecycleChanged(ProjectRef, ProjectLifecycleReason)` | `ProjectChanged` | `ProjectChangedEvent` |
+| `BacklogAvailabilityChanged(BacklogRef, BacklogMaintenanceReason)` | `BacklogChanged` | `BacklogChangedEvent` |
 | `ProjectMemberChanged(ProjectMemberRef)` | `ProjectMemberChanged` | `ProjectMemberChangedEvent` |
 | `WorkItemChanged(FormalWorkRef)` | `WorkItemChanged` | `WorkItemChangedEvent` |
 | `PromoteResultRecorded(PromoteResultRef)` | `PromoteResultRecorded` | `PromoteResultRecordedEvent` |
 | `WorkRelationChanged(DependencyOrBlockerRef)` | `WorkDependencyChanged` 或 `WorkBlockerChanged` | `WorkDependencyChangedEvent` 或 `WorkBlockerChangedEvent` by typed ref variant |
 | `IterationChanged(IterationRef)` | `IterationChanged` | `IterationChangedEvent` |
-| `HandoffMarkerChanged(WorkTraceSubjectRef)` | `WorkTraceAvailable` | `WorkTraceAvailableEvent` |
 
-`WorkOutboxRecord::from_truth_change(...)` 必须使用上表映射。若新增 `WorkTruthChange` variant,必须同批补 `WorkOutboxEventKind`、outbound payload schema、publisher dispatch、测试和验收映射;不得让实现侧自行选择复用哪一种 event。
+`WorkOutboxRecord::from_truth_change(...)` 必须使用上表映射并形成匹配的 `WorkOutboxSourceRef`。若新增 `WorkTruthChange` variant,必须同批补 `WorkOutboxEventKind`、`WorkOutboxSourceRef` variant、outbound payload schema、publisher source lookup、publisher dispatch、测试和验收映射;不得让实现侧自行选择复用哪一种 event。
+
+`WorkTruthChange` 到 `WorkOutboxSourceRef` 的正式映射:
+
+| WorkTruthChange | WorkOutboxSourceRef | publisher source lookup / payload supplement |
+|---|---|---|
+| `ProjectCreated(project_ref, reason)` | `Project { project_ref, reason }` | load committed `Project`;reason 来自 outbox source |
+| `ProjectLifecycleChanged(project_ref, reason)` | `Project { project_ref, reason }` | load committed `Project`;reason 来自 outbox source |
+| `BacklogAvailabilityChanged(backlog_ref, reason)` | `Backlog { backlog_ref, reason }` | load committed `Backlog`;reason 来自 outbox source |
+| `ProjectMemberChanged(project_member_ref)` | `ProjectMember(project_member_ref)` | load committed `ProjectMember` |
+| `WorkItemChanged(work_ref)` | `FormalWork(work_ref)` | load committed `FormalWorkRecord` |
+| `PromoteResultRecorded(result_ref)` | `PromoteResult(result_ref)` | load committed `PromoteResult` |
+| `WorkRelationChanged(Dependency(ref))` | `Dependency(ref)` | load committed `WorkDependency` |
+| `WorkRelationChanged(Blocker(ref))` | `Blocker(ref)` | load committed `WorkBlocker` |
+| `IterationChanged(iteration_ref)` | `Iteration(iteration_ref)` | load committed `Iteration` and optional `IterationCommitment` |
+
+`WorkTraceAvailable` 和 `DerivedWorkViewChanged` 不是由 business truth `WorkTruthChange` 隐式推出。它们必须通过 `WorkOutboxRecord::from_event_source(...)` 显式传入 `WorkOutboxSourceRef::TraceAvailable { trace_id, handoff_ref }` 或 `WorkOutboxSourceRef::DerivedView(view_ref)`;不得用 `outbox_id`、`subject_ref`、latest trace 或临时 projection key 反推 source。
 
 ##### projection / reconciliation helper DTO
 
@@ -1896,6 +1953,12 @@ pub struct WorkOutboxRecord {
     pub outbox_id: WorkOutboxId,
     /// Work event category.
     pub event_kind: WorkOutboxEventKind,
+    /// Typed source identity used to build the outbound payload.
+    pub source_ref: WorkOutboxSourceRef,
+    /// Core trace and request context captured when the outbox record was enqueued.
+    pub trace_context_ref: WorkTraceContextRef,
+    /// Time when the committed source change became publishable.
+    pub occurred_at: Timestamp,
     /// Current publication state.
     pub publication_state: OutboxPublicationState,
 }
@@ -1905,6 +1968,9 @@ pub struct WorkOutboxRecord {
 |---|---|---|---|
 | `outbox_id` | `WorkOutboxId` | outbox 记录身份 | 系统生成 |
 | `event_kind` | `WorkOutboxEventKind` | 事件类别 | 只能来自已成立 truth change |
+| `source_ref` | `WorkOutboxSourceRef` | outbound payload source identity | 必须与 `event_kind` 匹配;publisher 只能按该 typed source 回查 committed object |
+| `trace_context_ref` | `WorkTraceContextRef` | outbound envelope trace context | enqueue 时从 command / event / job metadata 捕获 |
+| `occurred_at` | `Timestamp` | outbound envelope event time | enqueue 时由 `ClockPort.now()` 捕获,表示 source change 可发布时间 |
 | `publication_state` | `OutboxPublicationState` | 发布状态 | 发布失败不回滚 truth |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
@@ -1915,7 +1981,8 @@ pub struct WorkOutboxRecord {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `WorkOutboxRecord::from_truth_change(outbox_id: WorkOutboxId, change: WorkTruthChange) -> Result<Self, DomainError>` | 从已成立变化形成 outbox | outbox id、truth change | `Result<Self, DomainError>` | command / consumer commit;`outbox_id` 由 application 通过 `IdGeneratorPort.next_outbox_id()` 生成 |
+| `WorkOutboxRecord::from_truth_change(outbox_id: WorkOutboxId, change: WorkTruthChange, trace_context_ref: WorkTraceContextRef, occurred_at: Timestamp) -> Result<Self, DomainError>` | 从已成立业务 truth change 形成 outbox | outbox id、truth change、trace context、event time | `Result<Self, DomainError>` | command / consumer commit;`outbox_id` 由 application 通过 `IdGeneratorPort.next_outbox_id()` 生成;source_ref 由正式映射派生 |
+| `WorkOutboxRecord::from_event_source(outbox_id: WorkOutboxId, source_ref: WorkOutboxSourceRef, trace_context_ref: WorkTraceContextRef, occurred_at: Timestamp) -> Result<Self, DomainError>` | 从非 business truth 的正式 publish source 形成 outbox | outbox id、typed source、trace context、event time | `Result<Self, DomainError>` | trace handoff / projection job;event_kind 由 `source_ref` 唯一推出;source 与 event kind 不匹配必须 reject |
 
 ##### history records
 
@@ -2354,7 +2421,7 @@ pub struct WorkRuntimeBuilder {
 | `IterationCommitment` | `committed_work_refs` | `FormalWorkRefSet` | command input + work repo lookup | `IterationCommitment::from_candidates(...)` | `CommitIterationScope.candidates` | reject non-formal work | `TC-WORK-ITER-*` |
 | `PromoteResult` | `created_work_ref` | `Option<FormalWorkRef>` | review accept path | `PromoteResult::accept(...)` | `ReviewWorkPromotion.decision` | absent for rejected | `TC-WORK-PROMOTE-*` |
 | `DerivedWorkViewState` | `freshness_state` | `DerivedFreshnessState` | truth change / rebuild job | `DerivedWorkViewState::for_view(...)` | query / job marker | missing -> stale marker | `TC-WORK-DERIVED-*` |
-| `WorkOutboxRecord` | `event_kind` | `WorkOutboxEventKind` | truth change | `WorkOutboxRecord::from_truth_change(...)` | outbound event | reject unknown change | `TC-WORK-OUTBOX-*` |
+| `WorkOutboxRecord` | `event_kind` / `source_ref` / `trace_context_ref` / `occurred_at` | `WorkOutboxEventKind` / `WorkOutboxSourceRef` / `WorkTraceContextRef` / `Timestamp` | truth change or explicit publish source | `WorkOutboxRecord::from_truth_change(...)` / `from_event_source(...)` | outbound event | reject unknown or mismatched source | `TC-WORK-OUTBOX-*` |
 
 #### 7.15 DTO / Event / Job 到 Domain 构造闭环表
 

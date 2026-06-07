@@ -99,7 +99,7 @@
 [repositories + audit + outbox]
   | save truth with expected_version when present
   | WorkTraceRecord::from_truth_change(trace_id, change, trace_context_ref)
-  | WorkOutboxRecord::from_truth_change(outbox_id, change)
+  | WorkOutboxRecord::from_truth_change(outbox_id, change, trace_context_ref, occurred_at)
   | ProjectionRepository.mark_stale(affected_views, cursor, &uow) when affected public DerivedWorkViewRef exists
   | build command result surface with WorkCommandReceipt { idempotency: Applied, ... }
   | CommandResultRepository.save_result(result_ref, StoredCommandResult::<kind>(result), &uow)
@@ -259,6 +259,7 @@ Outbound 不变量:
      -> IdGeneratorPort.next_backlog_id()
      -> Project::create(project_id, project_spec, actor)
      -> Backlog::open_for_project(backlog_id, project.project_id, actor)
+     -> ProjectLifecycleReason::created()
      -> ProjectRepository.create(project, &uow)
      -> BacklogRepository.create(backlog, &uow)
      -> trace + outbox + stale views
@@ -275,9 +276,10 @@ let project_id = ids.next_project_id()?;
 let backlog_id = ids.next_backlog_id()?;
 let project = Project::create(project_id, envelope.command.project_spec, actor)?;
 let backlog = Backlog::open_for_project(backlog_id, project.project_id, actor)?;
+let reason = ProjectLifecycleReason::created();
 let project_version = project_repo.create(project, &uow).await?;
 backlog_repo.create(backlog, &uow).await?;
-let change = WorkTruthChange::project_created(project.project_ref());
+let change = WorkTruthChange::ProjectCreated(project.project_ref(), reason);
 let (trace_ref, outbox_refs) = append_trace_outbox_and_mark_stale(change, &uow).await?;
 let result_ref = ApplicationResultRef::for_operation(operation, ids.next_result_id()?);
 let result = ProjectCommandResult::from_project(
@@ -1547,9 +1549,10 @@ promote_repo.save_pending_intake(intake, &uow).await?;
 [PublishWorkOutboxFlow]
   -> WorkOutboxRepository.list_pending(page)
      -> for each WorkOutboxRecord:
-          dispatch record.event_kind
-          build WorkOutboundEventEnvelope<T>
-          WorkOutboxPublisherPort.publish(record)
+          validate record.event_kind matches record.source_ref
+          load committed source object by record.source_ref
+          build WorkOutboundPublication / WorkOutboundEventEnvelope<T>
+          WorkOutboxPublisherPort.publish(publication)
           UnitOfWork.begin()
           mark_published(...) or mark_failed(...)
           UnitOfWork.commit()
@@ -1557,42 +1560,46 @@ promote_repo.save_pending_intake(intake, &uow).await?;
 
 ```rust
 // WorkOutboxPublishService::publish_one(WorkOutboxRecord record)
-let publication = match record.event_kind {
-    WorkOutboxEventKind::ProjectChanged => publish_project_changed(record).await,
-    WorkOutboxEventKind::BacklogChanged => publish_backlog_changed(record).await,
-    WorkOutboxEventKind::ProjectMemberChanged => publish_project_member_changed(record).await,
-    WorkOutboxEventKind::WorkItemChanged => publish_work_item_changed(record).await,
-    WorkOutboxEventKind::PromoteResultRecorded => publish_promote_result_recorded(record).await,
-    WorkOutboxEventKind::WorkDependencyChanged => publish_work_dependency_changed(record).await,
-    WorkOutboxEventKind::WorkBlockerChanged => publish_work_blocker_changed(record).await,
-    WorkOutboxEventKind::IterationChanged => publish_iteration_changed(record).await,
-    WorkOutboxEventKind::WorkTraceAvailable => publish_work_trace_available(record).await,
-    WorkOutboxEventKind::DerivedWorkViewChanged => publish_derived_work_view_changed(record).await,
+let publication = match (record.event_kind, record.source_ref) {
+    (WorkOutboxEventKind::ProjectChanged, WorkOutboxSourceRef::Project { .. }) => build_project_changed(record).await,
+    (WorkOutboxEventKind::BacklogChanged, WorkOutboxSourceRef::Backlog { .. }) => build_backlog_changed(record).await,
+    (WorkOutboxEventKind::ProjectMemberChanged, WorkOutboxSourceRef::ProjectMember(_)) => build_project_member_changed(record).await,
+    (WorkOutboxEventKind::WorkItemChanged, WorkOutboxSourceRef::FormalWork(_)) => build_work_item_changed(record).await,
+    (WorkOutboxEventKind::PromoteResultRecorded, WorkOutboxSourceRef::PromoteResult(_)) => build_promote_result_recorded(record).await,
+    (WorkOutboxEventKind::WorkDependencyChanged, WorkOutboxSourceRef::Dependency(_)) => build_work_dependency_changed(record).await,
+    (WorkOutboxEventKind::WorkBlockerChanged, WorkOutboxSourceRef::Blocker(_)) => build_work_blocker_changed(record).await,
+    (WorkOutboxEventKind::IterationChanged, WorkOutboxSourceRef::Iteration(_)) => build_iteration_changed(record).await,
+    (WorkOutboxEventKind::WorkTraceAvailable, WorkOutboxSourceRef::TraceAvailable { .. }) => build_work_trace_available(record).await,
+    (WorkOutboxEventKind::DerivedWorkViewChanged, WorkOutboxSourceRef::DerivedView(_)) => build_derived_work_view_changed(record).await,
+    _ => Err(ApplicationError::InvalidOutboxSource),
 };
-mark_publication_result(record, publication).await?;
+let publication_ref = outbox_publisher.publish(publication?).await;
+mark_publication_result(record, publication_ref).await?;
 ```
 
 #### 11.2 Outbound event flow table
 
-| Event | Payload builder | Topic | Source object | Failure behavior | 测试切口 |
+| Event | Payload builder | Topic | Source identity / lookup | Failure behavior | 测试切口 |
 |---|---|---|---|---|---|
-| `ProjectChanged` | `ProjectChangedEvent::from_project(project, reason)` | `work.project.changed.v1` | `Project` truth loaded by outbox ref | mark failed,do not rollback truth | payload fields,topic,mark published |
-| `BacklogChanged` | `BacklogChangedEvent::from_backlog(backlog, reason)` | `work.backlog.changed.v1` | `Backlog` truth loaded by outbox ref | mark failed,do not rollback truth | payload fields,topic,mark published |
-| `ProjectMemberChanged` | `ProjectMemberChangedEvent::from_member(member)` | `work.project_member.changed.v1` | `ProjectMember` truth | mark failed | payload member/global distinction |
-| `WorkItemChanged` | `WorkItemChangedEvent::from_formal_work(record)` | `work.formal_work.changed.v1` | `FormalWorkRecord` | mark failed | root/child payload |
-| `PromoteResultRecorded` | `PromoteResultRecordedEvent::from_result(result)` | `work.promote_result.recorded.v1` | `PromoteResult` | mark failed | accepted/rejected payload |
-| `WorkDependencyChanged` | `WorkDependencyChangedEvent::from_dependency(dependency)` | `work.dependency.changed.v1` | `WorkDependency` | mark failed | upstream/downstream/state |
-| `WorkBlockerChanged` | `WorkBlockerChangedEvent::from_blocker(blocker)` | `work.blocker.changed.v1` | `WorkBlocker` | mark failed | `evidence_ref` 从 `WorkBlocker.resolved_evidence_ref` 派生,不读取 evidence body |
-| `IterationChanged` | `IterationChangedEvent::from_iteration(iteration, commitment)` | `work.iteration.changed.v1` | `Iteration` / `IterationCommitment` | mark failed | commitment optional |
-| `WorkTraceAvailable` | `WorkTraceAvailableEvent::from_trace(trace, handoff_ref)` | `work.trace.available.v1` | `WorkTraceRecord` / handoff marker | mark failed | handoff optional |
-| `DerivedWorkViewChanged` | `DerivedWorkViewChangedEvent::from_state(state)` | `work.derived_view.changed.v1` | `DerivedWorkViewState` | mark failed | freshness/cursor payload |
+| `ProjectChanged` | `ProjectChangedEvent::from_project(project, reason)` | `work.project.changed.v1` | `WorkOutboxSourceRef::Project { project_ref, reason }` -> `ProjectRepository.get(project_ref)` | mark failed,do not rollback truth | payload fields,topic,mark published |
+| `BacklogChanged` | `BacklogChangedEvent::from_backlog(backlog, reason)` | `work.backlog.changed.v1` | `WorkOutboxSourceRef::Backlog { backlog_ref, reason }` -> `BacklogRepository.get(backlog_ref)` | mark failed,do not rollback truth | payload fields,topic,mark published |
+| `ProjectMemberChanged` | `ProjectMemberChangedEvent::from_member(member)` | `work.project_member.changed.v1` | `WorkOutboxSourceRef::ProjectMember(ref)` -> `ProjectMemberRepository.get(ref)` | mark failed | payload member/global distinction |
+| `WorkItemChanged` | `WorkItemChangedEvent::from_formal_work(record)` | `work.formal_work.changed.v1` | `WorkOutboxSourceRef::FormalWork(ref)` -> `WorkItemRepository.get_formal_work(ref)` | mark failed | root/child payload |
+| `PromoteResultRecorded` | `PromoteResultRecordedEvent::from_result(result)` | `work.promote_result.recorded.v1` | `WorkOutboxSourceRef::PromoteResult(ref)` -> `PromoteRepository.get(ref)` | mark failed | accepted/rejected payload |
+| `WorkDependencyChanged` | `WorkDependencyChangedEvent::from_dependency(dependency)` | `work.dependency.changed.v1` | `WorkOutboxSourceRef::Dependency(ref)` -> `DependencyRepository.get_dependency(ref)` | mark failed | upstream/downstream/state |
+| `WorkBlockerChanged` | `WorkBlockerChangedEvent::from_blocker(blocker)` | `work.blocker.changed.v1` | `WorkOutboxSourceRef::Blocker(ref)` -> `DependencyRepository.get_blocker(ref)` | mark failed | `evidence_ref` 从 `WorkBlocker.resolved_evidence_ref` 派生,不读取 evidence body |
+| `IterationChanged` | `IterationChangedEvent::from_iteration(iteration, commitment)` | `work.iteration.changed.v1` | `WorkOutboxSourceRef::Iteration(ref)` -> `IterationRepository.get_iteration(ref)` + `get_commitment(ref)` | mark failed | commitment optional |
+| `WorkTraceAvailable` | `WorkTraceAvailableEvent::from_trace(trace, handoff_ref)` | `work.trace.available.v1` | `WorkOutboxSourceRef::TraceAvailable { trace_id, handoff_ref }` -> `AuditRepository.get_trace_record(trace_id)` | mark failed | handoff optional |
+| `DerivedWorkViewChanged` | `DerivedWorkViewChangedEvent::from_state(state)` | `work.derived_view.changed.v1` | `WorkOutboxSourceRef::DerivedView(ref)` -> `ProjectionRepository.get_freshness_state(ref)` | mark failed | freshness/cursor payload |
 
 Outbound 发布不变量:
 
 - `WorkOutboundEventEnvelope.outbox_id` 来自 `WorkOutboxRecord.outbox_id`;bus publication ref 只在 publish result 中返回。
+- `WorkOutboundEventEnvelope.trace_context_ref` 和 `occurred_at` 来自 `WorkOutboxRecord`,不得由 publisher adapter 重新生成。
+- payload builder 必须从 `record.source_ref` 回查 committed source object;不得按 `outbox_id`、event kind 或 latest record 猜 source。
 - payload builder 不读取或复制外部正文。
 - publish failure 只调用 `WorkOutboxRecord.mark_failed(reason)` 后保存,不修改原 truth。
-- unsupported `event_kind` 映射 `DomainRejected` / failed marker,不得静默丢弃。
+- unsupported `event_kind` 或 `event_kind/source_ref` mismatch 映射 `InvalidOutboxSource` / failed marker,不得静默丢弃。
 
 ### 12. Operations Job 函数级处理流
 

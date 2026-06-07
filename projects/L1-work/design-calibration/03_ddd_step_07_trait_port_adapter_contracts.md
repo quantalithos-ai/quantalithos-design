@@ -762,8 +762,8 @@ pub trait WorkOutboxRepository {
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
-| `enqueue` | `WorkOutboxRecord`、UoW | `()` | `RepositoryError` | command / consumer service | 与 truth 写入同 UoW |
-| `list_pending` | `PageRequest` | `Page<WorkOutboxRecord>` | `RepositoryError` | outbox publisher job / worker | 不锁定 bus topic |
+| `enqueue` | `WorkOutboxRecord`、UoW | `()` | `RepositoryError` | command / consumer service | 与 truth 写入同 UoW;record 必须包含 `event_kind`、`source_ref`、`trace_context_ref`、`occurred_at` |
+| `list_pending` | `PageRequest` | `Page<WorkOutboxRecord>` | `RepositoryError` | outbox publisher job / worker | 返回完整 source identity;不锁定 bus topic |
 | `mark_published` / `mark_failed` | outbox id、publication / reason、version、UoW | `Version` | `RepositoryError` | publish job | 发布状态失败不回滚 truth |
 | `mark_pending_for_retry` | outbox id、retry reason、version、UoW | `Version` | `RepositoryError` | publish retry job / worker | 只允许 failed record 重新进入 pending |
 
@@ -1180,19 +1180,45 @@ pub struct ProcessTimeboxResolution {
 #### 9.8 `WorkOutboxPublisherPort`
 
 ```rust
+/// Typed outbound publication material built from a committed outbox record.
+pub enum WorkOutboundPublication {
+    /// Project changed publication.
+    ProjectChanged(WorkOutboundEventEnvelope<ProjectChangedEvent>),
+    /// Backlog changed publication.
+    BacklogChanged(WorkOutboundEventEnvelope<BacklogChangedEvent>),
+    /// Project member changed publication.
+    ProjectMemberChanged(WorkOutboundEventEnvelope<ProjectMemberChangedEvent>),
+    /// Formal work changed publication.
+    WorkItemChanged(WorkOutboundEventEnvelope<WorkItemChangedEvent>),
+    /// Promote result recorded publication.
+    PromoteResultRecorded(WorkOutboundEventEnvelope<PromoteResultRecordedEvent>),
+    /// Dependency changed publication.
+    WorkDependencyChanged(WorkOutboundEventEnvelope<WorkDependencyChangedEvent>),
+    /// Blocker changed publication.
+    WorkBlockerChanged(WorkOutboundEventEnvelope<WorkBlockerChangedEvent>),
+    /// Iteration changed publication.
+    IterationChanged(WorkOutboundEventEnvelope<IterationChangedEvent>),
+    /// Trace availability publication.
+    WorkTraceAvailable(WorkOutboundEventEnvelope<WorkTraceAvailableEvent>),
+    /// Derived view changed publication.
+    DerivedWorkViewChanged(WorkOutboundEventEnvelope<DerivedWorkViewChangedEvent>),
+}
+
 /// Publishes committed Work outbox records through a runtime publisher boundary.
 pub trait WorkOutboxPublisherPort {
-    /// Publishes one committed outbox record.
+    /// Publishes one committed outbound event envelope.
     async fn publish(
         &self,
-        record: WorkOutboxRecord,
+        publication: WorkOutboundPublication,
     ) -> Result<OutboxPublicationRef, PortError>;
 }
 ```
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
-| `publish` | `WorkOutboxRecord` | `OutboxPublicationRef` | `PortError` | `PublishWorkOutbox` worker / job | publisher 不修改 repository;mark 由 service 调 outbox repo |
+| `publish` | `WorkOutboundPublication` | `OutboxPublicationRef` | `PortError` | `PublishWorkOutbox` worker / job | application service 先用 `WorkOutboxRecord.source_ref` 回查 committed source 并构造 envelope;publisher adapter 不读取 repository、不修改 repository;mark 由 service 调 outbox repo |
+
+`WorkOutboundPublication` 是 application 到 publisher adapter 的内部传输类型,不等于 bus envelope id。它必须由 `WorkOutboxRecord.outbox_id`、`event_version = EventSchemaVersion::v1()`、`record.trace_context_ref`、`record.occurred_at` 和 typed payload 组成;publisher adapter 不得用 `outbox_id` 反查 source object,也不得自行补 payload 字段。
 
 #### 9.9 `TraceHandoffPort`
 

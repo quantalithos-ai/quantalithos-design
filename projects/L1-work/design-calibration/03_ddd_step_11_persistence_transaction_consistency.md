@@ -115,12 +115,12 @@
 
 | 存储对象 | 用途 | 主键 / 唯一键 | 关键索引 | 版本字段 |
 |---|---|---|---|---|
-| `projects` | Project truth | PK `project_id`;unique `owner_ref` 可选按业务配置 | `owner_ref`、`lifecycle_state` | `version: Version` |
+| `projects` | Project truth | PK `project_id`;unique `owner_ref` 可选按业务配置 | `owner_ref`、`source_ref`、`lifecycle_state` | `version: Version` |
 | `project_members` | 项目内成员承担 truth | PK `project_member_id`;unique `(project_id, member_ref)` for non-released current responsibility | `project_id`、`member_ref`、`responsibility_state` | `version` |
 | `backlogs` | Project formal work universe | PK `backlog_id`;unique `project_id` | `project_id`、`backlog_state` | `version` |
 | `backlog_formal_work` | Backlog membership | PK `(backlog_id, formal_work_ref)` | `formal_work_ref`、`backlog_id` | no independent version;owned by UoW write |
-| `work_items` | Root WorkItem truth | PK `work_item_id`;unique formal ref variant | `backlog_id`、`assignee_ref`、`work_state` | `version` |
-| `child_work_items` | ChildWorkItem truth | PK `child_work_item_id`;unique formal ref variant | `parent_work_item_id`、`work_state`、`source_ref`、`completion_ref` | `version` |
+| `work_items` | Root WorkItem truth | PK `work_item_id`;unique formal ref variant | `backlog_id`、`title`、`assignee_ref`、`source_ref`、`method_definition_ref`、`work_state`、`completion_ref` | `version` |
+| `child_work_items` | ChildWorkItem truth | PK `child_work_item_id`;unique formal ref variant | `parent_work_item_id`、`title`、`source_ref`、`method_definition_ref`、`work_state`、`completion_ref` | `version` |
 | `promote_results` | Promote decision truth | PK `promote_result_id`;latest by `source_ref` | `source_ref`、`result_state`、`created_work_ref` | `version` |
 | `pending_promote_intakes` | Runtime promote intake marker | PK `source_event_id`;unique `source_ref` optional by policy | `source_ref` | no independent version or `version` for durable adapter |
 | `work_dependencies` | Dependency truth | PK `dependency_id`;unique `(upstream_work_ref, downstream_work_ref)` for active relation | `upstream_work_ref`、`downstream_work_ref`、`dependency_state` | `version` |
@@ -249,7 +249,7 @@
 
 `ReferenceSnapshotRepository.list_project_references(project_ref, page)` 的持久化口径:
 
-- 可读取 committed Work truth / local reference snapshot indexes,包括 project member -> identity member,formal work / child work / promote intake -> source,formal work admission -> method definition,work lifecycle / dependency / blocker -> external evidence,iteration -> process timebox。
+- 可读取 committed Work truth / local reference snapshot indexes,包括 project -> source,project member -> identity member,formal work / child work / promote intake -> source,formal work / child work admission -> method definition,work lifecycle / dependency / blocker -> external evidence,iteration -> process timebox。
 - 不读取外部正文,不从 projection rows 反推 truth,不解析 string id,不临时拼接 `ExternalReferenceRef`。
 - 同一 external ref 多处出现时按 `ExternalReferenceRef` stable identity 去重。
 - 排序必须稳定:typed variant order then canonical inner ref;分页在去重和排序之后应用。

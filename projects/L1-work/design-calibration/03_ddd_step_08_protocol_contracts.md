@@ -390,11 +390,11 @@ pub struct IterationCommitmentChangeSet {
 |---|---|---|---|---|
 | `WorkTitle` | string | `FormalWorkIntent.title` | public view 标题 | trim 后 1..=160 UTF-8 chars;含换行或空白后为空 reject |
 | `ProjectSpec` | `owner_ref` | `ProjectOwnerRef` | 构造 `Project.owner_ref` | reject |
-| `ProjectSpec` | `source_ref` | `Option<SourceWorkRef>` | audit / trace 来源 | 缺失允许 |
+| `ProjectSpec` | `source_ref` | `Option<SourceWorkRef>` | `Project.source_ref` / audit / trace 来源 | 缺失允许 |
 | `ProjectResponsibilitySpec` | `responsibility_kind` | `ProjectResponsibilityKind` | policy 判断承担类型 | reject |
 | `ProjectResponsibilitySpec` | `required_capability_refs` | `CapabilityRefSet` | `MemberCapabilitySnapshot.supports(...)` | 空集合按 policy 判断 |
-| `FormalWorkIntent` | `title` | `WorkTitle` | public view 标题 | reject |
-| `FormalWorkIntent` | `method_definition_ref` | `Option<MethodDefinitionRef>` | method snapshot lookup | 缺失允许但不能要求 method policy |
+| `FormalWorkIntent` | `title` | `WorkTitle` | `WorkItem.title` / `ChildWorkItem.title` / public view 标题 | reject |
+| `FormalWorkIntent` | `method_definition_ref` | `Option<MethodDefinitionRef>` | `WorkItem.method_definition_ref` / `ChildWorkItem.method_definition_ref` / method snapshot lookup | 缺失允许但不能要求 method policy |
 | `FormalWorkIntent` | `assignee_ref` | `ProjectMemberRef` | `WorkItem.assignee_ref` | reject / lookup failed |
 | `FormalWorkIntent` | `parent_ref` | `Option<FormalWorkRef>` | child / promote parent hint | root work 缺失允许 |
 | `IterationCommitmentChangeSet` | `add_work_refs` / `remove_work_refs` | `Vec<FormalWorkRef>` | commitment 变更 | 两者都空 reject |
@@ -521,7 +521,7 @@ pub struct CreateProjectRequest {
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `project_spec.owner_ref` | `ProjectOwnerRef` | `Project.owner_ref` | request body | reject |
-| `project_spec.source_ref` | `Option<SourceWorkRef>` | trace / audit source | request body | 缺失允许 |
+| `project_spec.source_ref` | `Option<SourceWorkRef>` | `Project.source_ref` / trace / audit source | request body | 缺失允许 |
 | generated | `ProjectId` | `Project.project_id` | `IdGeneratorPort.next_project_id()` | generator failed -> reject |
 | generated | `BacklogId` | `Backlog.backlog_id` | `IdGeneratorPort.next_backlog_id()` | generator failed -> reject |
 
@@ -671,9 +671,10 @@ pub struct CreateWorkItemRequest {
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `project_ref` | `ProjectRef` | project / backlog lookup | route / body一致 | reject mismatch |
+| `work_intent.title` | `WorkTitle` | `WorkItem.title` | request body | reject |
 | `work_intent.assignee_ref` | `ProjectMemberRef` | `WorkItem.assignee_ref` | request body | reject / lookup failed |
-| `work_intent.method_definition_ref` | `Option<MethodDefinitionRef>` | policy input | request body / resolver | unresolved -> reject if required |
-| `source_ref` | `SourceWorkRef` | source audit / policy | request body | reject / resolver rejected |
+| `work_intent.method_definition_ref` | `Option<MethodDefinitionRef>` | `WorkItem.method_definition_ref` / policy input | request body / resolver | unresolved -> reject if required |
+| `source_ref` | `SourceWorkRef` | `WorkItem.source_ref` / source audit / policy | request body | reject / resolver rejected |
 | generated | `WorkItemId` | `WorkItem.work_item_id` | `IdGeneratorPort` | generator failed -> reject |
 
 #### 8.9 `CreateChildWorkItem`
@@ -700,7 +701,7 @@ pub struct CreateChildWorkItemRequest {
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `parent_ref` | `FormalWorkRef` | `ChildWorkItem.parent_work_item_id` via lookup | route / body一致 | reject mismatch / not root |
-| `work_intent` | `FormalWorkIntent` | child work policy input | request body | reject |
+| `work_intent` | `FormalWorkIntent` | child work `title` / `method_definition_ref` / policy input | request body | reject |
 | `source_ref` | `SourceWorkRef` | `ChildWorkItem.source_ref` | request body | reject |
 | generated | `ChildWorkItemId` | `ChildWorkItem.child_work_item_id` | `IdGeneratorPort` | generator failed -> reject |
 
@@ -1016,10 +1017,10 @@ pub struct BacklogQueryFilter {
 
 | DTO | 字段来源 | 约束 |
 |---|---|---|
-| `ProjectTruthSummary` | committed `Project` truth | 只暴露 `ProjectRef`、`ProjectLifecycleState`、`Option<BacklogRef>` |
+| `ProjectTruthSummary` | committed `Project` truth | 只暴露 `ProjectRef`、`ProjectLifecycleState`、`Option<SourceWorkRef>`、`Option<BacklogRef>` |
 | `BacklogTruthSummary` | committed `Backlog` truth | 只暴露 `BacklogRef`、`ProjectRef`、`BacklogState` |
 | `ProjectMemberTruthSummary` | committed `ProjectMember` truth | 只暴露 project member ref、global member ref、responsibility state |
-| `FormalWorkTruthSummary` | committed formal work truth | 只暴露 ref、parent、title、state、assignee、source ref/kind、completion evidence、iteration ref |
+| `FormalWorkTruthSummary` | committed formal work truth | 只暴露 ref、parent、title、state、assignee、source ref/kind、method definition ref、completion evidence、iteration ref |
 | `WorkRelationTruthSummary` | committed dependency / blocker truth | 只暴露 relation ref、affected work refs、shared relation state marker |
 | `IterationTruthSummary` | committed iteration / optional commitment truth | 只暴露 iteration ref/state、optional commitment state、committed work refs |
 | `ProjectWorkTruthSnapshot` | above summaries + `WorkTruthCursor` | 不得引用 `Project`、`Backlog`、`ProjectMember`、`Iteration`、`IterationCommitment` 或任何 domain-only object |

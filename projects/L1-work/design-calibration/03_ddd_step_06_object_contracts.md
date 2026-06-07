@@ -993,6 +993,8 @@ pub struct ProjectTruthSummary {
     pub project_ref: ProjectRef,
     /// Current project lifecycle state.
     pub lifecycle_state: ProjectLifecycleState,
+    /// Optional source ref captured when the project was created.
+    pub source_ref: Option<SourceWorkRef>,
     /// Current backlog when available.
     pub backlog_ref: Option<BacklogRef>,
 }
@@ -1039,6 +1041,8 @@ pub struct FormalWorkTruthSummary {
     pub source_ref: Option<SourceWorkRef>,
     /// Source kind copied out for projection filtering.
     pub source_kind: Option<SourceWorkKind>,
+    /// Optional method definition captured at formal admission.
+    pub method_definition_ref: Option<MethodDefinitionRef>,
     /// Completion evidence reference when present.
     pub completion_ref: Option<ExternalEvidenceRef>,
     /// Iteration scope when the work is currently committed.
@@ -1154,6 +1158,7 @@ pub struct WorkSearchProjection {
 - `MemberWorkView` 从 `snapshot.members` 与 `snapshot.work_items.assignee_ref` 构造 assigned work。
 - `IterationSummaryView` 从 `snapshot.iterations.committed_work_refs` 与 `snapshot.work_items` 构造 committed work summary。
 - `WorkSearchProjection` 从 `snapshot.work_items` 构造 title / state / assignee / source_kind / cursor search rows。
+- `ReferenceSnapshotRepository.list_project_references(project_ref, page)` 可复用同一 committed truth source 枚举 `snapshot.project.source_ref`、`snapshot.work_items.source_ref` 和 `snapshot.work_items.method_definition_ref`。
 - `WorkRelationTruthSummary` 只作为 facts / reconciliation / relation-aware view 的 summary 输入;当前 P0 relation 变化不进入 search row 字段。
 
 ##### `SourceWorkKind`
@@ -1438,6 +1443,8 @@ pub struct Project {
     pub project_id: ProjectId,
     /// External owner pointer without owner body.
     pub owner_ref: ProjectOwnerRef,
+    /// Optional source reference captured at project creation.
+    pub source_ref: Option<SourceWorkRef>,
     /// Current lifecycle state.
     pub lifecycle_state: ProjectLifecycleState,
 }
@@ -1447,6 +1454,7 @@ pub struct Project {
 |---|---|---|---|
 | `project_id` | `ProjectId` | Project truth identity | Work-owned |
 | `owner_ref` | `ProjectOwnerRef` | 外部 owner 引用 | 不保存 owner 正文 |
+| `source_ref` | `Option<SourceWorkRef>` | 项目创建来源引用 | 来自 `ProjectSpec.source_ref`;缺失允许;不保存 source 正文;供 trace / rebuild / reference refresh 使用 |
 | `lifecycle_state` | `ProjectLifecycleState` | 生命周期 | `Archived` 为普通写路径终态 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
@@ -1540,8 +1548,14 @@ pub struct WorkItem {
     pub work_item_id: WorkItemId,
     /// Owning backlog.
     pub backlog_id: BacklogId,
+    /// Searchable title captured from the formal work intent.
+    pub title: WorkTitle,
     /// Current assignee inside the project.
     pub assignee_ref: ProjectMemberRef,
+    /// Source used to create or promote this work.
+    pub source_ref: SourceWorkRef,
+    /// Optional method definition used at formal admission.
+    pub method_definition_ref: Option<MethodDefinitionRef>,
     /// Current formal work lifecycle state.
     pub work_state: WorkItemState,
     /// Optional external completion evidence.
@@ -1553,7 +1567,10 @@ pub struct WorkItem {
 |---|---|---|---|
 | `work_item_id` | `WorkItemId` | 正式工作身份 | Work-owned |
 | `backlog_id` | `BacklogId` | 所属全集 | 必须属于同一 Project |
+| `title` | `WorkTitle` | public title / search row 来源 | 来自 `FormalWorkIntent.title`;必须持久化以支持 projection rebuild / query |
 | `assignee_ref` | `ProjectMemberRef` | 当前承担者 | 必须 Active 或按 policy 可承担 |
+| `source_ref` | `SourceWorkRef` | 来源引用 | 来自 create / promote source;不保存来源正文 |
+| `method_definition_ref` | `Option<MethodDefinitionRef>` | admission method definition | 来自 `FormalWorkIntent.method_definition_ref`;缺失允许;用于 method reference refresh / projection filter |
 | `work_state` | `WorkItemState` | 生命周期 | 终态不可普通恢复 |
 | `completion_ref` | `Option<ExternalEvidenceRef>` | 完成依据 | `Completed` 必须有 verified evidence |
 
@@ -1577,8 +1594,12 @@ pub struct ChildWorkItem {
     pub child_work_item_id: ChildWorkItemId,
     /// Parent formal work id.
     pub parent_work_item_id: WorkItemId,
+    /// Searchable title captured from the child formal work intent.
+    pub title: WorkTitle,
     /// Source used for split or promotion.
     pub source_ref: SourceWorkRef,
+    /// Optional method definition used at child formal admission.
+    pub method_definition_ref: Option<MethodDefinitionRef>,
     /// Current child work lifecycle state.
     pub work_state: WorkItemState,
     /// Completion evidence reference when the child work is completed.
@@ -1590,7 +1611,9 @@ pub struct ChildWorkItem {
 |---|---|---|---|
 | `child_work_item_id` | `ChildWorkItemId` | 子工作身份 | Work-owned |
 | `parent_work_item_id` | `WorkItemId` | 父工作 | 必须存在且未终止到禁止拆分状态 |
+| `title` | `WorkTitle` | 子工作 public title / search row 来源 | 来自 `FormalWorkIntent.title`;必须持久化 |
 | `source_ref` | `SourceWorkRef` | 来源引用 | 不保存 plan / runtime 正文 |
+| `method_definition_ref` | `Option<MethodDefinitionRef>` | admission method definition | 来自 `FormalWorkIntent.method_definition_ref`;缺失允许 |
 | `work_state` | `WorkItemState` | 生命周期 | 与 WorkItem 共用状态集合 |
 | `completion_ref` | `Option<ExternalEvidenceRef>` | 完成依据 | `Completed` 必须有 verified evidence;不得保存 evidence body |
 
@@ -2531,9 +2554,15 @@ pub struct WorkRuntimeBuilder {
 |---|---|---|---|---|---|---|---|
 | `Project` | `project_id` | `ProjectId` | id generator / command explicit id policy | `Project::create(...)` | `CreateProject` | reject / generate by policy | `TC-WORK-PROJECT-*` |
 | `Project` | `owner_ref` | `ProjectOwnerRef` | command input | `Project::create(...)` | `CreateProject.project_spec.owner_ref` | reject | `TC-WORK-PROJECT-*` |
+| `Project` | `source_ref` | `Option<SourceWorkRef>` | command input | `Project::create(...)` | `CreateProject.project_spec.source_ref` | absent allowed | `TC-WORK-PROJECT-*`;`TC-WORK-OPS-*` |
 | `ProjectMember` | `member_ref` | `GlobalMemberRef` | command input / identity event | `ProjectMember::assign(...)` | `AssignProjectMember.member_ref` | reject | `TC-WORK-MEMBER-*` |
+| `WorkItem` | `title` | `WorkTitle` | command / promote accepted intent | `WorkItem::formalize(...)` | `CreateWorkItem.work_intent.title`;`ReviewWorkPromotion.accepted_work_intent.title` | reject | `TC-WORK-FORMAL-*`;`TC-WORK-OPS-*` |
+| `WorkItem` | `source_ref` | `SourceWorkRef` | command / promote result | `WorkItem::formalize(...)` | `CreateWorkItem.source_ref`;`ReviewWorkPromotion` accepted source | reject | `TC-WORK-FORMAL-*`;`TC-WORK-OPS-*` |
+| `WorkItem` | `method_definition_ref` | `Option<MethodDefinitionRef>` | command / promote accepted intent | `WorkItem::formalize(...)` | `CreateWorkItem.work_intent.method_definition_ref`;`ReviewWorkPromotion.accepted_work_intent.method_definition_ref` | absent allowed | `TC-WORK-FORMAL-*`;`TC-WORK-OPS-*` |
 | `WorkItem` | `completion_ref` | `Option<ExternalEvidenceRef>` | lifecycle command / evidence event | `WorkItem::mark_completed(...)` | `UpdateWorkItemLifecycle.evidence_ref` | reject completed without evidence | `TC-WORK-ITEM-*` |
+| `ChildWorkItem` | `title` | `WorkTitle` | command intent | `ChildWorkItem::create_child(...)` | `CreateChildWorkItem.work_intent.title` | reject | `TC-WORK-PROMOTE-*`;`TC-WORK-OPS-*` |
 | `ChildWorkItem` | `source_ref` | `SourceWorkRef` | command / promote result | `ChildWorkItem::create_child(...)` | `CreateChildWorkItem.source_ref` | reject | `TC-WORK-PROMOTE-*` |
+| `ChildWorkItem` | `method_definition_ref` | `Option<MethodDefinitionRef>` | command intent | `ChildWorkItem::create_child(...)` | `CreateChildWorkItem.work_intent.method_definition_ref` | absent allowed | `TC-WORK-PROMOTE-*`;`TC-WORK-OPS-*` |
 | `ChildWorkItem` | `completion_ref` | `Option<ExternalEvidenceRef>` | lifecycle command / evidence event | `ChildWorkItem::transition_lifecycle(...)` | `UpdateWorkItemLifecycle.evidence_ref` | reject completed without evidence | `TC-WORK-ITEM-*` |
 | `WorkDependency` | `upstream_work_ref` | `FormalWorkRef` | command input | `WorkDependency::link(...)` | `LinkWorkDependency.upstream` | reject missing / same as downstream | `TC-WORK-DEP-*` |
 | `WorkBlocker` | `resolved_evidence_ref` | `Option<ExternalEvidenceRef>` | resolve command + evidence resolver | `WorkBlocker::resolve(...)` | `ResolveWorkBlocker.evidence_ref`;`WorkBlockerChanged.evidence_ref` | reject missing / unverified evidence;unresolved blocker event uses `None` | `TC-WORK-DEP-*`;`WorkBlockerChanged_event_schema` |

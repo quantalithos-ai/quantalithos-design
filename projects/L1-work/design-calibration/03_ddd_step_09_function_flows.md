@@ -485,7 +485,7 @@ backlog_repo.add_formal_work(backlog.backlog_ref(), work.formal_ref(), &uow).awa
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | `FormalWorkIntent` + `SourceWorkRef` + generated `WorkItemId` + lookup `BacklogId` |
+| DTO -> Domain | `FormalWorkIntent.title` -> `WorkItem.title`;`FormalWorkIntent.method_definition_ref` -> `WorkItem.method_definition_ref`;`SourceWorkRef` -> `WorkItem.source_ref`;generated `WorkItemId` + lookup `BacklogId` |
 | 事务边界 | work create、backlog membership、audit、outbox、stale、idempotency complete 同一 UoW |
 | 错误映射 | project/backlog/member missing -> `NotFound`;source unresolved -> `ExternalReferenceUnresolved`;non-formal source -> `DomainRejected` |
 | 状态 / 事件 | WorkItem `Formalized`;enqueue `WorkItemChanged`;board/search/member views stale |
@@ -521,7 +521,7 @@ let version = work_repo.create_child_work_item(child, &uow).await?;
 
 | 项 | 口径 |
 |---|---|
-| DTO -> Domain | parent must be root formal work;generated `ChildWorkItemId`;intent parent hint 不替代 route parent |
+| DTO -> Domain | parent must be root formal work;`FormalWorkIntent.title` -> `ChildWorkItem.title`;`FormalWorkIntent.method_definition_ref` -> `ChildWorkItem.method_definition_ref`;`SourceWorkRef` -> `ChildWorkItem.source_ref`;generated `ChildWorkItemId`;intent parent hint 不替代 route parent |
 | 事务边界 | child create、audit、outbox、stale、idempotency complete 同一 UoW |
 | 错误映射 | parent missing -> `NotFound`;parent is child or terminal -> `DomainRejected`;source unresolved -> `ExternalReferenceUnresolved` |
 | 状态 / 事件 | ChildWorkItem `Formalized`;enqueue `WorkItemChanged` |

@@ -134,13 +134,13 @@ Step 15 observability
 
 | 测试切口 | 对应契约 | 验证内容 | 建议测试类型 |
 |---|---|---|---|
-| `CreateProject_contract` | `CreateProjectFlow` | project + backlog + trace + outbox 同 UoW;owner missing、duplicate、id generator failure | API + application |
+| `CreateProject_contract` | `CreateProjectFlow` | project + backlog + trace + outbox 同 UoW;`ProjectSpec.source_ref` persisted in `Project.source_ref`;owner missing、duplicate、id generator failure | API + application |
 | `UpdateProjectLifecycle_contract` | `UpdateProjectLifecycleFlow` | Active / ReadOnly / Closed / Archived 转换;archive 联动 backlog;version conflict | API + application |
 | `UpdateBacklogAvailability_contract` | `UpdateBacklogAvailabilityFlow` | Open <-> LockedForMaintenance;Archived 后拒绝;outbox rollback | API + application |
 | `AssignProjectMember_contract` | `AssignProjectMemberFlow` | member responsibility created;capability unresolved、duplicate active key、resolver failure | API + application |
 | `UpdateProjectMemberResponsibility_contract` | `UpdateProjectMemberResponsibilityFlow` | Proposed / Active / Paused / Released 转换;terminal reject、version conflict | API + application |
-| `CreateWorkItem_contract` | `CreateWorkItemFlow` | root work formalized + backlog membership + trace / outbox;source unresolved、backlog locked | API + application |
-| `CreateChildWorkItem_contract` | `CreateChildWorkItemFlow` | child work formalized;parent missing / not root、source unresolved、idempotency conflict | API + application |
+| `CreateWorkItem_contract` | `CreateWorkItemFlow` | root work formalized with persisted title/source/method fields + backlog membership + trace / outbox;source unresolved、backlog locked | API + application |
+| `CreateChildWorkItem_contract` | `CreateChildWorkItemFlow` | child work formalized with persisted title/source/method fields;parent missing / not root、source unresolved、idempotency conflict | API + application |
 | `UpdateWorkItemLifecycle_contract` | `UpdateWorkItemLifecycleFlow` | work lifecycle transition;completion evidence required、terminal transition reject | API + application |
 | `RequestWorkPromotion_contract` | `RequestWorkPromotionFlow` | promote result pending review;source unresolved、duplicate、outbox rollback | API + application |
 | `ReviewWorkPromotion_contract` | `ReviewWorkPromotionFlow` | accept / reject;accept path optional WorkItem;concurrent review version conflict | API + application |
@@ -184,7 +184,7 @@ Step 15 observability
 | `WorkTraceAvailable_event_schema` | outbound `WorkTraceAvailable` | trace id / subject / optional handoff ref;no observability body | contract + publisher |
 | `DerivedWorkViewChanged_event_schema` | outbound `DerivedWorkViewChanged` | view ref / freshness / source cursor;no projection body dump | contract + publisher |
 | `PublishWorkOutbox_contract` | `PublishWorkOutboxFlow` | pending batch is `Page<Versioned<WorkOutboxRecord>>`;publish from typed `WorkOutboxSourceRef`;`mark_published` / `mark_failed` use same item version;source missing or event_kind/source mismatch marks failed without partial publish;partial failure、version conflict、rerun | job runner |
-| `RebuildWorkProjections_contract` | `RebuildWorkProjectionsFlow` | rebuild from committed truth;failed marker, query surface | job runner |
+| `RebuildWorkProjections_contract` | `RebuildWorkProjectionsFlow` | rebuild from committed truth;truth snapshot includes persisted project source and formal work title/source/method fields;failed marker, query surface | job runner |
 | `RefreshExternalReferenceSnapshots_contract` | `RefreshExternalReferenceSnapshotsFlow` | `None` / `StaleOnly` uses stale refs;`Project` uses `ReferenceSnapshotRepository.list_project_references(project_ref, page)` with typed-ref dedup / stable order / paging;`ExplicitRefs` dedups request refs;resolver unavailable, failed marker | job runner |
 | `RunWorkReconciliation_contract` | `RunWorkReconciliationFlow` | read-only report;drift detected, no automatic repair | job runner |
 | `PrepareWorkTraceHandoff_contract` | `PrepareWorkTraceHandoffFlow` | trace handoff marker saved;handoff failure, no observability body | job runner |

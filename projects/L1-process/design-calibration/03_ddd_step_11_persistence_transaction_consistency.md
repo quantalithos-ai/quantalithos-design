@@ -150,7 +150,7 @@
 | `recovery_attempts` | recovery attempt truth | `recovery_attempt_id` | `process_instance_id`,`checkpoint_ref`,`recovery_state`,`failure_reason`,`abandon_reason` | `storage_version` |
 | `recovery_history_records` | recovery history | `history_id` | `process_instance_ref`,`checkpoint_ref`,`attempt_ref`,`history_kind` | append-only;optional `storage_version` |
 | `process_stage_states` | stage truth | `stage_id` | `process_instance_id`,`stage_kind`,`stage_state` | `storage_version` |
-| `process_timebox_bindings` | timebox binding truth | `binding_id` | `process_timebox_ref`,`external_timebox_ref`,`binding_state` | `storage_version` |
+| `process_timebox_bindings` | timebox binding truth | `binding_id`;unique(`process_subject_ref`) where `binding_state` in (`Active`,`Stale`) | `process_subject_ref`,`process_timebox_ref`,`external_timebox_ref`,`binding_state` | `storage_version` |
 | `method_definition_snapshots` | safe method summary | unique(`definition_ref`,`definition_version_ref`) | `definition_kind`,`snapshot_state.reference_ref` | `storage_version` |
 | `work_context_snapshots` | safe work summary | `work_context_ref` | `project_ref`,`iteration_ref`,`snapshot_state.reference_ref` | `storage_version` |
 | `actor_capability_snapshots` | safe identity capability summary | `actor_ref` | `member_ref`,`snapshot_state.reference_ref` | `storage_version` |

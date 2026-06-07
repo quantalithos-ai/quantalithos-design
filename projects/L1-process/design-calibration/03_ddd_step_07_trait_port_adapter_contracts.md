@@ -699,10 +699,10 @@ pub trait RhythmRepository {
         binding_ref: ProcessTimeboxBindingRef,
     ) -> Result<Option<Versioned<ProcessTimeboxBinding>>, RepositoryError>;
 
-    /// Finds the active timebox binding for an instance.
+    /// Finds the active timebox binding for a timing subject.
     async fn find_active_binding(
         &self,
-        instance_ref: ProcessInstanceRef,
+        process_subject_ref: ProcessTimingSubjectRef,
     ) -> Result<Option<Versioned<ProcessTimeboxBinding>>, RepositoryError>;
 
     /// Saves a timebox binding using optimistic concurrency.
@@ -1168,6 +1168,12 @@ pub trait IdGeneratorPort {
 
     /// Creates a recovery history record id.
     fn new_recovery_history_id(&self) -> RecoveryHistoryId;
+
+    /// Creates a process stage id.
+    fn new_process_stage_id(&self) -> ProcessStageId;
+
+    /// Creates a process timebox binding id.
+    fn new_process_timebox_binding_id(&self) -> ProcessTimeboxBindingId;
 
     /// Creates a process outbox id.
     fn new_process_outbox_id(&self) -> ProcessOutboxId;

@@ -489,7 +489,7 @@ factory -> Active --mark_stale--> Stale --refresh/rebind--> Active
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| factory | `Active` | `ProcessTimeboxBinding::bind(binding_id, process_timebox_ref, external_timebox_ref, actor)` | external timebox ref 可解析;不保存 Work truth | 创建 binding;写 timing trace | `DomainError::ReferenceResolutionFailed` |
+| factory | `Active` | `ProcessTimeboxBinding::bind(binding_id, process_subject_ref, process_timebox_ref, external_timebox_ref, actor)` | external timebox ref 可解析;subject 与 command 一致;不保存 Work truth | 创建 binding;写 timing trace | `DomainError::ReferenceResolutionFailed` |
 | `Active` | `Stale` | `ProcessTimeboxBinding.mark_stale(ReferenceStaleReason)` | work context consumer 或 refresh job 发现 source stale | 标记相关 view stale | `DomainError::InvalidStateTransition` |
 | `Stale` | `Active` | `ProcessTimeboxBinding.mark_active(&WorkContextSnapshot)` | external timebox ref 重新 resolved;policy 允许继续使用 | 清除 stale marker;写 timing trace | `DomainError::ReferenceResolutionFailed` |
 | `Active` / `Stale` | `Released` | `ProcessTimeboxBinding.release(TimeboxReleaseReason, ActorRef)` | reason 必填 | 解除 binding;不改 Work Iteration truth | `DomainError::InvalidStateTransition` |

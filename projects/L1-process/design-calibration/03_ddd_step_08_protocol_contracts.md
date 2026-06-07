@@ -211,6 +211,9 @@
 | `RuntimeFeedbackSummaryRef` / `SourceDigest` / `ProcessTokenRef` / `GatewayRouteRef` | `contracts/src/refs.rs` | secondary shared refs used by feedback、token and gateway protocols |
 | `ProcessStartIntentRef` / `ProcessStartReason` | `contracts/src/refs.rs` | structured command intent used by `StartProcessInstanceRequest.start_intent_ref`;schema and bootstrap mapping are Step 6 §7.2.2 |
 | `ActivityProgressionIntentRef` / `ActivityProgressionTransition` / `ActivityFlowControlIntent` | `contracts/src/refs.rs` | structured command intent used by `AdvanceProcessActivityRequest.progression_ref`;schema and variant-to-domain-method mapping are Step 6 §7.2.3 |
+| `ProcessStageId` / `ProcessStageRef` / `ProfileStageRef` / `ProcessStageKind` | `contracts/src/refs.rs` | PH-05 rhythm shared ids / refs / kind;schema and `ProfileStageRef.stage_kind` mapping are Step 6 §7.2.5 |
+| `ProcessTimingSubjectRef` / `ProcessTimingRef` / `ProcessTimeboxBindingId` / `ProcessTimeboxBindingRef` / `ProcessTimeboxRef` / `ExternalTimeboxKind` / `ExternalTimeboxRef` | `contracts/src/refs.rs` | PH-05 timing subject、truth ref、timebox binding and external timebox reference schema;schema is Step 6 §7.2.5 |
+| `StageTarget` / `StageChangeReason` / `RhythmReason` / `StagePauseReason` / `StageCompletionReason` / `StageSkipReason` / `TimeboxReleaseReason` / `TimeboxInvalidReason` | `contracts/src/refs.rs` | PH-05 rhythm command target and reason schema;target-to-domain-method mapping is Step 6 §7.2.5 |
 | `ReferenceResolutionState` / `ReferenceResolutionLifecycleState` | `contracts/src/refs.rs` | public reference state reused by external reference markers、DTO、view、job、repository / resolver port and domain policy;contracts 不依赖 domain |
 | `GovernanceDecisionRef` / `ArtifactEvidenceMarker` / `RuntimeFeedbackRef` / `ConversationContextRef` | `contracts/src/refs.rs` | public external reference markers reused by protocol surface and domain;不得保存外部正文 |
 | `ProcessSearchFilter` | `contracts/src/queries.rs` | projection search filter derived from search request |
@@ -696,6 +699,8 @@ pub enum StageTarget {
     /// Skip the stage.
     Skip,
 }
+
+`StageTarget` 归 `contracts::refs`。`UpdateProcessStageStateRequest.stage_change_reason` 必须使用 Step 6 §7.2.5 定义的结构化 `StageChangeReason`;`StageTarget` 与 `StageChangeReason` variant 必须一致,否则 handler / service 必须返回 `InvalidRequest`,不得把 `StageChangeReason` 当裸字符串转换成具体 domain reason。
 
 /// Retry limit used by jobs.
 pub struct RetryLimit {
@@ -1396,6 +1401,18 @@ pub struct ProcessTimingCommandResult {
 }
 ```
 
+字段闭环:
+
+| 字段 | 正式 schema / 来源 | Domain / result 映射 | 缺失 / 冲突处理 |
+|---|---|---|---|
+| `process_subject_ref` | `ProcessTimingSubjectRef::{ProcessInstance, ProcessProfile}`;schema 见 Step 6 §7.2.5 | 传入 `ProcessTimeboxBinding::bind(...)`;写入 `ProcessTimeboxBinding.process_subject_ref`;用于 `ProcessTimingRef.process_subject_ref` | unknown subject 或与 existing binding subject 不一致 -> `InvalidRequest` / `NotFound` |
+| `process_timebox_ref` | `ProcessTimeboxRef` 非空 | 传入 `ProcessTimeboxBinding::bind(...)` | 空 ref 或同 subject active binding 冲突 -> `InvalidRequest` |
+| `external_timebox_ref` | `ExternalTimeboxRef { external_kind, value }` | 用于 resolver/load `WorkContextSnapshot`;传入 binding;不得修改 Work truth | unresolved / invalid / stale source -> `DependencyUnavailable` / `InvalidRequest` |
+| `rhythm_reason` | `RhythmReason` 非空 | policy / trace / audit context;不保存会议正文 | 空 reason -> `InvalidRequest` |
+| result `timebox_binding_ref` | 由 `ProcessTimeboxBindingId` 派生 | `Some(binding_ref)` for accepted bind | accepted path 不得为空 |
+
+`BindProcessTimeboxRequest.process_subject_ref` 是唯一 subject 选择面。service 不得从 `process_timebox_ref` 或 `external_timebox_ref` 字符串反推 instance/profile。
+
 ##### 7.6.13 `UpdateProcessStageState`
 
 | 项 | 内容 |
@@ -1420,6 +1437,21 @@ pub struct UpdateProcessStageStateRequest {
     pub stage_change_reason: StageChangeReason,
 }
 ```
+
+字段闭环:
+
+| 字段 | 正式 schema / 来源 | Domain / result 映射 | 缺失 / 冲突处理 |
+|---|---|---|---|
+| `stage_ref` | `ProcessStageRef` 非空 | `RhythmRepository.get_stage(stage_ref)`;result `stage_ref = Some(stage_ref)` | missing stage -> `NotFound` |
+| `stage_target` | `StageTarget` enum | 选择唯一 domain transition | unknown / unsupported variant -> `InvalidRequest` |
+| `stage_change_reason` | `StageChangeReason` structured enum;schema 见 Step 6 §7.2.5 | 与 `stage_target` 同 variant 后传入对应 domain method | target / reason variant 不一致 -> `InvalidRequest` |
+
+| `stage_target` | `stage_change_reason` | Domain 调用 | result 字段 |
+|---|---|---|---|
+| `Activate` | `StageChangeReason::Activate(reason)` | `ProcessRhythmPolicy.assert_stage_transition_allowed(...)`;`ProcessStageState.activate(actor)` | `stage_state = Some(Active)` |
+| `Pause` | `StageChangeReason::Pause(reason)` | `ProcessRhythmPolicy.assert_stage_transition_allowed(...)`;`ProcessStageState.pause(reason, actor)` | `stage_state = Some(Paused)` |
+| `Complete` | `StageChangeReason::Complete(reason)` | `ProcessRhythmPolicy.assert_stage_transition_allowed(...)`;`ProcessStageState.complete(reason, actor)` | `stage_state = Some(Completed)` |
+| `Skip` | `StageChangeReason::Skip(reason)` | `ProcessRhythmPolicy.assert_stage_transition_allowed(...)`;`ProcessStageState.skip(reason, actor)` | `stage_state = Some(Skipped)` |
 
 #### 7.7 Command result duplicate replay matrix
 

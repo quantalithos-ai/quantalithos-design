@@ -514,10 +514,12 @@ Steps:
 
 1. Reserve command idempotency.
 2. Resolve / load `WorkContextSnapshot` for `external_timebox_ref`.
-3. `ProcessRhythmPolicy.assert_timebox_binding_allowed(...)`.
-4. `ProcessTimeboxBinding::bind(binding_id, process_timebox_ref, external_timebox_ref, actor)`.
-5. Save binding;append trace;append outbox `TimingChanged`.
-6. Store `ProcessTimingCommandResult`.
+3. Generate `binding_id = IdGeneratorPort.new_process_timebox_binding_id()`.
+4. Create candidate `ProcessTimeboxBinding::bind(binding_id, input.process_subject_ref, input.process_timebox_ref, input.external_timebox_ref, actor)`.
+5. `ProcessRhythmPolicy.assert_timebox_binding_allowed(binding, snapshot)`.
+6. Build `ProcessTimingRef { process_subject_ref: input.process_subject_ref, stage_ref: None, timebox_binding_ref: Some(binding_ref) }`.
+7. Save binding;append trace;append outbox `TimingChanged(timing_ref)`.
+8. Store `ProcessTimingCommandResult`.
 
 Tests:success;external timebox unavailable;invalid binding;duplicate;no work truth mutation.
 
@@ -529,10 +531,16 @@ Steps:
 
 1. Reserve command idempotency.
 2. Load `ProcessStageState`.
-3. `ProcessRhythmPolicy.assert_stage_transition_allowed(stage, stage_target, reason)`.
-4. Apply target through `activate`、`pause`、`complete` or `skip`.
-5. Save stage;append trace;append outbox `TimingChanged`.
-6. Store `ProcessTimingCommandResult`.
+3. Validate `input.stage_target` and `input.stage_change_reason` use the same variant;any mismatch -> `InvalidRequest`.
+4. `ProcessRhythmPolicy.assert_stage_transition_allowed(stage, input.stage_target, input.stage_change_reason)`.
+5. Apply the unique mapped domain method:
+   - `Activate` + `StageChangeReason::Activate(reason)` -> `ProcessStageState.activate(actor)`;`reason` is kept in policy / trace context.
+   - `Pause` + `StageChangeReason::Pause(reason)` -> `ProcessStageState.pause(reason, actor)`.
+   - `Complete` + `StageChangeReason::Complete(reason)` -> `ProcessStageState.complete(reason, actor)`.
+   - `Skip` + `StageChangeReason::Skip(reason)` -> `ProcessStageState.skip(reason, actor)`.
+6. Build `ProcessTimingRef { process_subject_ref: ProcessTimingSubjectRef::ProcessInstance(ProcessInstanceRef { value: stage.process_instance_id.value }), stage_ref: Some(input.stage_ref), timebox_binding_ref: None }`.
+7. Save stage;append trace;append outbox `TimingChanged(timing_ref)`.
+8. Store `ProcessTimingCommandResult`.
 
 Tests:activate;pause;complete;skip;illegal transition;duplicate.
 

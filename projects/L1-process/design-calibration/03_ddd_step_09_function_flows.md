@@ -368,7 +368,7 @@ Steps:
 3. Validate `progression_ref` against Step 6 §7.2.3:activity transition variant must contain its required reason / summary ref,flow-control variant must contain all required token / gateway / route / target refs.
 4. Compare `expected_position_ref` with loaded token current position when `progression_ref.flow_control` references a token;conflict if mismatch.
 5. `InstanceProgressionPolicy.assert_can_advance(...)`.
-6. Generate one `ActivityProgressionId` via `IdGeneratorPort::new_activity_progression_id()`;the generated id must be passed into the activity transition that creates the `ActivityProgressionRecord`,domain must not generate it.
+6. Generate one `ActivityProgressionId` via `IdGeneratorPort::new_activity_progression_id()`;the generated id must be passed into the activity transition that returns `ActivityTransitionOutcome`,domain must not generate it.
 7. Apply `progression_ref.activity_transition` exactly as Step 6 §7.2.3 maps it:
    - `Ready` -> `Activity.ready(progression_id, actor)`.
    - `Start` -> `Activity.start(progression_id, actor)`.
@@ -383,7 +383,7 @@ Steps:
    - `SelectGatewayRoute` -> load body-free `GatewayRouteSet` via `ProcessShapeRepository::get_gateway_route_set(gateway_ref)`,run `GatewayRoutingPolicy.assert_route_allowed(...)`,call `Gateway.select_route(route_ref, decision_reason, actor)`,then `Token.move_to(next_position_ref)`.
    - `JoinGateway` -> build `TokenSet` from loaded tokens and owning instance `token_set_ref`,run `GatewayRoutingPolicy.assert_can_join(...)`,then `Gateway.join_tokens(token_set)`.
 9. Call `ProcessInstance.advance(activity.ref(), actor)` only to update the instance current activity pointer;it returns `()` and must not construct `ActivityProgressionRecord`.
-10. Save changed objects and append `ActivityProgressionRecord`;record `token_refs` / `gateway_ref` / `selected_route_ref` from changed truth,where single-token variants put one ref,`JoinGateway` copies all joined token refs,and route selection copies committed `Gateway.selected_route_ref`.
+10. Save changed objects and append `ActivityProgressionRecord` by calling `ActivityProgressionRecord::from_activity_transition(activity_outcome, changed_token_refs, changed_gateway)` after flow-control truth has been changed;record `token_refs` / `gateway_ref` / `selected_route_ref` from changed truth,where single-token variants put one ref,`JoinGateway` copies all joined token refs,and route selection copies committed `Gateway.selected_route_ref`.
 11. Append trace and outbox `ActivityProgressed`.
 12. Store `ActivityProgressionCommandResult`,copying `selected_route_ref` from the same `ActivityProgressionRecord`;duplicate replay returns the stored result surface.
 
@@ -402,8 +402,8 @@ Steps:
 5. `ActivityFeedbackPolicy.assert_feedback_matches_activity(activity, resolution.runtime_feedback_ref)`.
 6. `ActivityFeedbackPolicy.assert_no_runtime_body(resolution.feedback_summary)`.
 7. Plain feedback binding must not complete activity; explicit completion paths consume the stored body-free summary before `Activity.complete(...)`.
-8. Generate `ActivityProgressionId` via `IdGeneratorPort::new_activity_progression_id()` and call `Activity.attach_feedback(progression_id, resolution.runtime_feedback_ref)`.
-9. Save activity, append progression record and trace.
+8. Generate `ActivityProgressionId` via `IdGeneratorPort::new_activity_progression_id()` and call `Activity.attach_feedback(progression_id, resolution.runtime_feedback_ref)` to obtain `ActivityTransitionOutcome`.
+9. Save activity, append progression record from the outcome with empty `token_refs` and no gateway, then append trace.
 10. Outbox only when policy says feedback binding is a publishable `ActivityProgressed` truth.
 11. Store `ActivityProgressionCommandResult`.
 

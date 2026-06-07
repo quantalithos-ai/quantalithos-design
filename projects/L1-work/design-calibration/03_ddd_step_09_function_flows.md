@@ -1712,6 +1712,8 @@ projection_repo.mark_rebuilding(batch.view_refs(), cursor, &uow).await?;
 projection_repo.replace_project_views(batch, cursor, &uow).await?;
 ```
 
+`load_project_truth_snapshot(...)` 返回 Step 6 定义的 contracts shared body-free `ProjectWorkTruthSnapshot`,其字段只能是 `ProjectTruthSummary`、`BacklogTruthSummary`、`ProjectMemberTruthSummary`、`FormalWorkTruthSummary`、`WorkRelationTruthSummary` 和 `IterationTruthSummary`。`ProjectProjectionBatch::from_truth(...)` 不得要求 `Project`、`Backlog`、`ProjectMember`、`Iteration` 或 `IterationCommitment` 等 domain-only object;repository 可以在 adapter 内部从 committed truth 表组装 summary,但不能把 domain object 穿过 job / port / contracts surface。
+
 | 项 | 口径 |
 |---|---|
 | DTO -> Job | `project_ref` + `projection_set` 决定 rebuild scope |
@@ -1726,8 +1728,10 @@ projection_repo.replace_project_views(batch, cursor, &uow).await?;
 [jobs.run_refresh_external_reference_snapshots]
   -> WorkReferenceRefreshService.refresh_external_reference_snapshots(input)
      -> reserve job idempotency in UoW
-     -> if reference_scope present: expand typed refs
-        else ReferenceSnapshotRepository.list_stale_references(page)
+     -> load refresh refs by reference_scope:
+        - None / StaleOnly -> ReferenceSnapshotRepository.list_stale_references(page)
+        - Project -> validate project_ref, then ReferenceSnapshotRepository.list_project_references(project_ref, page)
+        - ExplicitRefs -> validate non-empty reference_refs, stable dedup and page request refs
      -> dispatch each ExternalReferenceRef to resolver port
      -> save snapshot / reference state
      -> mark affected views stale
@@ -1756,13 +1760,37 @@ for reference_ref in refs.items {
 projection_repo.mark_stale(affected_reference_views(&refs.items), current_cursor(), &uow).await?;
 ```
 
+`load_refresh_refs(scope, page)` formal branch mapping:
+
+```rust
+match scope {
+    None => reference_repo.list_stale_references(page).await?,
+    Some(scope) if scope.scope_kind == ExternalReferenceScopeKind::StaleOnly => {
+        assert_scope_empty(scope.project_ref, scope.reference_refs)?;
+        reference_repo.list_stale_references(page).await?
+    }
+    Some(scope) if scope.scope_kind == ExternalReferenceScopeKind::Project => {
+        let project_ref = scope.project_ref.ok_or(ApplicationError::InvalidRequest)?;
+        assert_empty(scope.reference_refs)?;
+        reference_repo.list_project_references(project_ref, page).await?
+    }
+    Some(scope) if scope.scope_kind == ExternalReferenceScopeKind::ExplicitRefs => {
+        assert_none(scope.project_ref)?;
+        assert_non_empty(scope.reference_refs)?;
+        Page::from_items(stable_dedup_preserve_order(scope.reference_refs), page)
+    }
+}
+```
+
+`ReferenceSnapshotRepository.list_project_references(project_ref, page)` is the only formal owner of `Project` expansion. It returns typed `ExternalReferenceRef` values associated with the project through committed Work truth / local reference snapshot indexes: project member identity refs, method definition refs tied to formal work admission, project / work / promote source refs, work lifecycle / dependency / blocker evidence refs, and iteration process timebox refs. The repository deduplicates by `ExternalReferenceRef` stable identity, sorts by typed variant then canonical inner ref, and applies pagination after deduplication. Empty page is a valid no-op. The flow must not scan projection rows, parse ids, or use ad hoc `refs_for_project(...)` helpers.
+
 | 项 | 口径 |
 |---|---|
-| DTO -> Job | `reference_scope=None` 表示 list stale refs;typed refs 决定 resolver |
+| DTO -> Job | `reference_scope=None` / `StaleOnly` 表示 list stale refs;`Project` 由 repository 展开 typed refs;`ExplicitRefs` 使用 request typed refs;typed ref variant 决定 resolver |
 | 事务边界 | snapshot/reference writes、stale、idempotency complete 同一 UoW;实现可按 page 分批 |
 | 错误映射 | resolver failure -> failed ref + state failed/stale;invalid scope -> `InvalidRequest` |
 | 状态 / 事件 | reference states refreshed;affected views stale |
-| 测试切口 | stale list path;explicit scope;resolver failure;no refs;duplicate job |
+| 测试切口 | stale list path;project scope expansion;explicit scope;resolver failure;no refs;duplicate job |
 
 #### 12.5 `RunWorkReconciliationFlow`
 

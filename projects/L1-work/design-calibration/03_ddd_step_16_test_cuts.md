@@ -185,7 +185,7 @@ Step 15 observability
 | `DerivedWorkViewChanged_event_schema` | outbound `DerivedWorkViewChanged` | view ref / freshness / source cursor;no projection body dump | contract + publisher |
 | `PublishWorkOutbox_contract` | `PublishWorkOutboxFlow` | pending batch is `Page<Versioned<WorkOutboxRecord>>`;publish from typed `WorkOutboxSourceRef`;`mark_published` / `mark_failed` use same item version;source missing or event_kind/source mismatch marks failed without partial publish;partial failure、version conflict、rerun | job runner |
 | `RebuildWorkProjections_contract` | `RebuildWorkProjectionsFlow` | rebuild from committed truth;failed marker, query surface | job runner |
-| `RefreshExternalReferenceSnapshots_contract` | `RefreshExternalReferenceSnapshotsFlow` | stale refs refreshed;resolver unavailable, failed marker | job runner |
+| `RefreshExternalReferenceSnapshots_contract` | `RefreshExternalReferenceSnapshotsFlow` | `None` / `StaleOnly` uses stale refs;`Project` uses `ReferenceSnapshotRepository.list_project_references(project_ref, page)` with typed-ref dedup / stable order / paging;`ExplicitRefs` dedups request refs;resolver unavailable, failed marker | job runner |
 | `RunWorkReconciliation_contract` | `RunWorkReconciliationFlow` | read-only report;drift detected, no automatic repair | job runner |
 | `PrepareWorkTraceHandoff_contract` | `PrepareWorkTraceHandoffFlow` | trace handoff marker saved;handoff failure, no observability body | job runner |
 | `PrepareArchiveHandoff_contract` | `PrepareArchiveHandoffFlow` | archive marker saved;handoff failure, no archive body | job runner |

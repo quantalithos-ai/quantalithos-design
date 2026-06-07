@@ -1010,6 +1010,21 @@ pub struct BacklogQueryFilter {
 | `WorkRelationSummaryView` | `relation_state` | `WorkRelationStateView` | dependency / blocker truth | 使用 contracts shared state |
 | `WorkSearchCriteria` | filters | shared refs / enums | query body | page 在 `QueryMetadata.page`,不在 criteria |
 
+#### 9.1.1 Projection rebuild shared helper DTO
+
+`ProjectWorkTruthSnapshot`、`ProjectTruthSummary`、`BacklogTruthSummary`、`ProjectMemberTruthSummary`、`FormalWorkTruthSummary`、`WorkRelationTruthSummary`、`IterationTruthSummary` 和 `ProjectProjectionBatch` 归 `contracts/views.rs` shared DTO。它们是 job / port 传递类型,不是 public query response,字段级 schema 以 Step 6 projection / reconciliation helper DTO 为准。
+
+| DTO | 字段来源 | 约束 |
+|---|---|---|
+| `ProjectTruthSummary` | committed `Project` truth | 只暴露 `ProjectRef`、`ProjectLifecycleState`、`Option<BacklogRef>` |
+| `BacklogTruthSummary` | committed `Backlog` truth | 只暴露 `BacklogRef`、`ProjectRef`、`BacklogState` |
+| `ProjectMemberTruthSummary` | committed `ProjectMember` truth | 只暴露 project member ref、global member ref、responsibility state |
+| `FormalWorkTruthSummary` | committed formal work truth | 只暴露 ref、parent、title、state、assignee、source ref/kind、completion evidence、iteration ref |
+| `WorkRelationTruthSummary` | committed dependency / blocker truth | 只暴露 relation ref、affected work refs、shared relation state marker |
+| `IterationTruthSummary` | committed iteration / optional commitment truth | 只暴露 iteration ref/state、optional commitment state、committed work refs |
+| `ProjectWorkTruthSnapshot` | above summaries + `WorkTruthCursor` | 不得引用 `Project`、`Backlog`、`ProjectMember`、`Iteration`、`IterationCommitment` 或任何 domain-only object |
+| `ProjectProjectionBatch` | `ProjectProjectionBatch::from_truth(snapshot, projection_set)` | 只由 above summaries 构造 board/member/iteration/search projection |
+
 #### 9.2 projection key 与 `DerivedWorkViewRef` 稳定派生
 
 | Query / View | repository key | `DerivedWorkViewRef` 派生规则 | cursor 来源 |
@@ -1559,9 +1574,9 @@ pub enum WorkProjectionSet {
 pub struct ExternalReferenceScope {
     /// Scope kind.
     pub scope_kind: ExternalReferenceScopeKind,
-    /// Project scope when the kind is project-scoped.
+    /// Project scope when scope_kind is Project.
     pub project_ref: Option<ProjectRef>,
-    /// Explicit reference refs when the kind is explicit.
+    /// Explicit reference refs when scope_kind is ExplicitRefs.
     pub reference_refs: Vec<ExternalReferenceRef>,
 }
 
@@ -1676,6 +1691,16 @@ pub struct WorkJobReport {
 }
 ```
 
+`ExternalReferenceScope` validation and expansion:
+
+| scope_kind | DTO validation | Expansion source | Paging / ordering |
+|---|---|---|---|
+| `StaleOnly` | `project_ref = None`;`reference_refs` empty | `ReferenceSnapshotRepository.list_stale_references(page)` | repository stable order |
+| `Project` | `project_ref = Some`;`reference_refs` empty | `ReferenceSnapshotRepository.list_project_references(project_ref, page)` | repository dedupes by `ExternalReferenceRef`, sorts by typed variant + canonical inner ref, then pages |
+| `ExplicitRefs` | `project_ref = None`;`reference_refs` nonempty | request body | service dedupes by `ExternalReferenceRef` stable identity preserving first occurrence, then applies `PageRequest` |
+
+`Project` expansion may return only typed refs discoverable from committed Work truth / local reference snapshot indexes associated with the project: project member identity refs, method definition refs tied to formal work admission, source work refs tied to project / formal work / promote intake, evidence refs tied to work lifecycle / dependency / blocker truth, and process timebox refs tied to project iterations. It must not read external bodies, scan projection rows, parse string ids, or invent refs outside `ExternalReferenceRef` variants.
+
 | 字段 | 类型 | 来源 | 约束 |
 |---|---|---|---|
 | `job_run_id` | `JobRunId` | job trigger | trim 后非空;同一 retry 保持稳定 |
@@ -1685,7 +1710,7 @@ pub struct WorkJobReport {
 
 `WorkJobReport.receipt.result_ref` 必须指向 `JobResultRepository` 中同 UoW 保存的 `StoredJobResult::WorkJob`。duplicate replay 只 overlay `receipt.idempotency = Duplicate`,不得重新扫描 pending outbox、projection、reference 或 handoff marker 来生成新 report。
 | `projection_set` | `WorkProjectionSet` | rebuild job input | `All` 表示 board / member / iteration / search 全部重建 |
-| `reference_scope` | `Option<ExternalReferenceScope>` | refresh job input | `None` 表示 stale refs;`ExplicitRefs` 必须非空 |
+| `reference_scope` | `Option<ExternalReferenceScope>` | refresh job input | `None` / `StaleOnly` 表示 stale refs;`Project` 必须带 `project_ref`;`ExplicitRefs` 必须非空 |
 | `scope_ref` | `WorkReconciliationScopeRef` | reconciliation job input | kind 与对应 optional ref 必须匹配 |
 | `target_ref` | `TraceHandoffTargetRef` | trace handoff job input | 只保存目标引用 |
 | `archive_scope` | `ArchiveHandoffScope` | archive handoff job input | `subject_refs` 必须非空 |
@@ -1767,7 +1792,7 @@ pub struct PrepareArchiveHandoffJobInput {
 | `PublishWorkOutbox` | `page` | `WorkOutboxRepository.list_pending` | job input | reject |
 | `PublishWorkOutbox` | pending outbox record | `WorkOutboxPublisherPort.publish` | repository | no pending -> report zero |
 | `RebuildWorkProjections` | `project_ref`、`projection_set` | `WorkTruthSnapshotRepository`、`ProjectionRepository` | job input | reject |
-| `RefreshExternalReferenceSnapshots` | `reference_scope`、`page` | `ReferenceSnapshotRepository` + resolver ports | job input / stale refs | empty scope -> list stale refs |
+| `RefreshExternalReferenceSnapshots` | `reference_scope`、`page` | `ReferenceSnapshotRepository` + resolver ports | job input / stale refs / project refs | `None` / `StaleOnly` -> `list_stale_references`;`Project` -> `list_project_references`;`ExplicitRefs` -> request refs stable dedup + page |
 | `RunWorkReconciliation` | `scope_ref` | `ReconciliationReport` | job input + repositories | reject |
 | `PrepareWorkTraceHandoff` | `subject_ref`、`target_ref` | `TraceHandoffPort` | job input + audit repo | reject |
 | `PrepareArchiveHandoff` | `archive_scope`、`archive_target_ref` | `ArchiveHandoffPort` | job input + truth repos | reject |

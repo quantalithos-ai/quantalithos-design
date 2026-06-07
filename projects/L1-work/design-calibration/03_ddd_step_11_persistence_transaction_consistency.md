@@ -206,7 +206,7 @@
 | `ProjectionRepository.search_work(project_ref, criteria, page)` | 搜索 projection | read-only;projection only | `Page<WorkSearchProjection>` | `RepositoryError` |
 | `ProjectionRepository.list_views_affected_by_member(member_ref, page)` | 按 identity member 枚举既有 affected public view refs | read-only;stable order;只返回 Step 8 §9.2 public `DerivedWorkViewRef`;empty page 表示不标脏 | `Page<DerivedWorkViewRef>` | `RepositoryError` |
 | `ProjectionRepository.list_views_affected_by_method(definition_ref, page)` | 按 method definition 枚举既有 affected public view refs | read-only;stable order;只返回 Step 8 §9.2 public `DerivedWorkViewRef`;empty page 表示不标脏 | `Page<DerivedWorkViewRef>` | `RepositoryError` |
-| `ProjectionRepository.replace_project_views(batch, cursor, &uow)` | 从 truth snapshot 替换 projection batch | rebuild job UoW;atomic per project / projection_set | `()` | repository failure -> rollback |
+| `ProjectionRepository.replace_project_views(batch, cursor, &uow)` | 从 truth snapshot 替换 projection batch | rebuild job UoW;atomic per project / projection_set;batch 来自 Step 6 body-free `ProjectWorkTruthSnapshot` summaries | `()` | repository failure -> rollback |
 | `ProjectionRepository.mark_stale(affected, cursor, &uow)` | 标记 projection stale | command / consumer UoW;idempotent for same or older cursor | `()` | `RepositoryError` |
 | `ProjectionRepository.mark_rebuilding(affected, cursor, &uow)` | 标记 projection rebuilding | rebuild UoW;only stale / failed views | `()` | `RepositoryError` |
 | `ProjectionRepository.mark_failed(affected, cursor, reason, &uow)` | 标记 projection failed | rebuild failure UoW;no truth write | `()` | `RepositoryError` |
@@ -215,7 +215,8 @@
 | `ReferenceSnapshotRepository.save_method_snapshot(snapshot, expected_version, &uow)` | 保存 method snapshot | same UoW as reference resolved state | `Version` | version conflict |
 | `ReferenceSnapshotRepository.mark_reference_failed(reference_ref, reason, occurred_at, expected_version, &uow)` | 保存 failed marker | UoW;preserve last snapshot | `Version` | version conflict |
 | `ReferenceSnapshotRepository.list_stale_references(page)` | 列待刷新 refs | read-only;stable order | `Page<ExternalReferenceRef>` | `RepositoryError` |
-| `WorkTruthSnapshotRepository.load_project_truth_snapshot(project_ref)` | 读取 committed truth rebuild snapshot | read-only;no projection fallback | `ProjectWorkTruthSnapshot` | `RepositoryError` |
+| `ReferenceSnapshotRepository.list_project_references(project_ref, page)` | 列 project scope 下待刷新的 typed external refs | read-only;从 committed Work truth / local reference snapshot indexes 枚举;dedup + stable order before paging | `Page<ExternalReferenceRef>` | `RepositoryError` |
+| `WorkTruthSnapshotRepository.load_project_truth_snapshot(project_ref)` | 读取 committed truth rebuild snapshot | read-only;no projection fallback;返回 contracts shared body-free summary DTO,不得跨 port 暴露 domain-only object | `ProjectWorkTruthSnapshot` | `RepositoryError` |
 | `WorkTruthSnapshotRepository.load_truth_cursor(project_ref)` | 读取 truth cursor | read-only;cursor != optimistic version | `WorkTruthCursor` | `RepositoryError` |
 | `CommandResultRepository.save_result(result_ref, stored_result, &uow)` | 保存 public command result surface | same UoW as accepted command truth;must precede idempotency complete | `()` | `RepositoryError` |
 | `CommandResultRepository.get_result(result_ref)` | 读取 duplicate replay result surface | read-only;no UoW;no truth reconstruction | `Option<StoredCommandResult>` | `RepositoryError` |
@@ -243,8 +244,16 @@
 | outbox publish version source | `mark_published` / `mark_failed` 的 `expected_version` 必须来自同一条 `list_pending(page)` 返回的 `Versioned<WorkOutboxRecord>.version`;retry / reconciliation 单条处理必须来自 `get(outbox_id)` 返回的 version;不得假定版本或从 storage 内部临时偷读 | WorkOutboxRepository |
 | projection cursor monotonicity | `mark_stale` 不能把 view cursor 倒退;older cursor no-op or version-safe ignore | ProjectionRepository |
 | projection view identity closure | `mark_stale` 的 affected views 必须来自 Step 8 §9.2 已定义的 public `DerivedWorkViewRef`;没有 query / projection identity 的 truth 或 marker 不得临时派生 view ref | ProjectionRepository / function flows |
-| projection rebuild replace | `replace_project_views` 必须以 committed truth snapshot + cursor 为输入;不得从旧 projection 推导 | ProjectionRepository |
+| projection rebuild replace | `replace_project_views` 必须以 committed truth snapshot + cursor 为输入;`ProjectWorkTruthSnapshot` 必须使用 Step 6 body-free summaries,不得从旧 projection 推导,也不得让 `Project` / `Backlog` / `ProjectMember` / `Iteration` / `IterationCommitment` 等 domain-only object 进入 job / port / contracts surface | ProjectionRepository |
 | reference failed marker | failed marker 保留 last successful snapshot;不得删除 snapshot body summary | ReferenceSnapshotRepository |
+
+`ReferenceSnapshotRepository.list_project_references(project_ref, page)` 的持久化口径:
+
+- 可读取 committed Work truth / local reference snapshot indexes,包括 project member -> identity member,formal work / child work / promote intake -> source,formal work admission -> method definition,work lifecycle / dependency / blocker -> external evidence,iteration -> process timebox。
+- 不读取外部正文,不从 projection rows 反推 truth,不解析 string id,不临时拼接 `ExternalReferenceRef`。
+- 同一 external ref 多处出现时按 `ExternalReferenceRef` stable identity 去重。
+- 排序必须稳定:typed variant order then canonical inner ref;分页在去重和排序之后应用。
+- 空 page 表示当前 project scope 无需刷新,不是错误。
 | idempotency digest | `(operation, key)` unique;相同 digest duplicate 先返回 `ApplicationResultRef`;不同 digest conflict | IdempotencyRepository |
 | command result identity | command operation 的 `ApplicationResultRef` 必须能读回 `StoredCommandResult`;stored result variant 必须匹配 operation | CommandResultRepository |
 | job result identity | job operation 的 `ApplicationResultRef` 必须能读回 `StoredJobResult`;stored report variant 必须匹配 operation | JobResultRepository |

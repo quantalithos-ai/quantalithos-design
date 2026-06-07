@@ -898,14 +898,16 @@ pub struct ProjectProjectionBatch {
 }
 ```
 
+`ProjectProjectionBatch` 是 Step 6 `contracts/views.rs` shared DTO 的同一类型,这里只重复其 port 入口形态。`ProjectProjectionBatch::from_truth(snapshot, projection_set)` 必须只消费 `ProjectWorkTruthSnapshot` 中的 `ProjectTruthSummary`、`BacklogTruthSummary`、`ProjectMemberTruthSummary`、`FormalWorkTruthSummary`、`WorkRelationTruthSummary` 和 `IterationTruthSummary`;`ProjectionRepository` 不接收 `Project` / `Backlog` / `ProjectMember` / `Iteration` / `IterationCommitment` 等 domain-only object。
+
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
 | `get_*_view` | ref | `Option<*Projection>` | `RepositoryError` | query service | projection 不存在由 query 映射 empty / stale surface |
-| `search_work` | `ProjectRef`、criteria、page | `Page<WorkSearchProjection>` | `RepositoryError` | query service | 只读;不得触发 rebuild |
+| `search_work` | `ProjectRef`、criteria、page | `Page<WorkSearchProjection>` | `RepositoryError` | query service | 只读;不得触发 rebuild;`WorkSearchCriteria.source_kind` 使用 `WorkSearchProjection.source_kind` 过滤 |
 | `list_freshness_states` | `WorkReconciliationScopeRef`、`PageRequest` | `Page<DerivedWorkViewState>` | `RepositoryError` | reconciliation job | 只读,不得修复 projection |
 | `list_views_affected_by_member` | `GlobalMemberRef`、`PageRequest` | `Page<DerivedWorkViewRef>` | `RepositoryError` | identity member consumer stale scope | 只返回已存在且属于 Step 8 §9.2 public identity 的 view refs;不得临时派生 ad hoc ref |
 | `list_views_affected_by_method` | `MethodDefinitionRef`、`PageRequest` | `Page<DerivedWorkViewRef>` | `RepositoryError` | method definition consumer stale scope | 只返回已存在且 source index 依赖该 definition 的 public view refs;空页表示无 view 可标脏 |
-| `replace_project_views` | `ProjectProjectionBatch`、cursor、UoW | `()` | `RepositoryError` | rebuild job | 只能从 committed truth 构造 |
+| `replace_project_views` | `ProjectProjectionBatch`、cursor、UoW | `()` | `RepositoryError` | rebuild job | 只能接收由 Step 6 `ProjectWorkTruthSnapshot` body-free summaries 构造的 batch;不得从旧 projection 或 domain object 跨 port 构造 |
 | `mark_stale` | affected views、cursor、UoW | `()` | `RepositoryError` | command / consumer service | stale 不代表新 truth |
 | `mark_rebuilding` / `mark_failed` | affected views、cursor、reason、UoW | `()` | `RepositoryError` | rebuild job | failed / rebuilding marker 不反写真相 |
 
@@ -964,6 +966,13 @@ pub trait ReferenceSnapshotRepository {
         page: PageRequest,
     ) -> Result<Page<ExternalReferenceRef>, RepositoryError>;
 
+    /// Lists external references tied to one Work project for refresh jobs.
+    async fn list_project_references(
+        &self,
+        project_ref: ProjectRef,
+        page: PageRequest,
+    ) -> Result<Page<ExternalReferenceRef>, RepositoryError>;
+
     /// Marks a reference as failed while preserving the last successful snapshot.
     async fn mark_reference_failed(
         &self,
@@ -983,6 +992,7 @@ pub trait ReferenceSnapshotRepository {
 | `get_member_snapshot` / `save_member_snapshot` | member snapshot | `Option` / `Version` | `RepositoryError` | assign / identity consumer | 不保存 identity body |
 | `get_method_snapshot` / `save_method_snapshot` | method snapshot | `Option` / `Version` | `RepositoryError` | formalize / method consumer | 不保存 method body |
 | `list_stale_references` | `PageRequest` | `Page<ExternalReferenceRef>` | `RepositoryError` | refresh job | 只驱动 resolver,不修 business truth |
+| `list_project_references` | `ProjectRef`、`PageRequest` | `Page<ExternalReferenceRef>` | `RepositoryError` | refresh job `ExternalReferenceScopeKind::Project` | 按 Step 6 `ExternalReferenceScope` project family 从 committed Work truth / local reference snapshot indexes 枚举 typed refs;先去重稳定排序再分页;不得从 projection 或字符串拼接 |
 | `mark_reference_failed` | reference、failure reason、timestamp、version、UoW | `Version` | `RepositoryError` | refresh job / consumer | 保留旧快照,只更新 resolution state |
 
 #### 8.12 truth snapshot read helpers
@@ -1008,7 +1018,7 @@ pub trait WorkTruthSnapshotRepository {
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
-| `load_project_truth_snapshot` | `ProjectRef` | `ProjectWorkTruthSnapshot` | `RepositoryError` | rebuild job | snapshot 只读,字段闭环在 Step 8 / 11 |
+| `load_project_truth_snapshot` | `ProjectRef` | `ProjectWorkTruthSnapshot` | `RepositoryError` | rebuild job | snapshot 只读,字段闭环在 Step 6 projection helper DTO;返回 contracts shared body-free summaries,不得返回 domain-only object |
 | `load_truth_cursor` | `ProjectRef` | `WorkTruthCursor` | `RepositoryError` | rebuild / reconciliation | cursor 不能替代 optimistic version |
 
 ### 9. External Resolver / Publisher / Handoff Port 契约
@@ -1544,7 +1554,7 @@ pub enum StoredJobResult {
 | `InMemoryAuditRepository` | `infra/src/repositories.rs` | `AuditRepository` | P0 fake | trace list 可分页 |
 | `InMemoryWorkOutboxRepository` | `infra/src/outbox_store.rs` | `WorkOutboxRepository` | P0 fake | pending / mark published / failed 可测 |
 | `InMemoryProjectionRepository` | `infra/src/projection_stores.rs` | `ProjectionRepository`、`WorkTruthSnapshotRepository` | P0 fake | replace 只能由 service 调用 |
-| `InMemoryReferenceSnapshotRepository` | `infra/src/reference_stores.rs` | `ReferenceSnapshotRepository` | P0 fake | stale refs 可分页 |
+| `InMemoryReferenceSnapshotRepository` | `infra/src/reference_stores.rs` | `ReferenceSnapshotRepository` | P0 fake | stale refs / project-scoped refs 可分页;可断言去重与稳定排序 |
 | `InMemoryIdempotencyRepository` | `infra/src/idempotency_store.rs` | `IdempotencyRepository` | P0 fake | duplicate / conflict 按 digest 判定 |
 | `InMemoryCommandResultRepository` | `infra/src/command_result_store.rs` | `CommandResultRepository` | P0 fake | 按 `ApplicationResultRef` 保存 / 读取 stored result surface;支持 missing 注入 |
 | `InMemoryJobResultRepository` | `infra/src/job_result_store.rs` | `JobResultRepository` | P0 fake | 按 `ApplicationResultRef` 保存 / 读取 stored job report surface;支持 missing 注入 |
@@ -1614,7 +1624,7 @@ pub enum StoredJobResult {
 | `ConsumeRuntimePromoteRequested` | `ReferenceSnapshotRepository`、`PromoteRepository`、`IdempotencyRepository` | 是 | `SourceWorkResolverPort`、`ClockPort` | 只形成 pending intake / reference state |
 | `PublishWorkOutbox` | `WorkOutboxRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `WorkOutboxPublisherPort`、`ClockPort` | mark published / failed;save `StoredJobResult::WorkJob` before idempotency complete |
 | `RebuildWorkProjections` | `WorkTruthSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `ClockPort` | replace views + mark fresh;save `StoredJobResult::WorkJob` before idempotency complete |
-| `RefreshExternalReferenceSnapshots` | `ReferenceSnapshotRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | resolver ports、`ClockPort` | save snapshots + mark affected views stale;save `StoredJobResult::WorkJob` before idempotency complete |
+| `RefreshExternalReferenceSnapshots` | `ReferenceSnapshotRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | resolver ports、`ClockPort` | `None` / `StaleOnly` 用 `list_stale_references`;`Project` 用 `list_project_references`;`ExplicitRefs` 用 request refs;save snapshots + mark affected views stale;save `StoredJobResult::WorkJob` before idempotency complete |
 | `RunWorkReconciliation` | truth / projection / outbox / reference repositories、`IdempotencyRepository`、`JobResultRepository` | 是 | `ClockPort` | save `StoredJobResult::Reconciliation` before idempotency complete;does not repair truth |
 | `PrepareWorkTraceHandoff` | `AuditRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `TraceHandoffPort`、`ClockPort` | save / enqueue handoff marker;save `StoredJobResult::WorkJob` before idempotency complete |
 | `PrepareArchiveHandoff` | truth repositories、`AuditRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `ArchiveHandoffPort`、`ClockPort` | save / enqueue archive handoff marker;save `StoredJobResult::WorkJob` before idempotency complete |

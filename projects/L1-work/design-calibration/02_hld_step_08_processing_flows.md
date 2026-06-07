@@ -346,7 +346,8 @@
 | read ProjectWorkTruthSnapshot from truth repositories             |
 |        v                                                          |
 | ProjectBoardView::from_truth(ProjectWorkTruthSnapshot snapshot)   |
-| MemberWorkView / WorkSearchProjection rebuild from same truth      |
+| MemberWorkView / IterationSummaryView / WorkSearchProjection       |
+| rebuild from body-free truth summaries                             |
 |        v                                                          |
 | DerivedWorkViewState::mark_fresh(WorkTruthCursor cursor)          |
 +=================================================================+

@@ -274,8 +274,26 @@ pub struct ExternalEvidenceRef {
 | `ArchiveHandoffScope` | `scope_kind: ArchiveHandoffScopeKind`;`subject_refs: Vec<WorkTraceSubjectRef>`;`source_cursor: Option<WorkTruthCursor>` | archive handoff coverage | subject 非空;只含 Work refs / cursor;不含正文 |
 | `ArchiveHandoffTargetRef` | `target_kind: ArchiveHandoffTargetKind`;`external_ref: ExternalSourceRef` | archive handoff target | 指向 archive boundary;不保存 archive body |
 | `WorkReconciliationScopeRef` | `scope_kind: WorkReconciliationScopeKind`;`project_ref: Option<ProjectRef>`;`view_ref: Option<DerivedWorkViewRef>`;`reference_ref: Option<ExternalReferenceRef>` | reconciliation job scope | `Project` scope 必须带 `project_ref`;`View` scope 必须带 `view_ref`;`Reference` scope 必须带 `reference_ref` |
-| `ExternalReferenceScope` | `scope_kind: ExternalReferenceScopeKind`;`project_ref: Option<ProjectRef>`;`reference_refs: Vec<ExternalReferenceRef>` | reference refresh scope | absent in job input means stale refs;explicit scope 不保存外部正文 |
+| `ExternalReferenceScope` | `scope_kind: ExternalReferenceScopeKind`;`project_ref: Option<ProjectRef>`;`reference_refs: Vec<ExternalReferenceRef>` | reference refresh scope | absent in job input means stale refs;`Project` scope 必须带 `project_ref`;`ExplicitRefs` 必须带非空 `reference_refs`;scope 展开只产生 typed external refs,不保存外部正文 |
 | `JobRunId` | string newtype | operations job run identity | job trigger 提供或系统生成;同一 job retry 保持稳定 |
+
+`ExternalReferenceScope` 分支闭环:
+
+| scope_kind | required fields | forbidden / ignored fields | 展开来源 | 约束 |
+|---|---|---|---|---|
+| `StaleOnly` | 无 | `project_ref`、`reference_refs` 必须为空 | `ReferenceSnapshotRepository.list_stale_references(page)` | 与 `reference_scope = None` 等价 |
+| `Project` | `project_ref` | `reference_refs` 必须为空 | `ReferenceSnapshotRepository.list_project_references(project_ref, page)` | 从 committed Work truth / local reference snapshot indexes 枚举 project-scoped typed refs |
+| `ExplicitRefs` | 非空 `reference_refs` | `project_ref` 必须为空 | request body | 按 `ExternalReferenceRef` stable identity 去重后分页;不访问外部正文 |
+
+`Project` scope 的 reference family 必须由正式 typed conversion 构造:
+
+- `ExternalReferenceRef::from_member(member_ref)` for project members' `GlobalMemberRef`.
+- `ExternalReferenceRef::from_method_definition(definition_ref)` for formal work admission / stored intent method definitions that are associated with the project.
+- `ExternalReferenceRef::from_source_work(source_ref)` for project spec source refs, formal root / child work source refs, promote result / pending promote intake source refs that repository can tie to the project.
+- `ExternalReferenceRef::from_evidence(evidence_ref)` for work completion refs, dependency satisfaction evidence refs, blocker resolved evidence refs, and lifecycle / relation reason refs that are persisted as external evidence and tied to project work.
+- `ExternalReferenceRef::from_process_timebox(timebox_ref)` for iteration timebox refs owned by the project.
+
+Project scope must exclude refs that cannot be tied to the requested project by committed Work truth or local reference snapshot index. It must not scan projection rows, parse string ids, read external bodies, or invent ad hoc reference variants. Deduplicate by `ExternalReferenceRef` stable identity, sort by typed variant then canonical inner ref, then apply `PageRequest`.
 
 ##### trace / audit / handoff shared schema
 
@@ -969,20 +987,110 @@ pub enum WorkTruthChange {
 ##### projection / reconciliation helper DTO
 
 ```rust
+/// Body-free project summary used by projection rebuild.
+pub struct ProjectTruthSummary {
+    /// Project reference.
+    pub project_ref: ProjectRef,
+    /// Current project lifecycle state.
+    pub lifecycle_state: ProjectLifecycleState,
+    /// Current backlog when available.
+    pub backlog_ref: Option<BacklogRef>,
+}
+
+/// Body-free backlog summary used by projection rebuild.
+pub struct BacklogTruthSummary {
+    /// Backlog reference.
+    pub backlog_ref: BacklogRef,
+    /// Owning project.
+    pub project_ref: ProjectRef,
+    /// Current backlog availability state.
+    pub backlog_state: BacklogState,
+}
+
+/// Body-free project member summary used by projection rebuild.
+pub struct ProjectMemberTruthSummary {
+    /// Project member reference.
+    pub project_member_ref: ProjectMemberRef,
+    /// Owning project.
+    pub project_ref: ProjectRef,
+    /// Referenced identity member.
+    pub member_ref: GlobalMemberRef,
+    /// Current responsibility state.
+    pub responsibility_state: ProjectMemberResponsibilityState,
+}
+
+/// Body-free formal work summary used by projection rebuild.
+pub struct FormalWorkTruthSummary {
+    /// Formal work reference.
+    pub work_ref: FormalWorkRef,
+    /// Owning project.
+    pub project_ref: ProjectRef,
+    /// Owning backlog.
+    pub backlog_ref: BacklogRef,
+    /// Parent work when this is a child work item.
+    pub parent_ref: Option<FormalWorkRef>,
+    /// Searchable title.
+    pub title: WorkTitle,
+    /// Current work lifecycle state.
+    pub work_state: WorkItemState,
+    /// Current project member assignee when available.
+    pub assignee_ref: Option<ProjectMemberRef>,
+    /// Source used to create or promote this work when available.
+    pub source_ref: Option<SourceWorkRef>,
+    /// Source kind copied out for projection filtering.
+    pub source_kind: Option<SourceWorkKind>,
+    /// Completion evidence reference when present.
+    pub completion_ref: Option<ExternalEvidenceRef>,
+    /// Iteration scope when the work is currently committed.
+    pub iteration_ref: Option<IterationRef>,
+}
+
+/// Body-free dependency or blocker summary used by projection rebuild.
+pub struct WorkRelationTruthSummary {
+    /// Dependency or blocker reference.
+    pub relation_ref: DependencyOrBlockerRef,
+    /// Formal work affected by this relation.
+    pub affected_work_refs: Vec<FormalWorkRef>,
+    /// Current relation state marker.
+    pub relation_state: WorkRelationStateView,
+}
+
+/// Public relation state marker that avoids exposing domain-only relation objects.
+pub enum WorkRelationStateView {
+    /// Dependency state marker.
+    Dependency(DependencyState),
+    /// Blocker state marker.
+    Blocker(BlockerState),
+}
+
+/// Body-free iteration and commitment summary used by projection rebuild.
+pub struct IterationTruthSummary {
+    /// Iteration reference.
+    pub iteration_ref: IterationRef,
+    /// Owning project.
+    pub project_ref: ProjectRef,
+    /// Current iteration state.
+    pub iteration_state: IterationState,
+    /// Current commitment state when a commitment exists.
+    pub commitment_state: Option<CommitmentState>,
+    /// Formal work currently committed to this iteration.
+    pub committed_work_refs: Vec<FormalWorkRef>,
+}
+
 /// Committed truth snapshot used to rebuild project-scoped projections.
 pub struct ProjectWorkTruthSnapshot {
-    /// Project truth.
-    pub project: Project,
-    /// Backlog truth when present.
-    pub backlog: Option<Backlog>,
+    /// Project truth summary.
+    pub project: ProjectTruthSummary,
+    /// Backlog truth summary when present.
+    pub backlog: Option<BacklogTruthSummary>,
     /// Project members in scope.
-    pub members: Vec<ProjectMember>,
-    /// Formal work records in scope.
-    pub work_items: Vec<FormalWorkRef>,
-    /// Dependency and blocker refs in scope.
-    pub relation_refs: Vec<DependencyOrBlockerRef>,
-    /// Iteration refs in scope.
-    pub iteration_refs: Vec<IterationRef>,
+    pub members: Vec<ProjectMemberTruthSummary>,
+    /// Formal work summaries in scope.
+    pub work_items: Vec<FormalWorkTruthSummary>,
+    /// Dependency and blocker summaries in scope.
+    pub relations: Vec<WorkRelationTruthSummary>,
+    /// Iteration summaries in scope.
+    pub iterations: Vec<IterationTruthSummary>,
     /// Source cursor covered by this snapshot.
     pub source_cursor: WorkTruthCursor,
 }
@@ -1025,6 +1133,8 @@ pub struct WorkSearchProjection {
     pub work_state: WorkItemState,
     /// Current assignee when available.
     pub assignee_ref: Option<ProjectMemberRef>,
+    /// Source kind used by `WorkSearchCriteria.source_kind`.
+    pub source_kind: Option<SourceWorkKind>,
     /// Source cursor that produced this row.
     pub source_cursor: WorkTruthCursor,
 }
@@ -1032,10 +1142,19 @@ pub struct WorkSearchProjection {
 
 | 类型 | 字段 / 形态 | 作用 | 约束 |
 |---|---|---|---|
-| `ProjectWorkTruthSnapshot` | committed truth refs + cursor | rebuild source | 由 repository 从 committed truth 读取;不得读取旧 projection |
-| `ProjectProjectionBatch` | board/member/iteration/search projection DTO | rebuild replace input | 必须由 `ProjectWorkTruthSnapshot` 构造 |
+| `ProjectTruthSummary` / `BacklogTruthSummary` / `ProjectMemberTruthSummary` / `FormalWorkTruthSummary` / `WorkRelationTruthSummary` / `IterationTruthSummary` | body-free contracts summary DTO | projection rebuild input | 只能包含 shared refs / states / safe summary fields;不得引用 `Project`、`Backlog`、`ProjectMember`、`Iteration`、`IterationCommitment` 或其他 domain-only object |
+| `ProjectWorkTruthSnapshot` | body-free committed truth summaries + cursor | rebuild source | 由 repository 从 committed truth 读取;不得读取旧 projection;作为 `contracts/views.rs` shared DTO 穿过 job / port surface |
+| `ProjectProjectionBatch` | board/member/iteration/search projection DTO | rebuild replace input | 必须由 `ProjectWorkTruthSnapshot` summaries 构造,不得消费 domain object |
 | `ReconciliationReport` | scope/cursor/gap refs | reconciliation output | report 不是 business truth;不得修复 projection 本身 |
-| `WorkSearchProjection` | project/work/title/state/assignee/cursor | internal search row | public response 通过 `WorkSearchResult` 映射 |
+| `WorkSearchProjection` | project/work/title/state/assignee/source_kind/cursor | internal search row | public response 通过 `WorkSearchResult` 映射;`source_kind` 支撑 `WorkSearchCriteria.source_kind` filter |
+
+`ProjectProjectionBatch::from_truth(snapshot, projection_set)` 只能读取上述 body-free summary:
+
+- `ProjectBoardView` 从 `snapshot.project` 和 `snapshot.work_items` 构造 work cards。
+- `MemberWorkView` 从 `snapshot.members` 与 `snapshot.work_items.assignee_ref` 构造 assigned work。
+- `IterationSummaryView` 从 `snapshot.iterations.committed_work_refs` 与 `snapshot.work_items` 构造 committed work summary。
+- `WorkSearchProjection` 从 `snapshot.work_items` 构造 title / state / assignee / source_kind / cursor search rows。
+- `WorkRelationTruthSummary` 只作为 facts / reconciliation / relation-aware view 的 summary 输入;当前 P0 relation 变化不进入 search row 字段。
 
 ##### `SourceWorkKind`
 

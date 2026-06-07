@@ -53,7 +53,7 @@
 
 | 工厂函数 | 作用 |
 |---|---|
-| `from_truth(ProjectMember member, ProjectWorkTruthSnapshot snapshot)` | 从成员和 truth 摘要重建 |
+| `from_truth(ProjectMemberTruthSummary member, ProjectWorkTruthSnapshot snapshot)` | 从成员摘要和 truth 摘要重建 |
 
 禁止事项:不得替代 ProjectMember truth 或成员权限裁决。
 
@@ -80,7 +80,7 @@
 
 | 工厂函数 | 作用 |
 |---|---|
-| `from_iteration(Iteration iteration, IterationCommitment commitment)` | 从 Iteration truth 重建摘要 |
+| `from_truth(IterationTruthSummary iteration, ProjectWorkTruthSnapshot snapshot)` | 从 Iteration / commitment 摘要和 formal work 摘要重建 |
 
 禁止事项:不得改变 IterationCommitment。
 

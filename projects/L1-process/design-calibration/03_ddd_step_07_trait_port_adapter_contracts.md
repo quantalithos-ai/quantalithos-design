@@ -386,6 +386,12 @@ pub trait ProcessShapeRepository {
         version_ref: MethodDefinitionVersionRef,
     ) -> Result<Option<Versioned<RuntimeProcessShape>>, RepositoryError>;
 
+    /// Loads the body-free route set for a gateway in the indexed runtime shape summary.
+    async fn get_gateway_route_set(
+        &self,
+        gateway_ref: GatewayRef,
+    ) -> Result<Option<GatewayRouteSet>, RepositoryError>;
+
     /// Saves a shape using optimistic concurrency.
     async fn save(
         &self,
@@ -1110,6 +1116,9 @@ pub trait IdGeneratorPort {
 
     /// Creates an activity id.
     fn new_activity_id(&self) -> ActivityId;
+
+    /// Creates an activity progression record id.
+    fn new_activity_progression_id(&self) -> ActivityProgressionId;
 
     /// Creates a process outbox id.
     fn new_process_outbox_id(&self) -> ProcessOutboxId;

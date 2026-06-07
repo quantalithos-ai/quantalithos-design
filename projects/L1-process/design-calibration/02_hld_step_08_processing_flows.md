@@ -125,7 +125,7 @@
 
 ```text
 +======================= AdvanceProcessActivity ======================+
-| command: ProcessInstanceRef + ActivityRef + ProgressionInput          |
+| command: ProcessInstanceRef + ActivityRef + ActivityProgressionIntent |
 |        v                                                             |
 | ActivityProgressionService reserves idempotency                      |
 |        v                                                             |
@@ -133,9 +133,8 @@
 |        v                                                             |
 | ActivityFeedbackPolicy / GatewayRoutingPolicy validates progression  |
 |        v                                                             |
-| Activity::apply_progression(ActivityProgressionInput input,          |
-|                             ActorRef actor)                          |
-| Token::move_to(ProcessPosition target_position)                      |
+| map ActivityProgressionIntentRef to Activity.ready/start/complete/... |
+| map flow-control intent to Token / Gateway state change               |
 |        v                                                             |
 | save activity + token/gateway + progression record + trace + outbox   |
 +=====================================================================+

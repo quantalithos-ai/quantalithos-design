@@ -87,7 +87,7 @@
 
 | 模块 | 文件 | 对象 / 类型 |
 |---|---|---|
-| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState`、`ReferenceResolutionLifecycleState`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RuntimeFeedbackSummaryRef`、`SourceDigest` |
+| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker、command intent helper;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState`、`ReferenceResolutionLifecycleState`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RuntimeFeedbackSummaryRef`、`ProcessStartIntentRef`、`ProcessStartReason`、`ActivityProgressionIntentRef`、`ActivityProgressionTransition`、`ActivityFlowControlIntent`、`SourceDigest` |
 | `contracts` | `events.rs` | `ProcessOutboxEventKind`、`ProcessOutboundEventPayload` 及 outbound event payload DTO |
 | `contracts` | `views.rs` | `RuntimeProcessShapeView`、`ProcessProfileView`、`ProcessInstanceView`、`ActivityStatusView`、`ProcessTimelineView`、`ProcessProgressSummaryView`、`ReconciliationReportView` |
 | `domain` | `runtime_shape.rs` | `RuntimeProcessShape`、`RuntimeProcessShapeState` |
@@ -125,6 +125,7 @@ pub struct ExampleRef {
 | event reason enum | `contracts::refs` | 若 outbound payload 需要统一表达多种 domain reason,必须定义 enum 及从 domain reason 的映射 |
 | public state enum | `contracts::refs` | 若会进入 DTO / Event / View,归 contracts;domain 复用同一 enum |
 | public reference state struct | `contracts::refs` | 若 struct 会被 public ref、DTO、Event、View、Job 或 application port 直接引用,归 contracts;domain 只能复用或通过 policy / guard 校验 |
+| command intent helper | `contracts::refs` | 若 request 需要用 intent 选择 domain transition,必须定义结构化 enum / struct 和 variant 到 domain method 的映射;不得用裸字符串或 opaque ref 让 service 猜分支 |
 | internal-only state enum | `domain::<file>` | 不进入 public protocol;若后续 Step 8 需要暴露,必须上提到 contracts |
 | external refs | `contracts::refs` | `value: String` + kind / source 字段,只表达外部稳定引用,不得保存正文 |
 
@@ -186,7 +187,132 @@ pub enum RuntimeFeedbackKind {
 | `RuntimeFeedbackSummaryRef` | `contracts::refs` | `value: String` | 非空;指向无执行正文的 feedback summary |
 | `SourceDigest` | `contracts::refs` | `value: String` | 非空;opaque source digest;Process 只比较稳定值,不解释算法 |
 
-##### 7.2.2 feedback summary and gateway policy input schema
+##### 7.2.2 process start intent schema
+
+`StartProcessInstanceRequest.start_intent_ref` 必须使用以下结构化 schema。它虽然保留 `*Ref` 命名以兼容 protocol 字段,但不是 opaque string ref;实现必须用它选择 bootstrap start node、initial token position 和可选 gateway bootstrap,不得从 runtime shape body、profile 私有字段或字符串约定中自行推断 start 分支。
+
+```rust
+/// Structured command intent for bootstrapping a process instance.
+pub struct ProcessStartIntentRef {
+    /// Runtime shape node where the initial activity and token must be created.
+    pub start_node_ref: ShapeNodeRef,
+    /// Optional gateway that must be initialized when the start node enters gateway tracking.
+    pub initial_gateway_ref: Option<GatewayRef>,
+    /// Caller-supplied start reason or source reference.
+    pub start_reason: ProcessStartReason,
+}
+```
+
+| 字段 | 类型 | 来源 | Domain / flow 映射 | validation / 语义 |
+|---|---|---|---|---|
+| `start_node_ref` | `ShapeNodeRef` | caller + active profile / runtime shape summary | `Activity::from_shape_node(...)`;`Token::start_at(..., start_node_ref)` | 必须属于 active profile 的 runtime shape start node set;missing / unknown / not startable -> reject |
+| `initial_gateway_ref` | `Option<GatewayRef>` | caller + runtime shape body-free gateway summary | 当 start node requires gateway tracking 时创建 initial `Gateway` state | start node requires gateway tracking 时必填;不需要 gateway tracking 时必须为空;gateway 必须属于同一 shape |
+| `start_reason` | `ProcessStartReason` | caller | trace / audit / command result context;不进入 external body | 非空;表达启动分类或原因引用;正文说明进入 trace / audit |
+
+`ProcessStartReason` 归 `contracts::refs`,schema 为 `value: String`,非空。StartProcessInstance bootstrap 不追加 `ActivityProgressionRecord`;`ProcessStartIntentRef` 只用于创建 initial `Activity`、`Token` 和可选 `Gateway`,并驱动 `ProcessInstance::start(&profile, initial_activity_ref, actor)`。
+
+##### 7.2.3 activity progression intent schema
+
+`AdvanceProcessActivityRequest.progression_ref` 必须使用以下结构化 schema。它虽然保留 `*Ref` 命名以兼容 protocol 字段,但不是 opaque string ref;实现必须按 variant 直接分派到 Step 6 domain method,不得通过字符串约定、runtime shape body 或 adapter 私有字段推断。
+
+```rust
+/// Structured command intent for advancing one activity and its flow-control state.
+pub struct ActivityProgressionIntentRef {
+    /// Activity transition requested by the command.
+    pub activity_transition: ActivityProgressionTransition,
+    /// Token / gateway effect requested by the same command.
+    pub flow_control: ActivityFlowControlIntent,
+}
+
+/// Activity transition selected by AdvanceProcessActivity.
+pub enum ActivityProgressionTransition {
+    /// Mark a planned activity as ready.
+    Ready,
+    /// Start a ready activity.
+    Start,
+    /// Complete an in-progress or feedback-waiting activity.
+    Complete {
+        /// Completion reason supplied by the caller.
+        reason: ActivityCompletionReason,
+        /// Body-free feedback summary consumed by completion policy when the activity has feedback.
+        feedback_summary_ref: Option<RuntimeFeedbackSummaryRef>,
+    },
+    /// Skip a non-terminal activity.
+    Skip {
+        /// Skip reason supplied by the caller.
+        reason: ActivitySkipReason,
+    },
+    /// Fail a non-terminal activity.
+    Fail {
+        /// Failure reason supplied by the caller.
+        reason: ActivityFailureReason,
+    },
+}
+
+/// Flow-control effect requested by the same progression command.
+pub enum ActivityFlowControlIntent {
+    /// No token or gateway state changes in this command.
+    None,
+    /// Move one active token to a new runtime shape node.
+    MoveToken {
+        /// Token expected at the request expected_position_ref.
+        token_ref: ProcessTokenRef,
+        /// Target runtime shape node.
+        next_position_ref: ShapeNodeRef,
+    },
+    /// Consume one token after a normal terminal path.
+    ConsumeToken {
+        /// Token to consume.
+        token_ref: ProcessTokenRef,
+    },
+    /// Terminate one token after cancellation or failure.
+    TerminateToken {
+        /// Token to terminate.
+        token_ref: ProcessTokenRef,
+        /// Termination reason.
+        reason: TokenTerminationReason,
+    },
+    /// Select one gateway route and move the affected token to the selected route target.
+    SelectGatewayRoute {
+        /// Token affected by the selected route.
+        token_ref: ProcessTokenRef,
+        /// Gateway where the route is selected.
+        gateway_ref: GatewayRef,
+        /// Route selected from the gateway route set.
+        route_ref: GatewayRouteRef,
+        /// Token target node after route selection.
+        next_position_ref: ShapeNodeRef,
+        /// Route decision reason.
+        decision_reason: GatewayDecisionReason,
+    },
+    /// Join a gateway using a stable set of process tokens.
+    JoinGateway {
+        /// Gateway to join.
+        gateway_ref: GatewayRef,
+        /// Tokens participating in the join.
+        token_refs: Vec<ProcessTokenRef>,
+    },
+}
+```
+
+| `activity_transition` variant | 必填字段 | Domain method 映射 | policy / validation |
+|---|---|---|---|
+| `Ready` | 无 | `Activity.ready(progression_id, actor)` | 当前状态必须为 `Planned`;flow control 可为 `None` 或合法 token move;`progression_id` 由 application 生成 |
+| `Start` | 无 | `Activity.start(progression_id, actor)` | 当前状态必须为 `Ready`;assignee / actor policy 满足;`progression_id` 由 application 生成 |
+| `Complete` | `reason`;有 `Activity.feedback_ref` 或 `WaitingFeedback` 时必须带 `feedback_summary_ref` | `Activity.complete(progression_id, reason, actor)` | 若带 feedback,必须读取 matching `RuntimeFeedbackSummary` 并通过 `ActivityFeedbackPolicy.assert_feedback_can_complete(...)` 和 `assert_no_runtime_body(...)`;`progression_id` 由 application 生成 |
+| `Skip` | `reason` | `Activity.skip(progression_id, reason, actor)` | skip reason 合法;若影响 token,flow control 必须显式给出 `ConsumeToken` / `MoveToken`;`progression_id` 由 application 生成 |
+| `Fail` | `reason` | `Activity.fail(progression_id, reason, actor)` | failure reason 合法;若影响 token,flow control 必须显式给出 `TerminateToken`;`progression_id` 由 application 生成 |
+
+| `flow_control` variant | 必填字段 | Domain method 映射 | policy / validation |
+|---|---|---|---|
+| `None` | 无 | 无 token / gateway method | 仅在本次 progression 不改变 flow-control truth 时允许 |
+| `MoveToken` | `token_ref`;`next_position_ref` | `Token.move_to(next_position_ref)` | loaded token 必须属于 instance,且当前位置等于 `AdvanceProcessActivityRequest.expected_position_ref` |
+| `ConsumeToken` | `token_ref` | `Token.consume()` | token 必须属于 instance 且处于可消费状态 |
+| `TerminateToken` | `token_ref`;`reason` | `Token.terminate(reason)` | token 必须属于 instance 且处于可终止状态 |
+| `SelectGatewayRoute` | `token_ref`;`gateway_ref`;`route_ref`;`next_position_ref`;`decision_reason` | `GatewayRoutingPolicy.assert_route_allowed(...)` -> `Gateway.select_route(route_ref, decision_reason, actor)` -> `Token.move_to(next_position_ref)` | route 必须属于 gateway route set;`Gateway.select_route` 必须写入 `Gateway.selected_route_ref = Some(route_ref)` |
+| `JoinGateway` | `gateway_ref`;非空 `token_refs` | build `TokenSet` from loaded tokens -> `GatewayRoutingPolicy.assert_can_join(...)` -> `Gateway.join_tokens(token_set)` | tokens 必须属于同一 process instance,且 token set ref 使用 owning instance 的 `token_set_ref` |
+
+##### 7.2.4 feedback summary and gateway policy input schema
 
 `RuntimeFeedbackSummary`、`TokenSet`、`TokenSnapshot` 和 `GatewayRouteSet` 是 PH-03 domain policy input,归 `domain::reference` 或 `domain::token_gateway`。它们可以进入测试 fixture 和 fake resolver output,但不得保存外部正文、runtime queue、method shape body 或 provider response body。`RuntimeFeedbackSummary.runtime_feedback_ref` 与 `RuntimeFeedbackSummary.feedback_state` 复用 `contracts::refs` 中的 `RuntimeFeedbackRef` 与 `ReferenceResolutionState`。
 
@@ -251,7 +377,7 @@ pub struct GatewayRouteSet {
 | `RuntimeFeedbackSummary` | `feedback_summary_ref` 来自 request / inbound event;`runtime_feedback_ref` 来自 resolver marker;`activity_ref` 必须匹配 `Activity.activity_id`;`source_digest` 来自 source event / resolver | `assert_feedback_can_complete` 要求 `feedback_kind = Completion`、`feedback_state` 可用、activity 匹配;`assert_no_runtime_body` 要求 `contains_runtime_body = false` |
 | `TokenSet` | `token_set_ref` 必须匹配 `ProcessInstance.token_set_ref`;`token_refs` 来自 token repository / command candidate | gateway join 时 `token_refs` 必须非空且全部属于同一 `process_instance_id` |
 | `TokenSnapshot` | counts 和 `token_refs` 来自 token repository committed truth | counts 必须与 repository snapshot 一致;不得从 runtime queue 反推 |
-| `GatewayRouteSet` | `gateway_ref` 来自 `Gateway`;`route_refs` 来自 runtime shape summary / repository | `assert_route_allowed` 要求 route 属于 `route_refs`;空 route set 只能导致 policy reject |
+| `GatewayRouteSet` | `gateway_ref` 来自 `Gateway`;`route_refs` 来自 `ProcessShapeRepository::get_gateway_route_set(gateway_ref)` 的 body-free route summary | `assert_route_allowed` 要求 route 属于 `route_refs`;空 route set 只能导致 policy reject;不得读取 method definition body |
 
 ### 8. domain truth / execution 对象契约
 
@@ -442,13 +568,13 @@ pub struct ProcessInstance {
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `pub fn start(&mut self, profile: &ProcessProfile, initial_activity_ref: ActivityRef, actor: ActorRef) -> Result<(), DomainError>` | 启动实例 | active profile、初始 activity ref、actor | `Result<(), DomainError>` | `NotStarted` -> `Running`;设置 `current_activity_ref = Some(initial_activity_ref)`;不生成 `ActivityProgressionRecord` |
-| `pub fn advance(&mut self, activity_ref: ActivityRef, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 推进当前活动 | activity ref、actor | `Result<ActivityProgressionRecord, DomainError>` | 仅 `Running` 可推进 |
+| `pub fn advance(&mut self, activity_ref: ActivityRef, actor: ActorRef) -> Result<(), DomainError>` | 更新实例当前活动指针 | activity ref、actor | `Result<(), DomainError>` | 仅 `Running` 可推进;设置 `current_activity_ref = Some(activity_ref)`;不生成 `ActivityProgressionRecord` |
 | `pub fn pause_for_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 进入等待 | waiting gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Running` -> `Waiting` |
 | `pub fn resume_from_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 从等待恢复 | resumed gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Waiting` -> `Running` |
 | `pub fn mark_recovering(&mut self, checkpoint: &ProcessCheckpoint, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 进入恢复 | checkpoint、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;非终态 -> `Recovering` |
 | `pub fn complete_recovery(&mut self, attempt: &RecoveryAttempt, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 完成恢复并回到运行 | 已 `Applied` 的 recovery attempt、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;`Recovering` -> `Running`;不得创建第二份 instance |
-| `pub fn complete(&mut self, actor: ActorRef) -> Result<ProcessTraceRecord, DomainError>` | 完成实例 | actor | `Result<ProcessTraceRecord, DomainError>` | `Running` -> `Completed` |
-| `pub fn cancel(&mut self, reason: ProcessCancelReason, actor: ActorRef) -> Result<ProcessTraceRecord, DomainError>` | 取消实例 | 原因、actor | `Result<ProcessTraceRecord, DomainError>` | 非终态 -> `Cancelled` |
+| `pub fn complete(&mut self, actor: ActorRef) -> Result<(), DomainError>` | 完成实例 | actor | `Result<(), DomainError>` | `Running` -> `Completed`;只改变 instance truth;不生成 `ProcessTraceRecord` |
+| `pub fn cancel(&mut self, reason: ProcessCancelReason, actor: ActorRef) -> Result<(), DomainError>` | 取消实例 | 原因、actor | `Result<(), DomainError>` | 非终态 -> `Cancelled`;只改变 instance truth;不生成 `ProcessTraceRecord` |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -525,13 +651,13 @@ pub struct Activity {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn assign(&mut self, actor_ref: ActorRef, requested_by: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 指定承担者 | assignee、请求 actor | `Result<ActivityProgressionRecord, DomainError>` | 不改变外部 identity truth |
-| `pub fn ready(&mut self, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 标记可执行 | actor | `Result<ActivityProgressionRecord, DomainError>` | `Planned` -> `Ready` |
-| `pub fn start(&mut self, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 开始活动 | actor | `Result<ActivityProgressionRecord, DomainError>` | `Ready` -> `InProgress` |
-| `pub fn attach_feedback(&mut self, feedback_ref: RuntimeFeedbackRef) -> Result<ActivityProgressionRecord, DomainError>` | 绑定外部反馈 | runtime feedback ref | `Result<ActivityProgressionRecord, DomainError>` | 不保存 runtime body |
-| `pub fn complete(&mut self, reason: ActivityCompletionReason, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 完成活动 | 原因、actor | `Result<ActivityProgressionRecord, DomainError>` | 合法状态 -> `Completed` |
-| `pub fn skip(&mut self, reason: ActivitySkipReason, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 跳过活动 | 原因、actor | `Result<ActivityProgressionRecord, DomainError>` | 非终态 -> `Skipped` |
-| `pub fn fail(&mut self, reason: ActivityFailureReason, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 标记失败 | 原因、actor | `Result<ActivityProgressionRecord, DomainError>` | 非终态 -> `Failed` |
+| `pub fn assign(&mut self, progression_id: ActivityProgressionId, actor_ref: ActorRef, requested_by: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 指定承担者 | progression id、assignee、请求 actor | `Result<ActivityProgressionRecord, DomainError>` | 不改变外部 identity truth;record 使用调用方传入 id |
+| `pub fn ready(&mut self, progression_id: ActivityProgressionId, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 标记可执行 | progression id、actor | `Result<ActivityProgressionRecord, DomainError>` | `Planned` -> `Ready`;record 使用调用方传入 id |
+| `pub fn start(&mut self, progression_id: ActivityProgressionId, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 开始活动 | progression id、actor | `Result<ActivityProgressionRecord, DomainError>` | `Ready` -> `InProgress`;record 使用调用方传入 id |
+| `pub fn attach_feedback(&mut self, progression_id: ActivityProgressionId, feedback_ref: RuntimeFeedbackRef) -> Result<ActivityProgressionRecord, DomainError>` | 绑定外部反馈 | progression id、runtime feedback ref | `Result<ActivityProgressionRecord, DomainError>` | 不保存 runtime body;record 使用调用方传入 id |
+| `pub fn complete(&mut self, progression_id: ActivityProgressionId, reason: ActivityCompletionReason, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 完成活动 | progression id、原因、actor | `Result<ActivityProgressionRecord, DomainError>` | 合法状态 -> `Completed`;record 使用调用方传入 id |
+| `pub fn skip(&mut self, progression_id: ActivityProgressionId, reason: ActivitySkipReason, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 跳过活动 | progression id、原因、actor | `Result<ActivityProgressionRecord, DomainError>` | 非终态 -> `Skipped`;record 使用调用方传入 id |
+| `pub fn fail(&mut self, progression_id: ActivityProgressionId, reason: ActivityFailureReason, actor: ActorRef) -> Result<ActivityProgressionRecord, DomainError>` | 标记失败 | progression id、原因、actor | `Result<ActivityProgressionRecord, DomainError>` | 非终态 -> `Failed`;record 使用调用方传入 id |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -647,6 +773,8 @@ pub struct Gateway {
     pub gateway_kind: GatewayKind,
     /// Current routing state.
     pub gateway_state: GatewayState,
+    /// Route selected by select_route when gateway_state is RouteSelected or Joined.
+    pub selected_route_ref: Option<GatewayRouteRef>,
 }
 ```
 
@@ -656,12 +784,13 @@ pub struct Gateway {
 | `shape_node_ref` | `ShapeNodeRef` | runtime shape 节点 | 必填 |
 | `gateway_kind` | `GatewayKind` | 分支 / 合流类别 | 必须为正式 enum |
 | `gateway_state` | `GatewayState` | 路由状态 | 必须为正式 enum |
+| `selected_route_ref` | `Option<GatewayRouteRef>` | 已选择路线 | `PendingDecision` / `Invalid` 必须为 `None`;`RouteSelected` 必须为 `Some`;`Joined` 若由 route selection 而来则保留同一个 `Some` |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn select_route(&mut self, route_ref: GatewayRouteRef, reason: GatewayDecisionReason, actor: ActorRef) -> Result<(), DomainError>` | 选择路线 | route、原因、actor | `Result<(), DomainError>` | `PendingDecision` -> `RouteSelected` |
-| `pub fn join_tokens(&mut self, tokens: TokenSet) -> Result<(), DomainError>` | 合并 token | token set | `Result<(), DomainError>` | `RouteSelected` -> `Joined` 或待合流 -> `Joined` |
-| `pub fn mark_invalid(&mut self, reason: GatewayInvalidReason) -> Result<(), DomainError>` | 标记不可用 | invalid reason | `Result<(), DomainError>` | 非终态 -> `Invalid` |
+| `pub fn select_route(&mut self, route_ref: GatewayRouteRef, reason: GatewayDecisionReason, actor: ActorRef) -> Result<(), DomainError>` | 选择路线 | route、原因、actor | `Result<(), DomainError>` | `PendingDecision` -> `RouteSelected`;设置 `selected_route_ref = Some(route_ref)` |
+| `pub fn join_tokens(&mut self, tokens: TokenSet) -> Result<(), DomainError>` | 合并 token | token set | `Result<(), DomainError>` | `RouteSelected` -> `Joined` 或待合流 -> `Joined`;若已有 `selected_route_ref` 必须保留 |
+| `pub fn mark_invalid(&mut self, reason: GatewayInvalidReason) -> Result<(), DomainError>` | 标记不可用 | invalid reason | `Result<(), DomainError>` | 非终态 -> `Invalid`;清空 `selected_route_ref` |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -692,6 +821,7 @@ pub enum GatewayState {
 
 - 不实现完整 BPMN 引擎。
 - 不自造 governance decision。
+- route selection 的唯一 truth 落点是 `Gateway.selected_route_ref`;`ActivityProgressionRecord`、command result 和 outbound event 只能复制同事务已保存的该字段,不得重新按当前 shape 或 adapter 输出推导。
 
 ### 9. gate / recovery / timing 对象契约
 
@@ -1778,7 +1908,7 @@ pub enum ProcessOutboxEventKind {
 | 类型 | 最小字段 | 工厂函数 | 禁止事项 |
 |---|---|---|---|
 | `ProfileChangeRecord` | `change_id: ProfileChangeId`;`profile_ref: ProcessProfileRef`;`change_reason: ProfileChangeReason`;`actor_ref: ActorRef` | `from_profile_change(profile: ProcessProfile, reason: ProfileChangeReason, actor: ActorRef) -> Result<Self, DomainError>` | 不替代 `ProcessProfile`;不保存 method body |
-| `ActivityProgressionRecord` | `progression_id: ActivityProgressionId`;`activity_ref: ActivityRef`;`from_state: ActivityState`;`to_state: ActivityState`;`feedback_ref: Option<RuntimeFeedbackRef>` | `from_activity_transition(activity: Activity, from_state: ActivityState, to_state: ActivityState) -> Result<Self, DomainError>` | 不保存 runtime body;不替代 `Activity` |
+| `ActivityProgressionRecord` | `progression_id: ActivityProgressionId`;`activity_ref: ActivityRef`;`from_state: ActivityState`;`to_state: ActivityState`;`feedback_ref: Option<RuntimeFeedbackRef>`;`token_refs: Vec<ProcessTokenRef>`;`gateway_ref: Option<GatewayRef>`;`selected_route_ref: Option<GatewayRouteRef>` | `from_activity_transition(progression_id: ActivityProgressionId, activity: Activity, from_state: ActivityState, to_state: ActivityState, token_refs: Vec<ProcessTokenRef>, gateway: Option<Gateway>) -> Result<Self, DomainError>` | 不保存 runtime body;不替代 `Activity`;`progression_id` 必须由 application 通过 `IdGeneratorPort::new_activity_progression_id()` 生成后传入,single-token flow 放 1 个 token ref,no-token flow 为空;`selected_route_ref` 只能复制同事务 committed `Gateway.selected_route_ref` |
 | `WaitingGateChangeRecord` | `change_id: WaitingGateChangeId`;`waiting_gate_ref: WaitingGateRef`;`from_state: WaitingGateState`;`to_state: WaitingGateState`;`decision_ref: Option<GovernanceDecisionRef>` | `from_gate_transition(gate: WaitingGate, from_state: WaitingGateState, to_state: WaitingGateState) -> Result<Self, DomainError>` | 不生成 decision;不替代 `WaitingGate` |
 | `RecoveryHistoryRecord` | `history_id: RecoveryHistoryId`;`process_instance_ref: ProcessInstanceRef`;`checkpoint_ref: Option<ProcessCheckpointRef>`;`attempt_ref: Option<RecoveryAttemptRef>`;`history_kind: RecoveryHistoryKind` | `from_recovery_attempt(attempt: RecoveryAttempt) -> Result<Self, DomainError>` | 不保存 archive package;不替代 `RecoveryAttempt` |
 

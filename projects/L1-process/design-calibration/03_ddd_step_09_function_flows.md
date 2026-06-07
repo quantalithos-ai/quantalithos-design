@@ -347,12 +347,13 @@ Steps:
 
 1. Reserve command idempotency.
 2. Load active `ProcessProfile`;load `WorkContextSnapshot`.
-3. `InstanceProgressionPolicy.assert_can_start(profile, project_ref)`.
-4. Generate `ProcessInstanceId`、`ProcessTokenSetRef`、initial `ActivityId` / `TokenId`.
-5. Create initial `Activity::from_shape_node(...)` and `Token::start_at(...)`;create gateway initial state when the start node requires gateway tracking.
-6. `ProcessInstance::create(...)` then `ProcessInstance.start(&profile, initial_activity.ref(), actor)`.
-7. Save instance, activity, token / gateway initial state, trace, outbox `InstanceChanged`;do not append `ActivityProgressionRecord` during instance bootstrap.
-8. Store `ProcessInstanceCommandResult`.
+3. Validate `start_intent_ref` against Step 6 §7.2.2: `start_node_ref` must belong to the active profile runtime shape start node set, `start_reason` must be non-empty, and `initial_gateway_ref` must be present only when that start node requires gateway tracking.
+4. `InstanceProgressionPolicy.assert_can_start(profile, project_ref)`.
+5. Generate `ProcessInstanceId`、`ProcessTokenSetRef`、initial `ActivityId` / `TokenId`.
+6. Create initial `Activity::from_shape_node(start_intent_ref.start_node_ref, ...)` and `Token::start_at(..., start_intent_ref.start_node_ref)`;create gateway initial state only from `start_intent_ref.initial_gateway_ref` when the start node requires gateway tracking.
+7. `ProcessInstance::create(...)` then `ProcessInstance.start(&profile, initial_activity.ref(), actor)`.
+8. Save instance, activity, token / gateway initial state, trace, outbox `InstanceChanged`;do not append `ActivityProgressionRecord` during instance bootstrap.
+9. Store `ProcessInstanceCommandResult`.
 
 Tests:success;duplicate;profile suspended;work context mismatch;missing start node.
 
@@ -364,13 +365,27 @@ Steps:
 
 1. Reserve command idempotency.
 2. Load `ProcessInstance`、`Activity`、active token / gateway by subject refs.
-3. Compare `expected_position_ref` with token / activity current position;conflict if mismatch.
-4. `InstanceProgressionPolicy.assert_can_advance(...)`.
-5. Apply activity transition based on `progression_ref`: `Activity.ready/start/complete/skip/fail(...)`.
-6. Move token or select / join gateway through `Token.move_to(...)` / `Gateway.select_route(...)`.
-7. Save changed objects and append `ActivityProgressionRecord`.
-8. Append trace and outbox `ActivityProgressed`.
-9. Store `ActivityProgressionCommandResult`.
+3. Validate `progression_ref` against Step 6 §7.2.3:activity transition variant must contain its required reason / summary ref,flow-control variant must contain all required token / gateway / route / target refs.
+4. Compare `expected_position_ref` with loaded token current position when `progression_ref.flow_control` references a token;conflict if mismatch.
+5. `InstanceProgressionPolicy.assert_can_advance(...)`.
+6. Generate one `ActivityProgressionId` via `IdGeneratorPort::new_activity_progression_id()`;the generated id must be passed into the activity transition that creates the `ActivityProgressionRecord`,domain must not generate it.
+7. Apply `progression_ref.activity_transition` exactly as Step 6 §7.2.3 maps it:
+   - `Ready` -> `Activity.ready(progression_id, actor)`.
+   - `Start` -> `Activity.start(progression_id, actor)`.
+   - `Complete { reason, feedback_summary_ref }` -> if activity has feedback / is waiting feedback,load matching `RuntimeFeedbackSummary` by `feedback_summary_ref`,run `ActivityFeedbackPolicy.assert_feedback_can_complete(...)` and `assert_no_runtime_body(...)`,then `Activity.complete(progression_id, reason, actor)`.
+   - `Skip { reason }` -> `Activity.skip(progression_id, reason, actor)`.
+   - `Fail { reason }` -> `Activity.fail(progression_id, reason, actor)`.
+8. Apply `progression_ref.flow_control` exactly as Step 6 §7.2.3 maps it:
+   - `None` -> no token / gateway save.
+   - `MoveToken` -> load token and call `Token.move_to(next_position_ref)`.
+   - `ConsumeToken` -> load token and call `Token.consume()`.
+   - `TerminateToken` -> load token and call `Token.terminate(reason)`.
+   - `SelectGatewayRoute` -> load body-free `GatewayRouteSet` via `ProcessShapeRepository::get_gateway_route_set(gateway_ref)`,run `GatewayRoutingPolicy.assert_route_allowed(...)`,call `Gateway.select_route(route_ref, decision_reason, actor)`,then `Token.move_to(next_position_ref)`.
+   - `JoinGateway` -> build `TokenSet` from loaded tokens and owning instance `token_set_ref`,run `GatewayRoutingPolicy.assert_can_join(...)`,then `Gateway.join_tokens(token_set)`.
+9. Call `ProcessInstance.advance(activity.ref(), actor)` only to update the instance current activity pointer;it returns `()` and must not construct `ActivityProgressionRecord`.
+10. Save changed objects and append `ActivityProgressionRecord`;record `token_refs` / `gateway_ref` / `selected_route_ref` from changed truth,where single-token variants put one ref,`JoinGateway` copies all joined token refs,and route selection copies committed `Gateway.selected_route_ref`.
+11. Append trace and outbox `ActivityProgressed`.
+12. Store `ActivityProgressionCommandResult`,copying `selected_route_ref` from the same `ActivityProgressionRecord`;duplicate replay returns the stored result surface.
 
 Tests:success;expected position conflict;invalid activity state;gateway invalid route;duplicate replay.
 
@@ -387,7 +402,7 @@ Steps:
 5. `ActivityFeedbackPolicy.assert_feedback_matches_activity(activity, resolution.runtime_feedback_ref)`.
 6. `ActivityFeedbackPolicy.assert_no_runtime_body(resolution.feedback_summary)`.
 7. Plain feedback binding must not complete activity; explicit completion paths consume the stored body-free summary before `Activity.complete(...)`.
-8. `Activity.attach_feedback(resolution.runtime_feedback_ref)`.
+8. Generate `ActivityProgressionId` via `IdGeneratorPort::new_activity_progression_id()` and call `Activity.attach_feedback(progression_id, resolution.runtime_feedback_ref)`.
 9. Save activity, append progression record and trace.
 10. Outbox only when policy says feedback binding is a publishable `ActivityProgressed` truth.
 11. Store `ActivityProgressionCommandResult`.

@@ -209,6 +209,8 @@
 | `ActivityKind` / `GatewayKind` / `RuntimeFeedbackKind` | `contracts/src/refs.rs` | public execution kind enums reused by DTO、event and domain object signatures |
 | `ProcessCancelReason` / `ActivityCompletionReason` / `ActivitySkipReason` / `ActivityFailureReason` / `TokenTerminationReason` / `GatewayDecisionReason` / `GatewayInvalidReason` | `contracts/src/refs.rs` | public reason newtypes used by command DTO and domain transitions |
 | `RuntimeFeedbackSummaryRef` / `SourceDigest` / `ProcessTokenRef` / `GatewayRouteRef` | `contracts/src/refs.rs` | secondary shared refs used by feedback、token and gateway protocols |
+| `ProcessStartIntentRef` / `ProcessStartReason` | `contracts/src/refs.rs` | structured command intent used by `StartProcessInstanceRequest.start_intent_ref`;schema and bootstrap mapping are Step 6 §7.2.2 |
+| `ActivityProgressionIntentRef` / `ActivityProgressionTransition` / `ActivityFlowControlIntent` | `contracts/src/refs.rs` | structured command intent used by `AdvanceProcessActivityRequest.progression_ref`;schema and variant-to-domain-method mapping are Step 6 §7.2.3 |
 | `ReferenceResolutionState` / `ReferenceResolutionLifecycleState` | `contracts/src/refs.rs` | public reference state reused by external reference markers、DTO、view、job、repository / resolver port and domain policy;contracts 不依赖 domain |
 | `GovernanceDecisionRef` / `ArtifactEvidenceMarker` / `RuntimeFeedbackRef` / `ConversationContextRef` | `contracts/src/refs.rs` | public external reference markers reused by protocol surface and domain;不得保存外部正文 |
 | `ProcessSearchFilter` | `contracts/src/queries.rs` | projection search filter derived from search request |
@@ -1025,9 +1027,10 @@ pub struct ProcessInstanceCommandResult {
 |---|---|---|---|---|
 | `profile_ref` | `ProcessProfileRef` | `ProcessInstance.profile_ref` | caller + profile repository | missing / inactive -> reject |
 | `work_context_ref` | `WorkContextRef` | source for `project_ref` validation | caller + snapshot repository | unresolved -> reject / retry |
+| `start_intent_ref` | `ProcessStartIntentRef` | initial activity / token / optional gateway bootstrap | caller;schema 见 Step 6 §7.2.2 | unknown start node、gateway mismatch、missing start reason -> reject |
 | `process_instance_id` | `ProcessInstanceId` | `ProcessInstance.process_instance_id` | `IdGeneratorPort` | generated |
 | `token_set_ref` | `ProcessTokenSetRef` | `ProcessInstance.token_set_ref` | `IdGeneratorPort` / token builder | generated |
-| `current_activity_ref` | `Option<ActivityRef>` | `ProcessInstance.current_activity_ref` | shape node projection | if no start node -> reject |
+| `current_activity_ref` | `Option<ActivityRef>` | `ProcessInstance.current_activity_ref` | `start_intent_ref.start_node_ref` + shape node projection | if no start node -> reject |
 
 ##### 7.6.5 `AdvanceProcessActivity`
 
@@ -1065,10 +1068,12 @@ pub struct ActivityProgressionCommandResult {
     pub activity_state: ActivityState,
     /// Activity progression record created by the command.
     pub progression_record_ref: ActivityProgressionRecordRef,
-    /// Token affected by the transition when applicable.
-    pub token_ref: Option<ProcessTokenRef>,
+    /// Tokens affected by the transition when applicable.
+    pub token_refs: Vec<ProcessTokenRef>,
     /// Gateway affected by the transition when applicable.
     pub gateway_ref: Option<GatewayRef>,
+    /// Gateway route selected during this command when applicable.
+    pub selected_route_ref: Option<GatewayRouteRef>,
     /// Outbox record created when a truth change occurred.
     pub outbox_record_ref: Option<ProcessOutboxRef>,
     /// Command receipt for idempotency replay.
@@ -1082,8 +1087,12 @@ pub struct ActivityProgressionCommandResult {
 |---|---|---|---|---|
 | `process_instance_ref` | `ProcessInstanceRef` | load instance | caller | missing -> reject |
 | `activity_ref` | `ActivityRef` | `Activity.activity_id` | caller | missing -> reject |
-| `progression_ref` | `ActivityProgressionIntentRef` | progression record source | caller | reject |
+| `progression_ref` | `ActivityProgressionIntentRef` | activity transition + token / gateway flow-control intent | caller;schema 见 Step 6 §7.2.3 | unknown variant、missing variant field、route not allowed、summary mismatch -> reject |
 | `expected_position_ref` | `ShapeNodeRef` | token / activity consistency check | caller | mismatch -> conflict |
+
+`progression_ref.activity_transition` 到 domain method 的映射必须完全采用 Step 6 §7.2.3 表格:`Ready -> Activity.ready(progression_id, actor)`、`Start -> Activity.start(progression_id, actor)`、`Complete -> Activity.complete(progression_id, reason, actor)`、`Skip -> Activity.skip(progression_id, reason, actor)`、`Fail -> Activity.fail(progression_id, reason, actor)`。`progression_id` 由 application 通过 `IdGeneratorPort::new_activity_progression_id()` 生成后传入,domain 不得自行生成。`Complete.feedback_summary_ref` 只作为 body-free summary ref;若 activity 已有 `feedback_ref` 或当前状态为 `WaitingFeedback`,则必须读取 matching `RuntimeFeedbackSummary` 并通过 `ActivityFeedbackPolicy`,不得读取 runtime body。
+
+`progression_ref.flow_control` 到 token / gateway method 的映射必须完全采用 Step 6 §7.2.3 表格。`SelectGatewayRoute` 成功后,`Gateway.selected_route_ref` 是 route selection 的 committed truth;`ActivityProgressionCommandResult.selected_route_ref` 必须复制同事务保存后的 `Gateway.selected_route_ref`,不得由 handler 重新按 request 或 shape 推导。
 
 ##### 7.6.6 `RecordActivityFeedback`
 
@@ -2357,6 +2366,12 @@ pub struct ActivityProgressedEvent {
     pub progression_record_ref: ActivityProgressionRecordRef,
     /// Runtime feedback reference when available.
     pub feedback_ref: Option<RuntimeFeedbackRef>,
+    /// Tokens affected by this progression when applicable.
+    pub token_refs: Vec<ProcessTokenRef>,
+    /// Gateway affected by this progression when applicable.
+    pub gateway_ref: Option<GatewayRef>,
+    /// Gateway route selected by this progression when applicable.
+    pub selected_route_ref: Option<GatewayRouteRef>,
 }
 ```
 
@@ -2487,7 +2502,7 @@ pub struct DerivedProcessViewChangedEvent {
 | `RuntimeProcessShapeChangedEvent` | committed `RuntimeProcessShape` + accepted `ShapeChangeReason` / marker reason |
 | `ProcessProfileChangedEvent` | committed `ProcessProfile` + same-transaction `ProfileChangeRecordRef` |
 | `ProcessInstanceChangedEvent` | committed `ProcessInstance` after transition |
-| `ActivityProgressedEvent` | committed `Activity` + same-transaction `ActivityProgressionRecordRef` |
+| `ActivityProgressedEvent` | committed `Activity` + same-transaction `ActivityProgressionRecord`;`selected_route_ref` copies `ActivityProgressionRecord.selected_route_ref`,which itself copies committed `Gateway.selected_route_ref` |
 | `WaitingGateChangedEvent` | committed `WaitingGate` + `PauseContextRef` + same-transaction `WaitingGateChangeRecord` evidence |
 | `ProcessCheckpointCreatedEvent` | committed `ProcessCheckpoint` after capture / state change |
 | `RecoveryAttemptChangedEvent` | committed `RecoveryAttempt` + failure reason when state is `Failed` |

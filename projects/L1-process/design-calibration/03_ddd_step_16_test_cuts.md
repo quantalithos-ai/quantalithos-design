@@ -139,8 +139,8 @@ Step 15 observability and audit
 | `SyncRuntimeProcessShape_contract` | `SyncRuntimeProcessShapeFlow` | create / refresh success;duplicate replay;source unavailable;digest mismatch;no method body persisted | API + application |
 | `AdoptProcessProfile_contract` | `AdoptProcessProfileFlow` | profile adoption success;duplicate;shape retired rejected;work context mismatch;result store failure rollback | API + application |
 | `UpdateProcessProfileTailoring_contract` | `UpdateProcessProfileTailoringFlow` | switch tailoring success;duplicate;high-risk missing evidence;stale version conflict;retired profile reject | API + application |
-| `StartProcessInstance_contract` | `StartProcessInstanceFlow` | instance + initial activity / token / gateway success;`ProcessInstance::start(profile, initial_activity_ref, actor)` sets current activity;no bootstrap `ActivityProgressionRecord`;duplicate;inactive profile;work context mismatch;missing start node | API + application |
-| `AdvanceProcessActivity_contract` | `AdvanceProcessActivityFlow` | activity / token / gateway progression success;expected position conflict;invalid activity state;gateway invalid route;duplicate | API + application |
+| `StartProcessInstance_contract` | `StartProcessInstanceFlow` | structured `ProcessStartIntentRef` maps to initial activity / token / optional gateway bootstrap;`ProcessInstance::start(profile, initial_activity_ref, actor)` sets current activity;no bootstrap `ActivityProgressionRecord`;duplicate;inactive profile;work context mismatch;missing start node;gateway mismatch | API + application |
+| `AdvanceProcessActivity_contract` | `AdvanceProcessActivityFlow` | structured `ActivityProgressionIntentRef` maps to ready/start/complete/skip/fail and token/gateway flow-control variants;expected position conflict;invalid activity state;gateway invalid route;duplicate | API + application |
 | `RecordActivityFeedback_contract` | `RecordActivityFeedbackFlow` | feedback ref attach success;duplicate;feedback mismatch;runtime body rejected;unresolved feedback | API + application |
 | `OpenWaitingGate_contract` | `OpenWaitingGateFlow` | gate open success;duplicate;instance terminal;activity mismatch;missing resume requirement | API + application |
 | `ResumeWaitingGate_contract` | `ResumeWaitingGateFlow` | resume success;duplicate;decision mismatch;gate already terminal;token missing | API + application |
@@ -180,7 +180,7 @@ Step 15 observability and audit
 | `RuntimeProcessShapeChanged_outbound` | `RuntimeProcessShapeChangedEvent` | payload from committed `RuntimeShapeChanged`;forbidden method body absent;publish failure updates outbox only | publisher contract |
 | `ProcessProfileChanged_outbound` | `ProcessProfileChangedEvent` | payload from committed `ProfileChanged`;profile state and refs stable;no tailoring body dump | publisher contract |
 | `ProcessInstanceChanged_outbound` | `ProcessInstanceChangedEvent` | payload from committed `InstanceChanged`;instance state and current refs only | publisher contract |
-| `ActivityProgressed_outbound` | `ActivityProgressedEvent` | payload from committed `ActivityProgressed`;feedback ref only;no runtime execution log | publisher contract |
+| `ActivityProgressed_outbound` | `ActivityProgressedEvent` | payload from committed `ActivityProgressed`;feedback ref、`token_refs`、`gateway_ref`、`selected_route_ref` copied from same-transaction progression record;no runtime execution log | publisher contract |
 | `WaitingGateChanged_outbound` | `WaitingGateChangedEvent` | payload from committed `WaitingGateChanged`;decision ref only;no governance decision body | publisher contract |
 | `ProcessCheckpointCreated_outbound` | `ProcessCheckpointCreatedEvent` | payload from committed `CheckpointChanged`;evidence ref only;no artifact body | publisher contract |
 | `RecoveryAttemptChanged_outbound` | `RecoveryAttemptChangedEvent` | payload from committed `RecoveryAttemptChanged`;state and history refs stable | publisher contract |
@@ -209,7 +209,7 @@ Step 15 observability and audit
 | `process_instance_state_transitions` | `ProcessInstanceState` | commit-03-a:`NotStarted -> Running -> Completed / Cancelled` running subset and terminal guard;PH-04:`Waiting` / `Recovering` / `Failed` paths | domain unit |
 | `activity_state_transitions` | `ActivityState` | `Planned -> Ready -> InProgress -> WaitingFeedback -> Completed`;consumer 不可 direct complete | domain unit |
 | `token_state_transitions` | `TokenState` | `Active -> Waiting -> Active -> Consumed`;terminated token 不可 resume | domain unit |
-| `gateway_state_transitions` | `GatewayState` | `PendingDecision -> RouteSelected -> Joined`;invalid route -> `Invalid`;joined 后拒绝改 route | domain unit |
+| `gateway_state_transitions` | `GatewayState` | `PendingDecision -> RouteSelected` sets `selected_route_ref`;`RouteSelected -> Joined` retains selected route;invalid route -> `Invalid` clears it;joined 后拒绝改 route | domain unit |
 | `waiting_gate_state_transitions` | `WaitingGateState` | `Waiting -> DecisionResolved -> Resumed`;cancel / expire path;consumer 不直接 resume | domain unit |
 | `checkpoint_state_transitions` | `CheckpointState` | `Available -> Superseded / Invalid / Expired`;expired checkpoint 不可 recovery | domain unit |
 | `recovery_attempt_state_transitions` | `RecoveryAttemptState` | `Pending -> Applied / Failed / Abandoned`;terminal attempt duplicate 不改变 state | domain unit |

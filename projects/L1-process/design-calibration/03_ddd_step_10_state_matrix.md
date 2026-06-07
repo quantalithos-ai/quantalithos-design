@@ -204,14 +204,14 @@ Recovering --cancel--> Cancelled
 |---|---|---|---|---|---|
 | factory | `NotStarted` | `ProcessInstance::create(process_instance_id, profile, project_ref, token_set_ref, actor)` | profile state 为 `Active`;project ref 只保存引用 | 创建 instance 初始 truth | `DomainError::InvalidStateTransition` / `DomainError::BoundaryViolation` |
 | `NotStarted` | `Running` | `ProcessInstance.start(&ProcessProfile, ActivityRef, ActorRef)` | profile 仍为 `Active`;初始 token / activity 已建立 | 设置 current activity;写 trace / outbox `ProcessInstanceChanged`;不创建 `ActivityProgressionRecord` | `DomainError::InvalidStateTransition` |
-| `Running` | `Running` | `ProcessInstance.advance(ActivityRef, ActorRef)` | current activity / token position 与 request expected position 匹配 | 更新 `current_activity_ref`;写 progression record | `DomainError::InvalidStateTransition` |
+| `Running` | `Running` | `ProcessInstance.advance(ActivityRef, ActorRef)` | current activity / token position 与 request expected position 匹配 | 只更新 `current_activity_ref`;`ActivityProgressionRecord` 由同 flow 的 `Activity.*(progression_id, ...)` 构造 | `DomainError::InvalidStateTransition` |
 | `Running` | `Waiting` | `ProcessInstance.pause_for_gate(&WaitingGate, ActorRef)` | PH-04 reserved;gate 属于同一 instance 且 state 为 `Waiting` | 写 waiting change record;token `Active -> Waiting` | `DomainError::InvalidStateTransition` |
 | `Waiting` | `Running` | `ProcessInstance.resume_from_gate(&WaitingGate, ActorRef)` | PH-04 reserved;gate state 为 `Resumed`;token 可恢复 | 写 waiting change record;token `Waiting -> Active` | `DomainError::InvalidStateTransition` |
 | `NotStarted` / `Running` / `Waiting` | `Recovering` | `ProcessInstance.mark_recovering(&ProcessCheckpoint, ActorRef)` | PH-04 reserved;checkpoint `Available`;同一 instance;不会 fork recovery | 写 recovery history;创建 recovery attempt | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
 | `Recovering` | `Running` | `ProcessInstance.complete_recovery(&RecoveryAttempt, ActorRef)` | PH-04 reserved;recovery attempt state 为 `Applied`;attempt 属于同一 instance | 写 recovery history;不得创建新 instance | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
 | `Recovering` | `Failed` | `CompleteRecoveryAttemptFlow` after `RecoveryAttempt.mark_failed(...)` | PH-04 reserved;recovery outcome 为 `Failed`;failure reason 必填;policy 判定不可继续 | 写 recovery history / outbox | `DomainError::InvalidStateTransition` |
-| `Running` | `Completed` | `ProcessInstance.complete(ActorRef)` | 当前活动 / token 已无未完成阻塞 | 写 completion trace / outbox | `DomainError::InvalidStateTransition` |
-| `NotStarted` / `Running` / `Waiting` / `Recovering` | `Cancelled` | `ProcessInstance.cancel(ProcessCancelReason, ActorRef)` | reason 必填;actor 有权限 | 终止 active/waiting token;写 trace / outbox | `DomainError::InvalidStateTransition` |
+| `Running` | `Completed` | `ProcessInstance.complete(ActorRef)` | 当前活动 / token 已无未完成阻塞 | domain 只改变 instance truth;application 基于 committed `ProcessTruthChange::InstanceChanged` 生成 trace / outbox | `DomainError::InvalidStateTransition` |
+| `NotStarted` / `Running` / `Waiting` / `Recovering` | `Cancelled` | `ProcessInstance.cancel(ProcessCancelReason, ActorRef)` | reason 必填;actor 有权限 | domain 只改变 instance truth 并终止 active/waiting token 的正式 flow-control 语义;application 基于 committed `ProcessTruthChange::InstanceChanged` 生成 trace / outbox | `DomainError::InvalidStateTransition` |
 
 ---
 
@@ -252,13 +252,13 @@ InProgress --skip--> Skipped
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | factory | `Planned` | `Activity::from_shape_node(activity_id, process_instance_id, shape_node_ref, activity_kind)` | shape node 属于 adopted runtime shape | 创建 activity | `DomainError::BoundaryViolation` |
-| `Planned` | `Ready` | `Activity.ready(ActorRef)` | owning instance 为 `Running` | 创建 `ActivityProgressionRecord` | `DomainError::InvalidStateTransition` |
-| `Ready` | `Ready` | `Activity.assign(ActorRef, ActorRef)` | assignee ref 可解析;不改变 identity truth | 更新 assignee;写 progression record | `DomainError::ReferenceResolutionFailed` |
-| `Ready` | `InProgress` | `Activity.start(ActorRef)` | assignee / actor policy 满足 | 写 progression record | `DomainError::InvalidStateTransition` |
-| `InProgress` | `WaitingFeedback` | `Activity.attach_feedback(RuntimeFeedbackRef)` | feedback matches activity;只保存 ref | 绑定 feedback ref;写 marker / progression | `DomainError::ReferenceResolutionFailed` |
-| `InProgress` / `WaitingFeedback` | `Completed` | `Activity.complete(ActivityCompletionReason, ActorRef)` | completion reason 和 policy 满足;consumer 不得直接调用 | 写 `ActivityProgressionRecord`;outbox `ActivityProgressed` | `DomainError::InvalidStateTransition` |
-| `Planned` / `Ready` / `InProgress` | `Skipped` | `Activity.skip(ActivitySkipReason, ActorRef)` | skip reason 合法;不会留下 active token | 写 progression record | `DomainError::InvalidStateTransition` |
-| `Planned` / `Ready` / `InProgress` / `WaitingFeedback` | `Failed` | `Activity.fail(ActivityFailureReason, ActorRef)` | failure reason 必填 | 写 progression record;可触发 instance recovery policy | `DomainError::InvalidStateTransition` |
+| `Planned` | `Ready` | `Activity.ready(ActivityProgressionId, ActorRef)` | owning instance 为 `Running`;progression id 由 application 生成 | 创建 `ActivityProgressionRecord` | `DomainError::InvalidStateTransition` |
+| `Ready` | `Ready` | `Activity.assign(ActivityProgressionId, ActorRef, ActorRef)` | assignee ref 可解析;不改变 identity truth;progression id 由 application 生成 | 更新 assignee;写 progression record | `DomainError::ReferenceResolutionFailed` |
+| `Ready` | `InProgress` | `Activity.start(ActivityProgressionId, ActorRef)` | assignee / actor policy 满足;progression id 由 application 生成 | 写 progression record | `DomainError::InvalidStateTransition` |
+| `InProgress` | `WaitingFeedback` | `Activity.attach_feedback(ActivityProgressionId, RuntimeFeedbackRef)` | feedback matches activity;只保存 ref;progression id 由 application 生成 | 绑定 feedback ref;写 marker / progression | `DomainError::ReferenceResolutionFailed` |
+| `InProgress` / `WaitingFeedback` | `Completed` | `Activity.complete(ActivityProgressionId, ActivityCompletionReason, ActorRef)` | completion reason 和 policy 满足;consumer 不得直接调用;progression id 由 application 生成 | 写 `ActivityProgressionRecord`;outbox `ActivityProgressed` | `DomainError::InvalidStateTransition` |
+| `Planned` / `Ready` / `InProgress` | `Skipped` | `Activity.skip(ActivityProgressionId, ActivitySkipReason, ActorRef)` | skip reason 合法;不会留下 active token;progression id 由 application 生成 | 写 progression record | `DomainError::InvalidStateTransition` |
+| `Planned` / `Ready` / `InProgress` / `WaitingFeedback` | `Failed` | `Activity.fail(ActivityProgressionId, ActivityFailureReason, ActorRef)` | failure reason 必填;progression id 由 application 生成 | 写 progression record;可触发 instance recovery policy | `DomainError::InvalidStateTransition` |
 
 ---
 
@@ -325,9 +325,9 @@ factory for pure join gateway ---------------------------> Joined
 |---|---|---|---|---|---|
 | factory | `PendingDecision` | `Gateway::from_shape_node(gateway_id, shape_node_ref, gateway_kind)` | gateway kind 需要 route decision | 创建 gateway | `DomainError::BoundaryViolation` |
 | factory | `Joined` | `Gateway::from_shape_node(...)` for already-joinable gateway | gateway kind 不需要显式 decision 且 tokens satisfied | 创建 joined marker | `DomainError::BoundaryViolation` |
-| `PendingDecision` | `RouteSelected` | `Gateway.select_route(GatewayRouteRef, GatewayDecisionReason, ActorRef)` | route 属于 gateway;decision reason 合法 | 记录 selected route;token 进入 next path | `DomainError::InvalidStateTransition` |
-| `RouteSelected` | `Joined` | `Gateway.join_tokens(TokenSet)` | required incoming tokens complete | 消费 / 合并 token | `DomainError::InvalidStateTransition` |
-| `PendingDecision` / `RouteSelected` | `Invalid` | `Gateway.mark_invalid(GatewayInvalidReason)` | route / shape / decision invalid | 标记 invalid;可触发 activity / instance failure policy | `DomainError::InvalidStateTransition` |
+| `PendingDecision` | `RouteSelected` | `Gateway.select_route(GatewayRouteRef, GatewayDecisionReason, ActorRef)` | route 属于 gateway;decision reason 合法 | 设置 `Gateway.selected_route_ref = Some(route_ref)`;token 进入 next path | `DomainError::InvalidStateTransition` |
+| `RouteSelected` | `Joined` | `Gateway.join_tokens(TokenSet)` | required incoming tokens complete | 消费 / 合并 token;保留既有 `selected_route_ref` | `DomainError::InvalidStateTransition` |
+| `PendingDecision` / `RouteSelected` | `Invalid` | `Gateway.mark_invalid(GatewayInvalidReason)` | route / shape / decision invalid | 标记 invalid;清空 `selected_route_ref`;可触发 activity / instance failure policy | `DomainError::InvalidStateTransition` |
 
 ---
 

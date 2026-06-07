@@ -1192,7 +1192,8 @@ pub struct WaitingGateCommandResult {
 | `activity_ref` | `ActivityRef` | `WaitingGate.activity_ref` / `PauseContext.activity_ref` | caller | reject |
 | `pause_reason` | `PauseReason` | `PauseContext.pause_reason` | caller | reject |
 | `resume_requirement_ref` | `ResumeRequirementRef` | `PauseContext.resume_requirement_ref` | caller | reject |
-| `waiting_gate_id` / `pause_context_id` | generated ids | `WaitingGate` / `PauseContext` | `IdGeneratorPort` | generated |
+| `waiting_gate_id` / `pause_context_id` | generated ids | `WaitingGate.waiting_gate_id` / `PauseContext.pause_context_id` | `IdGeneratorPort::new_waiting_gate_id()` / `new_pause_context_id()` | generated before domain factory calls |
+| `change_record_ref` | generated ref from `WaitingGateChangeId` | `WaitingGateCommandResult.change_record_ref` / appended `WaitingGateChangeRecord.change_id` | `IdGeneratorPort::new_waiting_gate_change_id()` | generated before waiting gate / instance transition record construction |
 
 ##### 7.6.8 `ResumeWaitingGate`
 
@@ -1224,7 +1225,7 @@ pub struct ResumeWaitingGateRequest {
 | 输入字段 | 类型 | 目标对象字段 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
 | `waiting_gate_ref` | `WaitingGateRef` | existing `WaitingGate` | caller + repository | missing -> reject |
-| `resume_reason` | `ResumeReason` | change record reason | caller | reject |
+| `resume_reason` | `ResumeReason` | waiting gate transition / trace reason | caller | reject |
 | `decision_ref` | `GovernanceDecisionRef` | `WaitingGate.decision_ref` | caller / resolver | unresolved -> reject |
 
 ##### 7.6.9 `CreateProcessCheckpoint`

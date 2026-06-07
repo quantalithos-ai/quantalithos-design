@@ -102,8 +102,8 @@
 |---|---|
 | `start(ProcessProfile profile, ActorRef actor)` | 启动实例并进入运行态 |
 | `advance(ActivityRef activity_ref, ActorRef actor)` | 推进到指定活动节点 |
-| `pause_for_gate(WaitingGate gate, ActorRef actor)` | 因等待点进入 Waiting |
-| `resume_from_gate(WaitingGate gate, ActorRef actor)` | 从正式等待恢复依据继续运行 |
+| `pause_for_gate(WaitingGateChangeId change_id, WaitingGate gate, ActorRef actor)` | 因等待点进入 Waiting |
+| `resume_from_gate(WaitingGateChangeId change_id, WaitingGate gate, ActorRef actor)` | 从正式等待恢复依据继续运行 |
 | `mark_recovering(ProcessCheckpoint checkpoint, ActorRef actor)` | 进入恢复中状态 |
 | `complete(ActorRef actor)` | 标记实例完成 |
 | `cancel(ProcessCancelReason reason, ActorRef actor)` | 显式取消实例 |

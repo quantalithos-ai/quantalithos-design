@@ -408,7 +408,7 @@
 
 | 工厂函数 | 作用 |
 |---|---|
-| `from_gate_transition(WaitingGate gate, WaitingGateState from_state, WaitingGateState to_state)` | 从等待状态变化形成记录 |
+| `from_gate_transition(WaitingGateChangeId change_id, WaitingGate gate, WaitingGateState from_state, WaitingGateState to_state)` | 从等待状态变化形成记录 |
 
 | 禁止事项 | 说明 |
 |---|---|

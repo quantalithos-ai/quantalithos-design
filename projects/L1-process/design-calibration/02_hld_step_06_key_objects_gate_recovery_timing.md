@@ -27,14 +27,14 @@
 
 | 成员函数 | 作用 |
 |---|---|
-| `attach_decision(GovernanceDecisionRef decision_ref, ActorRef actor)` | 绑定正式外部决策引用 |
-| `resume(ResumeReason reason, ActorRef actor)` | 根据正式依据恢复 |
-| `cancel(WaitingCancelReason reason, ActorRef actor)` | 取消等待 |
-| `expire(WaitingExpireReason reason)` | 标记等待过期 |
+| `attach_decision(WaitingGateChangeId change_id, GovernanceDecisionRef decision_ref, ActorRef actor)` | 绑定正式外部决策引用 |
+| `resume(WaitingGateChangeId change_id, ResumeReason reason, ActorRef actor)` | 根据正式依据恢复 |
+| `cancel(WaitingGateChangeId change_id, WaitingCancelReason reason, ActorRef actor)` | 取消等待 |
+| `expire(WaitingGateChangeId change_id, WaitingExpireReason reason)` | 标记等待过期 |
 
 | 工厂函数 | 作用 |
 |---|---|
-| `open_for_activity(ProcessInstanceId process_instance_id, ActivityRef activity_ref, PauseContext pause_context)` | 为活动节点建立等待点 |
+| `open_for_activity(WaitingGateId waiting_gate_id, ProcessInstanceId process_instance_id, ActivityRef activity_ref, PauseContext pause_context)` | 为活动节点建立等待点 |
 
 | 禁止事项 | 说明 |
 |---|---|
@@ -65,7 +65,7 @@
 
 | 工厂函数 | 作用 |
 |---|---|
-| `from_activity(Activity activity, PauseReason pause_reason, ResumeRequirementRef requirement_ref)` | 从活动暂停意图形成上下文 |
+| `from_activity(PauseContextId pause_context_id, Activity activity, PauseReason pause_reason, ResumeRequirementRef requirement_ref)` | 从活动暂停意图形成上下文 |
 
 | 禁止事项 | 说明 |
 |---|---|

@@ -419,10 +419,10 @@ Steps:
 
 1. Reserve command idempotency.
 2. Load `ProcessInstance` and `Activity`.
-3. `WaitingGatePolicy.assert_can_open(activity, pause_context)`.
-4. Create `PauseContext::from_activity(...)`.
-5. Create `WaitingGate::open_for_activity(...)`.
-6. `ProcessInstance.pause_for_gate(&gate, actor)`.
+3. Generate `PauseContextId` via `IdGeneratorPort::new_pause_context_id()` and create `PauseContext::from_activity(pause_context_id, ...)`.
+4. `WaitingGatePolicy.assert_can_open(activity, pause_context)`.
+5. Generate `WaitingGateId` via `IdGeneratorPort::new_waiting_gate_id()` and create `WaitingGate::open_for_activity(waiting_gate_id, ...)`.
+6. Generate `WaitingGateChangeId` via `IdGeneratorPort::new_waiting_gate_change_id()` and call `ProcessInstance.pause_for_gate(change_id, &gate, actor)`.
 7. Move current token to waiting state via `Token.wait_at(...)`.
 8. Save pause context、gate、instance、token;append waiting change record、trace、outbox `WaitingGateChanged`.
 9. Store `WaitingGateCommandResult`.
@@ -439,9 +439,9 @@ Steps:
 2. Load `WaitingGate` by `waiting_gate_ref`;load `PauseContext` via `WaitingGateRepository.get_pause_context(gate.pause_context_ref)`;load `ProcessInstance` and waiting token.
 3. Resolve / validate `GovernanceDecisionRef`.
 4. `WaitingGatePolicy.assert_decision_matches(gate, decision_ref)` and `assert_can_resume(gate)`.
-5. `WaitingGate.attach_decision(decision_ref, actor)` if not already attached.
-6. `WaitingGate.resume(resume_reason, actor)`.
-7. `ProcessInstance.resume_from_gate(&gate, actor)` and `Token.resume_at(...)`.
+5. Generate `WaitingGateChangeId` for decision attachment and call `WaitingGate.attach_decision(change_id, decision_ref, actor)` if not already attached.
+6. Generate `WaitingGateChangeId` for resume and call `WaitingGate.resume(change_id, resume_reason, actor)`.
+7. Generate `WaitingGateChangeId` for instance resume and call `ProcessInstance.resume_from_gate(change_id, &gate, actor)`;then `Token.resume_at(...)`.
 8. Save all changed objects;append change record、trace、outbox `WaitingGateChanged`.
 9. Store `WaitingGateCommandResult`.
 

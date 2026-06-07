@@ -613,8 +613,8 @@ pub struct ProcessInstance {
 |---|---|---|---|---|
 | `pub fn start(&mut self, profile: &ProcessProfile, initial_activity_ref: ActivityRef, actor: ActorRef) -> Result<(), DomainError>` | 启动实例 | active profile、初始 activity ref、actor | `Result<(), DomainError>` | `NotStarted` -> `Running`;设置 `current_activity_ref = Some(initial_activity_ref)`;不生成 `ActivityProgressionRecord` |
 | `pub fn advance(&mut self, activity_ref: ActivityRef, actor: ActorRef) -> Result<(), DomainError>` | 更新实例当前活动指针 | activity ref、actor | `Result<(), DomainError>` | 仅 `Running` 可推进;设置 `current_activity_ref = Some(activity_ref)`;不生成 `ActivityProgressionRecord` |
-| `pub fn pause_for_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 进入等待 | waiting gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Running` -> `Waiting` |
-| `pub fn resume_from_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 从等待恢复 | resumed gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Waiting` -> `Running` |
+| `pub fn pause_for_gate(&mut self, change_id: WaitingGateChangeId, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 进入等待 | change id、waiting gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Running` -> `Waiting`;`change_id` 来自 `IdGeneratorPort::new_waiting_gate_change_id()` |
+| `pub fn resume_from_gate(&mut self, change_id: WaitingGateChangeId, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 从等待恢复 | change id、resumed gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Waiting` -> `Running`;`change_id` 来自 `IdGeneratorPort::new_waiting_gate_change_id()` |
 | `pub fn mark_recovering(&mut self, history_id: RecoveryHistoryId, checkpoint: &ProcessCheckpoint, attempt: &RecoveryAttempt, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 进入恢复 | history id、checkpoint、attempt、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;非终态 -> `Recovering`;history kind = `InstanceRecovering` |
 | `pub fn complete_recovery(&mut self, history_id: RecoveryHistoryId, attempt: &RecoveryAttempt, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 完成恢复并回到运行 | history id、已 `Applied` 的 recovery attempt、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;`Recovering` -> `Running`;不得创建第二份 instance;history kind = `InstanceRecoveryCompleted` |
 | `pub fn complete(&mut self, actor: ActorRef) -> Result<(), DomainError>` | 完成实例 | actor | `Result<(), DomainError>` | `Running` -> `Completed`;只改变 instance truth;不生成 `ProcessTraceRecord` |
@@ -920,7 +920,7 @@ pub struct WaitingGate {
 
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
-| `waiting_gate_id` | `WaitingGateId` | 等待点身份 | 必填 |
+| `waiting_gate_id` | `WaitingGateId` | 等待点身份 | 必填;由 application 通过 `IdGeneratorPort::new_waiting_gate_id()` 生成后传入 |
 | `process_instance_id` | `ProcessInstanceId` | 所属实例 | 必填 |
 | `activity_ref` | `ActivityRef` | 触发等待的活动 | 必填 |
 | `gate_state` | `WaitingGateState` | 等待状态 | 必须为正式 enum |
@@ -929,10 +929,10 @@ pub struct WaitingGate {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn attach_decision(&mut self, decision_ref: GovernanceDecisionRef, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 绑定治理依据 | decision ref、actor | `Result<WaitingGateChangeRecord, DomainError>` | `Waiting` -> `DecisionResolved` |
-| `pub fn resume(&mut self, reason: ResumeReason, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 恢复等待 | 原因、actor | `Result<WaitingGateChangeRecord, DomainError>` | `DecisionResolved` -> `Resumed` |
-| `pub fn cancel(&mut self, reason: WaitingCancelReason, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 取消等待 | 原因、actor | `Result<WaitingGateChangeRecord, DomainError>` | 非终态 -> `Cancelled` |
-| `pub fn expire(&mut self, reason: WaitingExpireReason) -> Result<WaitingGateChangeRecord, DomainError>` | 等待过期 | 过期原因 | `Result<WaitingGateChangeRecord, DomainError>` | `Waiting` / `DecisionResolved` -> `Expired` |
+| `pub fn attach_decision(&mut self, change_id: WaitingGateChangeId, decision_ref: GovernanceDecisionRef, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 绑定治理依据 | change id、decision ref、actor | `Result<WaitingGateChangeRecord, DomainError>` | `Waiting` -> `DecisionResolved`;`change_id` 来自 application |
+| `pub fn resume(&mut self, change_id: WaitingGateChangeId, reason: ResumeReason, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 恢复等待 | change id、原因、actor | `Result<WaitingGateChangeRecord, DomainError>` | `DecisionResolved` -> `Resumed`;`change_id` 来自 application |
+| `pub fn cancel(&mut self, change_id: WaitingGateChangeId, reason: WaitingCancelReason, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 取消等待 | change id、原因、actor | `Result<WaitingGateChangeRecord, DomainError>` | 非终态 -> `Cancelled`;`change_id` 来自 application |
+| `pub fn expire(&mut self, change_id: WaitingGateChangeId, reason: WaitingExpireReason) -> Result<WaitingGateChangeRecord, DomainError>` | 等待过期 | change id、过期原因 | `Result<WaitingGateChangeRecord, DomainError>` | `Waiting` / `DecisionResolved` -> `Expired`;`change_id` 来自 application |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -988,7 +988,7 @@ pub struct PauseContext {
 
 | 字段 | 类型 | 作用 | 约束 |
 |---|---|---|---|
-| `pause_context_id` | `PauseContextId` | 暂停上下文身份 | 必填 |
+| `pause_context_id` | `PauseContextId` | 暂停上下文身份 | 必填;由 application 通过 `IdGeneratorPort::new_pause_context_id()` 生成后传入 |
 | `activity_ref` | `ActivityRef` | 暂停关联活动 | 必填 |
 | `pause_reason` | `PauseReason` | 暂停原因 | 必填 |
 | `resume_requirement_ref` | `ResumeRequirementRef` | 恢复所需依据 | 只保存 ref |
@@ -1990,7 +1990,7 @@ pub enum ProcessOutboxEventKind {
 | `ProfileChangeRecord` | `change_id: ProfileChangeId`;`profile_ref: ProcessProfileRef`;`change_reason: ProfileChangeReason`;`actor_ref: ActorRef` | `from_profile_change(profile: ProcessProfile, reason: ProfileChangeReason, actor: ActorRef) -> Result<Self, DomainError>` | 不替代 `ProcessProfile`;不保存 method body |
 | `ActivityTransitionOutcome` | `progression_id: ActivityProgressionId`;`activity_ref: ActivityRef`;`from_state: ActivityState`;`to_state: ActivityState`;`feedback_ref: Option<RuntimeFeedbackRef>` | 由 `Activity.assign/ready/start/attach_feedback/complete/skip/fail(...)` 返回 | 只表达 activity truth delta;不追加保存;不包含 token / gateway / selected route |
 | `ActivityProgressionRecord` | `progression_id: ActivityProgressionId`;`activity_ref: ActivityRef`;`from_state: ActivityState`;`to_state: ActivityState`;`feedback_ref: Option<RuntimeFeedbackRef>`;`token_refs: Vec<ProcessTokenRef>`;`gateway_ref: Option<GatewayRef>`;`selected_route_ref: Option<GatewayRouteRef>` | `from_activity_transition(outcome: ActivityTransitionOutcome, token_refs: Vec<ProcessTokenRef>, gateway: Option<Gateway>) -> Result<Self, DomainError>` | 不保存 runtime body;不替代 `Activity`;`progression_id` 来自 application 生成并已包含在 outcome 中,single-token flow 放 1 个 token ref,no-token flow 为空;`selected_route_ref` 只能复制同事务 committed `Gateway.selected_route_ref`;application 必须在 token / gateway flow-control 完成后构造 record |
-| `WaitingGateChangeRecord` | `change_id: WaitingGateChangeId`;`waiting_gate_ref: WaitingGateRef`;`from_state: WaitingGateState`;`to_state: WaitingGateState`;`decision_ref: Option<GovernanceDecisionRef>` | `from_gate_transition(gate: WaitingGate, from_state: WaitingGateState, to_state: WaitingGateState) -> Result<Self, DomainError>` | 不生成 decision;不替代 `WaitingGate` |
+| `WaitingGateChangeRecord` | `change_id: WaitingGateChangeId`;`waiting_gate_ref: WaitingGateRef`;`from_state: WaitingGateState`;`to_state: WaitingGateState`;`decision_ref: Option<GovernanceDecisionRef>` | `from_gate_transition(change_id: WaitingGateChangeId, gate: WaitingGate, from_state: WaitingGateState, to_state: WaitingGateState) -> Result<Self, DomainError>` | 不生成 decision;不替代 `WaitingGate`;`change_id` 必须来自 application `IdGeneratorPort` |
 | `RecoveryHistoryRecord` | `history_id: RecoveryHistoryId`;`process_instance_ref: ProcessInstanceRef`;`checkpoint_ref: Option<ProcessCheckpointRef>`;`attempt_ref: Option<RecoveryAttemptRef>`;`history_kind: RecoveryHistoryKind` | `from_checkpoint(history_id: RecoveryHistoryId, checkpoint: ProcessCheckpoint, history_kind: RecoveryHistoryKind) -> Result<Self, DomainError>`;`from_recovery_attempt(history_id: RecoveryHistoryId, attempt: RecoveryAttempt) -> Result<Self, DomainError>`;`from_instance_recovery_transition(history_id: RecoveryHistoryId, instance: ProcessInstance, checkpoint_ref: Option<ProcessCheckpointRef>, attempt_ref: Option<RecoveryAttemptRef>, history_kind: RecoveryHistoryKind) -> Result<Self, DomainError>` | 不保存 archive package;不替代 `RecoveryAttempt`;`history_id` 必须来自 application `IdGeneratorPort` |
 
 ```rust

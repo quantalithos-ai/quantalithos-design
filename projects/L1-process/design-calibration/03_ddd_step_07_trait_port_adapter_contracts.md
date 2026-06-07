@@ -1151,6 +1151,15 @@ pub trait IdGeneratorPort {
     /// Creates an activity progression record id.
     fn new_activity_progression_id(&self) -> ActivityProgressionId;
 
+    /// Creates a waiting gate id.
+    fn new_waiting_gate_id(&self) -> WaitingGateId;
+
+    /// Creates a pause context id.
+    fn new_pause_context_id(&self) -> PauseContextId;
+
+    /// Creates a waiting gate change record id.
+    fn new_waiting_gate_change_id(&self) -> WaitingGateChangeId;
+
     /// Creates a process checkpoint id.
     fn new_process_checkpoint_id(&self) -> ProcessCheckpointId;
 

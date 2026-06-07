@@ -44,7 +44,7 @@
 
 4. 事务失败、并发冲突、重复请求、外部依赖失败如何处理?
 
-   回答:事务内失败 rollback,不得写 accepted truth / outbox / projection stale 成功副作用。version conflict 返回 `VersionConflict` 或 event retry。duplicate same digest 中,Command 通过 `CommandResultRepository.get_result` 返回 stored result,Job 通过 `JobResultRepository.get_report` 返回 stored report;different digest 返回 `IdempotencyConflict`。外部依赖 failure 不补造外部 truth:command reject / unresolved,consumer 保存 failed / unresolved marker 或 retry,job 写 failed_refs。
+   回答:事务内失败 rollback,不得写 accepted truth / outbox / projection stale 成功副作用。version conflict 返回 `VersionConflict` 或 event retry。duplicate same digest 中,Command 通过 `CommandResultRepository.get_result` 返回 stored result,Job 通过 `JobResultRepository.get_report` 返回 stored report;different digest 返回 `IdempotencyConflict`。外部依赖 failure 不补造外部 truth:command reject / unresolved,consumer 保存 failed / unresolved marker 或 retry,job 写 typed `WorkJobFailureRef` failed_refs。
 
 5. 哪些异常需要写审计、日志或事件?
 
@@ -219,7 +219,7 @@ Query path must not write audit, outbox, idempotency, freshness marker, or refer
 | `PrepareWorkTraceHandoff` | invalid target / missing idempotency | handoff port failure | retry handoff job |
 | `PrepareArchiveHandoff` | invalid archive scope / missing idempotency | archive port failure | retry handoff job |
 
-Job-level reject does not produce business truth. Item-level failure is reported in `WorkJobReport.failed_refs` or equivalent report DTO and must not be hidden as success.
+Job-level reject does not produce business truth. Item-level failure is reported in `WorkJobReport.failed_refs` as `WorkJobFailureRef` or equivalent report DTO and must not be hidden as success.
 
 #### 8.7 异常分支处理表
 

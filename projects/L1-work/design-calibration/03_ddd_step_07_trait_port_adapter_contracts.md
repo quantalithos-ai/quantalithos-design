@@ -91,6 +91,7 @@
 | `WorkOutboxRepository` | repository trait | `application/src/ports.rs` | `infra/src/outbox_store.rs` | outbox record 存取和发布状态 | `enqueue`、`list_pending`、`mark_published` |
 | `ProjectionRepository` | projection port | `application/src/ports.rs` | `infra/src/projection_stores.rs` | public read view 与 freshness state | `get_board_view`、`replace_project_views`、`mark_stale` |
 | `ReferenceSnapshotRepository` | repository trait | `application/src/ports.rs` | `infra/src/reference_stores.rs` | 本地 external snapshot / resolution state | `get_reference_state_with_version`、`save_member_snapshot` |
+| `ArchiveSummaryRepository` | repository trait | `application/src/ports.rs` | `infra/src/repositories.rs` | archive handoff scope summary 读取 | `load_subject_archive_summaries`、`load_project_archive_summaries` |
 | `IdempotencyRepository` | technical repository | `application/src/idempotency.rs` | `infra/src/idempotency_store.rs` | command / event / job 幂等保护 | `reserve`、`complete`、`mark_conflict` |
 | `CommandResultRepository` | technical repository | `application/src/results.rs` | `infra/src/command_result_store.rs` | command duplicate result replay | `save_result`、`get_result` |
 | `JobResultRepository` | technical repository | `application/src/results.rs` | `infra/src/job_result_store.rs` | operations job duplicate report replay | `save_report`、`get_report` |
@@ -1050,6 +1051,36 @@ pub trait WorkTruthSnapshotRepository {
 | `load_project_truth_snapshot` | `ProjectRef` | `ProjectWorkTruthSnapshot` | `RepositoryError` | rebuild job | snapshot 只读,字段闭环在 Step 6 projection helper DTO;返回 contracts shared body-free summaries,不得返回 domain-only object |
 | `load_truth_cursor` | `ProjectRef` | `WorkTruthCursor` | `RepositoryError` | rebuild / reconciliation | cursor 不能替代 optimistic version |
 
+#### 8.13 archive summary read helpers
+
+archive handoff 需要从 committed Work truth 和 audit trace records 构造 body-free `WorkArchiveSummarySet`。该读取面属于 repository port,不定义新 truth,也不允许 service 在 flow 内临时组合多个 repository 读取来猜 scope 展开。
+
+```rust
+/// Reads body-free Work summaries used by archive handoff jobs.
+pub trait ArchiveSummaryRepository {
+    /// Loads archive summaries for explicitly listed Work trace subjects.
+    async fn load_subject_archive_summaries(
+        &self,
+        subject_refs: Vec<WorkTraceSubjectRef>,
+        source_cursor: Option<WorkTruthCursor>,
+        page: PageRequest,
+    ) -> Result<WorkArchiveSummarySet, RepositoryError>;
+
+    /// Loads archive summaries for one project up to a committed truth cursor.
+    async fn load_project_archive_summaries(
+        &self,
+        project_ref: ProjectRef,
+        source_cursor: WorkTruthCursor,
+        page: PageRequest,
+    ) -> Result<WorkArchiveSummarySet, RepositoryError>;
+}
+```
+
+| 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
+|---|---|---|---|---|---|
+| `load_subject_archive_summaries` | `subject_refs`、`source_cursor`、`PageRequest` | `WorkArchiveSummarySet` | `RepositoryError` | `PrepareArchiveHandoff` job with `Subjects` scope | validates explicit subjects;uses supplied cursor as upper bound when present;loads related trace refs through audit-equivalent committed indexes;does not infer project scope |
+| `load_project_archive_summaries` | `ProjectRef`、`WorkTruthCursor`、`PageRequest` | `WorkArchiveSummarySet` | `RepositoryError` | `PrepareArchiveHandoff` job with `ProjectCursor` scope | expands project-owned Work trace subjects from committed truth up to cursor;does not scan projections or external archive body |
+
 ### 9. External Resolver / Publisher / Handoff Port 契约
 
 #### 9.1 resolver port 通用约束
@@ -1584,6 +1615,7 @@ pub enum StoredJobResult {
 | `InMemoryWorkOutboxRepository` | `infra/src/outbox_store.rs` | `WorkOutboxRepository` | P0 fake | pending / mark published / failed 可测 |
 | `InMemoryProjectionRepository` | `infra/src/projection_stores.rs` | `ProjectionRepository`、`WorkTruthSnapshotRepository` | P0 fake | replace 只能由 service 调用 |
 | `InMemoryReferenceSnapshotRepository` | `infra/src/reference_stores.rs` | `ReferenceSnapshotRepository` | P0 fake | stale refs / project-scoped refs 可分页;可断言去重与稳定排序 |
+| `InMemoryArchiveSummaryRepository` | `infra/src/repositories.rs` | `ArchiveSummaryRepository` | P0 fake | subject / project cursor scope 展开稳定;只返回 refs / cursor |
 | `InMemoryIdempotencyRepository` | `infra/src/idempotency_store.rs` | `IdempotencyRepository` | P0 fake | duplicate / conflict 按 digest 判定 |
 | `InMemoryCommandResultRepository` | `infra/src/command_result_store.rs` | `CommandResultRepository` | P0 fake | 按 `ApplicationResultRef` 保存 / 读取 stored result surface;支持 missing 注入 |
 | `InMemoryJobResultRepository` | `infra/src/job_result_store.rs` | `JobResultRepository` | P0 fake | 按 `ApplicationResultRef` 保存 / 读取 stored job report surface;支持 missing 注入 |
@@ -1656,7 +1688,7 @@ pub enum StoredJobResult {
 | `RefreshExternalReferenceSnapshots` | `ReferenceSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | resolver ports、`ClockPort` | `None` / `StaleOnly` 用 `list_stale_references`;`Project` 用 `list_project_references`;`ExplicitRefs` 用 request refs;save snapshots;`ProjectionRepository.list_views_affected_by_references(...)` 枚举 affected public views 后 mark stale;save `StoredJobResult::WorkJob` before idempotency complete |
 | `RunWorkReconciliation` | truth / projection / outbox / reference repositories、`IdempotencyRepository`、`JobResultRepository` | 是 | `ClockPort` | save `StoredJobResult::Reconciliation` before idempotency complete;does not repair truth |
 | `PrepareWorkTraceHandoff` | `AuditRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `TraceHandoffPort`、`ClockPort` | save / enqueue handoff marker;save `StoredJobResult::WorkJob` before idempotency complete |
-| `PrepareArchiveHandoff` | truth repositories、`AuditRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `ArchiveHandoffPort`、`ClockPort` | save / enqueue archive handoff marker;save `StoredJobResult::WorkJob` before idempotency complete |
+| `PrepareArchiveHandoff` | `ArchiveSummaryRepository`、`AuditRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `ArchiveHandoffPort`、`ClockPort` | load scoped `WorkArchiveSummarySet`;save / enqueue archive handoff marker;save `StoredJobResult::WorkJob` before idempotency complete |
 
 ### 14. Trait / Adapter 到文件布局映射
 

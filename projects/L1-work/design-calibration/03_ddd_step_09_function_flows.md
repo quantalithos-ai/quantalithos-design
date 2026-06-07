@@ -1649,7 +1649,7 @@ Job 共享不变量:
 - Job 写入同样必须通过 `CommandMetadata.request.idempotency_key` 保护。
 - Job digest 不包含 `job_run_id`、`request_id`、`requested_at` 或 trace 字段;只包含 operation、job scope、page / batch input 和会改变结果的业务参数。
 - Job 不修复业务 truth;只能发布 outbox、重建 projection、刷新 reference snapshot、写 reconciliation report / handoff marker。
-- 单条 item 失败进入 `WorkJobReport.failed_refs`;整个 job 输入无效才 reject。
+- 单条 item 失败进入 `WorkJobReport.failed_refs` as `WorkJobFailureRef`;整个 job 输入无效才 reject。
 - Job success path 必须先 `JobResultRepository.save_report(...)`,再 `IdempotencyRepository.complete(...)`,二者与 job marker / outbox publication marker / projection marker / handoff marker 同一 UoW。
 - Job duplicate 必须通过 `JobResultRepository.get_report(ApplicationResultRef)` 返回 stored report surface,不得从当前 truth / projection / outbox / reference store 重新扫描生成 report。若 report carries `WorkCommandReceipt`,duplicate replay 只 overlay receipt idempotency;无 receipt 的 report 原样返回 stored payload。
 - `ApplicationResultRef` 缺失、stored report 缺失或 stored job result variant 与当前 operation 不匹配时,返回 `ApplicationError::DuplicateResultMissing` / `TemporarilyUnavailable`。
@@ -1776,7 +1776,7 @@ for reference_ref in refs.items {
                 expected_version,
                 &uow,
             ).await?;
-            failed_refs.push(reference_ref);
+            failed_refs.push(WorkJobFailureRef::ExternalReference(reference_ref));
         }
     }
 }
@@ -1883,8 +1883,8 @@ for record in records.items {
 | 项 | 口径 |
 |---|---|
 | DTO -> Job | `subject_ref` selects trace records;`target_ref` selects handoff target |
-| 事务边界 | handoff marker、optional outbox、idempotency complete 同一 UoW;external handoff port failure records failed ref |
-| 错误映射 | no trace records -> report zero/empty;handoff failure -> failed refs;invalid target -> `InvalidRequest` |
+| 事务边界 | handoff marker、optional outbox、idempotency complete 同一 UoW;external handoff port failure records typed failed ref |
+| 错误映射 | no trace records -> report zero/empty;handoff failure -> `WorkJobFailureRef::TraceHandoff { trace_id, subject_ref, target_ref }`;invalid target -> `InvalidRequest` |
 | 状态 / 事件 | trace handoff marker;optional enqueue `WorkTraceAvailable` |
 | 测试切口 | handoff success;empty trace;port failure;duplicate job |
 
@@ -1894,7 +1894,7 @@ for record in records.items {
 [jobs.run_prepare_archive_handoff]
   -> WorkArchiveHandoffService.prepare_archive_handoff(input)
      -> reserve job idempotency in UoW
-     -> load scoped Work truth summaries and audit refs
+     -> load scoped Work truth summaries and audit refs through `ArchiveSummaryRepository`
      -> build ArchiveHandoffIntent
      -> ArchiveHandoffPort.prepare_archive_handoff(intent)
      -> save archive handoff marker / optional WorkTraceAvailable outbox
@@ -1903,20 +1903,50 @@ for record in records.items {
 
 ```rust
 // WorkArchiveHandoffService::prepare_archive_handoff(PrepareArchiveHandoffJobInput input)
-let summaries = load_archive_scope_summaries(input.archive_scope).await?;
+let summaries = load_archive_scope_summaries(input.archive_scope, handoff_page()).await?;
 let intent = ArchiveHandoffIntent::from_work_summaries(summaries, input.archive_target_ref)?;
 let archive_ref = archive_handoff.prepare_archive_handoff(intent).await?;
 let marker = ArchiveHandoffMarker::from_archive_ref(input.archive_scope, archive_ref)?;
 audit_repo.save_archive_handoff_marker(marker, &uow).await?;
 ```
 
+`load_archive_scope_summaries(scope, page)` is the application helper that validates `ArchiveHandoffScope` and dispatches to `ArchiveSummaryRepository.load_subject_archive_summaries(...)` or `ArchiveSummaryRepository.load_project_archive_summaries(...)` exactly as shown below.
+
 | 项 | 口径 |
 |---|---|
-| DTO -> Job | `archive_scope` selects Work summaries;`archive_target_ref` selects destination |
+| DTO -> Job | `archive_scope` selects Work summaries through `ArchiveSummaryRepository`;`archive_target_ref` selects destination |
 | 事务边界 | handoff marker、optional outbox、idempotency complete 同一 UoW |
-| 错误映射 | invalid scope -> `InvalidRequest`;archive port failure -> failed report;repo failure -> rollback |
+| 错误映射 | invalid scope -> `InvalidRequest`;archive port failure -> `WorkJobFailureRef::ArchiveHandoff { archive_scope, target_ref }`;repo failure -> rollback |
 | 状态 / 事件 | archive handoff marker;不写 archive long-term body |
 | 测试切口 | archive marker;empty scope;port failure;no body stored |
+
+Archive summary expansion is a formal repository seam:
+
+```rust
+match input.archive_scope.scope_kind {
+    ArchiveHandoffScopeKind::Subjects => {
+        validate(input.archive_scope.project_ref.is_none());
+        validate(!input.archive_scope.subject_refs.is_empty());
+        archive_summary_repo.load_subject_archive_summaries(
+            input.archive_scope.subject_refs,
+            input.archive_scope.source_cursor,
+            handoff_page(),
+        ).await?
+    }
+    ArchiveHandoffScopeKind::ProjectCursor => {
+        let project_ref = require(input.archive_scope.project_ref)?;
+        let cursor = require(input.archive_scope.source_cursor)?;
+        validate(input.archive_scope.subject_refs.is_empty());
+        archive_summary_repo.load_project_archive_summaries(
+            project_ref,
+            cursor,
+            handoff_page(),
+        ).await?
+    }
+}
+```
+
+`Subjects` scope only covers explicit `WorkTraceSubjectRef` values and their audit trace refs. `ProjectCursor` is the only project-wide expansion path and must carry `project_ref`;the service must not derive project identity from `source_cursor` or subject string values.
 
 ### 13. 错误映射与回滚矩阵
 

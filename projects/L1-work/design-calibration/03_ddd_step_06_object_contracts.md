@@ -271,8 +271,9 @@ pub struct ExternalEvidenceRef {
 | `TraceHandoffRef` | string newtype | trace handoff output pointer | 由 handoff port 返回;不等于 observability log id body |
 | `TraceHandoffTargetRef` | `target_kind: TraceHandoffTargetKind`;`external_ref: ExternalSourceRef` | trace handoff target | 指向 observability / archive / diagnostic consumer;不保存目标配置 |
 | `ArchiveHandoffRef` | string newtype | archive handoff output pointer | 由 archive handoff port 返回;不等于 archive 内容 |
-| `ArchiveHandoffScope` | `scope_kind: ArchiveHandoffScopeKind`;`subject_refs: Vec<WorkTraceSubjectRef>`;`source_cursor: Option<WorkTruthCursor>` | archive handoff coverage | subject 非空;只含 Work refs / cursor;不含正文 |
+| `ArchiveHandoffScope` | `scope_kind: ArchiveHandoffScopeKind`;`project_ref: Option<ProjectRef>`;`subject_refs: Vec<WorkTraceSubjectRef>`;`source_cursor: Option<WorkTruthCursor>` | archive handoff coverage | `Subjects` 必须 subject 非空且 `project_ref = None`;`ProjectCursor` 必须 `project_ref = Some`、`subject_refs` empty、`source_cursor = Some`;只含 Work refs / cursor;不含正文 |
 | `ArchiveHandoffTargetRef` | `target_kind: ArchiveHandoffTargetKind`;`external_ref: ExternalSourceRef` | archive handoff target | 指向 archive boundary;不保存 archive body |
+| `WorkJobFailureRef` | `WorkOutbox` / `ExternalReference` / `TraceHandoff` / `ArchiveHandoff` / `DerivedWorkView` typed variant | operations job failed item surface | 不把 trace / archive failure 强行映射成 `ExternalReferenceRef`;只保存 refs / scope / target |
 | `WorkReconciliationScopeRef` | `scope_kind: WorkReconciliationScopeKind`;`project_ref: Option<ProjectRef>`;`view_ref: Option<DerivedWorkViewRef>`;`reference_ref: Option<ExternalReferenceRef>` | reconciliation job scope | `Project` scope 必须带 `project_ref`;`View` scope 必须带 `view_ref`;`Reference` scope 必须带 `reference_ref` |
 | `ExternalReferenceScope` | `scope_kind: ExternalReferenceScopeKind`;`project_ref: Option<ProjectRef>`;`reference_refs: Vec<ExternalReferenceRef>` | reference refresh scope | absent in job input means stale refs;`Project` scope 必须带 `project_ref`;`ExplicitRefs` 必须带非空 `reference_refs`;scope 展开只产生 typed external refs,不保存外部正文 |
 | `JobRunId` | string newtype | operations job run identity | job trigger 提供或系统生成;同一 job retry 保持稳定 |
@@ -357,6 +358,52 @@ pub struct TraceHandoffIntent {
     /// Subject covered by the handoff.
     pub subject_ref: WorkTraceSubjectRef,
 }
+
+/// Scope prepared for archive handoff.
+pub struct ArchiveHandoffScope {
+    /// Scope kind.
+    pub scope_kind: ArchiveHandoffScopeKind,
+    /// Project scope when scope_kind is ProjectCursor.
+    pub project_ref: Option<ProjectRef>,
+    /// Work subjects included in the scope.
+    pub subject_refs: Vec<WorkTraceSubjectRef>,
+    /// Optional truth cursor covered by this handoff.
+    pub source_cursor: Option<WorkTruthCursor>,
+}
+
+/// Archive handoff scope kind.
+pub enum ArchiveHandoffScopeKind {
+    /// Archive selected Work subjects.
+    Subjects,
+    /// Archive a project up to the supplied cursor.
+    ProjectCursor,
+}
+
+/// Failed item reference reported by Work operations jobs.
+pub enum WorkJobFailureRef {
+    /// Failed pending outbox item.
+    WorkOutbox(WorkOutboxId),
+    /// Failed external reference refresh item.
+    ExternalReference(ExternalReferenceRef),
+    /// Failed trace handoff item.
+    TraceHandoff {
+        /// Trace record that failed handoff.
+        trace_id: WorkTraceId,
+        /// Work trace subject being handed off.
+        subject_ref: WorkTraceSubjectRef,
+        /// Target that rejected or failed the handoff.
+        target_ref: TraceHandoffTargetRef,
+    },
+    /// Failed archive handoff item.
+    ArchiveHandoff {
+        /// Archive scope requested by the job.
+        archive_scope: ArchiveHandoffScope,
+        /// Archive target that rejected or failed the handoff.
+        target_ref: ArchiveHandoffTargetRef,
+    },
+    /// Failed derived view rebuild item.
+    DerivedWorkView(DerivedWorkViewRef),
+}
 ```
 
 | 类型 | 字段 / 形态 | 作用 | 约束 |
@@ -367,6 +414,8 @@ pub struct TraceHandoffIntent {
 | `TraceHandoffRef` | string newtype | trace handoff output pointer | 由 handoff port 返回 |
 | `ArchiveHandoffRef` | string newtype | archive handoff output pointer | 由 archive handoff port 返回 |
 | `TraceHandoffIntent` | trace / target / subject refs | trace handoff input | 不保存 observability log body |
+| `ArchiveHandoffScope` | scope kind + optional project + subjects + cursor | archive handoff scope | `Subjects` 和 `ProjectCursor` 约束同 §6.4 表格 |
+| `WorkJobFailureRef` | typed enum | operations failed item report | variant 必须对应实际失败 item;不保存外部正文 |
 
 ##### low-level shared ref / helper schema
 
@@ -2060,8 +2109,12 @@ pub struct ArchiveHandoffMarker {
 |---|---|---|---|
 | `TraceHandoffMarker` | `trace_id`、`handoff_ref` | `WorkTraceRecord` + `TraceHandoffPort` | 不保存 observability log body |
 | `ArchiveHandoffIntent` | `summaries`、`target_ref` | committed Work truth summaries + job input | 不保存 archive 长期正文 |
-| `WorkArchiveSummarySet` | `archive_scope`、`truth_refs`、`trace_refs`、`source_cursor` | truth repositories + audit repository + truth cursor | 只含 refs / cursor,不含正文 |
+| `WorkArchiveSummarySet` | `archive_scope`、`truth_refs`、`trace_refs`、`source_cursor` | `ArchiveSummaryRepository` expands archive scope from committed Work truth + audit trace records | 只含 refs / cursor,不含正文 |
 | `ArchiveHandoffMarker` | `archive_scope`、`archive_ref` | job input + `ArchiveHandoffPort` | marker 不代表 archive 拥有 Work truth |
+
+`WorkArchiveSummarySet` 的正式读取 owner 是 `ArchiveSummaryRepository`。`ArchiveHandoffScopeKind::Subjects` 只展开 request 中显式传入的 `subject_refs`:对每个 subject,repository 校验 subject 指向 Work-owned truth / history / handoff marker,将该 subject 原样纳入 `truth_refs`,并通过 `AuditRepository.list_trace_records(subject_ref, page)` 等价读取面收集相关 `trace_refs`;若 `source_cursor = Some(cursor)`,该 cursor 作为本次 summary 的 upper bound,否则 repository 返回当前 covered `source_cursor`。`Subjects` scope 不要求同一 project,也不得仅凭 subject 字符串推断 project。
+
+`ArchiveHandoffScopeKind::ProjectCursor` 必须携带 `project_ref = Some(project_ref)` 与 `source_cursor = Some(cursor)`,且 `subject_refs` 必须为空。repository 以 `project_ref + cursor` 从 committed Work truth 枚举 project、backlog、project member、formal work、dependency / blocker、iteration、promote / handoff marker 等可归属该 project 的 `WorkTraceSubjectRef`,再读取这些 subject 的 audit trace refs。`ProjectCursor` 不得缺少 project_ref,不得从 `source_cursor` 反推 project,不得扫描 projection rows,不得读取 archive / observability body。
 
 ##### `WorkAuditTrail`
 

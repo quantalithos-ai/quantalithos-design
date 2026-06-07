@@ -1637,6 +1637,8 @@ pub enum TraceHandoffTargetKind {
 pub struct ArchiveHandoffScope {
     /// Scope kind.
     pub scope_kind: ArchiveHandoffScopeKind,
+    /// Project scope when scope_kind is ProjectCursor.
+    pub project_ref: Option<ProjectRef>,
     /// Work subjects included in the scope.
     pub subject_refs: Vec<WorkTraceSubjectRef>,
     /// Optional truth cursor covered by this handoff.
@@ -1649,6 +1651,32 @@ pub enum ArchiveHandoffScopeKind {
     Subjects,
     /// Archive a project up to the supplied cursor.
     ProjectCursor,
+}
+
+/// Failed item reference reported by Work operations jobs.
+pub enum WorkJobFailureRef {
+    /// Failed pending outbox item.
+    WorkOutbox(WorkOutboxId),
+    /// Failed external reference refresh item.
+    ExternalReference(ExternalReferenceRef),
+    /// Failed trace handoff item.
+    TraceHandoff {
+        /// Trace record that failed handoff.
+        trace_id: WorkTraceId,
+        /// Work trace subject being handed off.
+        subject_ref: WorkTraceSubjectRef,
+        /// Target that rejected or failed the handoff.
+        target_ref: TraceHandoffTargetRef,
+    },
+    /// Failed archive handoff item.
+    ArchiveHandoff {
+        /// Archive scope requested by the job.
+        archive_scope: ArchiveHandoffScope,
+        /// Archive target that rejected or failed the handoff.
+        target_ref: ArchiveHandoffTargetRef,
+    },
+    /// Failed derived view rebuild item.
+    DerivedWorkView(DerivedWorkViewRef),
 }
 
 /// Target for archive handoff.
@@ -1688,9 +1716,21 @@ pub struct WorkJobReport {
     /// Number of records changed.
     pub changed_count: u64,
     /// Failed item refs that require retry or inspection.
-    pub failed_refs: Vec<ExternalReferenceRef>,
+    pub failed_refs: Vec<WorkJobFailureRef>,
 }
 ```
+
+`WorkJobFailureRef` is the only formal item failure surface for `WorkJobReport.failed_refs`. Job flows must push the variant that matches the failed item they actually processed:
+
+| Job / failed item | `WorkJobFailureRef` variant | Construction source |
+|---|---|---|
+| `PublishWorkOutbox` pending outbox record | `WorkOutbox(record.outbox_id)` | `WorkOutboxRepository.list_pending(...)` item |
+| `RefreshExternalReferenceSnapshots` reference item | `ExternalReference(reference_ref)` | expanded `ExternalReferenceRef` item |
+| `RebuildWorkProjections` view rebuild item | `DerivedWorkView(view_ref)` | `ProjectProjectionBatch.view_refs()` / projection repository result |
+| `PrepareWorkTraceHandoff` trace record item | `TraceHandoff { trace_id: record.trace_id, subject_ref: input.subject_ref, target_ref: input.target_ref }` | loaded `WorkTraceRecord` + job input |
+| `PrepareArchiveHandoff` archive handoff item | `ArchiveHandoff { archive_scope: input.archive_scope, target_ref: input.archive_target_ref }` | job input |
+
+Job report construction must not coerce trace handoff / archive handoff / outbox / projection failures into `ExternalReferenceRef`. `ExternalReferenceRef` remains only the local external snapshot key.
 
 `ExternalReferenceScope` validation and expansion:
 
@@ -1707,14 +1747,23 @@ pub struct WorkJobReport {
 | `job_run_id` | `JobRunId` | job trigger | trim 后非空;同一 retry 保持稳定 |
 | `actor` | `ActorContext` | job trigger | system / operator actor |
 | `command_metadata` | `CommandMetadata` | job trigger | `request.idempotency_key` 必填 |
-| `failed_refs` | `Vec<ExternalReferenceRef>` | job processing | 不包含外部正文 |
+| `failed_refs` | `Vec<WorkJobFailureRef>` | job processing | 不包含外部正文;variant 必须对应实际失败 item |
+
+`ArchiveHandoffScope` validation and expansion:
+
+| scope_kind | DTO validation | Expansion source | Cursor source |
+|---|---|---|---|
+| `Subjects` | `project_ref = None`;`subject_refs` nonempty;`source_cursor` optional | `ArchiveSummaryRepository.load_subject_archive_summaries(subject_refs, source_cursor)` | if `source_cursor` is `Some`, use it as upper bound;otherwise repository returns current covered cursor |
+| `ProjectCursor` | `project_ref = Some`;`subject_refs` empty;`source_cursor = Some` | `ArchiveSummaryRepository.load_project_archive_summaries(project_ref, source_cursor)` | required `source_cursor` is the inclusive upper bound for project-scoped committed Work truth |
+
+`Subjects` scope expands only the explicitly supplied `WorkTraceSubjectRef` values. It must not infer a project scope from subject string values. `ProjectCursor` scope is the only project-wide archive expansion path and must carry `project_ref`;without it the request is invalid.
 
 `WorkJobReport.receipt.result_ref` 必须指向 `JobResultRepository` 中同 UoW 保存的 `StoredJobResult::WorkJob`。duplicate replay 只 overlay `receipt.idempotency = Duplicate`,不得重新扫描 pending outbox、projection、reference 或 handoff marker 来生成新 report。
 | `projection_set` | `WorkProjectionSet` | rebuild job input | `All` 表示 board / member / iteration / search 全部重建 |
 | `reference_scope` | `Option<ExternalReferenceScope>` | refresh job input | `None` / `StaleOnly` 表示 stale refs;`Project` 必须带 `project_ref`;`ExplicitRefs` 必须非空 |
 | `scope_ref` | `WorkReconciliationScopeRef` | reconciliation job input | kind 与对应 optional ref 必须匹配 |
 | `target_ref` | `TraceHandoffTargetRef` | trace handoff job input | 只保存目标引用 |
-| `archive_scope` | `ArchiveHandoffScope` | archive handoff job input | `subject_refs` 必须非空 |
+| `archive_scope` | `ArchiveHandoffScope` | archive handoff job input | `Subjects` -> `subject_refs` 必须非空且 `project_ref = None`;`ProjectCursor` -> `project_ref` / `source_cursor` 必填且 `subject_refs` empty |
 | `archive_target_ref` | `ArchiveHandoffTargetRef` | archive handoff job input | 只保存 archive boundary ref |
 
 #### 11.2 Job input / output schema

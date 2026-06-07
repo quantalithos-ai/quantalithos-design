@@ -1181,7 +1181,7 @@ Ok(WorkQueryResponse::visible(WorkSearchResult::from_page(project.project_ref(),
 
 | 项 | 口径 |
 |---|---|
-| DTO -> View | search key = `ProjectRef + WorkSearchCriteria + PageRequest`;criteria 不携带 page |
+| DTO -> View | projection identity = `ProjectRef + WorkSearchCriteriaDigest`;repository read = `ProjectRef + WorkSearchCriteria + PageRequest`;criteria 不携带 page, page 不进入 `DerivedWorkViewRef` |
 | 事务边界 | 无写 UoW |
 | 错误 / surface | project missing -> `Missing`;projection failed -> `Failed`;not visible -> `NotVisible` |
 | 状态 / 事件 | 无 |

@@ -923,6 +923,9 @@ pub struct UpdateIterationLifecycleRequest {
 /// Free-text query for Work search.
 pub struct WorkSearchText(pub String);
 
+/// Stable digest over normalized WorkSearchCriteria.
+pub struct WorkSearchCriteriaDigest(pub String);
+
 /// Summarizes one formal work record for public query views.
 pub struct FormalWorkSummaryView {
     /// Formal work reference.
@@ -987,6 +990,7 @@ pub struct BacklogQueryFilter {
 | DTO | 字段 | 类型 | 字段来源 | 约束 |
 |---|---|---|---|---|
 | `WorkSearchText` | string | `SearchWorkRequest.criteria.text_query` | query input | trim 后 1..=120 UTF-8 chars;控制字符 reject;缺失表示不按文本过滤 |
+| `WorkSearchCriteriaDigest` | string | `DerivedWorkViewScopeRef::Search` | canonical `WorkSearchCriteria` | 输入为 normalized `work_state`、`assignee_ref`、`source_kind`、`text_query`;不得包含 `QueryMetadata.page`、actor、trace、request id、projection freshness 或 repository cursor |
 | `FormalWorkSummaryView` | `work_ref` | `FormalWorkRef` | truth repository | 不含 work body / plan body |
 | `FormalWorkSummaryView` | `work_state` | `WorkItemState` | contracts shared enum | 不依赖 domain-only enum |
 | `ProjectMemberSummaryView` | `member_ref` | `GlobalMemberRef` | ProjectMember truth | 不暴露 identity body |
@@ -1000,9 +1004,11 @@ pub struct BacklogQueryFilter {
 | `GetProjectBoardView` / `ProjectBoardView` | `ProjectRef` | `project-board:{project_id}` | `DerivedWorkViewState.source_cursor` |
 | `ListMemberWork` / `MemberWorkView` | `ProjectMemberRef` | `member-work:{project_member_id}` | `DerivedWorkViewState.source_cursor` |
 | `GetIterationSummary` / `IterationSummaryView` | `IterationRef` | `iteration-summary:{iteration_id}` | `DerivedWorkViewState.source_cursor` |
-| `SearchWork` / `WorkSearchResult` | `ProjectRef + WorkSearchCriteria` | `work-search:{project_id}:{criteria_digest}` | `DerivedWorkViewState.source_cursor` |
+| `SearchWork` / `WorkSearchResult` | `ProjectRef + WorkSearchCriteria` | `work-search:{project_id}:{criteria_digest}` where `criteria_digest: WorkSearchCriteriaDigest` | `DerivedWorkViewState.source_cursor` |
 | `GetProjectWorkFacts` | `ProjectRef` | 不要求 projection ref;truth read | repository truth cursor optional |
 | `GetWorkTrace` | `WorkTraceSubjectRef` | 不要求 projection ref;trace read | trace page cursor |
+
+`SearchWork` 的 stable view identity 必须由完整 `WorkSearchCriteria` 派生。`criteria_digest` 的 canonical input 按固定顺序编码 `work_state`、`assignee_ref`、`source_kind` 和 normalized `text_query`;每个字段使用稳定字段名和 variant / ref value,`None` 必须显式编码为 `null`,text 使用 DTO validation 后的 normalized `WorkSearchText` value。`QueryMetadata.page` 只影响返回页,不得进入 `WorkSearchCriteriaDigest`,否则同一搜索条件的不同页面会变成不同 projection freshness key。实现不得以 `WorkSearchText` 单独派生 `DerivedWorkViewScopeRef::Search`,也不得使用 Rust `Debug` 输出或 map iteration order 作为 digest input。
 
 P0 public derived view identity 只包含 `ProjectBoardView`、`MemberWorkView`、`IterationSummaryView` 和 `WorkSearchResult`。`PromoteResult` 通过 command result、truth repository 和 `PromoteResultRecorded` outbound event 暴露;`PendingPromoteIntake` 只是 runtime intake marker / operations inspection 数据,当前 P0 不提供 query surface。因此不得派生 `promote-result:*`、`promote-intake:*` 或同类临时 `DerivedWorkViewRef`。Promote 写路径只有在 accept path 创建 / 绑定 formal work 并影响上述既有 Work views 时,才标记这些既有 view stale。
 

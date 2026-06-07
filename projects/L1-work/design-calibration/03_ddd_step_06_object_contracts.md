@@ -260,6 +260,7 @@ pub struct ExternalEvidenceRef {
 | `ExternalReferenceRef` | `Member` / `MethodDefinition` / `SourceWork` / `Evidence` / `ProcessTimebox` typed variant | 本地 reference snapshot key | 只能由 typed ref conversion 构造,不得手写字符串 |
 | `WorkTitle` | string newtype | Formal Work public title | trim 后 1..=160 UTF-8 chars;不得包含换行;空白折叠由 DTO validation 完成 |
 | `WorkSearchText` | string newtype | formal work search text | trim 后 1..=120 UTF-8 chars;不得包含控制字符;不作为全文索引产品约束 |
+| `WorkSearchCriteriaDigest` | string newtype | normalized `WorkSearchCriteria` stable digest | 由完整 criteria 的 canonical form 计算;必须包含 work_state、assignee_ref、source_kind、text_query;不得包含 page、actor、trace、request id 或 projection freshness |
 | `FormalWorkRefSet` | `refs: Vec<FormalWorkRef>` | iteration / policy 的正式工作集合 | 非空;去重;同一 command 内顺序稳定;全部必须指向已 formalized work |
 | `CapabilityRefSet` | `refs: Vec<CapabilityRef>` | member responsibility capability 摘要 | 只含 capability ref;空集合表示不要求能力,不表示未知 |
 | `WorkTruthCursor` | `cursor: String` | committed Work truth source position | 由 repository / outbox / rebuild source 生成;不得与 `Version` 或 `PageToken` 比较 |
@@ -477,8 +478,8 @@ pub enum DerivedWorkViewScopeRef {
     ProjectMember(ProjectMemberRef),
     /// Iteration-scoped view.
     Iteration(IterationRef),
-    /// Search-scoped view.
-    Search(ProjectRef, WorkSearchText),
+    /// Search-scoped view derived from a full WorkSearchCriteria digest.
+    Search(ProjectRef, WorkSearchCriteriaDigest),
 }
 
 /// Reference to either a dependency or a blocker.
@@ -563,7 +564,7 @@ pub enum OutboxFailureReasonKind {
 | `ProcessTimeboxSummary` | `timebox_ref`、`project_ref`、`can_open_iteration`、`summary`、`source_digest` | process timebox resolver safe summary | 归属 `contracts/refs.rs`;用于 `ProcessTimeboxResolution.summary` 和 OpenIteration validation;不得保存 process body;不得进入 `Iteration` truth;OpenIteration 不写 process timebox reference state;`source_digest` 必填 |
 | `SourceDigest` | string digest | source summary verification | 格式由 resolver / tests 固定;Work 不解释 digest algorithm |
 | `EvidenceKind` | enum | evidence category | 与 `EvidenceVerifiedState` 搭配使用 |
-| `DerivedWorkViewKind` / `DerivedWorkViewScopeRef` | enum | projection key derivation | kind 与 scope 必须匹配 |
+| `DerivedWorkViewKind` / `DerivedWorkViewScopeRef` | enum | projection key derivation | kind 与 scope 必须匹配;`Search` scope 必须使用 `WorkSearchCriteriaDigest`,不得只用 `WorkSearchText` |
 | `DependencyOrBlockerRef` | enum | relation union ref | 不得手写字符串合并 |
 | `BlockerCauseRef` | source/evidence refs | blocker cause | 不保存 governance / artifact 正文 |
 | `BlockerImpactExplanation` | blocker/work/summary | read-only explanation | 不作为 truth change |

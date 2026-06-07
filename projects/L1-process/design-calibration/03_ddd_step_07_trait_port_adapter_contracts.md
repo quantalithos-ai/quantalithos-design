@@ -1136,6 +1136,15 @@ pub trait IdGeneratorPort {
     /// Creates an activity progression record id.
     fn new_activity_progression_id(&self) -> ActivityProgressionId;
 
+    /// Creates a process checkpoint id.
+    fn new_process_checkpoint_id(&self) -> ProcessCheckpointId;
+
+    /// Creates a recovery attempt id.
+    fn new_recovery_attempt_id(&self) -> RecoveryAttemptId;
+
+    /// Creates a recovery history record id.
+    fn new_recovery_history_id(&self) -> RecoveryHistoryId;
+
     /// Creates a process outbox id.
     fn new_process_outbox_id(&self) -> ProcessOutboxId;
 

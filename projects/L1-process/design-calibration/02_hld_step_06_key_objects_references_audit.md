@@ -433,6 +433,19 @@
 | `attempt_ref` | `Option<RecoveryAttemptRef>` | 可选恢复尝试引用 |
 | `history_kind` | `RecoveryHistoryKind` | 历史记录类别 |
 
+| `RecoveryHistoryKind` 变体 | 作用 |
+|---|---|
+| `CheckpointCaptured` | checkpoint 已捕获 |
+| `CheckpointSuperseded` | checkpoint 被更新 checkpoint 替代 |
+| `CheckpointInvalidated` | checkpoint 被标记无效 |
+| `CheckpointExpired` | checkpoint 因策略过期 |
+| `AttemptStarted` | recovery attempt 已创建 |
+| `AttemptApplied` | recovery attempt 已应用 |
+| `AttemptFailed` | recovery attempt 失败 |
+| `AttemptAbandoned` | recovery attempt 被放弃 |
+| `InstanceRecovering` | process instance 进入恢复中 |
+| `InstanceRecoveryCompleted` | process instance 从恢复回到运行 |
+
 | 成员函数 | 作用 |
 |---|---|
 | `relates_to_checkpoint(ProcessCheckpointRef checkpoint_ref)` | 判断是否关联 checkpoint |
@@ -440,7 +453,9 @@
 
 | 工厂函数 | 作用 |
 |---|---|
-| `from_recovery_attempt(RecoveryAttempt attempt)` | 从恢复尝试形成历史记录 |
+| `from_checkpoint(history_id: RecoveryHistoryId, checkpoint: ProcessCheckpoint, history_kind: RecoveryHistoryKind)` | 从 checkpoint 变化形成历史记录 |
+| `from_recovery_attempt(history_id: RecoveryHistoryId, attempt: RecoveryAttempt)` | 从恢复尝试形成历史记录 |
+| `from_instance_recovery_transition(history_id: RecoveryHistoryId, instance: ProcessInstance, checkpoint_ref: Option<ProcessCheckpointRef>, attempt_ref: Option<RecoveryAttemptRef>, history_kind: RecoveryHistoryKind)` | 从 instance recovery 状态变化形成历史记录 |
 
 | 禁止事项 | 说明 |
 |---|---|

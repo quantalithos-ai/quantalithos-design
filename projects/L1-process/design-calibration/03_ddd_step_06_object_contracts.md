@@ -87,7 +87,7 @@
 
 | 模块 | 文件 | 对象 / 类型 |
 |---|---|---|
-| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker、command intent helper;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState`、`ReferenceResolutionLifecycleState`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RuntimeFeedbackSummaryRef`、`ProcessStartIntentRef`、`ProcessStartReason`、`ActivityProgressionIntentRef`、`ActivityProgressionTransition`、`ActivityFlowControlIntent`、`SourceDigest` |
+| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker、command intent helper;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState`、`ReferenceResolutionLifecycleState`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RecoveryHistoryKind`、`RuntimeFeedbackSummaryRef`、`ProcessStartIntentRef`、`ProcessStartReason`、`ActivityProgressionIntentRef`、`ActivityProgressionTransition`、`ActivityFlowControlIntent`、`SourceDigest` |
 | `contracts` | `events.rs` | `ProcessOutboxEventKind`、`ProcessOutboundEventPayload` 及 outbound event payload DTO |
 | `contracts` | `views.rs` | `RuntimeProcessShapeView`、`ProcessProfileView`、`ProcessInstanceView`、`ActivityStatusView`、`ProcessTimelineView`、`ProcessProgressSummaryView`、`ReconciliationReportView` |
 | `domain` | `runtime_shape.rs` | `RuntimeProcessShape`、`RuntimeProcessShapeState` |
@@ -97,7 +97,7 @@
 | `domain` | `token_gateway.rs` | `Token`、`TokenState`、`TokenSet`、`TokenSnapshot`、`Gateway`、`GatewayState`、`GatewayRouteSet` |
 | `domain` | `waiting_gate.rs` | `WaitingGate`、`WaitingGateState`、`PauseContext`、`WaitingGateChangeRecord` |
 | `domain` | `checkpoint.rs` | `ProcessCheckpoint`、`CheckpointState` |
-| `domain` | `recovery.rs` | `RecoveryAttempt`、`RecoveryAttemptState`、`RecoveryHistoryRecord` |
+| `domain` | `recovery.rs` | `RecoveryAttempt`、`RecoveryAttemptState`、`RecoveryHistoryRecord`;`RecoveryHistoryKind` 归 `contracts::refs` |
 | `domain` | `rhythm.rs` | `ProcessStageState`、`StageState`、`ProcessTimeboxBinding`、`TimeboxBindingState` |
 | `domain` | `reference.rs` | `MethodDefinitionSnapshot`、`WorkContextSnapshot`、`ActorCapabilitySnapshot`、`RuntimeFeedbackSummary` |
 | `domain` | `projection.rs` | `DerivedProcessViewState`、`ProcessReadModel`、`ProcessTimelineView`、`ProcessProgressSummary`、`ActivityStatusView`、`ReconciliationReport` |
@@ -615,8 +615,8 @@ pub struct ProcessInstance {
 | `pub fn advance(&mut self, activity_ref: ActivityRef, actor: ActorRef) -> Result<(), DomainError>` | 更新实例当前活动指针 | activity ref、actor | `Result<(), DomainError>` | 仅 `Running` 可推进;设置 `current_activity_ref = Some(activity_ref)`;不生成 `ActivityProgressionRecord` |
 | `pub fn pause_for_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 进入等待 | waiting gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Running` -> `Waiting` |
 | `pub fn resume_from_gate(&mut self, gate: &WaitingGate, actor: ActorRef) -> Result<WaitingGateChangeRecord, DomainError>` | 从等待恢复 | resumed gate、actor | `Result<WaitingGateChangeRecord, DomainError>` | PH-04 reserved;`Waiting` -> `Running` |
-| `pub fn mark_recovering(&mut self, checkpoint: &ProcessCheckpoint, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 进入恢复 | checkpoint、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;非终态 -> `Recovering` |
-| `pub fn complete_recovery(&mut self, attempt: &RecoveryAttempt, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 完成恢复并回到运行 | 已 `Applied` 的 recovery attempt、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;`Recovering` -> `Running`;不得创建第二份 instance |
+| `pub fn mark_recovering(&mut self, history_id: RecoveryHistoryId, checkpoint: &ProcessCheckpoint, attempt: &RecoveryAttempt, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 进入恢复 | history id、checkpoint、attempt、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;非终态 -> `Recovering`;history kind = `InstanceRecovering` |
+| `pub fn complete_recovery(&mut self, history_id: RecoveryHistoryId, attempt: &RecoveryAttempt, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 完成恢复并回到运行 | history id、已 `Applied` 的 recovery attempt、actor | `Result<RecoveryHistoryRecord, DomainError>` | PH-04 reserved;`Recovering` -> `Running`;不得创建第二份 instance;history kind = `InstanceRecoveryCompleted` |
 | `pub fn complete(&mut self, actor: ActorRef) -> Result<(), DomainError>` | 完成实例 | actor | `Result<(), DomainError>` | `Running` -> `Completed`;只改变 instance truth;不生成 `ProcessTraceRecord` |
 | `pub fn cancel(&mut self, reason: ProcessCancelReason, actor: ActorRef) -> Result<(), DomainError>` | 取消实例 | 原因、actor | `Result<(), DomainError>` | 非终态 -> `Cancelled`;只改变 instance truth;不生成 `ProcessTraceRecord` |
 
@@ -1089,6 +1089,8 @@ pub struct RecoveryAttempt {
     pub recovery_state: RecoveryAttemptState,
     /// Failure reason when recovery failed.
     pub failure_reason: Option<RecoveryFailureReason>,
+    /// Abandon reason when recovery was abandoned.
+    pub abandon_reason: Option<RecoveryAbandonReason>,
 }
 ```
 
@@ -1099,12 +1101,13 @@ pub struct RecoveryAttempt {
 | `checkpoint_ref` | `ProcessCheckpointRef` | 使用的 checkpoint | 必填 |
 | `recovery_state` | `RecoveryAttemptState` | 尝试状态 | 必须为正式 enum |
 | `failure_reason` | `Option<RecoveryFailureReason>` | 失败原因 | Failed 时必填 |
+| `abandon_reason` | `Option<RecoveryAbandonReason>` | 放弃原因 | Abandoned 时必填;其他状态必须为空 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn mark_applied(&mut self, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 标记已应用 | actor | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` -> `Applied` |
-| `pub fn mark_failed(&mut self, reason: RecoveryFailureReason) -> Result<RecoveryHistoryRecord, DomainError>` | 标记失败 | reason | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` -> `Failed` |
-| `pub fn abandon(&mut self, reason: RecoveryAbandonReason, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 放弃恢复 | reason、actor | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` / `Failed` -> `Abandoned` |
+| `pub fn mark_applied(&mut self, history_id: RecoveryHistoryId, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 标记已应用 | history id、actor | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` -> `Applied`;history kind = `AttemptApplied`;`failure_reason` / `abandon_reason` 必须为空 |
+| `pub fn mark_failed(&mut self, history_id: RecoveryHistoryId, reason: RecoveryFailureReason) -> Result<RecoveryHistoryRecord, DomainError>` | 标记失败 | history id、reason | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` -> `Failed`;保存 `failure_reason`;history kind = `AttemptFailed`;`abandon_reason` 必须为空 |
+| `pub fn abandon(&mut self, history_id: RecoveryHistoryId, reason: RecoveryAbandonReason, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 放弃恢复 | history id、reason、actor | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` / `Failed` -> `Abandoned`;保存 `abandon_reason`;history kind = `AttemptAbandoned` |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -1132,6 +1135,10 @@ pub enum RecoveryAttemptState {
 | `Abandoned` | `The recovery attempt was abandoned and will not be applied.` | 放弃 | `Pending` / `Failed` | 无 |
 
 不变量与禁止事项:
+
+- `failure_reason` 只能在 `recovery_state = Failed` 时填写。
+- `abandon_reason` 只能在 `recovery_state = Abandoned` 时填写。
+- recovery attempt 只延续同一 `ProcessInstance`,不得创建替代实例。
 
 - 不覆盖 checkpoint truth。
 - 不保存 reasoning trace 或 archive package。
@@ -1984,7 +1991,46 @@ pub enum ProcessOutboxEventKind {
 | `ActivityTransitionOutcome` | `progression_id: ActivityProgressionId`;`activity_ref: ActivityRef`;`from_state: ActivityState`;`to_state: ActivityState`;`feedback_ref: Option<RuntimeFeedbackRef>` | 由 `Activity.assign/ready/start/attach_feedback/complete/skip/fail(...)` 返回 | 只表达 activity truth delta;不追加保存;不包含 token / gateway / selected route |
 | `ActivityProgressionRecord` | `progression_id: ActivityProgressionId`;`activity_ref: ActivityRef`;`from_state: ActivityState`;`to_state: ActivityState`;`feedback_ref: Option<RuntimeFeedbackRef>`;`token_refs: Vec<ProcessTokenRef>`;`gateway_ref: Option<GatewayRef>`;`selected_route_ref: Option<GatewayRouteRef>` | `from_activity_transition(outcome: ActivityTransitionOutcome, token_refs: Vec<ProcessTokenRef>, gateway: Option<Gateway>) -> Result<Self, DomainError>` | 不保存 runtime body;不替代 `Activity`;`progression_id` 来自 application 生成并已包含在 outcome 中,single-token flow 放 1 个 token ref,no-token flow 为空;`selected_route_ref` 只能复制同事务 committed `Gateway.selected_route_ref`;application 必须在 token / gateway flow-control 完成后构造 record |
 | `WaitingGateChangeRecord` | `change_id: WaitingGateChangeId`;`waiting_gate_ref: WaitingGateRef`;`from_state: WaitingGateState`;`to_state: WaitingGateState`;`decision_ref: Option<GovernanceDecisionRef>` | `from_gate_transition(gate: WaitingGate, from_state: WaitingGateState, to_state: WaitingGateState) -> Result<Self, DomainError>` | 不生成 decision;不替代 `WaitingGate` |
-| `RecoveryHistoryRecord` | `history_id: RecoveryHistoryId`;`process_instance_ref: ProcessInstanceRef`;`checkpoint_ref: Option<ProcessCheckpointRef>`;`attempt_ref: Option<RecoveryAttemptRef>`;`history_kind: RecoveryHistoryKind` | `from_recovery_attempt(attempt: RecoveryAttempt) -> Result<Self, DomainError>` | 不保存 archive package;不替代 `RecoveryAttempt` |
+| `RecoveryHistoryRecord` | `history_id: RecoveryHistoryId`;`process_instance_ref: ProcessInstanceRef`;`checkpoint_ref: Option<ProcessCheckpointRef>`;`attempt_ref: Option<RecoveryAttemptRef>`;`history_kind: RecoveryHistoryKind` | `from_checkpoint(history_id: RecoveryHistoryId, checkpoint: ProcessCheckpoint, history_kind: RecoveryHistoryKind) -> Result<Self, DomainError>`;`from_recovery_attempt(history_id: RecoveryHistoryId, attempt: RecoveryAttempt) -> Result<Self, DomainError>`;`from_instance_recovery_transition(history_id: RecoveryHistoryId, instance: ProcessInstance, checkpoint_ref: Option<ProcessCheckpointRef>, attempt_ref: Option<RecoveryAttemptRef>, history_kind: RecoveryHistoryKind) -> Result<Self, DomainError>` | 不保存 archive package;不替代 `RecoveryAttempt`;`history_id` 必须来自 application `IdGeneratorPort` |
+
+```rust
+/// Recovery history record kind.
+pub enum RecoveryHistoryKind {
+    /// A process checkpoint was captured.
+    CheckpointCaptured,
+    /// A process checkpoint was superseded by a newer checkpoint.
+    CheckpointSuperseded,
+    /// A process checkpoint was invalidated.
+    CheckpointInvalidated,
+    /// A process checkpoint expired.
+    CheckpointExpired,
+    /// A recovery attempt was started.
+    AttemptStarted,
+    /// A recovery attempt was applied.
+    AttemptApplied,
+    /// A recovery attempt failed.
+    AttemptFailed,
+    /// A recovery attempt was abandoned.
+    AttemptAbandoned,
+    /// A process instance entered recovery.
+    InstanceRecovering,
+    /// A process instance completed recovery and returned to running.
+    InstanceRecoveryCompleted,
+}
+```
+
+| 变体 | 来源 | `checkpoint_ref` | `attempt_ref` |
+|---|---|---|---|
+| `CheckpointCaptured` | `CreateProcessCheckpointFlow` after `ProcessCheckpoint::capture(...)` | 必填 | 空 |
+| `CheckpointSuperseded` | checkpoint supersede policy after `ProcessCheckpoint.mark_superseded(...)` | 必填 | 空 |
+| `CheckpointInvalidated` | checkpoint invalidation command / maintenance marker | 必填 | 空 |
+| `CheckpointExpired` | checkpoint expiry maintenance marker | 必填 | 空 |
+| `AttemptStarted` | `StartRecoveryAttemptFlow` after `RecoveryAttempt::start(...)` | 必填 | 必填 |
+| `AttemptApplied` | `RecoveryAttempt.mark_applied(...)` | 必填 | 必填 |
+| `AttemptFailed` | `RecoveryAttempt.mark_failed(...)` | 必填 | 必填 |
+| `AttemptAbandoned` | `RecoveryAttempt.abandon(...)` | 必填 | 必填 |
+| `InstanceRecovering` | `ProcessInstance.mark_recovering(...)` | 必填 | 必填 |
+| `InstanceRecoveryCompleted` | `ProcessInstance.complete_recovery(...)` | 可空 | 必填 |
 
 #### 11.10 `ProcessTruthChange` and public truth refs
 

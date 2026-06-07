@@ -57,7 +57,7 @@
 
 | 来源 | 问题 | 本 Step 收口 |
 |---|---|---|
-| Step 6 `ProcessInstance` 方法表 | `CompleteRecoveryAttemptFlow` 需要 `Recovering -> Running`,但对象方法未命名 | 已回填 `ProcessInstance.complete_recovery(&RecoveryAttempt, ActorRef)` |
+| Step 6 `ProcessInstance` 方法表 | `CompleteRecoveryAttemptFlow` 需要 `Recovering -> Running`,但对象方法未命名 | 已回填 `ProcessInstance.complete_recovery(RecoveryHistoryId, &RecoveryAttempt, ActorRef)` |
 | Step 9 governance consumer | 写了“Mark matching gates as decision-resolved marker only if Step 10 state matrix allows” | 本 Step 明确 consumer 可调用 `WaitingGate.attach_decision(...)` 使 `Waiting -> DecisionResolved`,但不得调用 `WaitingGate.resume(...)` |
 | Step 8 protocol dispositions | `ProcessViewStatus`、`ConsumerDisposition`、`JobDisposition` 容易被误当 domain 状态 | 本 Step 单独列 protocol 状态映射,禁止反推核心 truth |
 | Step 6 `ProcessProgressState` | 允许来源 / 去向为 projection builder | 本 Step 定义为派生 summary state,不是 command 状态机 |
@@ -207,8 +207,8 @@ Recovering --cancel--> Cancelled
 | `Running` | `Running` | `ProcessInstance.advance(ActivityRef, ActorRef)` | current activity / token position 与 request expected position 匹配 | 只更新 `current_activity_ref`;`ActivityProgressionRecord` 由同 flow 在 activity outcome 和 token / gateway flow-control truth 都完成后构造 | `DomainError::InvalidStateTransition` |
 | `Running` | `Waiting` | `ProcessInstance.pause_for_gate(&WaitingGate, ActorRef)` | PH-04 reserved;gate 属于同一 instance 且 state 为 `Waiting` | 写 waiting change record;token `Active -> Waiting` | `DomainError::InvalidStateTransition` |
 | `Waiting` | `Running` | `ProcessInstance.resume_from_gate(&WaitingGate, ActorRef)` | PH-04 reserved;gate state 为 `Resumed`;token 可恢复 | 写 waiting change record;token `Waiting -> Active` | `DomainError::InvalidStateTransition` |
-| `NotStarted` / `Running` / `Waiting` | `Recovering` | `ProcessInstance.mark_recovering(&ProcessCheckpoint, ActorRef)` | PH-04 reserved;checkpoint `Available`;同一 instance;不会 fork recovery | 写 recovery history;创建 recovery attempt | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
-| `Recovering` | `Running` | `ProcessInstance.complete_recovery(&RecoveryAttempt, ActorRef)` | PH-04 reserved;recovery attempt state 为 `Applied`;attempt 属于同一 instance | 写 recovery history;不得创建新 instance | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
+| `NotStarted` / `Running` / `Waiting` | `Recovering` | `ProcessInstance.mark_recovering(RecoveryHistoryId, &ProcessCheckpoint, &RecoveryAttempt, ActorRef)` | PH-04 reserved;checkpoint `Available`;attempt 属于同一 instance;不会 fork recovery | 写 `RecoveryHistoryKind::InstanceRecovering`;创建 recovery attempt | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
+| `Recovering` | `Running` | `ProcessInstance.complete_recovery(RecoveryHistoryId, &RecoveryAttempt, ActorRef)` | PH-04 reserved;recovery attempt state 为 `Applied`;attempt 属于同一 instance | 写 `RecoveryHistoryKind::InstanceRecoveryCompleted`;不得创建新 instance | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
 | `Recovering` | `Failed` | `CompleteRecoveryAttemptFlow` after `RecoveryAttempt.mark_failed(...)` | PH-04 reserved;recovery outcome 为 `Failed`;failure reason 必填;policy 判定不可继续 | 写 recovery history / outbox | `DomainError::InvalidStateTransition` |
 | `Running` | `Completed` | `ProcessInstance.complete(ActorRef)` | 当前活动 / token 已无未完成阻塞 | domain 只改变 instance truth;application 基于 committed `ProcessTruthChange::InstanceChanged` 生成 trace / outbox | `DomainError::InvalidStateTransition` |
 | `NotStarted` / `Running` / `Waiting` / `Recovering` | `Cancelled` | `ProcessInstance.cancel(ProcessCancelReason, ActorRef)` | reason 必填;actor 有权限 | domain 只改变 instance truth 并终止 active/waiting token 的正式 flow-control 语义;application 基于 committed `ProcessTruthChange::InstanceChanged` 生成 trace / outbox | `DomainError::InvalidStateTransition` |
@@ -392,10 +392,10 @@ factory -> Available --mark_superseded--> Superseded
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| factory | `Available` | `ProcessCheckpoint::capture(checkpoint_id, &ProcessInstance, Option<ActivityRef>, CheckpointEvidenceRef)` | instance 非终态;activity 属于 instance;evidence ref 可验证 | 创建 checkpoint;写 recovery history / trace | `DomainError::ReferenceResolutionFailed` |
-| `Available` | `Superseded` | `ProcessCheckpoint.mark_superseded(ProcessCheckpointRef)` | next checkpoint 属于同一 instance;不会 fork | 设置 `superseded_by` | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
-| `Available` | `Invalid` | `ProcessCheckpoint.invalidate(CheckpointInvalidReason)` | evidence invalid 或 boundary violation | 标记 invalid;拒绝后续 recovery | `DomainError::InvalidStateTransition` |
-| `Available` | `Expired` | `ProcessCheckpoint.expire(CheckpointExpireReason)` | retention policy 到期 | 标记 expired | `DomainError::InvalidStateTransition` |
+| factory | `Available` | `ProcessCheckpoint::capture(checkpoint_id, &ProcessInstance, Option<ActivityRef>, CheckpointEvidenceRef)` | instance 非终态;activity 属于 instance;evidence ref 可验证 | 创建 checkpoint;写 `RecoveryHistoryKind::CheckpointCaptured` / trace | `DomainError::ReferenceResolutionFailed` |
+| `Available` | `Superseded` | `ProcessCheckpoint.mark_superseded(ProcessCheckpointRef)` | next checkpoint 属于同一 instance;不会 fork | 设置 `superseded_by`;写 `RecoveryHistoryKind::CheckpointSuperseded` | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
+| `Available` | `Invalid` | `ProcessCheckpoint.invalidate(CheckpointInvalidReason)` | evidence invalid 或 boundary violation | 标记 invalid;拒绝后续 recovery;写 `RecoveryHistoryKind::CheckpointInvalidated` when persisted | `DomainError::InvalidStateTransition` |
+| `Available` | `Expired` | `ProcessCheckpoint.expire(CheckpointExpireReason)` | retention policy 到期 | 标记 expired;写 `RecoveryHistoryKind::CheckpointExpired` when persisted | `DomainError::InvalidStateTransition` |
 
 ---
 
@@ -423,10 +423,10 @@ factory -> Pending --mark_applied--> Applied
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| factory | `Pending` | `RecoveryAttempt::start(recovery_attempt_id, process_instance_id, checkpoint_ref, actor)` | checkpoint `Available`;same instance;无 active conflicting attempt | 创建 attempt;instance `非终态 -> Recovering` | `DomainError::RecoveryForkViolation` |
-| `Pending` | `Applied` | `RecoveryAttempt.mark_applied(ActorRef)` | checkpoint can_resume;recovery outcome 为 `Applied` | 写 history;随后 instance `Recovering -> Running` | `DomainError::InvalidStateTransition` |
-| `Pending` | `Failed` | `RecoveryAttempt.mark_failed(RecoveryFailureReason)` | failure reason 必填 | 写 failure reason / history;instance 可按 policy 转 `Failed` 或保持 `Recovering` 待维护 | `DomainError::InvalidStateTransition` |
-| `Pending` / `Failed` | `Abandoned` | `RecoveryAttempt.abandon(RecoveryAbandonReason, ActorRef)` | abandon reason 必填;不会创建替代 instance | 写 history;maintenance job 可写 outbox | `DomainError::InvalidStateTransition` |
+| factory | `Pending` | `RecoveryAttempt::start(recovery_attempt_id, process_instance_id, checkpoint_ref, actor)` | checkpoint `Available`;same instance;无 active conflicting attempt | 创建 attempt;写 `RecoveryHistoryKind::AttemptStarted`;instance `非终态 -> Recovering` | `DomainError::RecoveryForkViolation` |
+| `Pending` | `Applied` | `RecoveryAttempt.mark_applied(RecoveryHistoryId, ActorRef)` | checkpoint can_resume;recovery outcome 为 `Applied`;failure / abandon reason 均为空 | 写 `RecoveryHistoryKind::AttemptApplied`;随后 instance `Recovering -> Running` | `DomainError::InvalidStateTransition` |
+| `Pending` | `Failed` | `RecoveryAttempt.mark_failed(RecoveryHistoryId, RecoveryFailureReason)` | failure reason 必填;abandon reason 为空 | 写 failure reason / `RecoveryHistoryKind::AttemptFailed`;instance 可按 policy 转 `Failed` 或保持 `Recovering` 待维护 | `DomainError::InvalidStateTransition` |
+| `Pending` / `Failed` | `Abandoned` | `RecoveryAttempt.abandon(RecoveryHistoryId, RecoveryAbandonReason, ActorRef)` | abandon reason 必填;failure reason 在请求中必须为空;不会创建替代 instance | 写 abandon reason / `RecoveryHistoryKind::AttemptAbandoned`;maintenance job 可写 outbox | `DomainError::InvalidStateTransition` |
 
 ---
 

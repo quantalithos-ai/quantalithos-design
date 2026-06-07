@@ -146,7 +146,7 @@ Step 15 observability and audit
 | `ResumeWaitingGate_contract` | `ResumeWaitingGateFlow` | resume success;duplicate;decision mismatch;gate already terminal;token missing | API + application |
 | `CreateProcessCheckpoint_contract` | `CreateProcessCheckpointFlow` | checkpoint success;duplicate;instance missing;activity not in instance;evidence invalid | API + application |
 | `StartRecoveryAttempt_contract` | `StartRecoveryAttemptFlow` | recovery attempt success;duplicate;checkpoint expired;fork violation;instance terminal | API + application |
-| `CompleteRecoveryAttempt_contract` | `CompleteRecoveryAttemptFlow` | applied / failed / abandoned result;duplicate;missing failure reason;terminal attempt reject | API + application |
+| `CompleteRecoveryAttempt_contract` | `CompleteRecoveryAttemptFlow` | applied / failed / abandoned result;duplicate;missing failure reason;missing abandon reason;conflicting reason fields;terminal attempt reject | API + application |
 | `BindProcessTimebox_contract` | `BindProcessTimeboxFlow` | binding success;duplicate;external timebox unavailable;invalid binding;no Work truth mutation | API + application |
 | `UpdateProcessStageState_contract` | `UpdateProcessStageStateFlow` | activate / pause / complete / skip success;duplicate;illegal transition;version conflict | API + application |
 
@@ -183,7 +183,7 @@ Step 15 observability and audit
 | `ActivityProgressed_outbound` | `ActivityProgressedEvent` | payload from committed `ActivityProgressed`;feedback ref、`token_refs`、`gateway_ref`、`selected_route_ref` copied from same-transaction progression record;no runtime execution log | publisher contract |
 | `WaitingGateChanged_outbound` | `WaitingGateChangedEvent` | payload from committed `WaitingGateChanged`;decision ref only;no governance decision body | publisher contract |
 | `ProcessCheckpointCreated_outbound` | `ProcessCheckpointCreatedEvent` | payload from committed `CheckpointChanged`;evidence ref only;no artifact body | publisher contract |
-| `RecoveryAttemptChanged_outbound` | `RecoveryAttemptChangedEvent` | payload from committed `RecoveryAttemptChanged`;state and history refs stable | publisher contract |
+| `RecoveryAttemptChanged_outbound` | `RecoveryAttemptChangedEvent` | payload from committed `RecoveryAttemptChanged`;failure / abandon reason matches committed attempt state;state and history refs stable | publisher contract |
 | `ProcessTimingChanged_outbound` | `ProcessTimingChangedEvent` | payload from committed `TimingChanged`;timebox binding ref only;no Work truth mutation | publisher contract |
 | `ProcessTraceAvailable_outbound` | `ProcessTraceAvailableEvent` | payload from committed `TraceAvailable`;publisher does not generate trace ad hoc;no observability body | publisher contract |
 | `DerivedProcessViewChanged_outbound` | `DerivedProcessViewChangedEvent` | payload from committed `DerivedViewChanged`;source cursor / freshness stable;no projection body dump | publisher contract |

@@ -127,6 +127,7 @@
 | `checkpoint_ref` | `ProcessCheckpointRef` | 使用的 checkpoint |
 | `recovery_state` | `RecoveryAttemptState` | 当前恢复尝试状态 |
 | `failure_reason` | `Option<RecoveryFailureReason>` | 失败解释 |
+| `abandon_reason` | `Option<RecoveryAbandonReason>` | 放弃解释 |
 
 | 状态 | 作用 |
 |---|---|
@@ -134,9 +135,9 @@
 
 | 成员函数 | 作用 |
 |---|---|
-| `mark_applied(ActorRef actor)` | 记录恢复已应用 |
-| `mark_failed(RecoveryFailureReason reason)` | 记录恢复失败 |
-| `abandon(RecoveryAbandonReason reason, ActorRef actor)` | 放弃恢复尝试 |
+| `mark_applied(RecoveryHistoryId history_id, ActorRef actor)` | 记录恢复已应用并返回 `AttemptApplied` history |
+| `mark_failed(RecoveryHistoryId history_id, RecoveryFailureReason reason)` | 记录恢复失败并返回 `AttemptFailed` history |
+| `abandon(RecoveryHistoryId history_id, RecoveryAbandonReason reason, ActorRef actor)` | 放弃恢复尝试并返回 `AttemptAbandoned` history |
 
 | 工厂函数 | 作用 |
 |---|---|

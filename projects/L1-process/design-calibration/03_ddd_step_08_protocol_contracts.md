@@ -206,7 +206,7 @@
 | `ProcessIdempotencyOperation` | `contracts/src/refs.rs` | command / event / job idempotency namespace |
 | `ProcessIdempotencyKey` | `contracts/src/refs.rs` | normalized command / event / job idempotency key |
 | `ProcessTruthRef` / `ProcessTruthRefKind` / `ProcessTruthCursorRef` / `ProcessTruthChangeRef` | `contracts/src/refs.rs` | committed truth refs used by outbox envelope、projection cursor、trace records |
-| `ActivityKind` / `GatewayKind` / `RuntimeFeedbackKind` | `contracts/src/refs.rs` | public execution kind enums reused by DTO、event and domain object signatures |
+| `ActivityKind` / `GatewayKind` / `RuntimeFeedbackKind` / `RecoveryHistoryKind` | `contracts/src/refs.rs` | public kind enums reused by DTO、event and domain object signatures |
 | `ProcessCancelReason` / `ActivityCompletionReason` / `ActivitySkipReason` / `ActivityFailureReason` / `TokenTerminationReason` / `GatewayDecisionReason` / `GatewayInvalidReason` | `contracts/src/refs.rs` | public reason newtypes used by command DTO and domain transitions |
 | `RuntimeFeedbackSummaryRef` / `SourceDigest` / `ProcessTokenRef` / `GatewayRouteRef` | `contracts/src/refs.rs` | secondary shared refs used by feedback、token and gateway protocols |
 | `ProcessStartIntentRef` / `ProcessStartReason` | `contracts/src/refs.rs` | structured command intent used by `StartProcessInstanceRequest.start_intent_ref`;schema and bootstrap mapping are Step 6 §7.2.2 |
@@ -1302,6 +1302,8 @@ pub struct RecoveryAttemptCommandResult {
     pub recovery_state: RecoveryAttemptState,
     /// Optional failure reason.
     pub failure_reason: Option<RecoveryFailureReason>,
+    /// Optional abandon reason.
+    pub abandon_reason: Option<RecoveryAbandonReason>,
     /// Recovery history record.
     pub history_record_ref: RecoveryHistoryRecordRef,
     /// Outbox record created when a truth change occurred.
@@ -1310,6 +1312,8 @@ pub struct RecoveryAttemptCommandResult {
     pub receipt: CommandReceipt,
 }
 ```
+
+`RecoveryAttemptCommandResult.history_record_ref` 指向该 command 的 primary history record:`StartRecoveryAttempt` 使用 `AttemptStarted`;`CompleteRecoveryAttempt` 使用 `AttemptApplied` / `AttemptFailed` / `AttemptAbandoned`。若同一 accepted transaction 还追加 instance recovery history,该 additional record 只通过 history repository / trace 暴露,不替代 primary result ref。
 
 ##### 7.6.11 `CompleteRecoveryAttempt`
 
@@ -1333,8 +1337,18 @@ pub struct CompleteRecoveryAttemptRequest {
     pub recovery_outcome: RecoveryOutcome,
     /// Failure reason when outcome is failed.
     pub failure_reason: Option<RecoveryFailureReason>,
+    /// Abandon reason when outcome is abandoned.
+    pub abandon_reason: Option<RecoveryAbandonReason>,
 }
 ```
+
+字段闭环:
+
+| `recovery_outcome` | `failure_reason` | `abandon_reason` | Domain 调用 | 缺失 / 冲突处理 |
+|---|---|---|---|---|
+| `Applied` | 必须为空 | 必须为空 | `RecoveryAttempt.mark_applied(...)`;随后 `ProcessInstance.complete_recovery(...)` | 任一 reason 存在 -> `InvalidRequest` |
+| `Failed` | 必填 | 必须为空 | `RecoveryAttempt.mark_failed(failure_reason)` | 缺失 failure 或存在 abandon -> `InvalidRequest` |
+| `Abandoned` | 必须为空 | 必填 | `RecoveryAttempt.abandon(abandon_reason, actor)` | 缺失 abandon 或存在 failure -> `InvalidRequest` |
 
 ##### 7.6.12 `BindProcessTimebox`
 
@@ -2434,6 +2448,8 @@ pub struct RecoveryAttemptChangedEvent {
     pub recovery_state: RecoveryAttemptState,
     /// Failure reason when failed.
     pub failure_reason: Option<RecoveryFailureReason>,
+    /// Abandon reason when abandoned.
+    pub abandon_reason: Option<RecoveryAbandonReason>,
 }
 ```
 
@@ -2515,7 +2531,7 @@ pub struct DerivedProcessViewChangedEvent {
 | `ActivityProgressedEvent` | committed `Activity` + same-transaction `ActivityProgressionRecord`;`selected_route_ref` copies `ActivityProgressionRecord.selected_route_ref`,which itself copies committed `Gateway.selected_route_ref` |
 | `WaitingGateChangedEvent` | committed `WaitingGate` + `PauseContextRef` + same-transaction `WaitingGateChangeRecord` evidence |
 | `ProcessCheckpointCreatedEvent` | committed `ProcessCheckpoint` after capture / state change |
-| `RecoveryAttemptChangedEvent` | committed `RecoveryAttempt` + failure reason when state is `Failed` |
+| `RecoveryAttemptChangedEvent` | committed `RecoveryAttempt` + failure reason when state is `Failed` + abandon reason when state is `Abandoned` |
 | `ProcessTimingChangedEvent` | committed `ProcessStageState` and / or `ProcessTimeboxBinding`;only one of stage or binding may be absent when the other changed |
 | `ProcessTraceAvailableEvent` | committed `ProcessTraceRecord` + optional prepared `TraceHandoffRef` |
 | `DerivedProcessViewChangedEvent` | committed `DerivedProcessViewState` after freshness transition |
@@ -2888,7 +2904,7 @@ Rules:
 | `ResumeWaitingGateRequest` | `WaitingGate`、`Token`、change record | 是 | repository / resolver | decision ref vs resume reason | reject |
 | `CreateProcessCheckpointRequest` | `ProcessCheckpoint`、trace / audit | 是 | id generator, repository | evidence ref vs checkpoint reason | reject |
 | `StartRecoveryAttemptRequest` | `RecoveryAttempt`、history record | 是 | checkpoint repository, id generator | checkpoint ref vs attempt ref | reject |
-| `CompleteRecoveryAttemptRequest` | `RecoveryAttempt`、history record、outbox | 是 | repository | outcome vs failure reason | invalid input |
+| `CompleteRecoveryAttemptRequest` | `RecoveryAttempt`、history record、outbox | 是 | repository | outcome vs failure reason / abandon reason | invalid input |
 | `BindProcessTimeboxRequest` | `ProcessTimeboxBinding`、stage / timing marker | 是 | id generator, work snapshot | process timebox vs external timebox | reject |
 | `UpdateProcessStageStateRequest` | `ProcessStageState`、trace / outbox | 是 | repository | stage target vs state enum | reject |
 | `InboundEventEnvelope<T>` | snapshot / reference / pending / stale marker | 是 if envelope valid | resolver, clock | source actor vs command actor | quarantine / delayed |

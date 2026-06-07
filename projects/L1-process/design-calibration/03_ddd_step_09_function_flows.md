@@ -456,10 +456,11 @@ Steps:
 1. Reserve command idempotency.
 2. Load `ProcessInstance`;validate optional `ActivityRef`.
 3. Validate `CheckpointEvidenceRef` through artifact evidence marker when available.
-4. `ProcessCheckpoint::capture(checkpoint_id, &instance, activity_ref, evidence_ref)`.
-5. Supersede previous available checkpoint when policy requires.
-6. Save checkpoint;append recovery history when applicable;append trace / audit.
-7. Store `ProcessCheckpointCommandResult`.
+4. Generate `ProcessCheckpointId` and `RecoveryHistoryId` via `IdGeneratorPort`.
+5. `ProcessCheckpoint::capture(checkpoint_id, &instance, activity_ref, evidence_ref)`.
+6. Supersede previous available checkpoint when policy requires;each superseded checkpoint history uses its own `RecoveryHistoryId`.
+7. Save checkpoint;append `RecoveryHistoryRecord` with `CheckpointCaptured` and optional `CheckpointSuperseded`;append trace / audit.
+8. Store `ProcessCheckpointCommandResult`.
 
 Tests:success;duplicate;instance missing;activity not in instance;evidence invalid.
 
@@ -472,10 +473,11 @@ Steps:
 1. Reserve command idempotency.
 2. Load `ProcessCheckpoint` and owning `ProcessInstance`.
 3. `RecoveryContinuityPolicy.assert_checkpoint_matches_instance(...)`.
-4. `RecoveryAttempt::start(recovery_attempt_id, process_instance_id, checkpoint_ref, actor)`.
-5. `ProcessInstance.mark_recovering(&checkpoint, actor)`.
-6. Save attempt and instance;append history、trace、outbox `RecoveryAttemptChanged`.
-7. Store `RecoveryAttemptCommandResult`.
+4. Generate `RecoveryAttemptId` and two `RecoveryHistoryId` values via `IdGeneratorPort`.
+5. `RecoveryAttempt::start(recovery_attempt_id, process_instance_id, checkpoint_ref, actor)`.
+6. Build primary `RecoveryHistoryRecord` with `AttemptStarted`,then call `ProcessInstance.mark_recovering(second_history_id, &checkpoint, &attempt, actor)`.
+7. Save attempt and instance;append both history records、trace、outbox `RecoveryAttemptChanged`.
+8. Store `RecoveryAttemptCommandResult`.
 
 Tests:success;checkpoint expired;fork violation;duplicate;instance terminal.
 
@@ -487,15 +489,20 @@ Steps:
 
 1. Reserve command idempotency.
 2. Load `RecoveryAttempt` and owning `ProcessInstance`.
-3. Match `RecoveryOutcome`:
-   - `Applied` -> `RecoveryAttempt.mark_applied(actor)` and `ProcessInstance.complete_recovery(&attempt, actor)`.
-   - `Failed` -> `RecoveryAttempt.mark_failed(failure_reason)`.
-   - `Abandoned` -> `RecoveryAttempt.abandon(reason, actor)`.
-4. Save attempt and instance when changed.
-5. Append recovery history、trace、outbox `RecoveryAttemptChanged`.
-6. Store `RecoveryAttemptCommandResult`.
+3. Validate outcome reason fields:
+   - `Applied` requires `failure_reason = None` and `abandon_reason = None`.
+   - `Failed` requires `failure_reason = Some(...)` and `abandon_reason = None`.
+   - `Abandoned` requires `abandon_reason = Some(...)` and `failure_reason = None`.
+4. Generate one `RecoveryHistoryId` per history record appended in this flow.
+5. Match `RecoveryOutcome`:
+   - `Applied` -> `RecoveryAttempt.mark_applied(history_id, actor)` and `ProcessInstance.complete_recovery(second_history_id, &attempt, actor)`.
+   - `Failed` -> `RecoveryAttempt.mark_failed(history_id, failure_reason)`.
+   - `Abandoned` -> `RecoveryAttempt.abandon(history_id, abandon_reason, actor)`.
+6. Save attempt and instance when changed.
+7. Append recovery history、trace、outbox `RecoveryAttemptChanged`.
+8. Store `RecoveryAttemptCommandResult`.
 
-Tests:applied;failed;abandoned;missing failure reason;terminal attempt duplicate.
+Tests:applied;failed;abandoned;missing failure reason;missing abandon reason;conflicting reason fields;terminal attempt duplicate.
 
 ##### 7.6.12 `BindProcessTimeboxFlow`
 

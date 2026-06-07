@@ -1027,10 +1027,20 @@ pub struct ProcessInstanceCommandResult {
 |---|---|---|---|---|
 | `profile_ref` | `ProcessProfileRef` | `ProcessInstance.profile_ref` | caller + profile repository | missing / inactive -> reject |
 | `work_context_ref` | `WorkContextRef` | source for `project_ref` validation | caller + snapshot repository | unresolved -> reject / retry |
-| `start_intent_ref` | `ProcessStartIntentRef` | initial activity / token / optional gateway bootstrap | caller;schema 见 Step 6 §7.2.2 | unknown start node、gateway mismatch、missing start reason -> reject |
+| `start_intent_ref` | `ProcessStartIntentRef` | initial activity / token / optional gateway bootstrap | caller + `ProcessShapeRepository.get_start_bootstrap_summary(profile.shape_ref, start_intent_ref.start_node_ref)`;schema 见 Step 6 §7.2.2 / §7.3 | unknown start node、gateway mismatch、missing start reason -> reject |
 | `process_instance_id` | `ProcessInstanceId` | `ProcessInstance.process_instance_id` | `IdGeneratorPort` | generated |
-| `token_set_ref` | `ProcessTokenSetRef` | `ProcessInstance.token_set_ref` | `IdGeneratorPort` / token builder | generated |
-| `current_activity_ref` | `Option<ActivityRef>` | `ProcessInstance.current_activity_ref` | `start_intent_ref.start_node_ref` + shape node projection | if no start node -> reject |
+| `token_set_ref` | `ProcessTokenSetRef` | `ProcessInstance.token_set_ref` | `IdGeneratorPort::new_process_token_set_ref()` | generated |
+| `activity_id` | `ActivityId` | `Activity.activity_id` | `IdGeneratorPort::new_activity_id()` | generated |
+| `token_id` | `ProcessTokenId` | `Token.token_id` | `IdGeneratorPort::new_process_token_id()` | generated |
+| `gateway_id` | `GatewayId` | `Gateway.gateway_id` when bootstrap gateway exists | `IdGeneratorPort::new_gateway_id()` | generated only when `ProcessStartBootstrapSummary.requires_gateway_tracking = true` |
+| `current_activity_ref` | `Option<ActivityRef>` | `ProcessInstance.current_activity_ref` | saved initial `Activity` ref generated from `activity_id` | if no start node summary -> reject |
+
+Start bootstrap validation:
+
+- `ProcessShapeRepository.get_start_bootstrap_summary(profile.shape_ref, start_intent_ref.start_node_ref)` is the only formal read surface for start node membership、`ActivityKind` and initial gateway bootstrap metadata.
+- `ProcessStartBootstrapSummary.activity_kind` is passed to `Activity::from_shape_node(...)`;service must not infer `ActivityKind` from `ShapeNodeRef` text or private adapter state.
+- If `ProcessStartBootstrapSummary.requires_gateway_tracking = true`,request `initial_gateway_ref` must equal `summary.initial_gateway.gateway_ref`;the saved `Gateway` truth still uses `IdGeneratorPort::new_gateway_id()` as `GatewayId`,and `summary.initial_gateway.shape_node_ref / gateway_kind` are passed to `Gateway::from_shape_node(...)`.
+- If `requires_gateway_tracking = false`,request `initial_gateway_ref` must be `None` and no `Gateway` truth is created.
 
 ##### 7.6.5 `AdvanceProcessActivity`
 

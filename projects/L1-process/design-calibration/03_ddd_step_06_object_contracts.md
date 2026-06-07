@@ -381,6 +381,48 @@ pub struct GatewayRouteSet {
 | `TokenSnapshot` | counts 和 `token_refs` 来自 token repository committed truth | counts 必须与 repository snapshot 一致;不得从 runtime queue 反推 |
 | `GatewayRouteSet` | `gateway_ref` 来自 `Gateway`;`route_refs` 来自 `ProcessShapeRepository::get_gateway_route_set(gateway_ref)` 的 body-free route summary | `assert_route_allowed` 要求 route 属于 `route_refs`;空 route set 只能导致 policy reject;不得读取 method definition body |
 
+#### 7.3 Start bootstrap summary
+
+`StartProcessInstanceFlow` 校验 `ProcessStartIntentRef` 和创建 initial `Activity` / `Token` / optional `Gateway` 时,必须读取 body-free runtime shape bootstrap summary。该 summary 只暴露可落码的 start 节点元数据,不得包含 method definition body、条件表达式正文、脚本文本、runtime 执行正文或外部 GRC / artifact 正文。
+
+```rust
+/// Body-free start-node summary used to validate and bootstrap StartProcessInstance.
+pub struct ProcessStartBootstrapSummary {
+    /// Runtime shape that owns the start node.
+    pub shape_ref: RuntimeProcessShapeRef,
+    /// Start node selected by ProcessStartIntentRef.
+    pub start_node_ref: ShapeNodeRef,
+    /// Activity kind declared by the runtime shape for the start node.
+    pub activity_kind: ActivityKind,
+    /// Whether this start node requires initial gateway tracking.
+    pub requires_gateway_tracking: bool,
+    /// Gateway identity and node/kind to initialize when gateway tracking is required.
+    pub initial_gateway: Option<ProcessStartGatewayBootstrapSummary>,
+}
+
+/// Body-free gateway bootstrap summary for a start node.
+pub struct ProcessStartGatewayBootstrapSummary {
+    /// Stable gateway reference declared by the runtime shape summary.
+    pub gateway_ref: GatewayRef,
+    /// Runtime shape node represented by the gateway.
+    pub shape_node_ref: ShapeNodeRef,
+    /// Gateway kind declared by the runtime shape.
+    pub gateway_kind: GatewayKind,
+}
+```
+
+| 字段 | 来源 | 使用口径 | validation / 缺失处理 |
+|---|---|---|---|
+| `shape_ref` | `ProcessProfile.shape_ref` + `ProcessShapeRepository.get_start_bootstrap_summary(...)` | 确认 summary 属于 active profile runtime shape | 不匹配 -> repository error / reject |
+| `start_node_ref` | request `ProcessStartIntentRef.start_node_ref` + shape indexed summary | 传入 `Activity::from_shape_node(...)` 和 `Token::start_at(...)` | missing / unknown / not startable -> `None` 或 reject |
+| `activity_kind` | runtime shape body-free node summary | 传入 `Activity::from_shape_node(activity_id, instance_id, start_node_ref, activity_kind)` | 缺失时 reject;不得由 service 根据 node id 字符串推断 |
+| `requires_gateway_tracking` | runtime shape body-free node summary | 决定 request `initial_gateway_ref` 是否必填 / 必须为空 | `true` 且 request 为空 -> reject;`false` 且 request 非空 -> reject |
+| `initial_gateway.gateway_ref` | runtime shape body-free gateway summary | 与 request `initial_gateway_ref` 精确匹配 | 不匹配 -> reject;该 ref 不作为 generated `GatewayId` 来源 |
+| `initial_gateway.shape_node_ref` | runtime shape body-free gateway summary | 传入 `Gateway::from_shape_node(gateway_id, shape_node_ref, gateway_kind)` | requires gateway tracking 时缺失 -> reject |
+| `initial_gateway.gateway_kind` | runtime shape body-free gateway summary | 传入 `Gateway::from_shape_node(...)` | 缺失时 reject;不得由 service 根据 gateway ref 字符串推断 |
+
+`ProcessStartBootstrapSummary` 归 `domain::runtime_shape` 或等价 body-free summary module;`ActivityKind` / `GatewayKind` 仍归 `contracts::refs`。application service 只能通过 `ProcessShapeRepository.get_start_bootstrap_summary(profile.shape_ref, start_intent_ref.start_node_ref)` 读取该 summary。`initial_gateway_ref` 是 caller intent 中对 runtime shape gateway summary 的选择和校验输入,不是本仓生成 `Gateway` truth identity 的来源;创建 `Gateway` truth 时仍由 `IdGeneratorPort::new_gateway_id()` 生成 `GatewayId`。
+
 ### 8. domain truth / execution 对象契约
 
 #### 8.1 `RuntimeProcessShape`

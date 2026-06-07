@@ -347,15 +347,17 @@ Steps:
 
 1. Reserve command idempotency.
 2. Load active `ProcessProfile`;load `WorkContextSnapshot`.
-3. Validate `start_intent_ref` against Step 6 §7.2.2: `start_node_ref` must belong to the active profile runtime shape start node set, `start_reason` must be non-empty, and `initial_gateway_ref` must be present only when that start node requires gateway tracking.
-4. `InstanceProgressionPolicy.assert_can_start(profile, project_ref)`.
-5. Generate `ProcessInstanceId`、`ProcessTokenSetRef`、initial `ActivityId` / `TokenId`.
-6. Create initial `Activity::from_shape_node(start_intent_ref.start_node_ref, ...)` and `Token::start_at(..., start_intent_ref.start_node_ref)`;create gateway initial state only from `start_intent_ref.initial_gateway_ref` when the start node requires gateway tracking.
-7. `ProcessInstance::create(...)` then `ProcessInstance.start(&profile, initial_activity.ref(), actor)`.
-8. Save instance, activity, token / gateway initial state, trace, outbox `InstanceChanged`;do not append `ActivityProgressionRecord` during instance bootstrap.
-9. Store `ProcessInstanceCommandResult`.
+3. Load `ProcessStartBootstrapSummary` through `ProcessShapeRepository.get_start_bootstrap_summary(profile.shape_ref, start_intent_ref.start_node_ref)`.
+4. Validate `start_intent_ref` against Step 6 §7.2.2 / §7.3: `start_reason` must be non-empty;summary must exist;`summary.start_node_ref == start_intent_ref.start_node_ref`;`summary.shape_ref == profile.shape_ref`;`initial_gateway_ref` must equal `summary.initial_gateway.gateway_ref` only when `summary.requires_gateway_tracking = true`,and must be absent when `summary.requires_gateway_tracking = false`.
+5. `InstanceProgressionPolicy.assert_can_start(profile, project_ref)`.
+6. Generate `ProcessInstanceId`、`ProcessTokenSetRef`、initial `ActivityId` / `TokenId`;if gateway tracking is required,also generate `GatewayId` through `IdGeneratorPort::new_gateway_id()`.
+7. Create initial `Activity::from_shape_node(activity_id, process_instance_id, summary.start_node_ref, summary.activity_kind)` and `Token::start_at(token_id, process_instance_id, summary.start_node_ref)`.
+8. Create initial `Gateway::from_shape_node(gateway_id, summary.initial_gateway.shape_node_ref, summary.initial_gateway.gateway_kind)` only when `summary.requires_gateway_tracking = true`;the caller `initial_gateway_ref` is only matched against the body-free shape summary and is not the generated `GatewayId`.
+9. `ProcessInstance::create(...)` then `ProcessInstance.start(&profile, initial_activity.ref(), actor)`.
+10. Save instance, activity, token / gateway initial state, trace, outbox `InstanceChanged`;do not append `ActivityProgressionRecord` during instance bootstrap.
+11. Store `ProcessInstanceCommandResult`.
 
-Tests:success;duplicate;profile suspended;work context mismatch;missing start node.
+Tests:success;duplicate;profile suspended;work context mismatch;missing start node;activity kind from summary;missing required gateway;gateway supplied when not required;gateway mismatch.
 
 ##### 7.6.5 `AdvanceProcessActivityFlow`
 

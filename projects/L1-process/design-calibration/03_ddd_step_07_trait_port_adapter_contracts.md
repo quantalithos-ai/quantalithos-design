@@ -84,7 +84,7 @@
 | `UnitOfWork` | transaction port | `application/src/unit_of_work.rs` | `infra/src/repositories.rs` | 管理 command / consumer / job 写事务 | `begin`、`commit`、`rollback` |
 | `IdempotencyRepository` | technical repository | `application/src/idempotency.rs` | `infra/src/idempotency_store.rs` | command / event / job 幂等 | `reserve_command`、`complete`、`mark_conflict` |
 | `OperationResultRepository` | technical repository | `application/src/idempotency.rs` | `infra/src/idempotency_store.rs` | duplicate result / receipt replay | `save_result`、`get_result` |
-| `ProcessShapeRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | runtime shape truth | `get`、`save`、`find_by_definition_version` |
+| `ProcessShapeRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | runtime shape truth / body-free shape summary | `get`、`save`、`find_by_definition_version`、`get_start_bootstrap_summary`、`get_gateway_route_set` |
 | `ProcessProfileRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | profile truth | `get`、`save`、`find_active_by_project` |
 | `ProcessInstanceRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | instance truth | `get`、`save`、`list_by_profile` |
 | `ActivityRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | activity truth / progression | `get`、`save`、`list_by_instance` |
@@ -391,6 +391,13 @@ pub trait ProcessShapeRepository {
         &self,
         gateway_ref: GatewayRef,
     ) -> Result<Option<GatewayRouteSet>, RepositoryError>;
+
+    /// Loads the body-free start-node bootstrap summary for one runtime shape.
+    async fn get_start_bootstrap_summary(
+        &self,
+        shape_ref: RuntimeProcessShapeRef,
+        start_node_ref: ShapeNodeRef,
+    ) -> Result<Option<ProcessStartBootstrapSummary>, RepositoryError>;
 
     /// Saves a shape using optimistic concurrency.
     async fn save(
@@ -1114,8 +1121,17 @@ pub trait IdGeneratorPort {
     /// Creates a process instance id.
     fn new_process_instance_id(&self) -> ProcessInstanceId;
 
+    /// Creates a process token set reference.
+    fn new_process_token_set_ref(&self) -> ProcessTokenSetRef;
+
     /// Creates an activity id.
     fn new_activity_id(&self) -> ActivityId;
+
+    /// Creates a process token id.
+    fn new_process_token_id(&self) -> ProcessTokenId;
+
+    /// Creates a gateway id.
+    fn new_gateway_id(&self) -> GatewayId;
 
     /// Creates an activity progression record id.
     fn new_activity_progression_id(&self) -> ActivityProgressionId;
@@ -1142,7 +1158,7 @@ pub trait IdGeneratorPort {
 |---|---|---|---|---|
 | `InMemoryUnitOfWork` | `infra/src/repositories.rs` | `UnitOfWork` / `UnitOfWorkHandle` | in-memory staged writes | commit / rollback assertions |
 | `InMemoryIdempotencyStore` | `infra/src/idempotency_store.rs` | `IdempotencyRepository`、`OperationResultRepository` | in-memory maps | duplicate / conflict / missing result |
-| `InMemoryProcessShapeRepository` | `infra/src/repositories.rs` | `ProcessShapeRepository` | shape map + version map | version conflict |
+| `InMemoryProcessShapeRepository` | `infra/src/repositories.rs` | `ProcessShapeRepository` | shape map + version map + body-free start bootstrap summaries + gateway route summaries | version conflict;missing start summary;gateway mismatch |
 | `InMemoryProcessProfileRepository` | `infra/src/repositories.rs` | `ProcessProfileRepository` | profile map + change records | active profile lookup |
 | `InMemoryProcessInstanceRepository` | `infra/src/repositories.rs` | `ProcessInstanceRepository` | instance map | list by profile / work context |
 | `InMemoryActivityRepository` | `infra/src/repositories.rs` | `ActivityRepository` | activity map + progression records | list by instance |

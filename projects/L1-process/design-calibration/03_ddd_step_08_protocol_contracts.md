@@ -209,6 +209,8 @@
 | `ActivityKind` / `GatewayKind` / `RuntimeFeedbackKind` | `contracts/src/refs.rs` | public execution kind enums reused by DTO、event and domain object signatures |
 | `ProcessCancelReason` / `ActivityCompletionReason` / `ActivitySkipReason` / `ActivityFailureReason` / `TokenTerminationReason` / `GatewayDecisionReason` / `GatewayInvalidReason` | `contracts/src/refs.rs` | public reason newtypes used by command DTO and domain transitions |
 | `RuntimeFeedbackSummaryRef` / `SourceDigest` / `ProcessTokenRef` / `GatewayRouteRef` | `contracts/src/refs.rs` | secondary shared refs used by feedback、token and gateway protocols |
+| `ReferenceResolutionState` / `ReferenceResolutionLifecycleState` | `contracts/src/refs.rs` | public reference state reused by external reference markers、DTO、view、job、repository / resolver port and domain policy;contracts 不依赖 domain |
+| `GovernanceDecisionRef` / `ArtifactEvidenceMarker` / `RuntimeFeedbackRef` / `ConversationContextRef` | `contracts/src/refs.rs` | public external reference markers reused by protocol surface and domain;不得保存外部正文 |
 | `ProcessSearchFilter` | `contracts/src/queries.rs` | projection search filter derived from search request |
 | `ProcessReconciliationScopeRef` / `ReconciliationReportTargetRef` | `contracts/src/refs.rs` | reconciliation report scope and target |
 | `ArchiveDestinationRef` / `ArchiveScopeRef` / `ArchivePackageRef` | `contracts/src/refs.rs` | archive handoff destination、scope and package marker |

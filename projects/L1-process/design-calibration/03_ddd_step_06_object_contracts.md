@@ -87,7 +87,7 @@
 
 | 模块 | 文件 | 对象 / 类型 |
 |---|---|---|
-| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RuntimeFeedbackSummaryRef`、`SourceDigest` |
+| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState`、`ReferenceResolutionLifecycleState`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RuntimeFeedbackSummaryRef`、`SourceDigest` |
 | `contracts` | `events.rs` | `ProcessOutboxEventKind`、`ProcessOutboundEventPayload` 及 outbound event payload DTO |
 | `contracts` | `views.rs` | `RuntimeProcessShapeView`、`ProcessProfileView`、`ProcessInstanceView`、`ActivityStatusView`、`ProcessTimelineView`、`ProcessProgressSummaryView`、`ReconciliationReportView` |
 | `domain` | `runtime_shape.rs` | `RuntimeProcessShape`、`RuntimeProcessShapeState` |
@@ -99,7 +99,7 @@
 | `domain` | `checkpoint.rs` | `ProcessCheckpoint`、`CheckpointState` |
 | `domain` | `recovery.rs` | `RecoveryAttempt`、`RecoveryAttemptState`、`RecoveryHistoryRecord` |
 | `domain` | `rhythm.rs` | `ProcessStageState`、`StageState`、`ProcessTimeboxBinding`、`TimeboxBindingState` |
-| `domain` | `reference.rs` | `MethodDefinitionSnapshot`、`WorkContextSnapshot`、`ActorCapabilitySnapshot`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`RuntimeFeedbackSummary`、`ConversationContextRef`、`ReferenceResolutionState` |
+| `domain` | `reference.rs` | `MethodDefinitionSnapshot`、`WorkContextSnapshot`、`ActorCapabilitySnapshot`、`RuntimeFeedbackSummary` |
 | `domain` | `projection.rs` | `DerivedProcessViewState`、`ProcessReadModel`、`ProcessTimelineView`、`ProcessProgressSummary`、`ActivityStatusView`、`ReconciliationReport` |
 | `domain` | `trace.rs` | `ProcessTraceRecord`、`ProcessAuditTrail`、`TraceHandoffRecord`;使用 `contracts::refs::TraceHandoffRef` 作为 handoff record identity |
 | `domain` | `outbox.rs` | `ProcessOutboxRecord`、`ProcessTruthChange` |
@@ -124,6 +124,7 @@ pub struct ExampleRef {
 | `*Kind` enum | `contracts::refs` | 每个 variant 必须有 Rustdoc;public protocol 可直接引用 |
 | event reason enum | `contracts::refs` | 若 outbound payload 需要统一表达多种 domain reason,必须定义 enum 及从 domain reason 的映射 |
 | public state enum | `contracts::refs` | 若会进入 DTO / Event / View,归 contracts;domain 复用同一 enum |
+| public reference state struct | `contracts::refs` | 若 struct 会被 public ref、DTO、Event、View、Job 或 application port 直接引用,归 contracts;domain 只能复用或通过 policy / guard 校验 |
 | internal-only state enum | `domain::<file>` | 不进入 public protocol;若后续 Step 8 需要暴露,必须上提到 contracts |
 | external refs | `contracts::refs` | `value: String` + kind / source 字段,只表达外部稳定引用,不得保存正文 |
 
@@ -187,7 +188,7 @@ pub enum RuntimeFeedbackKind {
 
 ##### 7.2.2 feedback summary and gateway policy input schema
 
-`RuntimeFeedbackSummary`、`TokenSet`、`TokenSnapshot` 和 `GatewayRouteSet` 是 PH-03 domain policy input,归 `domain::reference` 或 `domain::token_gateway`。它们可以进入测试 fixture 和 fake resolver output,但不得保存外部正文、runtime queue、method shape body 或 provider response body。
+`RuntimeFeedbackSummary`、`TokenSet`、`TokenSnapshot` 和 `GatewayRouteSet` 是 PH-03 domain policy input,归 `domain::reference` 或 `domain::token_gateway`。它们可以进入测试 fixture 和 fake resolver output,但不得保存外部正文、runtime queue、method shape body 或 provider response body。`RuntimeFeedbackSummary.runtime_feedback_ref` 与 `RuntimeFeedbackSummary.feedback_state` 复用 `contracts::refs` 中的 `RuntimeFeedbackRef` 与 `ReferenceResolutionState`。
 
 ```rust
 /// Body-free summary used by ActivityFeedbackPolicy.
@@ -1374,6 +1375,10 @@ pub enum ReconciliationResultState {
 
 #### 11.1 `ReferenceResolutionState`
 
+`ReferenceResolutionState` 是 public/shared reference state object,归 `contracts::refs`,domain、application port、protocol DTO、query view 和 job 共同复用。它被 `GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`RuntimeFeedbackSummary`、`ActivityStatusView`、resolver / repository port 和 external context refresh job 直接引用,因此不得放在 `domain::reference`,否则 `contracts` 会被迫反向依赖 domain。
+
+`contracts::refs::ReferenceResolutionState` 只承载字段 schema 和轻量校验,不得返回 `DomainError`。需要表达状态迁移、不变量失败或边界拒绝时,由 `domain::reference` / `ReferenceResolutionPolicy` 提供 domain helper / guard,返回 `DomainError`。
+
 ```rust
 /// Resolution state for an external reference or snapshot.
 pub struct ReferenceResolutionState {
@@ -1398,17 +1403,17 @@ pub struct ReferenceResolutionState {
 | `snapshot_ref` | `Option<ExternalSnapshotRef>` | 快照引用 | Resolved 时可填 |
 | `reason_ref` | `Option<ReferenceResolutionReasonRef>` | 解释原因 | 非 Resolved 时应填 |
 
-| 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
+| domain helper / guard 签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn mark_resolved(&mut self, snapshot_ref: ExternalSnapshotRef) -> Result<(), DomainError>` | 标记已解析 | snapshot ref | `Result<(), DomainError>` | -> `Resolved` |
-| `pub fn mark_unresolved(&mut self, reason: ReferenceUnresolvedReason) -> Result<(), DomainError>` | 标记无法解析 | reason | `Result<(), DomainError>` | -> `Unresolved` |
-| `pub fn mark_stale(&mut self, reason: ReferenceStaleReason) -> Result<(), DomainError>` | 标记过期 | reason | `Result<(), DomainError>` | -> `Stale` |
-| `pub fn mark_invalid(&mut self, reason: ReferenceInvalidReason) -> Result<(), DomainError>` | 标记非法 | reason | `Result<(), DomainError>` | -> `Invalid` |
-| `pub fn mark_unavailable(&mut self, reason: ReferenceUnavailableReason) -> Result<(), DomainError>` | 标记来源不可用 | reason | `Result<(), DomainError>` | -> `Unavailable` |
+| `ReferenceResolutionPolicy::mark_resolved(state: &mut ReferenceResolutionState, snapshot_ref: ExternalSnapshotRef) -> Result<(), DomainError>` | 标记已解析 | state、snapshot ref | `Result<(), DomainError>` | -> `Resolved` |
+| `ReferenceResolutionPolicy::mark_unresolved(state: &mut ReferenceResolutionState, reason: ReferenceUnresolvedReason) -> Result<(), DomainError>` | 标记无法解析 | state、reason | `Result<(), DomainError>` | -> `Unresolved` |
+| `ReferenceResolutionPolicy::mark_stale(state: &mut ReferenceResolutionState, reason: ReferenceStaleReason) -> Result<(), DomainError>` | 标记过期 | state、reason | `Result<(), DomainError>` | -> `Stale` |
+| `ReferenceResolutionPolicy::mark_invalid(state: &mut ReferenceResolutionState, reason: ReferenceInvalidReason) -> Result<(), DomainError>` | 标记非法 | state、reason | `Result<(), DomainError>` | -> `Invalid` |
+| `ReferenceResolutionPolicy::mark_unavailable(state: &mut ReferenceResolutionState, reason: ReferenceUnavailableReason) -> Result<(), DomainError>` | 标记来源不可用 | state、reason | `Result<(), DomainError>` | -> `Unavailable` |
 
-| 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
+| contracts constructor / helper | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn unresolved(reference_state_id: ReferenceResolutionStateId, reference_ref: ExternalContextRef, reason: ReferenceUnresolvedReason) -> Result<Self, DomainError>` | 创建 unresolved 状态 | id、ref、reason | `Result<ReferenceResolutionState, DomainError>` | consumer / refresh failure |
+| `ReferenceResolutionState { reference_state_id, reference_ref, resolution_state: Unresolved, snapshot_ref: None, reason_ref: Some(reason_ref) }` | 创建 unresolved 状态 | id、ref、reason ref | `ReferenceResolutionState` | consumer / refresh failure |
 
 ```rust
 /// External reference resolution lifecycle state.
@@ -1438,6 +1443,7 @@ pub enum ReferenceResolutionLifecycleState {
 
 - 不降级为裸字符串。
 - 不保存外部正文。
+- 不在 `contracts::refs` 中依赖 `DomainError`;domain 侧失败由 `ReferenceResolutionPolicy` 或引用该 state 的 domain object / service 返回。
 
 #### 11.2 `MethodDefinitionSnapshot`
 

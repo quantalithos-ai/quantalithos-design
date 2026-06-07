@@ -215,7 +215,7 @@ pub enum IdempotencyResultView {
 | `outbox_record_refs` | `Vec<WorkOutboxId>` | `WorkOutboxRepository.enqueue` | Query 不产生 |
 | `applied_version` | `Option<Version>` | primary repository save / create | 多对象变更时代表主对象版本 |
 
-`ApplicationResultRef` 必须指向 `CommandResultRepository` 中同 UoW 保存的 command result surface。success path 保存的 receipt 使用 `IdempotencyResultView::Applied`;duplicate replay 读取该 stored result 后只把返回给调用方的 receipt `idempotency` overlay 为 `Duplicate`,不得改变 `result_ref`、primary ref、state、`trace_ref`、`outbox_record_refs` 或 `applied_version`。若 `ApplicationResultRef` 无法读回对应 result surface,handler 映射 `ApplicationError::DuplicateResultMissing` 为 `WorkProtocolError::TemporarilyUnavailable`。
+`ApplicationResultRef` 必须指向同 UoW 保存的 result surface。Command operation 指向 `CommandResultRepository` 中的 command result surface;Operations Job 指向 `JobResultRepository` 中的 job report surface。success path 保存的 receipt 使用 `IdempotencyResultView::Applied`;duplicate replay 读取 stored surface 后只把返回给调用方的 receipt `idempotency` overlay 为 `Duplicate`,不得改变 `result_ref`、primary ref、state、`trace_ref`、`outbox_record_refs`、`applied_version`、job counts、`failed_refs` 或 report payload。若 `ApplicationResultRef` 无法读回对应 result / report surface,handler / runner 映射 `ApplicationError::DuplicateResultMissing` 为 `WorkProtocolError::TemporarilyUnavailable`。
 
 #### 6.4 page / projection / query response surface
 
@@ -498,7 +498,7 @@ pub struct IterationCommandResult {
 | `BlockerCommandResult` | `blocker_ref` | `blocker_state` | command operation name | 返回既有 blocker result |
 | `IterationCommandResult` | `iteration_ref` | `iteration_state` / `commitment_state` | command operation name | 返回既有 iteration result |
 
-所有 command result DTO 都必须能被 application-local `StoredCommandResult` enum 承载并按 `ApplicationResultRef` 持久化。duplicate 口径中的“返回既有 result”是读取 stored DTO,不是从当前 truth repository 重新组装。
+所有 command result DTO 都必须能被 application-local `StoredCommandResult` enum 承载并按 `ApplicationResultRef` 持久化。所有 job report DTO 都必须能被 application-local `StoredJobResult` enum 承载并按 `ApplicationResultRef` 持久化。duplicate 口径中的“返回既有 result / report”是读取 stored DTO,不是从当前 truth repository、projection repository 或 outbox repository 重新组装。
 
 #### 8.3 `CreateProject`
 
@@ -1682,6 +1682,8 @@ pub struct WorkJobReport {
 | `actor` | `ActorContext` | job trigger | system / operator actor |
 | `command_metadata` | `CommandMetadata` | job trigger | `request.idempotency_key` 必填 |
 | `failed_refs` | `Vec<ExternalReferenceRef>` | job processing | 不包含外部正文 |
+
+`WorkJobReport.receipt.result_ref` 必须指向 `JobResultRepository` 中同 UoW 保存的 `StoredJobResult::WorkJob`。duplicate replay 只 overlay `receipt.idempotency = Duplicate`,不得重新扫描 pending outbox、projection、reference 或 handoff marker 来生成新 report。
 | `projection_set` | `WorkProjectionSet` | rebuild job input | `All` 表示 board / member / iteration / search 全部重建 |
 | `reference_scope` | `Option<ExternalReferenceScope>` | refresh job input | `None` 表示 stale refs;`ExplicitRefs` 必须非空 |
 | `scope_ref` | `WorkReconciliationScopeRef` | reconciliation job input | kind 与对应 optional ref 必须匹配 |
@@ -1796,6 +1798,8 @@ pub struct ReconciliationReport {
 | `outbox_gaps` | outbox repository scan | 只含 outbox ids |
 | `reference_gaps` | reference repository scan | 只含 external reference refs |
 
+`ReconciliationReport` 必须能被 `StoredJobResult::Reconciliation` 承载并按 `ApplicationResultRef` 保存。duplicate `RunWorkReconciliation` 读取 stored reconciliation report,不得重新读取当前 projection / outbox / reference gap 后返回不同 report。
+
 ### 12. Protocol Error 映射
 
 ```rust
@@ -1862,7 +1866,7 @@ pub enum WorkProtocolError {
 | Query | 不要求 idempotency | 不写 audit,可读 trace | 不写 outbox | 不触发 rebuild |
 | Inbound Event | `source_event_id + topic + source_ref` dedup | snapshot / pending 写入可写 trace | 仅必要时 enqueue derived changed | 不直接创建 WorkItem |
 | Outbound Event | outbox id 驱动 publication | 使用已有 trace_context_ref | publisher 只发布 | 失败 mark failed |
-| Operations Job | job metadata idempotency key 必填 | 写本地状态时写 trace / report | handoff / derived change 可 enqueue | 不修 business truth |
+| Operations Job | job metadata idempotency key 必填 | 写本地状态时写 trace / report | handoff / derived change 可 enqueue | 不修 business truth;duplicate 通过 `JobResultRepository` 返回既有 report |
 
 ### 15. 设计取舍
 

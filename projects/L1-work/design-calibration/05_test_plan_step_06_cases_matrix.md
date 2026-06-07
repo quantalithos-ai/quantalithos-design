@@ -215,7 +215,7 @@ Consumer 和 outbound event 不新增独立编号族;它们必须被既有 `TC-W
 | `TC-WORK-OPS-001` | publisher failure recovery | `OutboxPublicationState::Failed`;retry 后单条 marker 更新 | bus publish fail | `EV-WORK-OPS-001` |
 | `TC-WORK-OPS-002` | projection rebuild recovery | `DerivedFreshnessState::Failed` 后 retry -> `Rebuilding` / `Fresh` | projection build failure | `EV-WORK-OPS-002` |
 | `TC-WORK-OPS-003` | reference refresh recovery | failed marker 保留 last good snapshot | resolver failure / version conflict | `EV-WORK-OPS-003` |
-| `TC-WORK-OPS-005` / `006` | handoff rerun idempotent | duplicate job 返回 existing report / marker | external handoff timeout | `EV-WORK-OPS-005` / `006` |
+| `TC-WORK-OPS-005` / `006` | handoff rerun idempotent | duplicate job 通过 `JobResultRepository.get_report` 返回 existing report / marker | external handoff timeout | `EV-WORK-OPS-005` / `006` |
 | `TC-WORK-NFR-004` | commit unknown recovery | retry 前调用 `IdempotencyRepository.get(key, operation)` | UoW commit status unknown | `EV-WORK-NFR-004` |
 
 ### 7.8 用例到设计契约断言矩阵

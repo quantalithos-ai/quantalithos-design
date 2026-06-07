@@ -183,7 +183,7 @@ Step 15 observability
 | `IterationChanged_event_schema` | outbound `IterationChanged` | iteration / commitment / affected refs;no work body copy | contract + publisher |
 | `WorkTraceAvailable_event_schema` | outbound `WorkTraceAvailable` | trace id / subject / optional handoff ref;no observability body | contract + publisher |
 | `DerivedWorkViewChanged_event_schema` | outbound `DerivedWorkViewChanged` | view ref / freshness / source cursor;no projection body dump | contract + publisher |
-| `PublishWorkOutbox_contract` | `PublishWorkOutboxFlow` | pending batch publish from typed `WorkOutboxSourceRef`;source missing or event_kind/source mismatch marks failed without partial publish;partial failure、version conflict、rerun | job runner |
+| `PublishWorkOutbox_contract` | `PublishWorkOutboxFlow` | pending batch is `Page<Versioned<WorkOutboxRecord>>`;publish from typed `WorkOutboxSourceRef`;`mark_published` / `mark_failed` use same item version;source missing or event_kind/source mismatch marks failed without partial publish;partial failure、version conflict、rerun | job runner |
 | `RebuildWorkProjections_contract` | `RebuildWorkProjectionsFlow` | rebuild from committed truth;failed marker, query surface | job runner |
 | `RefreshExternalReferenceSnapshots_contract` | `RefreshExternalReferenceSnapshotsFlow` | stale refs refreshed;resolver unavailable, failed marker | job runner |
 | `RunWorkReconciliation_contract` | `RunWorkReconciliationFlow` | read-only report;drift detected, no automatic repair | job runner |
@@ -212,6 +212,7 @@ Step 15 observability
 | 测试切口 | 对应契约 | 验证内容 | 建议测试类型 |
 |---|---|---|---|
 | `command_same_key_same_digest_replays_result` | Step 13 duplicate success | second request 通过 `CommandResultRepository.get_result` 返回同 result_ref,receipt 标记 duplicate,无新 truth / trace / outbox | application |
+| `job_same_key_same_digest_replays_report` | Step 13 job duplicate success | second job run 通过 `JobResultRepository.get_report` 返回同 result_ref / stored report,不重新 scan / publish / handoff | jobs |
 | `command_same_key_different_digest_conflicts` | Step 13 conflict | same key + different digest 返回 `IdempotencyConflict`,不得写业务 truth | application |
 | `command_reserved_inflight_returns_unavailable` | Step 13 in-flight | reserved same digest 返回 temporarily unavailable,不重放 domain | idempotency fake |
 | `command_duplicate_missing_result_surface` | Step 12 / 13 duplicate missing | completed idempotency 指向 missing / wrong stored result 时返回 temporarily unavailable,无业务写 | application + result store fake |
@@ -225,7 +226,7 @@ Step 15 observability
 | `outbox_dual_publisher_single_winner` | Step 13 outbox concurrency | 两个 publisher 只有一个 mark succeeds,另一方不改 truth | worker + repository |
 | `projection_stale_vs_rebuild_race` | Step 13 projection race | older cursor 不覆盖 newer freshness | projection fake |
 | `reference_refresh_race_preserves_last_good` | Step 13 reference race | failed / version conflict 保留 last successful snapshot | reference fake |
-| `handoff_job_rerun_idempotent` | Step 13 handoff rerun | duplicate job 返回 existing report / marker,不重复 handoff body | job runner |
+| `handoff_job_rerun_idempotent` | Step 13 handoff rerun | duplicate job 通过 `JobResultRepository.get_report` 返回 existing report / marker,不重复 handoff body | job runner |
 | `commit_unknown_requires_idempotency_audit` | Step 13 commit unknown | retry 前调用 `IdempotencyRepository.get`,不得盲重放 domain | service + fake UoW |
 | `query_never_repairs_projection` | Step 8 / 9 / 12 | stale / missing projection 只返回 surface,不触发 rebuild | query test |
 | `reconciliation_is_read_only` | Step 8 / 9 / 12 | `RunWorkReconciliation` 生成 report,不修 business truth | job runner |

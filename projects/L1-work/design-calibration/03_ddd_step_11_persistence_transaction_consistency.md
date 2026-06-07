@@ -106,6 +106,7 @@
 | `ReferenceResolutionState` / snapshots | `domain/reference.rs` / `ReferenceSnapshotRepository` | inbound consumers、reference refresh job | command policy、query、projection rebuild | 保存引用 / 快照摘要;不保存外部正文 |
 | `IdempotencyRecord` | `application/idempotency.rs` / `IdempotencyRepository` | command / consumer / job service | same service duplicate handling | reserve / complete 与业务写入同 UoW;digest 冲突不得执行业务写 |
 | `StoredCommandResult` | `application/results.rs` / `CommandResultRepository` | command service success path | same command service duplicate replay | command result save 必须与 accepted truth 和 idempotency complete 同 UoW;duplicate 不得从当前 truth 重建 |
+| `StoredJobResult` | `application/results.rs` / `JobResultRepository` | operations job success path | same job duplicate replay | job report save 必须与 job marker / publication marker / handoff marker 和 idempotency complete 同 UoW;duplicate 不得重新扫描生成 report |
 | handoff markers | `domain/audit.rs` / `AuditRepository` | trace / archive handoff jobs | jobs、reconciliation | 只保存 handoff ref / marker,不接管 archive / observability 正文 |
 
 #### 8.2 表 / collection / projection 契约表
@@ -141,6 +142,7 @@
 | `member_capability_snapshots` | Identity member snapshot | PK `member_ref` | snapshot state / updated cursor | `version` |
 | `method_definition_snapshots` | Method definition snapshot | PK `definition_ref` | definition kind / updated cursor | `version` |
 | `command_result_records` | Command duplicate replay result surface | PK `ApplicationResultRef`;unique `(operation,result_id)` | `operation`、`result_kind`、`created_at` | append-only;no optimistic update |
+| `job_result_records` | Operations job duplicate replay report surface | PK `ApplicationResultRef`;unique `(operation,result_id)` | `operation`、`job_result_kind`、`created_at` | append-only;no optimistic update |
 | `idempotency_records` | Command / event / job dedup | PK `(operation, idempotency_key)` | `request_digest`、`status`、`result_ref` | state version or atomic reservation |
 | `trace_handoff_markers` | Observability handoff marker | PK `handoff_ref`;unique `trace_id` | handoff state / target | `version` optional;`handoff_ref` 支撑 query visibility 反查 trace |
 | `archive_handoff_markers` | Archive handoff marker | PK `handoff_ref` | project / iteration / trace scope | `version` optional |
@@ -195,7 +197,8 @@
 | `AuditRepository.save_trace_handoff_marker(marker, &uow)` | 保存 observability handoff marker | job UoW;does not write observability body | `()` | conflict / unavailable |
 | `AuditRepository.save_archive_handoff_marker(marker, &uow)` | 保存 archive handoff marker | job UoW;does not write archive body | `()` | conflict / unavailable |
 | `WorkOutboxRepository.enqueue(record, &uow)` | 写待发布 outbox | same UoW as accepted truth | `()` | conflict / unavailable |
-| `WorkOutboxRepository.list_pending(page)` | 读取待发布或 retryable failed records | read-only;must be stable order | `Page<WorkOutboxRecord>` | `RepositoryError` |
+| `WorkOutboxRepository.list_pending(page)` | 读取待发布或 retryable failed records | read-only;must be stable order;returns current optimistic version for publish marker | `Page<Versioned<WorkOutboxRecord>>` | `RepositoryError` |
+| `WorkOutboxRepository.get(outbox_id)` | 读取单条 outbox record | read-only;returns current optimistic version for retry / reconciliation marker | `Option<Versioned<WorkOutboxRecord>>` | `RepositoryError` |
 | `WorkOutboxRepository.mark_published(outbox_id, publication_ref, expected_version, &uow)` | 标记发布成功 | publish UoW + optimistic version | `Version` | version conflict |
 | `WorkOutboxRepository.mark_failed(outbox_id, reason, expected_version, &uow)` | 标记发布失败 | publish UoW + optimistic version | `Version` | version conflict |
 | `WorkOutboxRepository.mark_pending_for_retry(outbox_id, reason, expected_version, &uow)` | retry policy 接受后重新待发布 | retry UoW + optimistic version | `Version` | version conflict |
@@ -216,6 +219,8 @@
 | `WorkTruthSnapshotRepository.load_truth_cursor(project_ref)` | 读取 truth cursor | read-only;cursor != optimistic version | `WorkTruthCursor` | `RepositoryError` |
 | `CommandResultRepository.save_result(result_ref, stored_result, &uow)` | 保存 public command result surface | same UoW as accepted command truth;must precede idempotency complete | `()` | `RepositoryError` |
 | `CommandResultRepository.get_result(result_ref)` | 读取 duplicate replay result surface | read-only;no UoW;no truth reconstruction | `Option<StoredCommandResult>` | `RepositoryError` |
+| `JobResultRepository.save_report(result_ref, stored_report, &uow)` | 保存 public job report surface | same UoW as job marker writes;must precede idempotency complete | `()` | `RepositoryError` |
+| `JobResultRepository.get_report(result_ref)` | 读取 duplicate replay job report surface | read-only;no UoW;no truth / projection / outbox rescan | `Option<StoredJobResult>` | `RepositoryError` |
 | `IdempotencyRepository.get(key, operation)` | 读取幂等记录用于 duplicate recovery / commit-status audit | read-only;no UoW | `Option<IdempotencyRecord>` | `IdempotencyError` |
 | `IdempotencyRepository.reserve(key, operation, digest, &uow)` | reserve dedup key | same UoW as protected write | `IdempotencyReservation` | `IdempotencyError` |
 | `IdempotencyRepository.complete(reservation, result_ref, &uow)` | 保存成功 result ref | same UoW as accepted writes | `()` | `IdempotencyError` |
@@ -235,12 +240,14 @@
 | dependency graph index | active dependency edge `(upstream, downstream)` 不得重复;graph snapshot 只含 formal work refs | DependencyRepository |
 | iteration active commitment | 一个 iteration 当前只能有一个 active commitment set;history 用 change record 追溯 | IterationRepository |
 | outbox retry | `Failed -> Pending` 必须通过 `mark_pending_for_retry(...)` 或 adapter 等价 retry transaction,不得由 `list_pending` 静默改状态 | WorkOutboxRepository |
+| outbox publish version source | `mark_published` / `mark_failed` 的 `expected_version` 必须来自同一条 `list_pending(page)` 返回的 `Versioned<WorkOutboxRecord>.version`;retry / reconciliation 单条处理必须来自 `get(outbox_id)` 返回的 version;不得假定版本或从 storage 内部临时偷读 | WorkOutboxRepository |
 | projection cursor monotonicity | `mark_stale` 不能把 view cursor 倒退;older cursor no-op or version-safe ignore | ProjectionRepository |
 | projection view identity closure | `mark_stale` 的 affected views 必须来自 Step 8 §9.2 已定义的 public `DerivedWorkViewRef`;没有 query / projection identity 的 truth 或 marker 不得临时派生 view ref | ProjectionRepository / function flows |
 | projection rebuild replace | `replace_project_views` 必须以 committed truth snapshot + cursor 为输入;不得从旧 projection 推导 | ProjectionRepository |
 | reference failed marker | failed marker 保留 last successful snapshot;不得删除 snapshot body summary | ReferenceSnapshotRepository |
 | idempotency digest | `(operation, key)` unique;相同 digest duplicate 先返回 `ApplicationResultRef`;不同 digest conflict | IdempotencyRepository |
-| command result identity | `ApplicationResultRef` 必须能读回 `StoredCommandResult`;stored result variant 必须匹配 operation | CommandResultRepository |
+| command result identity | command operation 的 `ApplicationResultRef` 必须能读回 `StoredCommandResult`;stored result variant 必须匹配 operation | CommandResultRepository |
+| job result identity | job operation 的 `ApplicationResultRef` 必须能读回 `StoredJobResult`;stored report variant 必须匹配 operation | JobResultRepository |
 | page ordering | `Page<T>` 必须有稳定排序和 next token;不得依赖 map iteration order | all list / search funcs |
 
 #### 8.5 事务边界表
@@ -281,11 +288,12 @@
 | Dependency / blocker state + history | 强一致 | history append failure rollback state change | relation changed without change record |
 | truth + trace + outbox | 强一致 on accepted truth command | outbox enqueue failure rollback truth | accepted truth without trace/outbox |
 | truth + projection stale | 强一致 marker on command / consumer write when an affected public view identity exists | stale marker failure rollback command;consumer may retry | mark stale for undefined / ad hoc view identity |
-| command result surface + idempotency complete | 强一致 on accepted command | result save failure rollback truth;complete 后必须可 duplicate replay | completed idempotency pointing to missing result surface |
+| command result surface + idempotency complete | 强一致 on accepted command | result save failure rollback truth;complete 后必须可 duplicate replay | completed idempotency pointing to missing command result surface |
+| job result surface + idempotency complete | 强一致 on accepted job | report save failure rollback job marker / publication marker transaction;complete 后必须可 duplicate replay | completed idempotency pointing to missing job report surface |
 | outbox publication | 最终一致 | publish failure -> `Failed`;retry -> `Pending`;no truth rollback | publisher failure deleting truth or outbox |
 | projection rebuild | 最终一致 from committed truth | rebuild failure -> `Failed`;query exposes failed/stale | projection write modifies truth |
 | reference snapshot | 最终一致 from upstream refs | resolver failure -> failed marker / stale old snapshot | external body copied into Work truth |
-| idempotency | 强一致 with protected write | incomplete reservation rollback;duplicate returns stored result | duplicate replays domain transition |
+| idempotency | 强一致 with protected write | incomplete reservation rollback;duplicate returns stored command result / job report | duplicate replays domain transition or job side effect |
 | handoff | 最终一致 | handoff failure marker / retry by job | observability/archive body stored as Work truth |
 | query surface | 只读一致性 | stale / failed / missing / not visible surface | query repair or writes truth |
 
@@ -298,13 +306,14 @@
 | outbox enqueue failure inside command | 无 accepted truth commit | rollback whole command | retry command with same idempotency key |
 | projection stale marker failure inside command | 无 accepted truth commit | rollback whole command | retry command;adapter issue fixed |
 | command result save failure inside command | 无 accepted truth commit | rollback whole command;do not complete idempotency | retry command with same idempotency key |
-| publisher failure after truth committed | truth + outbox pending already committed | mark outbox `Failed` | retry publish via `mark_pending_for_retry` |
+| job report save failure inside job | 无 completed job result commit;job marker writes in same UoW rollback where applicable | rollback job UoW;do not complete idempotency | retry job with same idempotency key |
+| publisher failure after truth committed | truth + outbox pending already committed;pending item carries current version | mark outbox `Failed` with the same pending item version | retry publish via `mark_pending_for_retry` using version from `get(outbox_id)` |
 | projection rebuild build failure | truth unchanged | mark affected views `Failed`;job report failed | fix builder / data issue, rerun rebuild |
 | projection replace failure | truth unchanged;old projection remains | rollback rebuild UoW;mark failed in failure UoW if possible | rerun rebuild |
 | reference resolver failure | old snapshot remains | mark reference failed;job failed_refs | retry refresh |
 | inbound event unsupported version | no business write | dead-letter / no accepted UoW | design / adapter upgrade |
-| idempotency duplicate same digest | previous `ApplicationResultRef` exists | load `StoredCommandResult` via `CommandResultRepository`;overlay duplicate receipt | no new write |
-| idempotency duplicate missing result surface | completed idempotency points to missing / wrong result | return `DuplicateResultMissing` -> temporarily unavailable;raise reconciliation | operator repair result store or investigate partial durable failure |
+| idempotency duplicate same digest | previous `ApplicationResultRef` exists | command loads `StoredCommandResult` via `CommandResultRepository`;job loads `StoredJobResult` via `JobResultRepository`;overlay duplicate receipt when present | no new write |
+| idempotency duplicate missing result surface | completed idempotency points to missing / wrong result/report | return `DuplicateResultMissing` -> temporarily unavailable;raise reconciliation | operator repair result store or investigate partial durable failure |
 | idempotency conflict different digest | no business write | mark conflict;return conflict | caller changes key |
 | UnitOfWork commit failure | adapter-specific unknown | surface `TemporarilyUnavailable`;do not publish side effects outside repository | reconciliation / idempotency audit required by Step 12 / 13 |
 
@@ -327,7 +336,7 @@ Query services must not open write UoW, must not enqueue outbox, and must not ca
 | `WorkTruthCursor` | committed Work truth / rebuild source position | no | as projection marker / reconciliation marker |
 | `PageToken` | pagination continuation | no | yes through public page DTO |
 | `OutboxPublicationRef` | downstream publish result ref | no | only event / job report surface |
-| `ApplicationResultRef` | stable result pointer for idempotency duplicate | no | command result / duplicate handling |
+| `ApplicationResultRef` | stable result pointer for idempotency duplicate | no | command result / job report duplicate handling |
 
 Implementation must not compare `WorkTruthCursor` as a record version, and must not use `PageToken` as an ordering truth.
 

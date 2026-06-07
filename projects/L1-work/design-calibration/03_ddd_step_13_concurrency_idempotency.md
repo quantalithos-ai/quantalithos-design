@@ -39,11 +39,11 @@
 
 3. 幂等键来自请求、事件、job 参数还是数据库唯一约束?
 
-   回答:Command 和 Job 的幂等键来自 core `CommandMetadata.request.idempotency_key`;Inbound Event dedup key 来自 `topic + source_event_id + source_ref`;outbox 单条发布以 `WorkOutboxId + expected_version` 控制并发,不使用 public idempotency key;数据库唯一键只防止同一 business key 被并发创建,不能替代 idempotency result replay。
+   回答:Command 和 Job 的幂等键来自 core `CommandMetadata.request.idempotency_key`;Inbound Event dedup key 来自 `topic + source_event_id + source_ref`;outbox 单条发布以 `WorkOutboxId + expected_version` 控制并发,`expected_version` 来自 `list_pending(page)` / `get(outbox_id)` 返回的 `Versioned<WorkOutboxRecord>`,不使用 public idempotency key;数据库唯一键只防止同一 business key 被并发创建,不能替代 idempotency result replay。
 
 4. 重复请求应该返回既有结果、跳过、覆盖还是报错?
 
-   回答:same key + same digest + completed 返回既有 `ApplicationResultRef` 对应 result surface;in-flight same key 返回 temporarily unavailable / retry later;same key + different digest 返回 `IdempotencyConflict`;duplicate inbound event same digest 返回 `AckDuplicate`;outbox publish version conflict 视为另一 worker 已处理,不覆盖。
+   回答:same key + same digest + completed 返回既有 `ApplicationResultRef` 对应 result / report surface;in-flight same key 返回 temporarily unavailable / retry later;same key + different digest 返回 `IdempotencyConflict`;duplicate inbound event same digest 返回 `AckDuplicate`;outbox publish version conflict 视为另一 worker 已处理,不覆盖。
 
 5. 并发冲突如何测试?
 
@@ -56,7 +56,7 @@
 | Step 7 `IdempotencyRepository` | Step 12 要求 commit unknown 先查幂等结果,但原 trait 只有 reserve / complete / mark_conflict | 回填只读 `get(key, operation)` |
 | Step 9 digest 示例 | 旧示例把 `metadata` 整体传入 digest,容易把 `request_id`、`requested_at`、trace 算进去 | 回填为 stable business input / stable job input |
 | Step 11 commit unknown open item | 只写需要 idempotency audit,未给 retry 前读取规则 | 本 Step 固定 `get` 审计和 reserved unknown 处理 |
-| Step 8 / 9 duplicate 口径 | 已说明 duplicate 返回 stored result,但未区分 in-flight / completed / conflict,也未定义 `ApplicationResultRef` 如何读回 result surface | 本 Step 增加重复处理矩阵,并回填 `CommandResultRepository` 读取面 |
+| Step 8 / 9 duplicate 口径 | 已说明 duplicate 返回 stored result / report,但未区分 in-flight / completed / conflict,也未定义 `ApplicationResultRef` 如何读回 command result 或 job report surface | 本 Step 增加重复处理矩阵,并回填 `CommandResultRepository` / `JobResultRepository` 读取面 |
 | outbox / projection / reference job | 已有 failed marker,但未说明双 worker / crash 重入保护 | 本 Step 增加重入保护表 |
 
 ### 6. 改动前后对比
@@ -64,7 +64,7 @@
 | 项 | 改动前 | 改动后 | 原因 |
 |---|---|---|---|
 | 幂等 port | 只能 reserve / complete / conflict | 增加只读 `get` | 支撑 duplicate recovery 和 commit-status audit |
-| duplicate result replay | `IdempotencyRepository` 只保存 `ApplicationResultRef`,但没有 result surface loader | 新增 `CommandResultRepository.save_result/get_result` | 支撑 same digest duplicate 返回既有 DTO,避免从当前 truth 重算 |
+| duplicate result replay | `IdempotencyRepository` 只保存 `ApplicationResultRef`,但没有 result / report surface loader | 新增 `CommandResultRepository.save_result/get_result` 和 `JobResultRepository.save_report/get_report` | 支撑 same digest duplicate 返回既有 DTO / report,避免从当前 truth / projection / outbox 重算 |
 | RequestDigest | 只说 canonical payload | 明确 stable input,排除易变 metadata | 防止同一业务请求重试误判 conflict |
 | 重复请求 | 分散在 Step 8 / 9 / 12 | 按 completed / in-flight / conflict 统一 | 支撑 service tests |
 | 并发冲突 | Step 11 有 version / unique key | 本 Step 映射到具体场景和测试切口 | 支撑 Step 16 |
@@ -77,7 +77,7 @@
 | 只靠数据库唯一键防重复 | adapter 简单 | 无法返回既有 result,也无法区分 same digest / different digest | 不采用 |
 | 所有重复都重放 domain transition | 代码直观 | 破坏 outbox / trace / version,可能重复创建 truth | 不采用 |
 | `(operation, key)` + canonical digest + result_ref | 可返回既有结果,冲突可判定 | 需要 idempotency store | 采用 |
-| `ApplicationResultRef` 指向独立 result store | duplicate 可按原 DTO 返回,不受当前 truth 漂移影响 | 需要同 UoW 保存 result surface | 采用 |
+| `ApplicationResultRef` 指向独立 result store | duplicate 可按原 DTO / report 返回,不受当前 truth / projection / outbox 漂移影响 | 需要同 UoW 保存 result surface | 采用 |
 | duplicate 时从当前 truth repository 重构 result | 不需要额外存储 | state 可能已变化,也无法保证 trace / outbox refs 与原返回一致 | 不采用 |
 | digest 包含全部 metadata | 实现省事 | 重试时 request_id / trace / timestamp 变化会误判 conflict | 不采用 |
 | digest 只包含稳定业务输入 | 符合重试语义 | 需要明确排除字段 | 采用 |
@@ -93,7 +93,7 @@
 | digest 作用 | `RequestDigest` 只用于判定同一 key 下是否同一业务输入,不能作为 authorization 或 visibility truth。 |
 | digest 输入 | Command digest 包含 operation、route-bound resource ids、actor principal / effective scope、command body 中影响结果的字段。Job digest 包含 operation、job scope、page / batch input 和影响结果的参数。Inbound event digest 包含 topic、source envelope stable refs、schema version 和 payload digest。 |
 | digest 排除 | 不包含 `idempotency_key`、`request_id`、`requested_at`、`trace_id`、`job_run_id`、transport headers、runtime retry counter。 |
-| duplicate 成功 | completed same digest 通过 `CommandResultRepository.get_result(ApplicationResultRef)` 返回 stored result surface,不重放 domain transition。 |
+| duplicate 成功 | completed same digest:Command 通过 `CommandResultRepository.get_result(ApplicationResultRef)` 返回 stored result surface;Job 通过 `JobResultRepository.get_report(ApplicationResultRef)` 返回 stored report surface;不重放 domain transition 或 job side effect。 |
 | duplicate in-flight | same key 正在处理或处于 reserved unknown 时,返回 `TemporarilyUnavailable` / retry later,不执行业务写。 |
 | conflict | same key + different digest 返回 `IdempotencyConflict`,不得写 business truth、trace 或 outbox。 |
 | Query | Query 只读,不写 idempotency record,重复读取不改变状态。 |
@@ -116,7 +116,7 @@
 | dependency / blocker 并发状态更新 | relation version、change record id | expected version + append-only change id | `VersionConflict` | `TC-WORK-CONC-DEP-002` |
 | iteration commit 与 lifecycle update 并发 | `Iteration.version`、`IterationCommitment.version`、work versions | same UoW + expected versions | `VersionConflict` | `TC-WORK-CONC-ITER-001` |
 | 同一 inbound event 重投递 | `idempotency_records(operation,dedup_key)` | dedup key `topic + source_event_id + source_ref` | duplicate -> `AckDuplicate`;different digest -> `DeadLetter` | `TC-WORK-EVENT-DEDUP-001` |
-| 两个 publisher 发布同一 outbox record | `WorkOutboxRecord.version`、`publication_state` | `mark_published/mark_failed` expected version | version conflict treated as already handled / report item conflict | `TC-WORK-OUTBOX-CONC-001` |
+| 两个 publisher 发布同一 outbox record | `Versioned<WorkOutboxRecord>.version`、`publication_state` | `list_pending(page)` / `get(outbox_id)` 提供 current version;`mark_published/mark_failed` 使用同一 item version | version conflict treated as already handled / report item conflict | `TC-WORK-OUTBOX-CONC-001` |
 | projection rebuild 与 command stale marker 并发 | `DerivedWorkViewState.version`、`source_cursor` | cursor monotonicity + optimistic marker update | older cursor no-op or `VersionConflict` retry | `TC-WORK-PROJ-CONC-001` |
 | 两个 rebuild job 同一 projection_set | `idempotency_records`、projection batch key、freshness version | job key dedup + replace batch atomic by project/projection_set | duplicate report / `VersionConflict` | `TC-WORK-PROJ-CONC-002` |
 | reference refresh 同一 external ref | `ReferenceResolutionState.version`、snapshot key | expected version;last successful snapshot preserved | `VersionConflict` / failed marker | `TC-WORK-REF-CONC-001` |
@@ -134,12 +134,12 @@
 | `ConsumeGovernanceEvidenceChanged` | `governance.evidence.changed.v1 + source_event_id + source_ref` | event dedup 保留期 | same digest skip;different digest dead-letter |
 | `ConsumeArchiveHandoffChanged` | `archive.handoff.changed.v1 + source_event_id + source_ref` | event dedup 保留期 | same digest skip;different digest dead-letter |
 | `ConsumeArtifactEvidenceChanged` | `artifact.evidence.changed.v1 + source_event_id + source_ref` | event dedup 保留期 | same digest skip;different digest dead-letter |
-| `PublishWorkOutbox` job | `WorkJobMetadata.command_metadata.request.idempotency_key`,operation `PublishWorkOutbox` | job retry window | duplicate returns stored `WorkJobReport`;per-record publish still protected by outbox version |
-| `RebuildWorkProjections` job | job metadata key + operation | job retry window | duplicate returns stored report;new key may rerun from committed truth |
-| `RefreshExternalReferenceSnapshots` job | job metadata key + operation | job retry window | duplicate returns stored report;new key may retry failed refs |
-| `RunWorkReconciliation` job | job metadata key + operation | job retry window | duplicate returns stored `ReconciliationReport`;does not repair truth |
-| `PrepareWorkTraceHandoff` job | job metadata key + operation | job retry window | duplicate returns stored report / marker ref |
-| `PrepareArchiveHandoff` job | job metadata key + operation | job retry window | duplicate returns stored report / marker ref |
+| `PublishWorkOutbox` job | `WorkJobMetadata.command_metadata.request.idempotency_key`,operation `PublishWorkOutbox` | job retry window | duplicate returns stored `WorkJobReport` via `JobResultRepository.get_report`;per-record publish still protected by outbox version |
+| `RebuildWorkProjections` job | job metadata key + operation | job retry window | duplicate returns stored report via `JobResultRepository.get_report`;new key may rerun from committed truth |
+| `RefreshExternalReferenceSnapshots` job | job metadata key + operation | job retry window | duplicate returns stored report via `JobResultRepository.get_report`;new key may retry failed refs |
+| `RunWorkReconciliation` job | job metadata key + operation | job retry window | duplicate returns stored `ReconciliationReport` via `JobResultRepository.get_report`;does not repair truth |
+| `PrepareWorkTraceHandoff` job | job metadata key + operation | job retry window | duplicate returns stored report / marker ref via `JobResultRepository.get_report` |
+| `PrepareArchiveHandoff` job | job metadata key + operation | job retry window | duplicate returns stored report / marker ref via `JobResultRepository.get_report` |
 | Outbound event publication per record | `WorkOutboxId` + expected `Version`,not `IdempotencyRepository` key | outbox record lifetime | second publisher observes version conflict or already published;no new truth write |
 | Query | none | none | repeated read returns current authorized surface;no idempotency record |
 
@@ -150,8 +150,8 @@
 | none | any | `reserve` -> `Reserved`,继续执行业务写 | success or normal error |
 | `Reserved` same operation/key | same digest | 不执行业务写;视为 in-flight / unknown | `TemporarilyUnavailable`,调用方稍后用同 key retry |
 | `Reserved` same operation/key | different digest | 不执行业务写;`mark_conflict` when possible | `IdempotencyConflict` |
-| `Completed` with `result_ref` | same digest | `CommandResultRepository.get_result(result_ref)` and match expected result kind | 返回既有 result surface,receipt 标记 duplicate |
-| `Completed` with `result_ref` but stored surface missing / wrong kind | same digest | 不执行业务写;进入 duplicate result missing | `TemporarilyUnavailable` + reconciliation required |
+| `Completed` with `result_ref` | same digest | Command: `CommandResultRepository.get_result(result_ref)` and match expected result kind;Job: `JobResultRepository.get_report(result_ref)` and match expected report kind | 返回既有 result / report surface,receipt 标记 duplicate when present |
+| `Completed` with `result_ref` but stored surface missing / wrong kind | same digest | 不执行业务写 / 不重跑 job;进入 duplicate result missing | `TemporarilyUnavailable` + reconciliation required |
 | `Completed` without `result_ref` | same digest | 不执行业务写;进入 duplicate result missing | `TemporarilyUnavailable` + reconciliation required |
 | `Completed` | different digest | 不执行业务写 | `IdempotencyConflict` |
 | `Conflict` | any | 不执行业务写 | `IdempotencyConflict` |
@@ -164,8 +164,8 @@
 | Command handler 超时后客户端重试 | HTTP/RPC timeout | same idempotency key + digest;completed 后通过 `CommandResultRepository` 读取 stored result | 客户端使用同 key retry;不同输入必须换 key |
 | Command UoW commit unknown 后重试 | adapter commit 返回 unknown | retry 前调用 `IdempotencyRepository.get(key, operation)`;completed 后再读 `CommandResultRepository` | completed 返回 stored result;reserved unknown 返回 `TemporarilyUnavailable` 并交 reconciliation |
 | Event ack 丢失后 redelivery | bus / source redelivery | event dedup key + digest | same digest `AckDuplicate`;different digest dead-letter |
-| Job worker crash 后 scheduler 重跑 | job runner retry | job idempotency key + stable job digest | same key duplicate report;new key按 item-level marker / version 继续 |
-| Outbox publish 成功但 mark_published 失败 | worker crash or repo failure | outbox remains Pending or Failed;next publish uses same `WorkOutboxId` | at-least-once publish;downstream需按 event id / outbox id 去重;本仓版本化 mark |
+| Job worker crash 后 scheduler 重跑 | job runner retry | job idempotency key + stable job digest;completed 后通过 `JobResultRepository` 读取 stored report | same key duplicate report;new key按 item-level marker / version 继续 |
+| Outbox publish 成功但 mark_published 失败 | worker crash or repo failure | outbox remains Pending or Failed;next publish reloads `Versioned<WorkOutboxRecord>` by pending page or `get(outbox_id)` | at-least-once publish;downstream需按 event id / outbox id 去重;本仓版本化 mark |
 | Projection rebuild crash after `Rebuilding` | worker crash | freshness marker + source_cursor + job key | rerun rebuild from committed truth;query surfaces `Rebuilding` / `Stale` |
 | Projection rebuild with older cursor | delayed job | cursor monotonicity | older cursor no-op or version conflict retry;不得覆盖 fresh newer view |
 | Reference refresh partial success | resolver or worker failure | per-reference version and failed marker | rerun refresh;successful snapshots preserved |
@@ -185,9 +185,12 @@ Input: operation, idempotency_key, original stable RequestDigest
 2. if record == None:
      reserve normally and retry only if adapter confirms previous UoW did not commit
 3. if record.status == Completed and digest matches and result_ref exists:
-     result = CommandResultRepository.get_result(result_ref)
-     if result exists and matches operation result kind:
-         return result with duplicate receipt overlay
+     result = if operation is Command:
+         CommandResultRepository.get_result(result_ref)
+       else if operation is Job:
+         JobResultRepository.get_report(result_ref)
+     if result exists and matches operation result/report kind:
+         return result/report with duplicate receipt overlay when present
      else:
          return TemporarilyUnavailable; raise DuplicateResultMissing
 4. if record.status == Completed and digest matches but result_ref missing:
@@ -212,7 +215,7 @@ P0 只要求只读审计和拒绝盲重试。自动将 `Reserved` unknown 修复
 | `TC-WORK-CONC-002` | unique create conflict | duplicate business key 不覆盖 existing truth | repository fake |
 | `TC-WORK-EVENT-DEDUP-001` | inbound redelivery | same event key + digest -> `AckDuplicate` | worker service |
 | `TC-WORK-EVENT-DEDUP-002` | inbound digest conflict | same event key + different payload -> dead-letter / conflict | worker service |
-| `TC-WORK-JOB-IDEM-001` | job duplicate | duplicate job key returns stored report | jobs service |
+| `TC-WORK-JOB-IDEM-001` | job duplicate | duplicate job key returns stored report through `JobResultRepository.get_report`;does not rerun scan / publish / handoff | jobs service |
 | `TC-WORK-OUTBOX-CONC-001` | dual publisher | one mark succeeds, other version conflict does not republish truth | infra fake |
 | `TC-WORK-PROJ-CONC-001` | stale vs rebuild | older cursor cannot overwrite newer projection freshness | projection fake |
 | `TC-WORK-REF-CONC-001` | reference refresh race | version conflict preserves last good snapshot | reference fake |
@@ -224,9 +227,9 @@ P0 只要求只读审计和拒绝盲重试。自动将 `Reserved` unknown 修复
 | 回填文件 | 回填内容 | 原因 |
 |---|---|---|
 | `03_ddd_step_07_trait_port_adapter_contracts.md` | `IdempotencyRepository.get(key, operation) -> Result<Option<IdempotencyRecord>, IdempotencyError>` | Step 12 的 commit unknown / duplicate recovery 需要只读幂等审计入口 |
-| `03_ddd_step_07_trait_port_adapter_contracts.md` | `CommandResultRepository.save_result/get_result`、`StoredCommandResult`、`IdGeneratorPort.next_result_id()` | `ApplicationResultRef` 必须有正式 result surface 读取面 |
+| `03_ddd_step_07_trait_port_adapter_contracts.md` | `CommandResultRepository.save_result/get_result`、`StoredCommandResult`、`JobResultRepository.save_report/get_report`、`StoredJobResult`、`IdGeneratorPort.next_result_id()` | `ApplicationResultRef` 必须有正式 result / report surface 读取面 |
 | `03_ddd_step_09_function_flows.md` | Command / Job digest 改为 stable business / job input,排除易变 metadata | 防止同一业务请求重试误判 digest conflict |
-| `03_ddd_step_11_persistence_transaction_consistency.md` | Repository 函数表补 `IdempotencyRepository.get` 和 `CommandResultRepository`;更新 DDD11-OPEN-005 | 事务一致性与 Step 13 幂等审计对齐 |
+| `03_ddd_step_11_persistence_transaction_consistency.md` | Repository 函数表补 `IdempotencyRepository.get`、`CommandResultRepository` 和 `JobResultRepository`;更新 DDD11-OPEN-005 | 事务一致性与 Step 13 幂等审计对齐 |
 | `03_ddd_step_12_error_recovery.md` | 更新 DDD12-OPEN-002 状态 | commit unknown 已有只读审计口径,测试仍留 Step 16 |
 
 ### 10. 回填草稿
@@ -241,7 +244,7 @@ P0 只要求只读审计和拒绝盲重试。自动将 `Reserved` unknown 修复
 
 L1-work 写路径使用三层保护:第一层是 `IdempotencyRepository` 对 `(operation, idempotency_key)` 的 atomic reserve;第二层是 `RequestDigest` 区分 same request 与 key reuse conflict;第三层是 repository optimistic `Version`、唯一键和 cursor monotonicity 防止并发覆盖。
 
-Command 和 Operations Job 的幂等键来自 core `CommandMetadata.request.idempotency_key`。Inbound Event 的 dedup key 来自 `topic + source_event_id + source_ref`。Query 不写幂等记录。Outbound publish 不使用 public idempotency key,而以 `WorkOutboxId + expected_version` 保护单条 publication state。
+Command 和 Operations Job 的幂等键来自 core `CommandMetadata.request.idempotency_key`。Inbound Event 的 dedup key 来自 `topic + source_event_id + source_ref`。Query 不写幂等记录。Outbound publish 不使用 public idempotency key,而以 `WorkOutboxId + expected_version` 保护单条 publication state;`expected_version` 必须来自 `list_pending(page)` 或 `get(outbox_id)` 返回的 `Versioned<WorkOutboxRecord>`。
 
 `RequestDigest` 只包含稳定业务输入:operation、route scope、actor effective scope、command body / job body / event payload digest 等会改变结果的字段。它不得包含 `idempotency_key`、`request_id`、`requested_at`、`trace_id`、`job_run_id` 或 retry counter。
 
@@ -249,13 +252,13 @@ Command 和 Operations Job 的幂等键来自 core `CommandMetadata.request.idem
 
 | 情况 | 结果 |
 |---|---|
-| same key + same digest + completed | 通过 `CommandResultRepository.get_result(ApplicationResultRef)` 返回 stored result,不重放 domain transition |
+| same key + same digest + completed | Command 通过 `CommandResultRepository.get_result(ApplicationResultRef)` 返回 stored result;Job 通过 `JobResultRepository.get_report(ApplicationResultRef)` 返回 stored report;不重放 domain transition / job side effect |
 | same key + same digest + reserved / unknown | 返回 temporarily unavailable,稍后重试或 reconciliation |
 | same key + different digest | `IdempotencyConflict` |
 | duplicate inbound event same digest | `AckDuplicate` |
-| duplicate outbox publish worker | version conflict treated as already handled / item failure,不改 truth |
+| duplicate outbox publish worker | 使用同一 pending item version 标记 publication state;version conflict treated as already handled / item failure,不改 truth |
 
-`CommitStatusUnknown` 不允许盲重试。重试前必须调用 `IdempotencyRepository.get(key, operation)`。若记录已 completed 且 digest 匹配,再通过 `CommandResultRepository.get_result(result_ref)` 读取既有 result;若 stored result 缺失或仍是 reserved unknown,不得再次执行 domain 写入,返回 temporarily unavailable 并交 reconciliation / operator review。
+`CommitStatusUnknown` 不允许盲重试。重试前必须调用 `IdempotencyRepository.get(key, operation)`。若记录已 completed 且 digest 匹配,Command 通过 `CommandResultRepository.get_result(result_ref)` 读取既有 result,Job 通过 `JobResultRepository.get_report(result_ref)` 读取既有 report;若 stored surface 缺失或仍是 reserved unknown,不得再次执行 domain 写入或 job side effect,返回 temporarily unavailable 并交 reconciliation / operator review。
 
 ### 11. 待确认事项
 

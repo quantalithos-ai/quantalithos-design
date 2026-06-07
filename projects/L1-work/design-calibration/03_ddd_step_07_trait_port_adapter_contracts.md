@@ -93,6 +93,7 @@
 | `ReferenceSnapshotRepository` | repository trait | `application/src/ports.rs` | `infra/src/reference_stores.rs` | 本地 external snapshot / resolution state | `save_member_snapshot`、`get_reference_state` |
 | `IdempotencyRepository` | technical repository | `application/src/idempotency.rs` | `infra/src/idempotency_store.rs` | command / event / job 幂等保护 | `reserve`、`complete`、`mark_conflict` |
 | `CommandResultRepository` | technical repository | `application/src/results.rs` | `infra/src/command_result_store.rs` | command duplicate result replay | `save_result`、`get_result` |
+| `JobResultRepository` | technical repository | `application/src/results.rs` | `infra/src/job_result_store.rs` | operations job duplicate report replay | `save_report`、`get_report` |
 | `UnitOfWork` / `UnitOfWorkHandle` | technical port | `application/src/unit_of_work.rs` | `infra/src/repositories.rs` | 本地事务边界 | `begin`、`commit`、`rollback` |
 | `IdGeneratorPort` | technical port | `application/src/ports.rs` | `infra/src/clock_id.rs` | Work-owned id 生成 | `next_project_id`、`next_work_item_id` 等 |
 | `ClockPort` | technical port | `application/src/ports.rs` | `infra/src/clock_id.rs` | 时间戳来源 | `now` |
@@ -723,13 +724,13 @@ pub trait WorkOutboxRepository {
     async fn list_pending(
         &self,
         page: PageRequest,
-    ) -> Result<Page<WorkOutboxRecord>, RepositoryError>;
+    ) -> Result<Page<Versioned<WorkOutboxRecord>>, RepositoryError>;
 
     /// Loads one outbox record.
     async fn get(
         &self,
         outbox_id: WorkOutboxId,
-    ) -> Result<Option<WorkOutboxRecord>, RepositoryError>;
+    ) -> Result<Option<Versioned<WorkOutboxRecord>>, RepositoryError>;
 
     /// Marks an outbox record as published.
     async fn mark_published(
@@ -763,7 +764,8 @@ pub trait WorkOutboxRepository {
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
 | `enqueue` | `WorkOutboxRecord`、UoW | `()` | `RepositoryError` | command / consumer service | 与 truth 写入同 UoW;record 必须包含 `event_kind`、`source_ref`、`trace_context_ref`、`occurred_at` |
-| `list_pending` | `PageRequest` | `Page<WorkOutboxRecord>` | `RepositoryError` | outbox publisher job / worker | 返回完整 source identity;不锁定 bus topic |
+| `list_pending` | `PageRequest` | `Page<Versioned<WorkOutboxRecord>>` | `RepositoryError` | outbox publisher job / worker | 返回完整 source identity 和当前 optimistic version;page 稳定排序;不锁定 bus topic |
+| `get` | `WorkOutboxId` | `Option<Versioned<WorkOutboxRecord>>` | `RepositoryError` | publish retry / reconciliation / visibility check | 返回 record + current version;missing -> job item failed / reconciliation gap |
 | `mark_published` / `mark_failed` | outbox id、publication / reason、version、UoW | `Version` | `RepositoryError` | publish job | 发布状态失败不回滚 truth |
 | `mark_pending_for_retry` | outbox id、retry reason、version、UoW | `Version` | `RepositoryError` | publish retry job / worker | 只允许 failed record 重新进入 pending |
 
@@ -1445,7 +1447,7 @@ pub enum IdempotencyError {
 | `complete` | reservation、result ref、UoW | `()` | `IdempotencyError` | service success path | duplicate 必须返回同一 result ref |
 | `mark_conflict` | conflict、UoW | `()` | `IdempotencyError` | conflict path | 不执行 business truth 写入 |
 
-#### 10.5 `CommandResultRepository`
+#### 10.5 `CommandResultRepository` / `JobResultRepository`
 
 ```rust
 /// Stores public command result surfaces for idempotency duplicate replay.
@@ -1484,19 +1486,47 @@ pub enum StoredCommandResult {
     /// Stored result for Iteration command operations.
     Iteration(IterationCommandResult),
 }
+
+/// Stores public job report surfaces for idempotency duplicate replay.
+pub trait JobResultRepository {
+    /// Saves the job report surface under its stable application result ref.
+    async fn save_report(
+        &self,
+        result_ref: ApplicationResultRef,
+        result: StoredJobResult,
+        uow: &UnitOfWorkHandle,
+    ) -> Result<(), RepositoryError>;
+
+    /// Loads a previously saved job report surface by result ref.
+    async fn get_report(
+        &self,
+        result_ref: ApplicationResultRef,
+    ) -> Result<Option<StoredJobResult>, RepositoryError>;
+}
+
+/// Application-local union of public operations job result DTOs.
+pub enum StoredJobResult {
+    /// Stored report for jobs returning the common Work job report.
+    WorkJob(WorkJobReport),
+    /// Stored report for reconciliation jobs.
+    Reconciliation(ReconciliationReport),
+}
 ```
 
 | 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
 |---|---|---|---|---|---|
 | `save_result` | result ref、stored command result、UoW | `()` | `RepositoryError` | command success path | 必须与 truth / trace / outbox / stale marker 和 `IdempotencyRepository.complete(...)` 同一 UoW;必须先于 idempotency complete 调用 |
 | `get_result` | result ref | `Option<StoredCommandResult>` | `RepositoryError` | command duplicate replay / commit-status audit | read-only;不得重建 truth;不得重放 domain transition |
+| `save_report` | result ref、stored job result、UoW | `()` | `RepositoryError` | job success path | 必须与 job marker / outbox publication marker / projection marker / handoff marker 和 `IdempotencyRepository.complete(...)` 同一 UoW;必须先于 idempotency complete 调用 |
+| `get_report` | result ref | `Option<StoredJobResult>` | `RepositoryError` | job duplicate replay / commit-status audit | read-only;不得重扫 truth / projection / outbox;不得重放 job side effects |
 
 正式口径:
 
-- `ApplicationResultRef` 是指向 `CommandResultRepository` 中 stored result surface 的稳定指针;`IdempotencyRepository` 只保存这个指针,不保存完整 result DTO。
+- `ApplicationResultRef` 是指向 stored result surface 的稳定指针;Command operation 指向 `CommandResultRepository` 中的 `StoredCommandResult`,Job operation 指向 `JobResultRepository` 中的 `StoredJobResult`;`IdempotencyRepository` 只保存这个指针,不保存完整 result DTO。
 - `StoredCommandResult` 保存的是成功写路径原始 `Applied` result surface。duplicate replay 读取后只把返回 receipt 的 `idempotency` surface 改为 `Duplicate`,必须保留原 `result_ref`、primary ref、state、`trace_ref`、`outbox_record_refs` 和 `applied_version`。
-- service 必须按当前 operation 匹配期望 variant。`ApplicationResultRef.operation` 与 variant / command 不匹配,或 `get_result(result_ref)` 返回 `None`,均映射 `ApplicationError::DuplicateResultMissing`。
-- duplicate replay 禁止从当前 Project / Backlog / Work truth 重新构造 result,也禁止再次调用 domain factory / transition。
+- `StoredJobResult` 保存的是成功 job 原始 report surface。duplicate replay 读取后只把 report 内 receipt 的 `idempotency` surface overlay 为 `Duplicate` when present;`job_run_id`、counts、failed_refs、marker refs 和 report payload 必须保持原值。
+- service 必须按当前 operation 匹配期望 variant。`ApplicationResultRef.operation` 与 variant / command / job 不匹配,或 `get_result(result_ref)` / `get_report(result_ref)` 返回 `None`,均映射 `ApplicationError::DuplicateResultMissing`。
+- duplicate replay 禁止从当前 Project / Backlog / Work truth 重新构造 result / report,也禁止再次调用 domain factory / transition 或 job side effects。
 
 ### 11. Infra Adapter 契约
 
@@ -1517,6 +1547,7 @@ pub enum StoredCommandResult {
 | `InMemoryReferenceSnapshotRepository` | `infra/src/reference_stores.rs` | `ReferenceSnapshotRepository` | P0 fake | stale refs 可分页 |
 | `InMemoryIdempotencyRepository` | `infra/src/idempotency_store.rs` | `IdempotencyRepository` | P0 fake | duplicate / conflict 按 digest 判定 |
 | `InMemoryCommandResultRepository` | `infra/src/command_result_store.rs` | `CommandResultRepository` | P0 fake | 按 `ApplicationResultRef` 保存 / 读取 stored result surface;支持 missing 注入 |
+| `InMemoryJobResultRepository` | `infra/src/job_result_store.rs` | `JobResultRepository` | P0 fake | 按 `ApplicationResultRef` 保存 / 读取 stored job report surface;支持 missing 注入 |
 | `InMemoryUnitOfWork` | `infra/src/repositories.rs` | `UnitOfWork` | P0 fake | 测试可断言 commit / rollback |
 | `DeterministicWorkIdGenerator` | `infra/src/clock_id.rs` | `IdGeneratorPort` | P0 fake | fixture 可预测 |
 | `FixedClock` | `infra/src/clock_id.rs` | `ClockPort` | P0 fake | fixture 可预测 |
@@ -1548,6 +1579,7 @@ pub enum StoredCommandResult {
 | projection store | `ProjectionRepository` | query handler 直接访问 projection adapter | query no-write 和 stale surface 由 service 统一处理 |
 | idempotency store | `IdempotencyRepository` | handler 自行判重 | duplicate / conflict 必须覆盖 command、event、job |
 | command result store | `CommandResultRepository` | service 从当前 truth 现算 duplicate result | duplicate 必须返回已保存 result surface,不得重放 domain transition |
+| job result store | `JobResultRepository` | job duplicate 重新扫描 truth / projection / outbox 后生成新 report | duplicate 必须返回已保存 job report surface,不得重放 side effect |
 | transaction boundary | `UnitOfWork` | repository 隐式开启不可见事务 | 多 repository / outbox / audit 同 UoW |
 | event bus | `WorkOutboxPublisherPort` | domain 直接 publish | truth commit 与 publish failure 解耦 |
 | identity | `ActorMemberResolverPort` / `MemberReferencePort` / event consumer snapshot | Cargo 依赖 identity crate 或解释 role / credential body | L1-work 不拥有 GlobalMember truth;query 只消费 actor -> `GlobalMemberRef` 安全映射和 ProjectMember responsibility |
@@ -1580,11 +1612,12 @@ pub enum StoredCommandResult {
 | `ConsumeIdentityMemberChanged` | `ReferenceSnapshotRepository`、`ProjectMemberRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | `ProjectMemberRepository.list_by_member(...)` + `ProjectionRepository.list_views_affected_by_member(...)` 枚举 affected public views 后 mark stale |
 | `ConsumeMethodDefinitionChanged` | `ReferenceSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | `ProjectionRepository.list_views_affected_by_method(...)` 枚举 affected public views 后 mark stale |
 | `ConsumeRuntimePromoteRequested` | `ReferenceSnapshotRepository`、`PromoteRepository`、`IdempotencyRepository` | 是 | `SourceWorkResolverPort`、`ClockPort` | 只形成 pending intake / reference state |
-| `PublishWorkOutbox` | `WorkOutboxRepository`、`IdempotencyRepository` | 是 | `WorkOutboxPublisherPort`、`ClockPort` | mark published / failed |
-| `RebuildWorkProjections` | `WorkTruthSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository` | 是 | `ClockPort` | replace views + mark fresh |
-| `RefreshExternalReferenceSnapshots` | `ReferenceSnapshotRepository`、`IdempotencyRepository` | 是 | resolver ports、`ClockPort` | save snapshots + mark affected views stale |
-| `PrepareWorkTraceHandoff` | `AuditRepository`、`IdempotencyRepository` | 是 | `TraceHandoffPort`、`ClockPort` | save / enqueue handoff marker |
-| `PrepareArchiveHandoff` | truth repositories、`AuditRepository`、`IdempotencyRepository` | 是 | `ArchiveHandoffPort`、`ClockPort` | save / enqueue archive handoff marker |
+| `PublishWorkOutbox` | `WorkOutboxRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `WorkOutboxPublisherPort`、`ClockPort` | mark published / failed;save `StoredJobResult::WorkJob` before idempotency complete |
+| `RebuildWorkProjections` | `WorkTruthSnapshotRepository`、`ProjectionRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `ClockPort` | replace views + mark fresh;save `StoredJobResult::WorkJob` before idempotency complete |
+| `RefreshExternalReferenceSnapshots` | `ReferenceSnapshotRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | resolver ports、`ClockPort` | save snapshots + mark affected views stale;save `StoredJobResult::WorkJob` before idempotency complete |
+| `RunWorkReconciliation` | truth / projection / outbox / reference repositories、`IdempotencyRepository`、`JobResultRepository` | 是 | `ClockPort` | save `StoredJobResult::Reconciliation` before idempotency complete;does not repair truth |
+| `PrepareWorkTraceHandoff` | `AuditRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `TraceHandoffPort`、`ClockPort` | save / enqueue handoff marker;save `StoredJobResult::WorkJob` before idempotency complete |
+| `PrepareArchiveHandoff` | truth repositories、`AuditRepository`、`IdempotencyRepository`、`JobResultRepository` | 是 | `ArchiveHandoffPort`、`ClockPort` | save / enqueue archive handoff marker;save `StoredJobResult::WorkJob` before idempotency complete |
 
 ### 14. Trait / Adapter 到文件布局映射
 
@@ -1593,9 +1626,9 @@ pub enum StoredCommandResult {
 | `crates/application/src/ports.rs` | repository / resolver / publisher / handoff / id / clock trait、`Page<T>`、`PageInfo`、`RepositoryError`、`PortError` | concrete adapter、DB client、HTTP client、bus client |
 | `crates/application/src/unit_of_work.rs` | `UnitOfWork`、`UnitOfWorkHandle`、`UnitOfWorkError` | durable transaction implementation |
 | `crates/application/src/idempotency.rs` | `IdempotencyRepository`、`IdempotencyReservation`、`IdempotencyConflict`、`RequestDigest` | concrete store |
-| `crates/application/src/results.rs` | `CommandResultRepository`、`StoredCommandResult`、duplicate receipt overlay helper | concrete store、truth reconstruction |
+| `crates/application/src/results.rs` | `CommandResultRepository`、`StoredCommandResult`、`JobResultRepository`、`StoredJobResult`、duplicate receipt overlay helper | concrete store、truth reconstruction |
 | `crates/infra/src/repositories.rs` | truth repository fake / durable adapters、`InMemoryUnitOfWork` | application service business flow |
-| `crates/infra/src/command_result_store.rs` | command result store fake / durable adapter | domain transition、truth repository ownership |
+| `crates/infra/src/command_result_store.rs` / `job_result_store.rs` | command / job result store fake / durable adapter | domain transition、truth repository ownership |
 | `crates/infra/src/projection_stores.rs` | projection adapter | domain policy |
 | `crates/infra/src/reference_stores.rs` | snapshot / reference adapter | external resolver logic |
 | `crates/infra/src/source_resolvers.rs` | fake / durable resolver adapter | Cargo dependency to sibling business crates unless later design explicitly permits |

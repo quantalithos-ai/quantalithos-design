@@ -196,13 +196,13 @@ Inbound 不变量:
 
 ```text
 [jobs::WorkOperationsJobRunner.run_publish_work_outbox]
-  | WorkOutboxRepository.list_pending(page)
+  | WorkOutboxRepository.list_pending(page) -> Page<Versioned<WorkOutboxRecord>>
   v
-[application::WorkOutboxPublishService.publish_one]
-  | dispatch WorkOutboxRecord.event_kind -> payload builder
-  | WorkOutboxPublisherPort.publish(record)
+[application::WorkOutboxPublishService.publish_one(versioned)]
+  | dispatch versioned.record.event_kind -> payload builder
+  | WorkOutboxPublisherPort.publish(publication)
   | UnitOfWork.begin()
-  | mark_published or mark_failed
+  | mark_published or mark_failed with versioned.version
   | UnitOfWork.commit()
 ```
 
@@ -1548,18 +1548,23 @@ promote_repo.save_pending_intake(intake, &uow).await?;
 ```text
 [PublishWorkOutboxFlow]
   -> WorkOutboxRepository.list_pending(page)
-     -> for each WorkOutboxRecord:
+     -> for each Versioned<WorkOutboxRecord>:
+          let record = versioned.record
+          let expected_version = versioned.version
           validate record.event_kind matches record.source_ref
           load committed source object by record.source_ref
           build WorkOutboundPublication / WorkOutboundEventEnvelope<T>
           WorkOutboxPublisherPort.publish(publication)
           UnitOfWork.begin()
-          mark_published(...) or mark_failed(...)
+          mark_published(..., expected_version) or mark_failed(..., expected_version)
           UnitOfWork.commit()
 ```
 
 ```rust
-// WorkOutboxPublishService::publish_one(WorkOutboxRecord record)
+// WorkOutboxPublishService::publish_one(Versioned<WorkOutboxRecord> versioned)
+let record = versioned.record;
+let expected_version = versioned.version;
+let outbox_id = record.outbox_id;
 let publication = match (record.event_kind, record.source_ref) {
     (WorkOutboxEventKind::ProjectChanged, WorkOutboxSourceRef::Project { .. }) => build_project_changed(record).await,
     (WorkOutboxEventKind::BacklogChanged, WorkOutboxSourceRef::Backlog { .. }) => build_backlog_changed(record).await,
@@ -1574,7 +1579,7 @@ let publication = match (record.event_kind, record.source_ref) {
     _ => Err(ApplicationError::InvalidOutboxSource),
 };
 let publication_ref = outbox_publisher.publish(publication?).await;
-mark_publication_result(record, publication_ref).await?;
+mark_publication_result(outbox_id, publication_ref, expected_version).await?;
 ```
 
 #### 11.2 Outbound event flow table
@@ -1598,6 +1603,7 @@ Outbound 发布不变量:
 - `WorkOutboundEventEnvelope.trace_context_ref` 和 `occurred_at` 来自 `WorkOutboxRecord`,不得由 publisher adapter 重新生成。
 - payload builder 必须从 `record.source_ref` 回查 committed source object;不得按 `outbox_id`、event kind 或 latest record 猜 source。
 - payload builder 不读取或复制外部正文。
+- `mark_published` / `mark_failed` 的 `expected_version` 必须来自同一条 `Versioned<WorkOutboxRecord>` pending item;不得假定版本、重查 storage 内部版本或移除 optimistic guard。
 - publish failure 只调用 `WorkOutboxRecord.mark_failed(reason)` 后保存,不修改原 truth。
 - unsupported `event_kind` 或 `event_kind/source_ref` mismatch 映射 `InvalidOutboxSource` / failed marker,不得静默丢弃。
 
@@ -1613,9 +1619,11 @@ Outbound 发布不变量:
 [application::<JobService>.<job>]
   | UnitOfWork.begin()
   | IdempotencyRepository.reserve(job key, operation, digest, &uow)
-  | duplicate -> return stored report/result
+  | duplicate -> rollback UoW + return JobResultRepository.get_report(result_ref)
   | execute job-specific scan / write / handoff
-  | IdempotencyRepository.complete(...)
+  | build WorkJobReport / ReconciliationReport;when report carries receipt, use { idempotency: Applied, ... }
+  | JobResultRepository.save_report(result_ref, StoredJobResult::<kind>(report), &uow)
+  | IdempotencyRepository.complete(reservation, result_ref, &uow)
   | UnitOfWork.commit()
 ```
 
@@ -1625,6 +1633,9 @@ Job 共享不变量:
 - Job digest 不包含 `job_run_id`、`request_id`、`requested_at` 或 trace 字段;只包含 operation、job scope、page / batch input 和会改变结果的业务参数。
 - Job 不修复业务 truth;只能发布 outbox、重建 projection、刷新 reference snapshot、写 reconciliation report / handoff marker。
 - 单条 item 失败进入 `WorkJobReport.failed_refs`;整个 job 输入无效才 reject。
+- Job success path 必须先 `JobResultRepository.save_report(...)`,再 `IdempotencyRepository.complete(...)`,二者与 job marker / outbox publication marker / projection marker / handoff marker 同一 UoW。
+- Job duplicate 必须通过 `JobResultRepository.get_report(ApplicationResultRef)` 返回 stored report surface,不得从当前 truth / projection / outbox / reference store 重新扫描生成 report。若 report carries `WorkCommandReceipt`,duplicate replay 只 overlay receipt idempotency;无 receipt 的 report 原样返回 stored payload。
+- `ApplicationResultRef` 缺失、stored report 缺失或 stored job result variant 与当前 operation 不匹配时,返回 `ApplicationError::DuplicateResultMissing` / `TemporarilyUnavailable`。
 
 #### 12.2 `PublishWorkOutboxFlow`
 
@@ -1632,11 +1643,14 @@ Job 共享不变量:
 [jobs.run_publish_work_outbox]
   -> WorkOutboxPublishService.publish_outbox(input)
      -> WorkOutboxRepository.list_pending(page)
-     -> for each record:
-          WorkOutboxPublisherPort.publish(record)
+     -> for each Versioned<WorkOutboxRecord>:
+          let record = versioned.record
+          let expected_version = versioned.version
+          build WorkOutboundPublication by record.event_kind + record.source_ref
+          WorkOutboxPublisherPort.publish(publication)
           UnitOfWork.begin()
           WorkOutboxRecord.mark_published(publication_ref) or mark_failed(reason)
-          WorkOutboxRepository.mark_published / mark_failed
+          WorkOutboxRepository.mark_published / mark_failed with expected_version
           UnitOfWork.commit()
      -> WorkJobReport
 ```
@@ -1644,10 +1658,16 @@ Job 共享不变量:
 ```rust
 // WorkOutboxPublishService::publish_outbox(PublishWorkOutboxJobInput input)
 let pending = outbox_repo.list_pending(input.page).await?;
-for record in pending.items {
-    match publisher.publish(record).await {
-        Ok(publication_ref) => mark_published(record.outbox_id, publication_ref).await?,
-        Err(error) => mark_failed(record.outbox_id, OutboxFailureReason::from(error)).await?,
+for versioned in pending.items {
+    let record = versioned.record;
+    let expected_version = versioned.version;
+    let outbox_id = record.outbox_id;
+    match build_publication(record).await {
+        Ok(publication) => match publisher.publish(publication).await {
+            Ok(publication_ref) => mark_published(outbox_id, publication_ref, expected_version).await?,
+            Err(error) => mark_failed(outbox_id, OutboxFailureReason::from(error), expected_version).await?,
+        },
+        Err(error) => mark_failed(outbox_id, OutboxFailureReason::from(error), expected_version).await?,
     }
 }
 Ok(WorkJobReport::from_counts(input.metadata.job_run_id, pending.info, changed, failed_refs))
@@ -1656,10 +1676,12 @@ Ok(WorkJobReport::from_counts(input.metadata.job_run_id, pending.info, changed, 
 | 项 | 口径 |
 |---|---|
 | DTO -> Job | `page` 来自 job input;metadata idempotency key 必填 |
-| 事务边界 | list_pending 无写 UoW;每条 mark published/failed 单独 UoW |
-| 错误映射 | missing idempotency -> `InvalidRequest`;publisher fail -> mark failed + report;repo fail -> report failed / retry |
+| 事务边界 | list_pending 无写 UoW;每条 mark published/failed 单独 UoW;job report save + idempotency complete 同一 UoW |
+| version 来源 | `WorkOutboxRepository.list_pending(input.page)` 返回 `Page<Versioned<WorkOutboxRecord>>`;每条 `mark_published` / `mark_failed` 使用同一 item 的 `versioned.version` 作为 `expected_version` |
+| duplicate replay | completed same digest 通过 `JobResultRepository.get_report(result_ref)` 返回 stored `StoredJobResult::WorkJob`;不得重新 list pending |
+| 错误映射 | missing idempotency -> `InvalidRequest`;publisher fail -> mark failed + report;version conflict -> item already handled / item conflict report;repo fail -> report failed / retry |
 | 状态 / 事件 | `OutboxPublicationState` -> `Published` / `Failed` |
-| 测试切口 | no pending zero report;publish success;publish failure marks failed;duplicate job |
+| 测试切口 | no pending zero report;publish success;publish failure marks failed;duplicate job;version conflict uses pending item version |
 
 #### 12.3 `RebuildWorkProjectionsFlow`
 
@@ -1840,7 +1862,7 @@ audit_repo.save_archive_handoff_marker(marker, &uow).await?;
 |---|---|---|---|---|---|---|
 | envelope / metadata 缺失 | handler / runner | `InvalidRequest` | `InvalidRequest` | `DeadLetter` | 不适用 | `InvalidRequest` |
 | idempotency key 缺失 | handler / runner | `InvalidRequest` | 不适用 | `DeadLetter` / reject | 不适用 | `InvalidRequest` |
-| idempotency duplicate | service | 通过 `CommandResultRepository.get_result` 返回既有 result | 不适用 | ack duplicate | skip publish duplicate marker | 返回既有 report |
+| idempotency duplicate | service | 通过 `CommandResultRepository.get_result` 返回既有 result | 不适用 | ack duplicate | skip publish duplicate marker | 通过 `JobResultRepository.get_report` 返回既有 report |
 | idempotency conflict | service | rollback + `IdempotencyConflict` | 不适用 | dead-letter / conflict marker | 不适用 | rollback + reject |
 | repository none | service | `NotFound` | `Missing` surface | unresolved / failed marker | mark failed if payload source missing | failed report |
 | domain reject | domain method / policy | rollback + `DomainRejected` | 不适用 | unresolved / dead-letter by consumer policy | mark failed | failed report |

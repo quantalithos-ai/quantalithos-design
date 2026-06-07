@@ -2113,7 +2113,7 @@ pub struct TraceVisibilityDeps<'a> {
 | Helper | 字段 | 约束 |
 |---|---|---|
 | `ResultId` | string newtype | 由 `IdGeneratorPort.next_result_id()` 生成;只用于 stored result surface |
-| `ApplicationResultRef` | `operation`、`result_id` | duplicate idempotency 必须返回同一 result ref;必须可由 `CommandResultRepository.get_result(...)` 读回原 result surface |
+| `ApplicationResultRef` | `operation`、`result_id` | duplicate idempotency 必须返回同一 result ref;Command 必须可由 `CommandResultRepository.get_result(...)` 读回原 result surface;Job 必须可由 `JobResultRepository.get_report(...)` 读回原 report surface |
 | `IdempotencyRecord` | `idempotency_key`、`operation`、`request_digest`、`result_ref`、`status` | conflict 由 digest 不同判定 |
 | `RequestDigest` | canonical hash string | 由 Command / Job canonical payload 生成 |
 | `IdempotencyStatus` | `Reserved` / `Completed` / `Conflict` | `Completed` 不可回到 `Reserved` |

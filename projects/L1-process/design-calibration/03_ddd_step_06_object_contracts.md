@@ -87,7 +87,7 @@
 
 | 模块 | 文件 | 对象 / 类型 |
 |---|---|---|
-| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker、command intent helper;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`TraceHandoffTargetRef`、`TraceHandoffTargetKind`、`TraceHandoffKind`、`HandoffFailureRef`、`HandoffFailureKind`、`HandoffCancelReason`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState`、`ReferenceResolutionLifecycleState`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RecoveryHistoryKind`、`RuntimeFeedbackSummaryRef`、`ProcessStartIntentRef`、`ProcessStartReason`、`ActivityProgressionIntentRef`、`ActivityProgressionTransition`、`ActivityFlowControlIntent`、`ProcessStageId`、`ProcessStageRef`、`ProfileStageRef`、`ProcessStageKind`、`ProcessTimingSubjectRef`、`ProcessTimingRef`、`ProcessTimeboxBindingId`、`ProcessTimeboxBindingRef`、`ProcessTimeboxRef`、`ExternalTimeboxKind`、`ExternalTimeboxRef`、`StageTarget`、`StageChangeReason`、`RhythmReason`、`StagePauseReason`、`StageCompletionReason`、`StageSkipReason`、`TimeboxReleaseReason`、`TimeboxInvalidReason`、`SourceDigest`、`PageCursorRef`、`DegradedReasonRef`、`ProcessConsumerRef`、`VisibilityReasonRef`、`ReferenceResolutionStateId`、`ReferenceResolutionStateRef`、`DerivedProcessViewStateId`、`DerivedProcessViewStateRef`、`ProcessReadSubjectRef`、`ProcessSearchFilterRef`、`ProcessReadModelId`、`ProcessReadModelRef`、`ActivityStatusViewId`、`ProcessTimelineEntryRef`、`ProcessTimelineEntryRefSet`、`ProcessProgressSummaryId`、`ProcessProgressSummaryRef`、`ReconciliationReportId`、`ReconciliationReportRef`、`ReconciliationIssueRef`、`ReconciliationIssueRefSet`、`RecoveryStatusSubjectRef`、`ProcessTimelineFilterRef`、`ProcessSummarySubjectRef`、`ProcessTraceSubjectRef`、`ProcessAuditSubjectRef` |
+| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker、command intent helper;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`TraceHandoffTargetRef`、`TraceHandoffTargetKind`、`TraceHandoffKind`、`HandoffFailureRef`、`HandoffFailureKind`、`HandoffCancelReason`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState`、`ReferenceResolutionLifecycleState`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RecoveryHistoryKind`、`RecoveryRetryPolicyRef`、`RecoveryExpiryPolicyRef`、`RecoveryRetryPolicySummary`、`RecoveryExpiryPolicySummary`、`RecoveryFailureReason`、`RecoveryAbandonReason`、`RuntimeFeedbackSummaryRef`、`ProcessStartIntentRef`、`ProcessStartReason`、`ActivityProgressionIntentRef`、`ActivityProgressionTransition`、`ActivityFlowControlIntent`、`ProcessStageId`、`ProcessStageRef`、`ProfileStageRef`、`ProcessStageKind`、`ProcessTimingSubjectRef`、`ProcessTimingRef`、`ProcessTimeboxBindingId`、`ProcessTimeboxBindingRef`、`ProcessTimeboxRef`、`ExternalTimeboxKind`、`ExternalTimeboxRef`、`StageTarget`、`StageChangeReason`、`RhythmReason`、`StagePauseReason`、`StageCompletionReason`、`StageSkipReason`、`TimeboxReleaseReason`、`TimeboxInvalidReason`、`SourceDigest`、`PageCursorRef`、`DegradedReasonRef`、`ProcessConsumerRef`、`VisibilityReasonRef`、`ReferenceResolutionStateId`、`ReferenceResolutionStateRef`、`DerivedProcessViewStateId`、`DerivedProcessViewStateRef`、`ProcessReadSubjectRef`、`ProcessSearchFilterRef`、`ProcessReadModelId`、`ProcessReadModelRef`、`ActivityStatusViewId`、`ProcessTimelineEntryRef`、`ProcessTimelineEntryRefSet`、`ProcessProgressSummaryId`、`ProcessProgressSummaryRef`、`ReconciliationReportId`、`ReconciliationReportRef`、`ReconciliationIssueRef`、`ReconciliationIssueRefSet`、`RecoveryStatusSubjectRef`、`ProcessTimelineFilterRef`、`ProcessSummarySubjectRef`、`ProcessTraceSubjectRef`、`ProcessAuditSubjectRef` |
 | `contracts` | `events.rs` | `ProcessOutboxEventKind`、`ProcessOutboundEventPayload` 及 outbound event payload DTO |
 | `contracts` | `views.rs` | `RuntimeProcessShapeView`、`ProcessProfileView`、`ProcessInstanceView`、`ActivityStatusView`、`ProcessTimelineView`、`ProcessProgressSummaryView`、`ReconciliationReportView` |
 | `domain` | `runtime_shape.rs` | `RuntimeProcessShape`、`RuntimeProcessShapeState` |
@@ -1207,6 +1207,8 @@ pub struct ProcessCheckpoint {
     pub checkpoint_state: CheckpointState,
     /// Evidence reference for recovery.
     pub evidence_ref: CheckpointEvidenceRef,
+    /// Time when the checkpoint was captured.
+    pub captured_at: Timestamp,
     /// Optional next checkpoint that superseded this checkpoint.
     pub superseded_by: Option<ProcessCheckpointRef>,
 }
@@ -1219,6 +1221,7 @@ pub struct ProcessCheckpoint {
 | `activity_ref` | `Option<ActivityRef>` | 对应活动 | 可空 |
 | `checkpoint_state` | `CheckpointState` | 有效性 | 必须为正式 enum |
 | `evidence_ref` | `CheckpointEvidenceRef` | 恢复依据 | 只保存 ref |
+| `captured_at` | `Timestamp` | checkpoint 捕获时间 | 必填;来自 application `ClockPort::now()` |
 | `superseded_by` | `Option<ProcessCheckpointRef>` | 替代者 | Superseded 时必填 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
@@ -1230,7 +1233,7 @@ pub struct ProcessCheckpoint {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn capture(checkpoint_id: ProcessCheckpointId, instance: &ProcessInstance, activity_ref: Option<ActivityRef>, evidence_ref: CheckpointEvidenceRef) -> Result<Self, DomainError>` | 捕获 checkpoint | id、instance、activity、evidence | `Result<ProcessCheckpoint, DomainError>` | `CreateProcessCheckpoint` |
+| `pub fn capture(checkpoint_id: ProcessCheckpointId, instance: &ProcessInstance, activity_ref: Option<ActivityRef>, evidence_ref: CheckpointEvidenceRef, captured_at: Timestamp) -> Result<Self, DomainError>` | 捕获 checkpoint | id、instance、activity、evidence、captured time | `Result<ProcessCheckpoint, DomainError>` | `CreateProcessCheckpoint` |
 
 ```rust
 /// Checkpoint validity state.
@@ -1257,6 +1260,7 @@ pub enum CheckpointState {
 
 - 不保存 runtime micro checkpoint。
 - 不创建第二份 Process truth。
+- `captured_at` 是 recovery maintenance 的唯一 checkpoint 时间判定输入;maintenance job 必须用 loaded `RecoveryExpiryPolicySummary.checkpoint_retention` 计算 expiry,不得从 history order、repository insertion time 或 clock side effect 反推 checkpoint expiry。
 
 #### 9.4 `RecoveryAttempt`
 
@@ -1275,6 +1279,12 @@ pub struct RecoveryAttempt {
     pub failure_reason: Option<RecoveryFailureReason>,
     /// Abandon reason when recovery was abandoned.
     pub abandon_reason: Option<RecoveryAbandonReason>,
+    /// Time when this attempt was started.
+    pub started_at: Timestamp,
+    /// Last time this attempt failed.
+    pub last_failed_at: Option<Timestamp>,
+    /// Number of recorded failures for this attempt.
+    pub failure_count: u16,
 }
 ```
 
@@ -1286,16 +1296,19 @@ pub struct RecoveryAttempt {
 | `recovery_state` | `RecoveryAttemptState` | 尝试状态 | 必须为正式 enum |
 | `failure_reason` | `Option<RecoveryFailureReason>` | 失败原因 | Failed 时必填 |
 | `abandon_reason` | `Option<RecoveryAbandonReason>` | 放弃原因 | Abandoned 时必填;其他状态必须为空 |
+| `started_at` | `Timestamp` | attempt 开始时间 | 必填;来自 application `ClockPort::now()` |
+| `last_failed_at` | `Option<Timestamp>` | 最近失败时间 | Failed 时必填;其他状态为空 |
+| `failure_count` | `u16` | 失败次数 | 工厂为 0;每次 `mark_failed(...)` 加 1;用于 retry exhausted 判定 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `pub fn mark_applied(&mut self, history_id: RecoveryHistoryId, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 标记已应用 | history id、actor | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` -> `Applied`;history kind = `AttemptApplied`;`failure_reason` / `abandon_reason` 必须为空 |
-| `pub fn mark_failed(&mut self, history_id: RecoveryHistoryId, reason: RecoveryFailureReason) -> Result<RecoveryHistoryRecord, DomainError>` | 标记失败 | history id、reason | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` -> `Failed`;保存 `failure_reason`;history kind = `AttemptFailed`;`abandon_reason` 必须为空 |
+| `pub fn mark_failed(&mut self, history_id: RecoveryHistoryId, reason: RecoveryFailureReason, failed_at: Timestamp) -> Result<RecoveryHistoryRecord, DomainError>` | 标记失败 | history id、reason、failure time | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` -> `Failed`;保存 `failure_reason`;设置 `last_failed_at = Some(failed_at)`;`failure_count += 1`;history kind = `AttemptFailed`;`abandon_reason` 必须为空 |
 | `pub fn abandon(&mut self, history_id: RecoveryHistoryId, reason: RecoveryAbandonReason, actor: ActorRef) -> Result<RecoveryHistoryRecord, DomainError>` | 放弃恢复 | history id、reason、actor | `Result<RecoveryHistoryRecord, DomainError>` | `Pending` / `Failed` -> `Abandoned`;保存 `abandon_reason`;history kind = `AttemptAbandoned` |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn start(recovery_attempt_id: RecoveryAttemptId, process_instance_id: ProcessInstanceId, checkpoint_ref: ProcessCheckpointRef, actor: ActorRef) -> Result<Self, DomainError>` | 建立恢复尝试 | id、instance、checkpoint、actor | `Result<RecoveryAttempt, DomainError>` | `StartRecoveryAttempt` |
+| `pub fn start(recovery_attempt_id: RecoveryAttemptId, process_instance_id: ProcessInstanceId, checkpoint_ref: ProcessCheckpointRef, actor: ActorRef, started_at: Timestamp) -> Result<Self, DomainError>` | 建立恢复尝试 | id、instance、checkpoint、actor、start time | `Result<RecoveryAttempt, DomainError>` | `StartRecoveryAttempt`;`failure_count = 0`;`last_failed_at = None` |
 
 ```rust
 /// Recovery attempt state.
@@ -1322,6 +1335,8 @@ pub enum RecoveryAttemptState {
 
 - `failure_reason` 只能在 `recovery_state = Failed` 时填写。
 - `abandon_reason` 只能在 `recovery_state = Abandoned` 时填写。
+- `last_failed_at` 只能在 `recovery_state = Failed` 时填写;`failure_count > 0` 时必须有一次正式 `AttemptFailed` history。
+- `started_at` / `last_failed_at` / `failure_count` 是 recovery maintenance 的唯一 retry / expiry 判定输入;maintenance job 不得从 history list 长度、adapter retry counter 或 repository insert order 反推 retry exhausted。
 - recovery attempt 只延续同一 `ProcessInstance`,不得创建替代实例。
 
 - 不覆盖 checkpoint truth。
@@ -2370,6 +2385,7 @@ Policy 只表达判断边界,不保存业务 truth。所有 `assert_*` 函数失
 | `GatewayRoutingPolicy` | `gateway_ref: GatewayRef`;`available_routes: GatewayRouteSet`;`token_snapshot: TokenSnapshot` | `assert_route_allowed(gateway: Gateway, route_ref: GatewayRouteRef, reason: GatewayDecisionReason) -> Result<(), DomainError>`;`assert_can_join(gateway: Gateway, tokens: TokenSet) -> Result<(), DomainError>`;`assert_no_orphan_token(token: Token) -> Result<(), DomainError>` | 不实现完整 BPMN 表达力;不自造外部决策依据 |
 | `WaitingGatePolicy` | `waiting_gate_ref: WaitingGateRef`;`pause_context: PauseContext`;`decision_state: ReferenceResolutionState` | `assert_can_open(activity: Activity, pause_context: PauseContext) -> Result<(), DomainError>`;`assert_decision_matches(gate: WaitingGate, decision_ref: GovernanceDecisionRef) -> Result<(), DomainError>`;`assert_can_resume(gate: WaitingGate) -> Result<(), DomainError>`;`assert_waiting_not_expired(gate: WaitingGate) -> Result<(), DomainError>` | 不生成 decision truth;不允许后台静默恢复 |
 | `RecoveryContinuityPolicy` | `process_instance_ref: ProcessInstanceRef`;`checkpoint_ref: ProcessCheckpointRef`;`recovery_context: RecoveryContext` | `assert_checkpoint_matches_instance(checkpoint: ProcessCheckpoint, instance: ProcessInstance) -> Result<(), DomainError>`;`assert_can_apply(checkpoint: ProcessCheckpoint, context: RecoveryContext) -> Result<(), DomainError>`;`assert_no_truth_fork(attempt: RecoveryAttempt) -> Result<(), DomainError>` | 不创建新实例替代恢复;不保存 archive / runtime 正文 |
+| `RecoveryMaintenancePolicy` | `retry_policy: RecoveryRetryPolicySummary`;`expiry_policy: RecoveryExpiryPolicySummary`;`now: Timestamp` | `should_abandon_pending(attempt: RecoveryAttempt, checkpoint: ProcessCheckpoint) -> bool`;`should_abandon_failed(attempt: RecoveryAttempt) -> bool`;`assert_policy_input_complete(attempt: RecoveryAttempt, checkpoint: ProcessCheckpoint) -> Result<(), DomainError>` | 不重新应用 attempt;不创建新 attempt;不读取 config body;只消费 Step 7 policy summary 和 committed checkpoint / attempt 字段 |
 | `ProcessRhythmPolicy` | `stage_ref: ProcessStageRef`;`timebox_binding_ref: Option<ProcessTimeboxBindingRef>`;`rhythm_context: ProcessRhythmContext` | `assert_stage_transition_allowed(stage: ProcessStageState, target: StageTarget, reason: StageChangeReason) -> Result<(), DomainError>`;`assert_timebox_binding_allowed(binding: ProcessTimeboxBinding, snapshot: WorkContextSnapshot) -> Result<(), DomainError>`;`assert_not_iteration_truth(binding: ProcessTimeboxBinding) -> Result<(), DomainError>` | 不决定 Iteration commitment;不保存会议正文 |
 | `ReadVisibilityPolicy` | `consumer_ref: ProcessConsumerRef`;`visibility_context: ProcessVisibilityContext` | `assert_can_read(subject_ref: ProcessReadSubjectRef, consumer_ref: ProcessConsumerRef) -> Result<(), DomainError>`;`filter_timeline(timeline: ProcessTimelineView, consumer_ref: ProcessConsumerRef) -> Result<ProcessTimelineView, DomainError>`;`assert_trace_handoff_allowed(handoff_ref: TraceHandoffRef, consumer_ref: ProcessConsumerRef) -> Result<(), DomainError>` | 不写业务 truth;不拥有 conversation visibility truth |
 | `DerivedProcessViewPolicy` | `view_state: DerivedProcessViewState`;`source_cursor_ref: ProcessTruthCursorRef` | `assert_view_readable(view_state: DerivedProcessViewState) -> Result<(), DomainError>`;`should_rebuild(view_state: DerivedProcessViewState) -> bool`;`assert_rebuild_does_not_write_truth() -> Result<(), DomainError>` | 不生成业务事实;不隐藏 stale / failed |

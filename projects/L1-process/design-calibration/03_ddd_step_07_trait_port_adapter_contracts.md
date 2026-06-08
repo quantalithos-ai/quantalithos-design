@@ -93,7 +93,7 @@
 | `TokenGatewayRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | token / gateway flow state | `get_token`、`save_token`、`get_gateway`、`save_gateway` |
 | `WaitingGateRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | waiting gate / pause context | `get_gate`、`get_pause_context`、`save_gate`、`find_open_by_instance` |
 | `CheckpointRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | checkpoint truth | `get`、`save`、`latest_for_instance` |
-| `RecoveryRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | recovery attempt / history | `get_attempt`、`save_attempt`、`append_history` |
+| `RecoveryRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | recovery attempt / history | `get_attempt`、`list_attempts_for_maintenance`、`save_attempt`、`append_history` |
 | `RhythmRepository` | truth repository | `application/src/ports.rs` | `infra/src/repositories.rs` | stage / timebox binding | `get_stage`、`save_stage`、`get_binding`、`save_binding` |
 | `TraceRepository` | append / handoff repository | `application/src/ports.rs` | `infra/src/repositories.rs` | trace / audit / handoff records | `append_trace`、`append_audit_record`、`save_handoff_ref` |
 | `ProcessOutboxRepository` | outbox repository | `application/src/ports.rs` | `infra/src/outbox_store.rs` | outbox record persistence with outbound payload snapshot | `append`、`list_pending`、`save_state` |
@@ -108,6 +108,7 @@
 | `ArtifactEvidenceResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | artifact evidence marker | `resolve_evidence` |
 | `RuntimeFeedbackResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | runtime feedback marker / body-free summary | `resolve_feedback` |
 | `ConversationContextResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | conversation context marker | `resolve_context` |
+| `RecoveryMaintenancePolicyRepository` | policy summary repository | `application/src/ports.rs` | `infra/src/repositories.rs` | recovery retry / expiry policy summary | `get_retry_policy`、`get_expiry_policy` |
 | `ProcessOutboxPublisherPort` | publisher port | `application/src/ports.rs` | `infra/src/publishers.rs` | outbound event publish | `publish` |
 | `TraceHandoffPort` | handoff port | `application/src/ports.rs` | `infra/src/handoff_adapters.rs` | observability handoff | `deliver_trace` |
 | `ArchiveHandoffPort` | handoff port | `application/src/ports.rs` | `infra/src/handoff_adapters.rs` | archive handoff | `deliver_archive` |
@@ -674,8 +675,8 @@ pub trait RecoveryRepository {
         attempt_ref: RecoveryAttemptRef,
     ) -> Result<Option<Versioned<RecoveryAttempt>>, RepositoryError>;
 
-    /// Lists pending recovery attempts in a scope.
-    async fn list_pending_attempts(
+    /// Lists pending and optionally failed recovery attempts in a maintenance scope.
+    async fn list_attempts_for_maintenance(
         &self,
         scope: RecoveryMaintenanceScope,
         page: PageRequest,
@@ -697,6 +698,13 @@ pub trait RecoveryRepository {
     ) -> Result<(), RepositoryError>;
 }
 ```
+
+Rules:
+
+- `list_attempts_for_maintenance(scope, page)` returns `Pending` attempts and, only when `scope.include_failed = true`, `Failed` attempts. It must not return `Applied` or `Abandoned`.
+- Returned items are `Versioned<RecoveryAttempt>` because the maintenance job saves state transitions with optimistic concurrency.
+- Sorting is stable by `started_at ASC, recovery_attempt_id ASC`;pagination uses the public `PageRequest` derived from `RecoveryMaintenanceScope.page`.
+- The repository must not compute retry exhaustion or expiry;it only filters by state and optional `process_instance_ref`.
 
 ##### 7.6.9 `RhythmRepository`
 
@@ -1190,6 +1198,21 @@ pub trait ConversationContextResolverPort {
         source_version_ref: Option<SourceVersionRef>,
     ) -> Result<ConversationContextRef, ResolverError>;
 }
+
+/// Repository for body-free recovery maintenance policy summaries.
+pub trait RecoveryMaintenancePolicyRepository {
+    /// Loads the retry policy summary used by recovery maintenance.
+    async fn get_retry_policy(
+        &self,
+        policy_ref: RecoveryRetryPolicyRef,
+    ) -> Result<Option<RecoveryRetryPolicySummary>, RepositoryError>;
+
+    /// Loads the expiry policy summary used by recovery maintenance.
+    async fn get_expiry_policy(
+        &self,
+        policy_ref: RecoveryExpiryPolicyRef,
+    ) -> Result<Option<RecoveryExpiryPolicySummary>, RepositoryError>;
+}
 ```
 
 Resolver 归属规则:
@@ -1333,12 +1356,13 @@ pub trait IdGeneratorPort {
 | `InMemoryTokenGatewayRepository` | `infra/src/repositories.rs` | `TokenGatewayRepository` | token / gateway maps | flow state conflict |
 | `InMemoryWaitingGateRepository` | `infra/src/repositories.rs` | `WaitingGateRepository` | gate / pause / change maps | open gate lookup;pause context lookup;missing pause context injection for query degraded tests |
 | `InMemoryCheckpointRepository` | `infra/src/repositories.rs` | `CheckpointRepository` | checkpoint map | latest checkpoint lookup |
-| `InMemoryRecoveryRepository` | `infra/src/repositories.rs` | `RecoveryRepository` | attempt / history maps | pending scope scan |
+| `InMemoryRecoveryRepository` | `infra/src/repositories.rs` | `RecoveryRepository` | attempt / history maps | pending / failed maintenance scope scan |
 | `InMemoryRhythmRepository` | `infra/src/repositories.rs` | `RhythmRepository` | stage / binding maps | active binding lookup |
 | `InMemoryTraceRepository` | `infra/src/repositories.rs` | `TraceRepository` | trace / audit / handoff maps | handoff scope scan |
 | `InMemoryOutboxStore` | `infra/src/outbox_store.rs` | `ProcessOutboxRepository` | outbox map + ordered index + payload snapshot storage | pending ordered scan;payload snapshot retained verbatim |
 | `InMemoryProjectionStore` | `infra/src/projection_stores.rs` | `ProjectionRepository`、`ReconciliationReportRepository` | projection maps | stale / failed view state |
 | `InMemoryReferenceStore` | `infra/src/reference_stores.rs` | `ReferenceSnapshotRepository` | snapshot / state maps | missing / stale / invalid refs |
+| `InMemoryRecoveryPolicyStore` | `infra/src/repositories.rs` | `RecoveryMaintenancePolicyRepository` | retry / expiry policy summaries | missing policy injection for job failure tests |
 | `ConfiguredSourceResolvers` | `infra/src/source_resolvers.rs` | all resolver ports | configured fixtures or runtime endpoint | resolved / unavailable / digest mismatch |
 | `FakeProcessPublisher` | `infra/src/publishers.rs` | `ProcessOutboxPublisherPort` | outbound event capture | success / retryable / permanent failure |
 | `FakeHandoffAdapters` | `infra/src/handoff_adapters.rs` | `TraceHandoffPort`、`ArchiveHandoffPort` | handoff capture | success / retryable / permanent failure |
@@ -1365,7 +1389,8 @@ pub trait IdGeneratorPort {
 | public page DTO | query / job request and response | public request / response field names and mapping to `PageRequest` / `PageInfo` |
 | `ProcessOutboxScope` | outbox pending scan | filter fields and ordering |
 | `TraceHandoffScope` | trace handoff pending scan | filter fields and state set |
-| `RecoveryMaintenanceScope` | recovery maintenance scan | filter fields and retry / expiry boundary |
+| `RecoveryMaintenanceScope` | recovery maintenance scan | filter fields, failed-inclusion behavior, page, and retry / expiry boundary |
+| `RecoveryRetryPolicySummary` / `RecoveryExpiryPolicySummary` | recovery maintenance policy | body-free executable fields used by maintenance job |
 | `ProcessSearchFilter` | projection search | allowed filters and stale behavior |
 | `ProcessOutboundEventEnvelope` | publisher input | envelope metadata, event kind, payload, truth ref |
 | `PublicationReceipt` | publish success | publication_ref、published_at、downstream ack marker |

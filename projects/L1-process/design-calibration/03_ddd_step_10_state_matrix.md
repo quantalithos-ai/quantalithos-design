@@ -392,7 +392,7 @@ factory -> Available --mark_superseded--> Superseded
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| factory | `Available` | `ProcessCheckpoint::capture(checkpoint_id, &ProcessInstance, Option<ActivityRef>, CheckpointEvidenceRef)` | instance 非终态;activity 属于 instance;evidence ref 可验证 | 创建 checkpoint;写 `RecoveryHistoryKind::CheckpointCaptured` / trace | `DomainError::ReferenceResolutionFailed` |
+| factory | `Available` | `ProcessCheckpoint::capture(checkpoint_id, &ProcessInstance, Option<ActivityRef>, CheckpointEvidenceRef, captured_at)` | instance 非终态;activity 属于 instance;evidence ref 可验证 | 创建 checkpoint;写 `RecoveryHistoryKind::CheckpointCaptured` / trace | `DomainError::ReferenceResolutionFailed` |
 | `Available` | `Superseded` | `ProcessCheckpoint.mark_superseded(ProcessCheckpointRef)` | next checkpoint 属于同一 instance;不会 fork | 设置 `superseded_by`;写 `RecoveryHistoryKind::CheckpointSuperseded` | `DomainError::RecoveryForkViolation` / `DomainError::InvalidStateTransition` |
 | `Available` | `Invalid` | `ProcessCheckpoint.invalidate(CheckpointInvalidReason)` | evidence invalid 或 boundary violation | 标记 invalid;拒绝后续 recovery;写 `RecoveryHistoryKind::CheckpointInvalidated` when persisted | `DomainError::InvalidStateTransition` |
 | `Available` | `Expired` | `ProcessCheckpoint.expire(CheckpointExpireReason)` | retention policy 到期 | 标记 expired;写 `RecoveryHistoryKind::CheckpointExpired` when persisted | `DomainError::InvalidStateTransition` |
@@ -423,10 +423,10 @@ factory -> Pending --mark_applied--> Applied
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| factory | `Pending` | `RecoveryAttempt::start(recovery_attempt_id, process_instance_id, checkpoint_ref, actor)` | checkpoint `Available`;same instance;无 active conflicting attempt | 创建 attempt;写 `RecoveryHistoryKind::AttemptStarted`;instance `非终态 -> Recovering` | `DomainError::RecoveryForkViolation` |
+| factory | `Pending` | `RecoveryAttempt::start(recovery_attempt_id, process_instance_id, checkpoint_ref, actor, started_at)` | checkpoint `Available`;same instance;无 active conflicting attempt | 创建 attempt;`failure_count = 0`;`last_failed_at = None`;写 `RecoveryHistoryKind::AttemptStarted`;instance `非终态 -> Recovering` | `DomainError::RecoveryForkViolation` |
 | `Pending` | `Applied` | `RecoveryAttempt.mark_applied(RecoveryHistoryId, ActorRef)` | checkpoint can_resume;recovery outcome 为 `Applied`;failure / abandon reason 均为空 | 写 `RecoveryHistoryKind::AttemptApplied`;随后 instance `Recovering -> Running` | `DomainError::InvalidStateTransition` |
-| `Pending` | `Failed` | `RecoveryAttempt.mark_failed(RecoveryHistoryId, RecoveryFailureReason)` | failure reason 必填;abandon reason 为空 | 写 failure reason / `RecoveryHistoryKind::AttemptFailed`;instance 可按 policy 转 `Failed` 或保持 `Recovering` 待维护 | `DomainError::InvalidStateTransition` |
-| `Pending` / `Failed` | `Abandoned` | `RecoveryAttempt.abandon(RecoveryHistoryId, RecoveryAbandonReason, ActorRef)` | abandon reason 必填;failure reason 在请求中必须为空;不会创建替代 instance | 写 abandon reason / `RecoveryHistoryKind::AttemptAbandoned`;maintenance job 可写 outbox | `DomainError::InvalidStateTransition` |
+| `Pending` | `Failed` | `RecoveryAttempt.mark_failed(RecoveryHistoryId, RecoveryFailureReason, failed_at)` | failure reason 必填;abandon reason 为空 | 写 failure reason;`last_failed_at = Some(failed_at)`;`failure_count += 1`;写 `RecoveryHistoryKind::AttemptFailed`;instance 可按 policy 转 `Failed` 或保持 `Recovering` 待维护 | `DomainError::InvalidStateTransition` |
+| `Pending` / `Failed` | `Abandoned` | `RecoveryAttempt.abandon(RecoveryHistoryId, RecoveryAbandonReason, ActorRef)` | abandon reason 必填;failure reason 在请求中必须为空;不会创建替代 instance;maintenance 仅在 pending expired 或 failed retry exhausted 时调用 | 写 abandon reason / `RecoveryHistoryKind::AttemptAbandoned`;maintenance job 可写 outbox | `DomainError::InvalidStateTransition` |
 
 ---
 

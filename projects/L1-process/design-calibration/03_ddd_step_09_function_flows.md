@@ -458,8 +458,8 @@ Steps:
 1. Reserve command idempotency.
 2. Load `ProcessInstance`;validate optional `ActivityRef`.
 3. Validate `CheckpointEvidenceRef` through artifact evidence marker when available.
-4. Generate `ProcessCheckpointId` and `RecoveryHistoryId` via `IdGeneratorPort`.
-5. `ProcessCheckpoint::capture(checkpoint_id, &instance, activity_ref, evidence_ref)`.
+4. Generate `ProcessCheckpointId` and `RecoveryHistoryId` via `IdGeneratorPort`;capture `captured_at` from `ClockPort::now()`.
+5. `ProcessCheckpoint::capture(checkpoint_id, &instance, activity_ref, evidence_ref, captured_at)`.
 6. Supersede previous available checkpoint when policy requires;each superseded checkpoint history uses its own `RecoveryHistoryId`.
 7. Save checkpoint;append `RecoveryHistoryRecord` with `CheckpointCaptured` and optional `CheckpointSuperseded`;append trace / audit.
 8. Store `ProcessCheckpointCommandResult`.
@@ -475,8 +475,8 @@ Steps:
 1. Reserve command idempotency.
 2. Load `ProcessCheckpoint` and owning `ProcessInstance`.
 3. `RecoveryContinuityPolicy.assert_checkpoint_matches_instance(...)`.
-4. Generate `RecoveryAttemptId` and two `RecoveryHistoryId` values via `IdGeneratorPort`.
-5. `RecoveryAttempt::start(recovery_attempt_id, process_instance_id, checkpoint_ref, actor)`.
+4. Generate `RecoveryAttemptId` and two `RecoveryHistoryId` values via `IdGeneratorPort`;capture `started_at` from `ClockPort::now()`.
+5. `RecoveryAttempt::start(recovery_attempt_id, process_instance_id, checkpoint_ref, actor, started_at)`.
 6. Build primary `RecoveryHistoryRecord` with `AttemptStarted`,then call `ProcessInstance.mark_recovering(second_history_id, &checkpoint, &attempt, actor)`.
 7. Save attempt and instance;append both history records、trace、outbox `RecoveryAttemptChanged`.
 8. Store `RecoveryAttemptCommandResult`.
@@ -498,7 +498,7 @@ Steps:
 4. Generate one `RecoveryHistoryId` per history record appended in this flow.
 5. Match `RecoveryOutcome`:
    - `Applied` -> `RecoveryAttempt.mark_applied(history_id, actor)` and `ProcessInstance.complete_recovery(second_history_id, &attempt, actor)`.
-   - `Failed` -> `RecoveryAttempt.mark_failed(history_id, failure_reason)`.
+   - `Failed` -> `RecoveryAttempt.mark_failed(history_id, failure_reason, ClockPort::now())`.
    - `Abandoned` -> `RecoveryAttempt.abandon(history_id, abandon_reason, actor)`.
 6. Save attempt and instance when changed.
 7. Append recovery history、trace、outbox `RecoveryAttemptChanged`.
@@ -871,14 +871,18 @@ Tests:archive delivered;partial failure;permanent failure;no archive package bod
 Steps:
 
 1. Reserve job idempotency.
-2. List pending / failed attempts by `RecoveryMaintenanceScope`.
-3. For each attempt,load checkpoint and instance.
-4. Apply recovery retry / expiry policy:
-   - eligible expired pending attempt -> `RecoveryAttempt.abandon(...)`.
-   - failed attempt included and retry policy exhausted -> remain failed or abandon according to Step 10.
-5. Append `RecoveryHistoryRecord`.
-6. Append outbox `RecoveryAttemptChanged` when state changed.
-7. Return `JobRunReceipt`.
+2. Load `RecoveryRetryPolicySummary` using `RecoveryMaintenancePolicyRepository.get_retry_policy(input.retry_policy_ref)` and `RecoveryExpiryPolicySummary` using `get_expiry_policy(input.expiry_policy_ref)`.
+3. Capture maintenance time from `ClockPort::now()`;it must be consistent with `JobMetadata.requested_at` for deterministic tests.
+4. List pending / failed attempts by `RecoveryRepository.list_attempts_for_maintenance(input.scope, input.scope.page.to_page_request())`.
+5. For each returned `Versioned<RecoveryAttempt>`,load `ProcessCheckpoint` by `attempt.checkpoint_ref` and owning `ProcessInstance`.
+6. Apply recovery maintenance policy using only committed attempt / checkpoint fields and loaded policy summaries:
+   - `Pending` attempt is expired when `now >= attempt.started_at + expiry_policy.pending_attempt_ttl` or `now >= checkpoint.captured_at + expiry_policy.checkpoint_retention`;expired pending attempt -> `RecoveryAttempt.abandon(history_id, RecoveryAbandonReason::ExpiredByMaintenancePolicy, actor)`.
+   - `Pending` attempt that is still fresh -> no state change and no history / outbox.
+   - `Failed` attempt is evaluated only when `input.scope.include_failed = true`;if `attempt.failure_count >= retry_policy.max_failures.value`,call `RecoveryAttempt.abandon(history_id, RecoveryAbandonReason::RetryPolicyExhausted, actor)`.
+   - `Failed` attempt below retry exhaustion remains `Failed`;maintenance does not retry, re-apply, create a new attempt, or create a new process instance.
+7. For each state change,save attempt with loaded version,append `RecoveryHistoryRecord`,append outbox `RecoveryAttemptChanged`,and count the item as changed.
+8. Missing policy summary is job-level dependency failure before item loop. Missing checkpoint / instance is item-level failure and must appear in `JobRunReceipt` / report.
+9. Return `JobRunReceipt`.
 
 Tests:abandon expired;skip fresh pending;partial failure;duplicate;no new process instance.
 

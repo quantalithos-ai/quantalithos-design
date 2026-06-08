@@ -213,9 +213,10 @@
 | `WaitingGateRepository::append_change_record(...)` | 追加 waiting change | append-only | `()` | `RepositoryError` |
 | `CheckpointRepository::get(...)` / `latest_for_instance(...)` | 读取 checkpoint | update path 使用 returned version | `Option<Versioned<ProcessCheckpoint>>` | `RepositoryError` |
 | `CheckpointRepository::save(...)` | 保存 checkpoint | optimistic save;supersede previous checkpoint uses its loaded version | `StorageVersion` | `RepositoryError` |
-| `RecoveryRepository::get_attempt(...)` / `list_pending_attempts(...)` | 读取 recovery attempt | maintenance job uses returned versions per item | `Option` / `Page<Versioned<RecoveryAttempt>>` | `RepositoryError` |
+| `RecoveryRepository::get_attempt(...)` / `list_attempts_for_maintenance(...)` | 读取 recovery attempt | maintenance job uses returned versions per item;list returns Pending plus Failed only when scope includes failed | `Option` / `Page<Versioned<RecoveryAttempt>>` | `RepositoryError` |
 | `RecoveryRepository::save_attempt(...)` | 保存 recovery attempt | optimistic save;command path may also save instance | `StorageVersion` | `RepositoryError` |
 | `RecoveryRepository::append_history(...)` | 追加 recovery history | append-only;state changed transaction 内 | `()` | `RepositoryError` |
+| `RecoveryMaintenancePolicyRepository::get_retry_policy(...)` / `get_expiry_policy(...)` | 读取 recovery maintenance policy summary | job item loop 前读取;missing policy 是 job-level dependency failure | `Option<RecoveryRetryPolicySummary>` / `Option<RecoveryExpiryPolicySummary>` | `RepositoryError` |
 | `RhythmRepository::get_stage(...)` / `get_binding(...)` / `find_active_binding(...)` | 读取 rhythm truth | update path 使用 returned version | `Option<Versioned<_>>` | `RepositoryError` |
 | `RhythmRepository::find_bindings_by_external_timebox(...)` | 按 `ProcessTimeboxBinding.external_timebox_ref` 查找受 Work context 变更影响的 active / stale binding | consumer stale path 使用 returned version 保存;不得从 `WorkContextRef` 或字符串反推 process subject | `Page<Versioned<ProcessTimeboxBinding>>` | `RepositoryError` |
 | `RhythmRepository::save_stage(...)` / `save_binding(...)` | 保存 stage / binding | optimistic save;with trace / outbox when Step 9 requires | `StorageVersion` | `RepositoryError` |
@@ -276,7 +277,8 @@ Command 行的“开始位置”统一表示 write `UnitOfWork` 的起点:reques
 | `RunProcessReconciliationFlow` | reconciliation job begins transaction | report and job receipt saved 后 | report builder failure、repository conflict | reserve job、save report only,save job receipt;no truth repair |
 | `PrepareProcessTraceHandoffFlow` | per trace / handoff item transaction after handoff port outcome | handoff marker and job receipt / counters saved 后 | invalid target、handoff state conflict、repository conflict | prepare / save `TraceHandoffRecord`,mark delivered/failed,save job receipt or report marker |
 | `PrepareProcessArchiveHandoffFlow` | per handoff item transaction after archive port outcome | handoff/archive marker and receipt saved 后 | invalid target、archive adapter failure、repository conflict | save handoff marker,store archive package ref marker only,save job receipt |
-| `MaintainRecoveryAttemptsFlow` | per recovery attempt transaction | attempt/history/outbox/job receipt saved 后 | checkpoint missing、invalid state,repository conflict | load attempt with version,save attempt,append history,append outbox when changed,save job receipt/report |
+| `MaintainRecoveryAttemptsFlow` policy load | job service begins run transaction before item loop | policy summaries loaded and job reservation committed 后 | retry / expiry policy missing、repository error | reserve job,load `RecoveryRetryPolicySummary` and `RecoveryExpiryPolicySummary`;missing policy -> job dependency failure,no item mutation |
+| `MaintainRecoveryAttemptsFlow` per recovery attempt transaction | per returned attempt after policy summaries and clock time are fixed | attempt/history/outbox/job receipt saved 后 | checkpoint missing、instance missing、invalid state,repository conflict | load `Versioned<RecoveryAttempt>`,load checkpoint and instance,evaluate policy from committed attempt/checkpoint fields,save changed attempt with loaded version,append history,append outbox when changed,save job receipt/report |
 
 ### 6.5 一致性策略表
 

@@ -214,6 +214,7 @@
 | `ProcessStageId` / `ProcessStageRef` / `ProfileStageRef` / `ProcessStageKind` | `contracts/src/refs.rs` | PH-05 rhythm shared ids / refs / kind;schema and `ProfileStageRef.stage_kind` mapping are Step 6 §7.2.5 |
 | `ProcessTimingSubjectRef` / `ProcessTimingRef` / `ProcessTimeboxBindingId` / `ProcessTimeboxBindingRef` / `ProcessTimeboxRef` / `ExternalTimeboxKind` / `ExternalTimeboxRef` | `contracts/src/refs.rs` | PH-05 timing subject、truth ref、timebox binding and external timebox reference schema;schema is Step 6 §7.2.5 |
 | `StageTarget` / `StageChangeReason` / `RhythmReason` / `StagePauseReason` / `StageCompletionReason` / `StageSkipReason` / `TimeboxReleaseReason` / `TimeboxInvalidReason` | `contracts/src/refs.rs` | PH-05 rhythm command target and reason schema;target-to-domain-method mapping is Step 6 §7.2.5 |
+| `RecoveryRetryPolicyRef` / `RecoveryExpiryPolicyRef` / `RecoveryRetryPolicySummary` / `RecoveryExpiryPolicySummary` / `RecoveryFailureReason` / `RecoveryAbandonReason` | `contracts/src/refs.rs` | PH-09 recovery maintenance policy identity, body-free executable summary, failure reason and abandon reason schema |
 | `ReferenceResolutionState` / `ReferenceResolutionLifecycleState` | `contracts/src/refs.rs` | public reference state reused by external reference markers、DTO、view、job、repository / resolver port and domain policy;contracts 不依赖 domain |
 | `GovernanceDecisionRef` / `ArtifactEvidenceMarker` / `RuntimeFeedbackRef` / `ConversationContextRef` | `contracts/src/refs.rs` | public external reference markers reused by protocol surface and domain;不得保存外部正文 |
 | `TraceHandoffRef` / `TraceHandoffTargetRef` / `TraceHandoffTargetKind` / `TraceHandoffKind` / `HandoffFailureRef` / `HandoffFailureKind` / `HandoffCancelReason` | `contracts/src/refs.rs` | trace / archive handoff identity、stored target、kind、failure and cancel reason schema;schema is Step 6 §11.5 |
@@ -912,6 +913,29 @@ pub enum RecoveryOutcome {
     Abandoned,
 }
 
+/// Reason why a recovery attempt failed.
+pub struct RecoveryFailureReason {
+    /// Stable failure reason value.
+    pub value: String,
+}
+
+/// Reason why a recovery attempt was abandoned.
+pub enum RecoveryAbandonReason {
+    /// Operator or command caller explicitly abandoned the attempt.
+    UserRequested { value: String },
+    /// Maintenance abandoned a pending attempt because its expiry policy elapsed.
+    ExpiredByMaintenancePolicy,
+    /// Maintenance abandoned a failed attempt because retry policy was exhausted.
+    RetryPolicyExhausted,
+}
+
+Rules:
+
+- `RecoveryFailureReason.value` is a non-empty redacted marker;it must not contain stack traces, runtime logs, artifact body, or checkpoint body.
+- `RecoveryAbandonReason::UserRequested.value` is the only caller-provided abandon reason for `CompleteRecoveryAttemptRequest`.
+- `RecoveryAbandonReason::ExpiredByMaintenancePolicy` is used only by `MaintainRecoveryAttemptsFlow` for expired pending attempts.
+- `RecoveryAbandonReason::RetryPolicyExhausted` is used only by `MaintainRecoveryAttemptsFlow` for failed attempts whose `failure_count >= RecoveryRetryPolicySummary.max_failures.value`.
+
 /// Requested target for a stage state update.
 pub enum StageTarget {
     /// Activate the stage.
@@ -936,6 +960,36 @@ pub struct RetryLimit {
 pub struct RetentionDuration {
     /// Duration in seconds.
     pub seconds: u64,
+}
+
+/// Reference to a configured recovery retry policy summary.
+pub struct RecoveryRetryPolicyRef {
+    /// Stable policy reference value.
+    pub value: String,
+}
+
+/// Reference to a configured recovery expiry policy summary.
+pub struct RecoveryExpiryPolicyRef {
+    /// Stable policy reference value.
+    pub value: String,
+}
+
+/// Body-free executable recovery retry policy summary.
+pub struct RecoveryRetryPolicySummary {
+    /// Policy reference.
+    pub policy_ref: RecoveryRetryPolicyRef,
+    /// Maximum number of failed attempts before maintenance abandons the attempt.
+    pub max_failures: RetryLimit,
+}
+
+/// Body-free executable recovery expiry policy summary.
+pub struct RecoveryExpiryPolicySummary {
+    /// Policy reference.
+    pub policy_ref: RecoveryExpiryPolicyRef,
+    /// Maximum age for a pending recovery attempt.
+    pub pending_attempt_ttl: RetentionDuration,
+    /// Maximum retention duration for the checkpoint used by a recovery attempt.
+    pub checkpoint_retention: RetentionDuration,
 }
 
 /// Public search filter used by projection repository search.
@@ -1577,8 +1631,8 @@ pub struct CompleteRecoveryAttemptRequest {
 | `recovery_outcome` | `failure_reason` | `abandon_reason` | Domain 调用 | 缺失 / 冲突处理 |
 |---|---|---|---|---|
 | `Applied` | 必须为空 | 必须为空 | `RecoveryAttempt.mark_applied(...)`;随后 `ProcessInstance.complete_recovery(...)` | 任一 reason 存在 -> `InvalidRequest` |
-| `Failed` | 必填 | 必须为空 | `RecoveryAttempt.mark_failed(failure_reason)` | 缺失 failure 或存在 abandon -> `InvalidRequest` |
-| `Abandoned` | 必须为空 | 必填 | `RecoveryAttempt.abandon(abandon_reason, actor)` | 缺失 abandon 或存在 failure -> `InvalidRequest` |
+| `Failed` | 必填 | 必须为空 | `RecoveryAttempt.mark_failed(history_id, failure_reason, ClockPort::now())` | 缺失 failure 或存在 abandon -> `InvalidRequest` |
+| `Abandoned` | 必须为空 | 必填且必须为 `RecoveryAbandonReason::UserRequested` | `RecoveryAttempt.abandon(history_id, abandon_reason, actor)` | 缺失 abandon、存在 failure、或使用 maintenance-only reason -> `InvalidRequest` |
 
 ##### 7.6.12 `BindProcessTimebox`
 
@@ -2902,6 +2956,14 @@ pub struct RecoveryMaintenanceScope {
     pub page: ProcessPageRequest,
 }
 
+Rules:
+
+- `RecoveryMaintenanceScope.include_failed = false` scans only `Pending` attempts.
+- `RecoveryMaintenanceScope.include_failed = true` scans `Pending` and `Failed` attempts;it never includes `Applied` or `Abandoned`.
+- `RecoveryRetryPolicyRef` and `RecoveryExpiryPolicyRef` are policy identities only. The maintenance job must load `RecoveryRetryPolicySummary` and `RecoveryExpiryPolicySummary` through `RecoveryMaintenancePolicyRepository` before evaluating attempts.
+- `RecoveryRetryPolicySummary.max_failures` and `RecoveryExpiryPolicySummary.pending_attempt_ttl / checkpoint_retention` are body-free executable summary fields. They do not expose config source body, operator comments, rollout notes, or adapter internals.
+- A missing policy summary is a job-level `JobError::DependencyUnavailable` before item processing starts.
+
 /// Trace handoff scan scope.
 pub struct TraceHandoffScope {
     /// Optional trace subject scope.
@@ -3168,6 +3230,9 @@ Rules:
 - job may mark eligible attempts abandoned or failed according to recovery policy.
 - job must not create a new `ProcessInstance`.
 - each state change must append `RecoveryHistoryRecord` and may create outbox when Step 9 flow says so.
+- `retry_policy_ref` and `expiry_policy_ref` must be resolved to `RecoveryRetryPolicySummary` / `RecoveryExpiryPolicySummary` before listing attempts;the job input never carries policy body or numeric thresholds directly.
+- pending expiry is evaluated from committed `RecoveryAttempt.started_at`, committed `ProcessCheckpoint.captured_at + RecoveryExpiryPolicySummary.checkpoint_retention`, and `JobMetadata.requested_at` / `ClockPort::now()` as the maintenance time.
+- failed retry exhaustion is evaluated from committed `RecoveryAttempt.failure_count` and `RecoveryRetryPolicySummary.max_failures`.
 
 #### 7.20 DTO 到 Domain 构造闭环总表
 
@@ -3193,7 +3258,7 @@ Rules:
 | `RunProcessReconciliationJob` | `ReconciliationReport` | 是 | report builder | report ref vs issue ref | failed report |
 | `PrepareProcessTraceHandoffJob` | `TraceHandoffRecord` marker | 是 | trace repository, handoff port | target ref vs external ref | failed / delayed |
 | `PrepareProcessArchiveHandoffJob` | `TraceHandoffRecord` / archive marker | 是 | trace repository, archive port | archive package ref vs body | failed / delayed |
-| `MaintainRecoveryAttemptsJob` | `RecoveryAttempt` / `RecoveryHistoryRecord` | 是 | recovery repository, policy | retry policy vs recovery reason | partial / failed |
+| `MaintainRecoveryAttemptsJob` | `RecoveryAttempt` / `RecoveryHistoryRecord` | 是 | recovery repository, `RecoveryMaintenancePolicyRepository`, clock | retry policy ref vs summary;expiry policy ref vs summary;checkpoint expiry vs attempt state | partial / failed |
 
 ### 8. 回填草稿
 

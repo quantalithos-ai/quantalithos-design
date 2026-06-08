@@ -89,6 +89,7 @@
 | `activity_ref` | `Option<ActivityRef>` | checkpoint 对应活动节点 |
 | `checkpoint_state` | `CheckpointState` | checkpoint 是否可用于恢复 |
 | `evidence_ref` | `CheckpointEvidenceRef` | 恢复依据引用 |
+| `captured_at` | `Timestamp` | checkpoint 捕获时间 |
 
 | 状态 | 作用 |
 |---|---|
@@ -103,12 +104,13 @@
 
 | 工厂函数 | 作用 |
 |---|---|
-| `capture(ProcessInstance instance, Option<ActivityRef> activity_ref, CheckpointEvidenceRef evidence_ref)` | 从实例当前状态捕获 checkpoint |
+| `capture(ProcessInstance instance, Option<ActivityRef> activity_ref, CheckpointEvidenceRef evidence_ref, Timestamp captured_at)` | 从实例当前状态捕获 checkpoint |
 
 | 禁止事项 | 说明 |
 |---|---|
 | 不保存 runtime micro checkpoint | 只保存 Instance 级恢复锚点 |
 | 不创建第二份 Process truth | 只能服务同一实例链恢复 |
+| 不从 repository 插入时间推断 expiry | maintenance 只能使用 `captured_at` 和正式 expiry policy summary |
 
 ---
 
@@ -128,6 +130,9 @@
 | `recovery_state` | `RecoveryAttemptState` | 当前恢复尝试状态 |
 | `failure_reason` | `Option<RecoveryFailureReason>` | 失败解释 |
 | `abandon_reason` | `Option<RecoveryAbandonReason>` | 放弃解释 |
+| `started_at` | `Timestamp` | 尝试开始时间 |
+| `last_failed_at` | `Option<Timestamp>` | 最近失败时间 |
+| `failure_count` | `u16` | 失败次数 |
 
 | 状态 | 作用 |
 |---|---|
@@ -136,17 +141,18 @@
 | 成员函数 | 作用 |
 |---|---|
 | `mark_applied(RecoveryHistoryId history_id, ActorRef actor)` | 记录恢复已应用并返回 `AttemptApplied` history |
-| `mark_failed(RecoveryHistoryId history_id, RecoveryFailureReason reason)` | 记录恢复失败并返回 `AttemptFailed` history |
+| `mark_failed(RecoveryHistoryId history_id, RecoveryFailureReason reason, Timestamp failed_at)` | 记录恢复失败并返回 `AttemptFailed` history |
 | `abandon(RecoveryHistoryId history_id, RecoveryAbandonReason reason, ActorRef actor)` | 放弃恢复尝试并返回 `AttemptAbandoned` history |
 
 | 工厂函数 | 作用 |
 |---|---|
-| `start(ProcessInstanceId process_instance_id, ProcessCheckpointRef checkpoint_ref, ActorRef actor)` | 从恢复意图形成尝试记录 |
+| `start(ProcessInstanceId process_instance_id, ProcessCheckpointRef checkpoint_ref, ActorRef actor, Timestamp started_at)` | 从恢复意图形成尝试记录 |
 
 | 禁止事项 | 说明 |
 |---|---|
 | 不覆盖 checkpoint truth | 只记录一次尝试 |
 | 不保存 reasoning trace | 只保留失败原因和引用 |
+| 不从 history 条数推断 retry exhausted | maintenance 只能使用 `failure_count` 和正式 policy summary |
 
 ---
 

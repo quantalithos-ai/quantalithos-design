@@ -98,7 +98,7 @@
 | Query not visible / missing | `info` | `query_kind`,`request_ref`,`actor_ref`,`subject_ref`,`status` | query surface audit correlation |
 | Query degraded / unavailable | `warn` | `query_kind`,`request_ref`,`subject_ref`,`projection_marker_ref`,`freshness_state` | projection health |
 | Consumer envelope invalid | `warn` | `event_kind`,`source_event_id`,`source_ref`,`quarantine_reason_ref` | bad event triage |
-| Consumer accepted | `info` | `event_kind`,`source_event_id`,`dedup_key_hash`,`reference_state_ref`,`trace_record_ref` | event intake trace |
+| Consumer accepted | `info` | `event_kind`,`source_event_id`,`dedup_key_hash`,`reference_state_ref`,`trace_record_ref_optional` | event intake trace;`trace_record_ref_optional = None` for reference-only accepted consumers such as method definition snapshot intake |
 | Consumer duplicate | `info` | `event_kind`,`source_event_id`,`dedup_key_hash`,`result_ref` | no duplicate marker write |
 | Consumer delayed | `warn` | `event_kind`,`source_event_id`,`delay_reason_ref`,`retry_after` | source unavailable |
 | Consumer quarantined | `warn` | `event_kind`,`source_event_id`,`quarantine_reason_ref`,`offending_ref` | source / payload issue |
@@ -161,7 +161,7 @@ Metric label rules:
 | `ProcessCommandRejectedAudit` | command rejected after authorization / domain policy | `command_kind`,`request_ref`,`actor_ref`,`domain_error_ref` or `protocol_error_ref` | operations audit;not outbox |
 | `ProcessIdempotencyConflictAudit` | idempotency same operation key different digest | `operation`,`conflict_ref`,`request_ref` | operations audit |
 | `ProcessResultMissingAudit` | duplicate result missing | `operation`,`application_result_ref` | operations repair |
-| `ProcessConsumerMarkerAudit` | consumer accepted / delayed / quarantine / noop marker saved | `event_kind`,`source_event_id`,`consumer_receipt_ref_or_result_ref`,`marker_ref`,`trace_record_ref` | worker / operations |
+| `ProcessConsumerMarkerAudit` | consumer accepted / delayed / quarantine / noop marker saved | `event_kind`,`source_event_id`,`consumer_receipt_ref_or_result_ref`,`marker_ref`,`trace_record_ref_optional` | worker / operations |
 | `ProcessProjectionStateAudit` | projection state stale / rebuilding / fresh / failed / disabled | `view_state_ref`,`projection_kind`,`source_cursor_ref`,`freshness_state` | query / operations |
 | `ProcessOutboxPublicationAudit` | outbox published / retry / failed | `outbox_id`,`event_kind`,`truth_ref`,`publication_state`,`publication_ref_or_failure_ref` | worker / operations |
 | `ProcessTraceHandoffAudit` | trace handoff prepared / delivered / failed / cancelled | `handoff_ref`,`target_ref`,`handoff_state`,`receipt_or_failure_ref` | observability / archive operations |

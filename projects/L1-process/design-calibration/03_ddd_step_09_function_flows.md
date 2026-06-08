@@ -233,7 +233,7 @@ Consumer rules:
 
 - `InboundEventEnvelope.metadata.source_actor_ref` is a trusted source actor only inside this consumer flow.
 - Consumer must not call command service to advance instance, complete activity, or resume waiting gate.
-- Consumer accepted path may write snapshot / reference / stale / pending marker and trace record.
+- Consumer accepted path may write snapshot / reference / stale / pending marker. It may write a trace record only when Step 6 / Step 8 define a formal `ProcessTraceSubjectRef` and `ProcessTraceRecord` source for that consumer;otherwise `ConsumerReceipt.trace_record_ref` must be `None`.
 
 #### 7.5 通用 Job 写路径模板
 
@@ -677,7 +677,9 @@ Steps:
 3. `ReferenceSnapshotRepository.upsert_method_snapshot(snapshot)`.
 4. `ReferenceSnapshotRepository.upsert_reference_state(snapshot.snapshot_state)`.
 5. Mark affected `RuntimeProcessShape` / profile derived state stale if source version changed.
-6. Append trace marker and complete event idempotency with `ConsumerReceipt::Accepted`.
+6. Save `ConsumerReceipt::Accepted` with `reference_state_ref = Some(snapshot.snapshot_state.to_ref())` and `trace_record_ref = None`,then complete event idempotency.
+
+`ConsumeMethodDefinitionChangedFlow` does not append `ProcessTraceRecord`: the changed object is an external method definition snapshot,not a committed Process truth subject. The accepted receipt, operation result, and consumer observability event are the formal trace surface for this intake.
 
 Tests:accepted;duplicate;unsupported schema quarantine;source unavailable delayed;digest mismatch quarantine.
 

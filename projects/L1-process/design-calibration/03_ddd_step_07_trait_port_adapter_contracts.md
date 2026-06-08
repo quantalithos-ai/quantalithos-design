@@ -259,7 +259,7 @@ pub trait UnitOfWorkHandle {
 
 约束:
 
-- command / consumer / job 写路径必须在一个 `UnitOfWorkHandle` 内保存 truth、trace、outbox、projection marker、idempotency completion 和 operation result / receipt。
+- command / consumer / job 写路径必须在一个 `UnitOfWorkHandle` 内保存本 flow 要求的 truth、trace、outbox、projection marker、idempotency completion 和 operation result / receipt;reference-only consumer 没有正式 trace source 时不得写 trace。
 - query 路径不得打开 write unit of work。
 - `application` 只持有 trait,不得依赖 infra transaction 类型。
 - service 中需要把 `Box<dyn UnitOfWorkHandle>` 绑定为可变局部变量后以 `&mut dyn UnitOfWorkHandle` 传给 repository;提交或回滚时消费该 boxed handle。
@@ -762,7 +762,7 @@ pub trait RhythmRepository {
 ```rust
 /// Repository for process trace, audit trail, and handoff references.
 pub trait TraceRepository {
-    /// Appends a trace record from a committed truth change.
+    /// Appends a trace record from a committed process truth change.
     async fn append_trace(
         &self,
         record: ProcessTraceRecord,
@@ -805,6 +805,8 @@ pub trait TraceRepository {
     ) -> Result<Page<TraceHandoffRecord>, RepositoryError>;
 }
 ```
+
+`TraceRepository::append_trace(...)` 只接收由 committed Process truth change 构造的 `ProcessTraceRecord`。Inbound consumer 如果只更新 external snapshot、reference state、projection stale marker 或 idempotency receipt,且没有正式 `ProcessTraceSubjectRef` / `ProcessTraceRecord` source,不得伪造 trace subject 写入 `TraceRepository`;这类 accepted event 的追溯由 `ConsumerReceipt`、operation result、consumer audit/log 字段承载。
 
 ##### 7.7.2 `ProcessOutboxRepository`
 
@@ -1369,7 +1371,7 @@ pub trait IdGeneratorPort {
 
 `application` 模块定义所有 repository、transaction、idempotency、operation result store、external resolver、publisher、handoff、clock 和 id generator port。`infra` 模块实现这些 trait。`domain` 不定义 repository / external client trait,也不访问持久化、bus、外部仓或 handoff adapter。
 
-所有 mutable truth repository 读取返回 `Versioned<T>`,保存接收 `expected_version: StorageVersion` 和 `&mut dyn UnitOfWorkHandle`。所有写 command / consumer / job 必须在一个 unit of work 中保存 truth、trace、outbox、projection marker、idempotency completion 和 operation result / receipt。幂等 duplicate replay 必须读取 `OperationResultRepository`,不得从当前 truth、当前 marker 或 job counter 临时重算 result。
+所有 mutable truth repository 读取返回 `Versioned<T>`,保存接收 `expected_version: StorageVersion` 和 `&mut dyn UnitOfWorkHandle`。所有写 command / consumer / job 必须在一个 unit of work 中保存本 flow 要求的 truth、trace、outbox、projection marker、idempotency completion 和 operation result / receipt。reference-only consumer 没有正式 trace source 时不得写 trace,receipt 必须显式返回 empty trace ref。幂等 duplicate replay 必须读取 `OperationResultRepository`,不得从当前 truth、当前 marker 或 job counter 临时重算 result。
 
 外部 resolver port 只返回本仓允许保存的 snapshot / ref / marker,不得返回 method、work、identity、governance、artifact、runtime 或 conversation 正文。outbox publisher 和 trace / archive handoff 只承接已形成的 public DTO / handoff ref,不得自行改写 Process truth。outbound event payload 是 `ProcessOutboxRecord.payload_snapshot` 的 committed transition snapshot,不是 publish job 按当前 repository 状态重算的 view。
 

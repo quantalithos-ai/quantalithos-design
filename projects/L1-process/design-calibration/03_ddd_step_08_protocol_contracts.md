@@ -2298,7 +2298,7 @@ pub struct ConsumerReceipt {
     pub disposition: ConsumerDisposition,
     /// Snapshot or reference state written by the consumer.
     pub reference_state_ref: Option<ReferenceResolutionStateRef>,
-    /// Trace record created when a marker was written.
+    /// Trace record created when the consumer wrote a formal process trace record.
     pub trace_record_ref: Option<ProcessTraceRecordRef>,
     /// Quarantine marker when the event was quarantined.
     pub quarantine_marker: Option<QuarantineMarker>,
@@ -2344,6 +2344,8 @@ pub struct NoopConsumerMarker {
     pub reason_ref: NoopReasonRef,
 }
 ```
+
+`ConsumerReceipt.trace_record_ref` 为可选字段。Accepted consumer 只有在同一事务内写入正式 `ProcessTraceRecord` 且 subject 属于 `ProcessTraceSubjectRef` 时才填充。仅更新 external snapshot、reference state、projection stale marker 或 idempotency receipt 的 accepted consumer 必须返回 `trace_record_ref = None`;`ConsumeMethodDefinitionChanged` 属于该分支,不得为了填充 receipt 而伪造 method definition trace subject。
 
 Inbound envelope validation:
 

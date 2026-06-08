@@ -147,7 +147,7 @@ Step 15 observability and audit
 | `CreateProcessCheckpoint_contract` | `CreateProcessCheckpointFlow` | checkpoint success;duplicate;instance missing;activity not in instance;evidence invalid | API + application |
 | `StartRecoveryAttempt_contract` | `StartRecoveryAttemptFlow` | recovery attempt success;duplicate;checkpoint expired;fork violation;instance terminal | API + application |
 | `CompleteRecoveryAttempt_contract` | `CompleteRecoveryAttemptFlow` | applied / failed / abandoned result;duplicate;missing failure reason;missing abandon reason;conflicting reason fields;terminal attempt reject | API + application |
-| `BindProcessTimebox_contract` | `BindProcessTimeboxFlow` | binding success;duplicate;external timebox unavailable;invalid binding;no Work truth mutation | API + application |
+| `BindProcessTimebox_contract` | `BindProcessTimeboxFlow` | binding success with explicit `work_context_ref` resolution;duplicate;work context unavailable;external timebox unavailable;external timebox not in resolved work context;invalid binding;no Work truth mutation | API + application |
 | `UpdateProcessStageState_contract` | `UpdateProcessStageStateFlow` | activate / pause / complete / skip success;duplicate;illegal transition;version conflict | API + application |
 
 ### 6.4 Query 接口测试切口汇总表

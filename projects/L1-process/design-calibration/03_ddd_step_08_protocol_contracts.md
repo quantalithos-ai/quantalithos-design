@@ -1374,6 +1374,8 @@ pub struct BindProcessTimeboxRequest {
     pub metadata: CommandMetadata,
     /// Process instance or profile subject for the binding.
     pub process_subject_ref: ProcessTimingSubjectRef,
+    /// Work context snapshot source used to validate the external timebox.
+    pub work_context_ref: WorkContextRef,
     /// Process-owned timebox reference.
     pub process_timebox_ref: ProcessTimeboxRef,
     /// External work timebox or iteration reference.
@@ -1406,12 +1408,13 @@ pub struct ProcessTimingCommandResult {
 | 字段 | 正式 schema / 来源 | Domain / result 映射 | 缺失 / 冲突处理 |
 |---|---|---|---|
 | `process_subject_ref` | `ProcessTimingSubjectRef::{ProcessInstance, ProcessProfile}`;schema 见 Step 6 §7.2.5 | 传入 `ProcessTimeboxBinding::bind(...)`;写入 `ProcessTimeboxBinding.process_subject_ref`;用于 `ProcessTimingRef.process_subject_ref` | unknown subject 或与 existing binding subject 不一致 -> `InvalidRequest` / `NotFound` |
+| `work_context_ref` | `WorkContextRef` 非空;caller 必须显式提供 | 调用 `WorkContextResolverPort.resolve_work_context(input.work_context_ref, source_version_ref)` 取得 `WorkContextSnapshot`;policy 用 snapshot 校验 external timebox 可见且属于该 work context;不保存到 `ProcessTimeboxBinding` truth | missing / unresolved -> `DependencyUnavailable`;snapshot 与 `external_timebox_ref` 不一致 -> `InvalidRequest` |
 | `process_timebox_ref` | `ProcessTimeboxRef` 非空 | 传入 `ProcessTimeboxBinding::bind(...)` | 空 ref 或同 subject active binding 冲突 -> `InvalidRequest` |
-| `external_timebox_ref` | `ExternalTimeboxRef { external_kind, value }` | 用于 resolver/load `WorkContextSnapshot`;传入 binding;不得修改 Work truth | unresolved / invalid / stale source -> `DependencyUnavailable` / `InvalidRequest` |
+| `external_timebox_ref` | `ExternalTimeboxRef { external_kind, value }` | 传入 `ProcessTimeboxBinding::bind(...)`;由 `WorkContextSnapshot` / policy 校验可用性;不得修改 Work truth | unresolved / invalid / stale source -> `DependencyUnavailable` / `InvalidRequest` |
 | `rhythm_reason` | `RhythmReason` 非空 | policy / trace / audit context;不保存会议正文 | 空 reason -> `InvalidRequest` |
 | result `timebox_binding_ref` | 由 `ProcessTimeboxBindingId` 派生 | `Some(binding_ref)` for accepted bind | accepted path 不得为空 |
 
-`BindProcessTimeboxRequest.process_subject_ref` 是唯一 subject 选择面。service 不得从 `process_timebox_ref` 或 `external_timebox_ref` 字符串反推 instance/profile。
+`BindProcessTimeboxRequest.process_subject_ref` 是唯一 subject 选择面。`work_context_ref` 是唯一 `WorkContextSnapshot` 解析输入面。service 不得从 `process_subject_ref`、`process_timebox_ref` 或 `external_timebox_ref` 字符串反推 work context,也不得从 `work_context_ref` 反推或覆盖 process subject。
 
 ##### 7.6.13 `UpdateProcessStageState`
 
@@ -2938,7 +2941,7 @@ Rules:
 | `CreateProcessCheckpointRequest` | `ProcessCheckpoint`、trace / audit | 是 | id generator, repository | evidence ref vs checkpoint reason | reject |
 | `StartRecoveryAttemptRequest` | `RecoveryAttempt`、history record | 是 | checkpoint repository, id generator | checkpoint ref vs attempt ref | reject |
 | `CompleteRecoveryAttemptRequest` | `RecoveryAttempt`、history record、outbox | 是 | repository | outcome vs failure reason / abandon reason | invalid input |
-| `BindProcessTimeboxRequest` | `ProcessTimeboxBinding`、stage / timing marker | 是 | id generator, work snapshot | process timebox vs external timebox | reject |
+| `BindProcessTimeboxRequest` | `ProcessTimeboxBinding`、stage / timing marker | 是 | id generator, `work_context_ref` -> `WorkContextSnapshot` | process subject vs work context;process timebox vs external timebox | reject |
 | `UpdateProcessStageStateRequest` | `ProcessStageState`、trace / outbox | 是 | repository | stage target vs state enum | reject |
 | `InboundEventEnvelope<T>` | snapshot / reference / pending / stale marker | 是 if envelope valid | resolver, clock | source actor vs command actor | quarantine / delayed |
 | `PublishProcessOutboxJob` | `ProcessOutboxRecord.publication_state` | 是 | publisher receipt | publication ref vs outbox ref | partial failure |

@@ -96,7 +96,7 @@
 | `CreateProcessCheckpointFlow` | `CreateProcessCheckpointRequest` | `ProcessRecoveryService.create_process_checkpoint` | write tx | `CheckpointState`;trace/audit | success / duplicate / instance missing / evidence invalid |
 | `StartRecoveryAttemptFlow` | `StartRecoveryAttemptRequest` | `ProcessRecoveryService.start_recovery_attempt` | write tx | `RecoveryAttemptState`;instance recovering;history | success / duplicate / checkpoint invalid / fork violation |
 | `CompleteRecoveryAttemptFlow` | `CompleteRecoveryAttemptRequest` | `ProcessRecoveryService.complete_recovery_attempt` | write tx | `RecoveryAttemptState`;history;outbox | success / duplicate / outcome mismatch / terminal attempt |
-| `BindProcessTimeboxFlow` | `BindProcessTimeboxRequest` | `ProcessRhythmService.bind_process_timebox` | write tx | `TimeboxBindingState`;outbox | success / duplicate / work timebox unresolved / invalid binding |
+| `BindProcessTimeboxFlow` | `BindProcessTimeboxRequest` | `ProcessRhythmService.bind_process_timebox` | write tx | `TimeboxBindingState`;outbox | success / duplicate / work context unavailable / external timebox unresolved / invalid binding |
 | `UpdateProcessStageStateFlow` | `UpdateProcessStageStateRequest` | `ProcessRhythmService.update_process_stage_state` | write tx | `StageState`;outbox | success / duplicate / illegal stage target / version conflict |
 | `GetRuntimeProcessShapeFlow` | `GetRuntimeProcessShapeRequest` | `AuthorizedProcessQueryService.get_runtime_process_shape` | read only | none | available / missing / not visible / stale snapshot |
 | `GetProcessProfileFlow` | `GetProcessProfileRequest` | `AuthorizedProcessQueryService.get_process_profile` | read only | none | available / missing / not visible / degraded |
@@ -513,15 +513,15 @@ Tests:applied;failed;abandoned;missing failure reason;missing abandon reason;con
 Steps:
 
 1. Reserve command idempotency.
-2. Resolve / load `WorkContextSnapshot` for `external_timebox_ref`.
+2. Resolve / load `WorkContextSnapshot` by calling `WorkContextResolverPort.resolve_work_context(input.work_context_ref, source_version_ref)`.
 3. Generate `binding_id = IdGeneratorPort.new_process_timebox_binding_id()`.
 4. Create candidate `ProcessTimeboxBinding::bind(binding_id, input.process_subject_ref, input.process_timebox_ref, input.external_timebox_ref, actor)`.
-5. `ProcessRhythmPolicy.assert_timebox_binding_allowed(binding, snapshot)`.
+5. `ProcessRhythmPolicy.assert_timebox_binding_allowed(binding, snapshot)`, including `input.external_timebox_ref` visibility / membership in the resolved work context.
 6. Build `ProcessTimingRef { process_subject_ref: input.process_subject_ref, stage_ref: None, timebox_binding_ref: Some(binding_ref) }`.
 7. Save binding;append trace;append outbox `TimingChanged(timing_ref)`.
 8. Store `ProcessTimingCommandResult`.
 
-Tests:success;external timebox unavailable;invalid binding;duplicate;no work truth mutation.
+Tests:success;work context unavailable;external timebox unavailable;external timebox not in resolved work context;invalid binding;duplicate;no Work truth mutation.
 
 ##### 7.6.13 `UpdateProcessStageStateFlow`
 

@@ -16,6 +16,7 @@
 | v0.12 | 2026-06-03 | Agent 永久记忆种子规则 | 在 Step 3 增加永久记忆种子表、生成门禁、禁止自由总结和技术栈规范路径来源约束 |
 | v0.13 | 2026-06-06 | 交付实现前闭环审计讨论规则 | 要求 Step 3 / 12 / 13 将按 phase / commit boundary 审计正式 `03/05/06/07` 作为实现移交门禁和永久记忆种子 |
 | v0.14 | 2026-06-06 | 设计修复后经验沉淀讨论规则 | 要求 Step 3 讨论永久记忆种子时覆盖设计修复后的经验沉淀检查、提交合并口径和示例补充 |
+| v0.15 | 2026-06-08 | Phase / commit boundary 小循环实施规划 | 明确 Step 5~7 / Step 11 必须按 phase 和 commit boundary 逐个停审,再做跨 boundary 依赖、门禁、提交粒度和证据闭环审计 |
 | v0.9 | 2026-05-29 | 测试证据、报告生成与脚本目录讨论规则 | 在 Step 3 / 7 / 11 / 12 补充 scripts、artifacts/test/<run_id>、reports/runs/<run_id> 和 reports/acceptance 的输入输出 |
 | v0.8 | 2026-05-29 | 代码仓目录与命名前置讨论规则 | 在 Step 3 补充实现仓目录、workspace member、Cargo package、Rust crate 和 binary 命名检查 |
 | v0.7 | 2026-05-29 | 本地多仓依赖实施讨论规则 | 在 Step 3 / Step 8 补充 `/home/aris/Projects` sibling repo、编译期 path dependency、依赖检查和不可用时处理的输入输出 |
@@ -82,7 +83,37 @@
 
 实施计划必须提前定义提交边界。提交边界应服务于 review、回退和证据审查，而不是事后按当天工作量随意切分。
 
-### 2.6 中间产物先于正式文档
+### 2.6 以 Phase / Commit Boundary 为小循环主轴
+
+实施计划不能一次性生成全仓任务清单后再按文件或对象补提交。必须先按可验证功能增量定义 phase,再在每个 phase 内逐个定义 commit boundary:
+
+```text
+Phase 可验证目标
+  -> phase 依赖和前置门禁
+  -> commit boundary
+  -> boundary 子功能分组
+  -> 代码批次和编写顺序
+  -> 测试 / 验收 / 证据门禁
+  -> 提交 message 分组
+  -> boundary 停审
+```
+
+每个 phase 完成后必须停审:
+
+- phase 是否是可验证功能增量,而不是对象 / 文件 / 个人待办集合。
+- phase 依赖、前置条件、测试门禁和验收门禁是否清楚。
+- phase 是否包含后续 phase 才能实现或验证的内容。
+
+每个 commit boundary 完成后必须停审:
+
+- boundary 是否能一句话描述。
+- boundary 是否可以独立 review、独立验证、必要时独立回退。
+- boundary 内多个子功能是否属于同一可验证增量,而不是无关功能拼接。
+- boundary 是否有开工前设计闭环复核、代码批次、测试门禁、证据输出和提交 message 分组。
+
+所有 phase / commit boundary 完成后,必须做跨 boundary 审计,检查依赖顺序、phase 越界、测试重复或缺失、验收覆盖、证据归属、提交粒度和 commit message scope 是否一致。
+
+### 2.7 中间产物先于正式文档
 
 每个 Step 不得直接跳到正式 `07-实施计划.md`。
 
@@ -113,7 +144,7 @@ Step 中间产物必须遵循 `standards/document/设计文档讨论中间产物
 
 如果用户要求逐步讨论或逐步划掉，必须先在对应子项目内建立 `design-calibration/07_implementation_plan_calibration_flow.md` 工作台文件，并在每个 Step 完成后更新状态。
 
-### 2.7 ASCII 图输出统一
+### 2.8 ASCII 图输出统一
 
 凡是本 SOP 中要求或允许输出 ASCII 图的 Step，都必须在讨论阶段同时收稳：
 
@@ -143,7 +174,7 @@ ASCII 图正文
 
 如果某一步按需可画图但本轮不画，必须说明“不画图的原因”，不能留下空图占位。
 
-### 2.8 通用执行纪律
+### 2.9 通用执行纪律
 
 实施计划讨论必须遵守 `设计文档讨论中间产物规范.md` 的“通用执行纪律”：
 
@@ -178,7 +209,7 @@ Step 6 单独拆分阶段任务和提交边界。
 - 阶段任务、提交边界和测试验收门禁混写会影响 review、回退和验收证据。
 - 旧提交纪律和新版实现仓纪律容易冲突。
 
-### 2.9 实施前必须确认设计可 1:1 落码
+### 2.10 实施前必须确认设计可 1:1 落码
 
 实施计划不是让实现者替设计文档补缺口。每个 phase / commit boundary 开工前，必须确认字段、DTO、状态、测试、验收和 phase boundary 已经闭环。
 
@@ -609,6 +640,9 @@ git config user.email
 - 阶段依赖图
 - 阶段总表
 - 阶段顺序理由
+- 每个 phase 的可验证增量说明
+- Phase 停审记录
+- 跨 phase 依赖闭环审计表
 
 #### 应问的问题
 
@@ -618,6 +652,10 @@ git config user.email
 4. 每个阶段完成后能验证什么。
 5. 是否存在按对象拆分而不可验证的阶段。
 6. 哪些阶段可以并行，哪些不能并行。
+7. 每个 phase 是否有明确的功能增量、输入、输出、测试门禁和验收门禁。
+8. 每个 phase 是否包含只能由后续 phase 提供的对象、协议、flow、状态或证据。
+9. 每个 phase 完成后是否通过停审。
+10. 所有 phase 完成后,依赖顺序、风险前置、外部依赖和验收覆盖是否通过跨 phase 审计。
 
 #### 期望产出
 
@@ -642,6 +680,26 @@ git config user.email
 |---|---|---|---|---|---|
 | PH-02 | <阶段名称> | <目标> | PH-01 | <交付物> | GATE-xx |
 
+#### <PH-xx> 可验证增量说明
+
+| 项 | 内容 |
+|---|---|
+| 功能增量 | <本阶段新增的可验证能力> |
+| 输入 | <上游设计 / 依赖阶段 / 外部依赖> |
+| 输出 | <代码 / 测试 / 证据 / 文档更新> |
+| 不包含 | <明确排除的后续 phase 内容> |
+| 验证方式 | <测试 / 验收 / 证据> |
+
+#### Phase 停审记录
+
+| Phase | 审查项 | 结论 | 缺口 / 修正 |
+|---|---|---|---|
+
+#### 跨 phase 依赖闭环审计表
+
+| 审计项 | 结论 | 缺口 / 修正 |
+|---|---|---|
+
 #### 回填位置
 
 - `07-实施计划.md` §5 实施阶段与依赖顺序
@@ -652,11 +710,15 @@ git config user.email
 - 阶段不能按对象、函数或文件裸拆。
 - 阶段必须有门禁。
 - 不允许把所有实现压成一个阶段。
+- 每个 phase 必须写可验证增量说明,说明本阶段新增什么能力、依赖什么输入、输出什么证据、明确不包含什么。
+- 每个 phase 完成后必须停审:是否可验证、依赖是否清楚、是否越过后续 phase、门禁是否可执行。
+- 所有 phase 完成后必须审计跨 phase 依赖顺序、风险前置、外部依赖、验收覆盖和 phase boundary 越界风险。
 
 #### 进入下一步的条件
 
 - 阶段顺序、依赖和理由均已明确。
 - 用户确认阶段拆分符合可验证增量原则。
+- 每个 phase 已完成停审,跨 phase 依赖闭环审计没有 unresolved 冲突。
 
 ### Step 6. 拆分阶段任务、编写顺序与提交边界
 
@@ -679,6 +741,9 @@ git config user.email
 - 每阶段提交边界表
 - 提交粒度判断表
 - 提交前检查清单
+- 每个 commit boundary 的子功能分组表
+- Commit boundary 停审记录
+- 跨 boundary 粒度 / 依赖 / 门禁审计表
 
 #### 应问的问题
 
@@ -700,6 +765,10 @@ git config user.email
 16. 每个代码批次与提交边界是什么关系。
 17. 每个 phase / commit boundary 开工前需要复核哪些字段、DTO、状态、证据和 phase boundary。
 18. 发现详细设计、测试方案、验收标准之间冲突时，是暂停、回写设计还是调整本阶段范围。
+19. 每个 commit boundary 内有哪些协作子功能,为什么这些子功能必须同提交。
+20. 每个 commit boundary 是否明确不包含哪些后续 boundary 内容。
+21. 每个 commit boundary 完成后是否通过停审。
+22. 所有 boundary 完成后,是否存在过细拆分、过粗合并、跨 phase 混入、测试门禁缺失或提交时机不清。
 
 #### 期望产出
 
@@ -724,6 +793,12 @@ git config user.email
 |---|---|---|---|---|
 | commit-02-a | <何时提交> | <包含> | <不包含> | GATE-xx |
 
+#### Commit boundary 子功能分组
+
+| Commit boundary | 子功能分组 | 必须同提交的原因 | 涉及批次 | 验证门禁 | 不包含 |
+|---|---|---|---|---|---|
+| commit-02-a | <sub-feature group> | <共同构成同一可验证增量> | BATCH-02-01 | GATE-xx | <后续 boundary 内容> |
+
 #### 开工前设计闭环复核
 
 | 复核项 | 检查内容 | 失败处理 |
@@ -743,6 +818,16 @@ git config user.email
 | 提交边界 | 粒度判断 | 是否可一句话描述 | 是否可独立验证 | 调整结论 |
 |---|---|---|---|---|
 | commit-02-a | 适中 / 过细 / 过粗 | 是 / 否 | 是 / 否 | 保留 / 拆分 / 合并 |
+
+#### Commit boundary 停审记录
+
+| Commit boundary | 审查项 | 结论 | 缺口 / 修正 |
+|---|---|---|---|
+
+#### 跨 boundary 粒度 / 依赖 / 门禁审计表
+
+| 审计项 | 结论 | 缺口 / 修正 |
+|---|---|---|
 ```
 
 #### 回填位置
@@ -761,10 +846,14 @@ git config user.email
 - 状态机、事务、并发、幂等、安全、审计、错误恢复和跨仓同步等高风险逻辑必须单独批次实现、单独验证。
 - 提交边界必须服务于 review 和回退。
 - 提交边界必须说明 commit 时机。
+- 每个 commit boundary 必须写子功能分组表,说明各子功能为什么共同构成同一个可验证增量。
+- 每个 commit boundary 必须明确不包含内容,防止提前实现后续 boundary。
 - 不允许以单个函数作为默认提交边界。
 - 不允许以单个文件、单个 struct 或当天工作量作为默认提交边界。
 - 不允许把多个无关功能合并成一笔提交。
 - 不允许把测试全部留到阶段最后之后再补。
+- 每个 commit boundary 完成后必须停审:一句话描述是否成立、是否可独立 review / 验证 / 回退、子功能是否同属一个增量、开工前闭环复核是否完整、提交前门禁是否明确。
+- 所有 boundary 完成后必须审计跨 boundary 依赖顺序、phase 越界、提交粒度、测试重复或缺失、证据归属、代码批次规模和提交时机。
 
 #### 进入下一步的条件
 
@@ -772,6 +861,7 @@ git config user.email
 - 每个阶段都有代码实现批次表，且批次规模、验证门禁和提交关系清楚。
 - 每个阶段或 commit boundary 都有字段、DTO、状态和 phase boundary 开工前复核口径。
 - 每个提交边界都有提交前门禁。
+- 每个 commit boundary 已完成停审,跨 boundary 审计没有 unresolved 冲突。
 
 ### Step 7. 嵌入测试与验收门禁
 
@@ -789,10 +879,13 @@ git config user.email
 #### 本步输出
 
 - 阶段门禁矩阵
+- Commit boundary 门禁矩阵
 - 证据归档规则
 - 报告生成规则
 - 验收交接报告审查规则
 - 门禁失败处理口径
+- 门禁停审记录
+- 跨门禁覆盖 / 证据归属审计表
 
 #### 应问的问题
 
@@ -807,15 +900,32 @@ git config user.email
 9. 哪些阶段需要调用 `scripts/reports/*.sh` 生成 `reports/runs/<run_id>`？
 10. 哪些阶段需要生成或更新 `reports/acceptance/*`？
 11. 哪些报告必须由人或 Agent 审查补充后才能进入验收？
+12. 每个 commit boundary 提交前应执行哪些测试、生成哪些 artifact / report、覆盖哪些 AC / VETO 风险。
+13. 是否存在阶段有门禁但 boundary 无提交前门禁,或 boundary 有测试但没有证据归属。
+14. 每个 phase / commit boundary 的门禁完成后是否通过停审。
+15. 所有门禁完成后,测试重复、证据缺失、验收覆盖缺口和 report 审查责任是否通过审计。
 
 #### 期望产出
 
 | 阶段编号 | 测试门禁 | 验收门禁 | 执行脚本 | artifact 输出 | report 输出 | 失败处理 |
 |---|---|---|---|---|---|---|
 
+| Commit boundary | 提交前测试门禁 | 验收 / VETO 关联 | artifact 输出 | report 输出 | 失败处理 |
+|---|---|---|---|---|---|
+
 | 阶段编号 | 生成脚本 | 输入 artifact | 输出 report | 人 / Agent 审查要求 |
 |---|---|---|---|---|
 | PH-02 | TC-xxx | AC-xxx | <证据> | <处理> |
+
+#### 门禁停审记录
+
+| Phase / Commit boundary | 审查项 | 结论 | 缺口 / 修正 |
+|---|---|---|---|
+
+#### 跨门禁覆盖 / 证据归属审计表
+
+| 审计项 | 结论 | 缺口 / 修正 |
+|---|---|---|
 
 #### 回填位置
 
@@ -824,16 +934,21 @@ git config user.email
 #### 执行约束
 
 - 每个阶段至少绑定一个测试门禁。
+- 每个 commit boundary 必须绑定提交前测试门禁;无法绑定时必须说明该 boundary 为什么只允许文档 / 配置 / 非代码变更。
 - 涉及外部可见行为、状态转换、跨仓交互或数据一致性的阶段必须绑定验收门禁。
+- 涉及外部可见行为、状态转换、跨仓交互或数据一致性的 commit boundary 必须回指验收 AC / VETO 风险。
 - 门禁失败处理必须明确。
 - artifact 输出必须使用 `artifacts/test/<run_id>`。
 - report 输出必须使用 `reports/runs/<run_id>` 和 `reports/acceptance`。
 - `reports/acceptance/*` 可以脚本生成初稿，但必须声明审查补充责任。
+- 每个 phase / commit boundary 门禁完成后必须停审:测试是否覆盖增量、证据输出是否存在、report 是否可读、失败处理是否明确、是否需要人 / Agent 审查。
+- 所有门禁完成后必须审计测试重复或缺失、artifact / report 归属、AC / VETO 覆盖、redaction、验收交接和风险接受责任。
 
 #### 进入下一步的条件
 
 - 阶段门禁矩阵完整。
 - 证据归档和失败处理已明确。
+- Commit boundary 门禁矩阵完整,每个 phase / boundary 门禁已停审,跨门禁审计没有 unresolved 冲突。
 
 ### Step 8. 定义配置、环境与外部依赖准备
 
@@ -1013,6 +1128,7 @@ git config user.email
 - 提交 message 结构约束
 - Type / Scope 约束
 - Commit body 分组格式
+- Commit boundary 到 body 分组映射表
 - 固定 footer 策略
 - 设计仓 / 实现仓语言边界
 - Commit 示例
@@ -1020,6 +1136,8 @@ git config user.email
 - 评审纪律表
 - 交付纪律表
 - artifact / report 交付检查表
+- Commit discipline 停审记录
+- 跨提交边界纪律审计表
 
 #### 应问的问题
 
@@ -1052,6 +1170,10 @@ git config user.email
 27. 提交或交付说明是否只引用 `reports/runs/<run_id>` 和 `reports/acceptance`，而不是粘贴完整日志？
 28. 如果门禁生成了 raw artifact，是否已经生成对应 report？
 29. `reports/acceptance/handoff.md` 和 `veto-checklist.md` 是否已经由人或 Agent 审查？
+30. Step 6 中每个 commit boundary 的子功能分组是否已经映射到 commit body 分组。
+31. Commit body 分组是否说明“为什么这些文件属于同一笔提交”,而不是按文件类型或目录平铺。
+32. 每个 commit boundary 的提交纪律是否完成停审。
+33. 所有 boundary 的 type / scope、message 语言、body 分组、footer、证据引用和 diff 范围是否通过跨提交审计。
 
 #### 期望产出
 
@@ -1104,6 +1226,12 @@ Sub-feature group B:
 | 分组 | 按子功能分组，不按文件类型平铺 | `Projection and repository reads:` | `Files:` |
 | 换行 | 使用真实换行，不写字面量 `\n` | 标题、body、footer 分段 | `subject\n\nbody` |
 | 空行 | 标题后空一行；footer 前空一行；bullet 之间不插空行 | 分组间可空行 | bullet 之间逐条空行 |
+
+#### Commit boundary 到 body 分组映射
+
+| Commit boundary | Step 6 子功能分组 | Commit body 分组名称 | 文件条目规则 | 证据引用 |
+|---|---|---|---|---|
+| commit-02-a | <sub-feature group> | `<GroupName>:` | 文件名 + 大致改动量 + 文件级说明 | `reports/runs/<run_id>` |
 
 #### 语言边界
 
@@ -1190,6 +1318,16 @@ commit 3: feat(query): add routes
 | 一票否决 | `reports/acceptance/veto-checklist.md` 已审查 |
 | 风险接受 | 有条件通过时 `reports/acceptance/risk-acceptance.md` 已审查 |
 
+#### Commit discipline 停审记录
+
+| Commit boundary | 审查项 | 结论 | 缺口 / 修正 |
+|---|---|---|---|
+
+#### 跨提交边界纪律审计表
+
+| 审计项 | 结论 | 缺口 / 修正 |
+|---|---|---|
+
 #### 回填位置
 
 - `07-实施计划.md` §11 提交、评审与交付纪律
@@ -1206,6 +1344,7 @@ commit 3: feat(query): add routes
 - 必须包含 type / scope 允许值；实现仓不得默认省略 scope。
 - 必须包含一笔提交对应一个 §6 commit boundary 的规则。
 - 必须说明同一 boundary 内多个协作子功能应保留为一笔提交，并在 body 中按子功能分组。
+- Commit body 分组必须回指 Step 6 的 commit boundary 子功能分组;若分组名称变化,必须说明映射关系。
 - 必须包含 body boundary summary、子功能分组、文件名写法和改动量标记规则。
 - 必须禁止 body 字面量 `\n`。
 - 必须禁止 bullet 之间插空行。
@@ -1219,11 +1358,14 @@ commit 3: feat(query): add routes
 - 必须包含提交前检查清单。
 - 必须包含 artifact / report 交付检查表。
 - 不允许把不相关改动混入同一提交。
+- 每个 commit boundary 的提交纪律必须停审:diff 范围、type / scope、body summary、子功能分组、文件条目、footer、证据引用和提交时机是否符合 §6。
+- 所有 commit boundary 完成后必须审计 scope 命名、提交粒度、body 分组、语言边界、footer、证据引用、raw artifact/report 配对和未提交本地文件处理口径。
 
 #### 进入下一步的条件
 
 - 提交、评审和交付纪律可执行。
 - 用户确认提交边界与纪律符合项目约定。
+- 每个 commit boundary 的提交纪律已停审,跨提交边界纪律审计没有 unresolved 冲突。
 
 ### Step 12. 定义实施完成判定
 

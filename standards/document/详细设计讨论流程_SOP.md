@@ -1,7 +1,7 @@
 # 详细设计讨论流程_SOP
 
-> 目标：定义“详细设计内容如何生成”，用于把已收稳的概要设计结果转译成可以 1:1 实现的代码实现契约。  
-> 适用对象：人类作者、Claude/其他 Agent、多人协作讨论。  
+> 目标：定义“详细设计内容如何生成”，用于把已收稳的概要设计结果转译成可以 1:1 实现的代码实现契约。
+> 适用对象：人类作者、Claude/其他 Agent、多人协作讨论。
 > 与 `详细设计书写规范.md` 的关系：书写规范负责定义最终结果结构；本 SOP 负责定义章节如何被讨论、收敛和回填。
 > 与 `设计文档讨论中间产物规范.md` 的关系：本 SOP 定义每一步问什么；中间产物规范定义每一步讨论后留下什么、如何确认、如何回填。
 
@@ -22,6 +22,8 @@
 | v0.9 | 2026-06-03 | Query view 传递类型闭环门禁 | 在 Step 7 / Step 8 增加 view 字段引用类型归属和 repository page helper schema 检查 |
 | v0.10 | 2026-06-04 | Public protocol 传递类型闭环门禁 | 在 Step 8 增加 command result、event envelope / receipt、outbound payload 和 job I/O 的二级公开类型 schema 检查 |
 | v0.11 | 2026-06-06 | 详细设计到实现交付审计承接 | 明确 Step 17 只完成详细设计到 07 的承接,正式实现移交前仍需由 07 按 phase / commit boundary 做整体可落码闭环审计 |
+| v0.12 | 2026-06-08 | Step 6 模块内功能抽象流程 | 明确 Step 6 应按模块小循环从功能 / capability 推导对象、对象能力、字段、函数和状态,再做跨模块闭环审计 |
+| v0.13 | 2026-06-08 | Step 7~10 契约小循环闭环 | 明确 port、protocol、flow、state matrix 必须分别按模块 / 协议族 / 接口 / 状态机小循环停审,再做跨模块闭环审计 |
 
 ---
 
@@ -59,6 +61,30 @@
 模块是详细设计的组织主轴。
 对象、trait、函数、错误、持久化和测试切口是模块内的固定内容。
 ```
+
+模块内对象不能只从概要设计对象清单机械转写。尤其在 Step 6 中,必须按以下链路逐模块抽象:
+
+```text
+模块职责
+  -> 模块需要完成的功能 / capability
+  -> 每个功能需要的输入、输出、状态、副作用和协作边界
+  -> 承接这些功能的对象
+  -> 对象自身需要完成的能力
+  -> 成员变量、工厂函数、成员函数、状态 enum 和不变量
+```
+
+跨模块 shared vocabulary、typed ref、public marker 和基础 state enum 可以先做全局收敛,但具体 truth object、policy、view、application helper、adapter state 和 entry object 必须回到所属模块内逐个抽象。所有模块完成后,再做跨模块字段、状态、命名和依赖闭环审计。
+
+Step 7~Step 10 也必须沿用同一范式,不能在 Step 6 之后退回总表式生成:
+
+```text
+Step 7: 按模块逐个定义 trait / port / adapter,每个模块停审,最后审计跨模块接缝。
+Step 8: 按协议族或所属模块逐个定义 protocol schema,每组停审,最后审计 DTO 到对象构造闭环。
+Step 9: 按 Command / Query / Event / Job 逐个定义函数级处理流,每条 flow 停审,最后审计跨 flow 事务、状态和 outbox 副作用。
+Step 10: 按状态机逐个定义状态集合和转换矩阵,每个状态机停审,最后审计状态名、触发函数和测试 / 验收口径。
+```
+
+每个小循环都必须证明“上游功能 / 对象 / 协议有人承接、下游 flow / state / test 可以回指”,然后才能进入下一组。所有小循环完成后,必须做一次跨模块闭环审计,检查字段来源、DTO 构造、port 读取面、状态触发、事务边界、错误映射和 phase boundary 是否一致。
 
 ### 2.3 结果结构与生成流程分离
 
@@ -669,16 +695,28 @@ Step 19. 整理正式详细设计文档
 
 #### 本步目标
 
-在每个模块内部定义 struct、enum、value object、service 等对象的实现契约。
+在每个模块内部,从模块职责和功能 / capability 出发,抽象出 struct、enum、value object、service 等对象,并定义这些对象的实现契约。
+
+本步不是把概要设计对象清单直接扩写成字段表,而是要证明:
+
+```text
+每个模块功能都有对象承接。
+每个对象的存在都能回到模块功能。
+对象字段、函数和状态都能回到对象需要完成的能力。
+```
 
 #### 本步输入
 
 - Step 5 的模块主轴
 - 概要设计中的关键对象轮廓
+- 概要设计中的模块功能、处理流、状态机和对象反查表
 - Step 3 的 Rustdoc 注释要求
 
 #### 本步输出
 
+- shared vocabulary / typed ref / public marker 的全局基础对象小节,如果本仓需要
+- 每个模块的 capability / 功能清单
+- 功能到对象映射表
 - 每个模块内的对象小节
 - 类型定义代码块
 - 成员变量表
@@ -690,18 +728,34 @@ Step 19. 整理正式详细设计文档
 #### 应问的问题
 
 ```text
-1. 每个模块中需要定义哪些 struct / enum / value object / service？
-2. 每个对象的主要责任和不变量是什么？
-3. 每个字段的类型、作用和约束是什么？
-4. 每个成员函数的完整签名、参数类型、返回类型和副作用是什么？
-5. 哪些函数是工厂函数或静态函数？
-6. 哪些状态 enum 需要写变体、允许来源和允许去向？
-7. 每个 enum variant 的 Rustdoc 注释是什么？带载荷 variant 的载荷类型承载什么语义？
+0. 本仓是否需要先收敛跨模块 shared vocabulary、typed ref、public marker 或基础 state enum？
+1. 当前模块需要完成哪些功能 / capability？
+2. 每个功能需要哪些输入、输出、状态、副作用、外部协作或后续 Step 承接点？
+3. 每个功能应该由哪些对象承接？哪些属于 truth object、policy / guard、view / report、application helper、adapter state 或 entry object？
+4. 是否存在功能无人承接、对象没有功能来源、对象职责过大或对象跨越模块边界？
+5. 每个模块中最终需要定义哪些 struct / enum / value object / service？
+6. 每个对象需要完成哪些对象级能力？主要责任和不变量是什么？
+7. 对象为了完成这些能力需要哪些成员变量？每个字段的类型、作用、约束和来源是什么？
+8. 对象需要哪些成员函数？完整签名、参数类型、返回类型和副作用是什么？
+9. 哪些函数是工厂函数或静态函数？factory 入参是否覆盖必填字段？
+10. 哪些状态 enum 需要写变体、允许来源和允许去向？
+11. 每个 enum variant 的 Rustdoc 注释是什么？带载荷 variant 的载荷类型承载什么语义？
+12. 当前模块完成后,模块内字段闭环、状态闭环、对象职责边界和后续 Step 承接点是否通过审计？
 ```
 
 #### 期望产出
 
 ````md
+#### <ModuleName> capability / 功能清单
+
+| 功能 / capability | 输入 | 输出 | 状态 / 副作用 | 所属对象 | 后续 Step 承接 |
+|---|---|---|---|---|---|
+
+#### <ModuleName> 功能到对象映射
+
+| 对象 | 承接功能 | 对象类别 | 不承接的功能 / 禁止事项 |
+|---|---|---|---|
+
 ##### <TypeName>
 
 ```rust
@@ -743,6 +797,10 @@ pub enum EnumName {
 
 #### 执行约束
 
+- Step 6 必须先完成 shared vocabulary / typed ref / public marker 的必要全局收敛,再逐模块展开对象;不得把所有模块对象一股脑混在一个全局章节讨论。
+- 逐模块执行时,每个模块都必须先写 capability / 功能清单和功能到对象映射,再写对象卡片。
+- 每完成一个模块或一个明确对象组,必须停下来做模块内审查:功能是否有人承接、对象是否有功能来源、字段来源是否闭合、状态是否闭合、是否越过模块边界。
+- 所有模块写完后,必须再做一次跨模块闭环审计,检查 shared ref、重复对象、跨模块依赖、命名、字段来源和状态语义是否一致。
 - 每个对象必须独立成小节。
 - 字段必须写类型。
 - 函数参数必须写类型。
@@ -751,11 +809,43 @@ pub enum EnumName {
 - 非状态类 enum 也必须写变体表;`允许来源` 和 `允许去向` 可写 `不适用`。
 - 带载荷 variant 必须在 Rustdoc 注释和变体表中说明载荷类型的业务语义。
 - 不把所有对象集中写入一个全局对象章节。
+- 不以概要设计对象清单替代功能抽象;如果对象无法回指任何模块功能,必须删除、合并或标为后续 phase reserved。
+- 不让一个对象承接多个不相干模块功能;发现对象职责过大时,必须拆分或重新归属。
+
+正确示例:
+
+```text
+先收敛 contracts shared refs。
+然后按 domain 模块讨论:
+  domain capability: 创建 context、打开 gate、记录 decision、关闭 nonconformity。
+  功能到对象映射: GovernanceContext 承接 context readiness;Gate 承接 pending decision;GovernanceDecision 承接 formal outcome。
+  再分别写字段、factory、transition method 和 state enum。
+domain 完成后停审,再进入 application helper 模块。
+最后做跨模块字段 / 状态 / ref 闭环审计。
+```
+
+错误示例:
+
+```text
+直接把 contracts、domain、application、infra、api、worker、jobs 的所有对象列在一个巨大对象清单里。
+没有说明模块要完成哪些功能,也没有功能到对象映射。
+为了赶进度,字段表从已有对象名猜字段。
+```
+
+错误原因:
+
+- reviewer 无法判断某个功能是否没有对象承接。
+- 对象可能只是“看起来需要”的类型,无法回到模块职责。
+- 字段和函数容易从对象名或旧文档猜出来,而不是从对象能力和功能闭环推导出来。
+- 后续 Step 7 / Step 8 / Step 9 会发现 port、DTO、flow 找不到对应对象能力或字段来源。
 
 #### 进入下一步的条件
 
 ```text
-每个模块内的对象、字段、函数和不变量已经足够实现者直接写 Rust 类型和 impl。
+每个模块的功能 / capability 已经映射到对象。
+每个对象都能回到所属模块功能。
+每个模块内的对象、字段、函数、状态和不变量已经足够实现者直接写 Rust 类型和 impl。
+跨模块 shared ref、字段来源、状态语义和依赖方向已经完成闭环审计。
 ```
 
 ---
@@ -775,22 +865,36 @@ pub enum EnumName {
 #### 本步输出
 
 - Trait / Port / Adapter 契约表
+- 每个模块的 port capability / 接缝清单
 - trait Rust 契约片段
 - 实现方 / 调用方关系表
+- 模块内 trait / port 停审记录
+- 跨模块接缝闭环审计表
 
 #### 应问的问题
 
 ```text
 1. 哪些模块需要定义 trait / port？
 2. 哪些模块负责实现这些 trait / port？
-3. repository、outbox、projection、external client 的函数签名是什么？
-4. 每个 trait 函数的参数类型、返回类型、错误类型是什么？
-5. 哪些依赖只能通过 trait 访问，不能直接跨层调用？
+3. 当前模块的哪些 capability、对象能力、处理流或状态转换需要 repository、outbox、projection、external client、gateway 或 adapter 接缝？
+4. 每个 trait / port 承接 Step 6 的哪个对象能力或字段 / 状态来源？
+5. repository、outbox、projection、external client 的函数签名是什么？
+6. 每个 trait 函数的参数类型、返回类型、错误类型是什么？
+7. 每个读取函数是否提供后续 DTO 构造、flow、state matrix 或 projection stale 所需的完整读取面？
+8. 每个写入函数的 expected_version、UnitOfWork、幂等、append-only record 或 sidecar truth 口径是否闭合？
+9. 哪些依赖只能通过 trait 访问，不能直接跨层调用？
+10. 当前模块的 trait / port 完成后是否通过停审？
+11. 所有模块完成后,跨模块接缝是否存在重复 port、反向依赖、读取面缺失或写入面 version 来源缺失？
 ```
 
 #### 期望产出
 
 ````md
+#### <ModuleName> port capability / 接缝清单
+
+| capability / 对象能力 | 需要的接缝 | 调用方 | 实现方 | 后续承接 |
+|---|---|---|---|---|
+
 | 名称 | 类型 | 定义位置 | 作用 | 关键函数 |
 |---|---|---|---|---|
 
@@ -801,6 +905,16 @@ pub trait RepositoryName {
     async fn save(&self, entity: EntityName, expected_version: Version) -> Result<(), DomainError>;
 }
 ```
+
+#### <ModuleName> trait / port 停审记录
+
+| 审查项 | 结论 | 缺口 / 修正 |
+|---|---|---|
+
+#### 跨模块接缝闭环审计表
+
+| 审计项 | 结论 | 缺口 / 修正 |
+|---|---|---|
 ````
 
 #### 回填位置
@@ -811,13 +925,19 @@ pub trait RepositoryName {
 #### 执行约束
 
 - trait 必须放在正确模块内讨论。
+- Step 7 必须按模块逐个定义 trait / port / adapter,不得先生成全仓 port 总表再补模块归属。
+- 每个模块必须先写 port capability / 接缝清单,说明接缝来自 Step 6 哪个对象能力、字段来源、状态来源或后续处理流。
 - trait 函数必须写参数类型、返回类型和错误类型。
+- repository / projection / snapshot / outbox 读取函数必须覆盖 Step 8 DTO 构造、Step 9 flow、Step 10 state matrix 和 Step 11 persistence 所需读取面;不能只写 save / append。
+- 写入函数如果使用 optimistic version、UnitOfWork、idempotency、append-only record 或 sidecar truth,必须同步定义 version 来源、事务参数和读取 / 保存配对。
 - 不允许用“调用数据库”“调用外部服务”替代 port 契约。
+- 每完成一个模块的 trait / port,必须停审:对象能力是否有接缝承接、调用方 / 实现方是否清楚、读取面是否闭合、写入面 version / transaction 是否闭合、是否越过模块边界。
+- 所有模块完成后,必须审计跨模块重复 port、反向依赖、缺失读取面、缺失 version 来源、public page helper schema 和 downstream protocol / flow 承接关系。
 
 #### 进入下一步的条件
 
 ```text
-所有跨模块、跨层、跨外部系统的实现接缝都有明确 trait / port / adapter 契约。
+所有跨模块、跨层、跨外部系统的实现接缝都有明确 trait / port / adapter 契约；每个模块 port 已停审；跨模块接缝闭环审计没有 unresolved 冲突；Step 8 / 9 / 10 所需读取面和写入面已经有正式 port 承接。
 ```
 
 ---
@@ -838,6 +958,7 @@ pub trait RepositoryName {
 #### 本步输出
 
 - 协议总表
+- 按协议族 / 所属模块组织的协议定义批次表
 - 每个协议的独立小节
 - 函数签名 / 路由表
 - 请求 / 响应 / event schema
@@ -846,36 +967,46 @@ pub trait RepositoryName {
 - DTO / Event / Job 到 Domain 对象构造闭环表
 - 错误映射
 - 幂等与审计要求
+- 协议族停审记录
+- 跨协议 public surface 闭环审计表
 
 #### 应问的问题
 
 ```text
 1. 本轮需要定义哪些 API / Command / Query / Event / Job？
-2. 每个协议的调用方、处理方、传输方式是什么？
-3. 外部接口使用 HTTP、RPC、event bus 还是其他方式？
-4. 请求、响应、事件或 job 输入输出 schema 是什么？
-5. 每个输入契约会构造或影响哪些 Domain 对象？
-6. 目标对象的必填字段是否全部能从输入、派生、查表或系统生成中获得？
-7. 哪些字段名相近但语义不同，不得混同？
-8. 字段缺失时是 reject、derive、lookup、retry、dead-letter 还是暂停处理？
-9. Query 的 response view、page、projection marker 是否有字段级 schema？
-10. Query 的 empty、not visible、stale、failed、rebuilding、disabled、missing state 对外 surface 是什么？
-11. Query response 中 read model / projection / cursor 的 id/ref 如何生成，repository key 是什么？
-12. Query response 字段引用的 enum / ref 是否归属到 contracts shared,或是否写明 domain 到 view 的正式映射？
-13. Query / repository 使用的 page helper 是否有 schema、归属和 public page DTO 映射？
-14. HLD `*Query`、DDD `*Request`、Rust DTO 名称是否存在收敛映射？
-15. Command result、event payload、consumer envelope / receipt、job report 中引用的 enum / ref / helper 是否都有 schema 和归属？
-16. Inbound consumer 的 envelope、receipt、duplicate、quarantine、delayed、no-op marker 是否有字段级 schema？
-17. 每个 command / event / job 的 actor 是 participant、system、integration 还是 trusted source actor？是否必须在 participant / visibility scope 中？
-18. 如果存在 trusted source actor 例外,适用的 source kind、actor kind、入口协议和不可绕过的 gate 是否写清？
-19. 每个协议失败时映射成什么错误？
-20. 哪些协议需要幂等键或审计记录？
+2. 这些协议应按哪个协议族或所属模块分批定义: Command、Query、Inbound Event、Outbound Event、Operations Job、admin/internal？
+3. 每个协议的调用方、处理方、传输方式是什么？
+4. 外部接口使用 HTTP、RPC、event bus 还是其他方式？
+5. 请求、响应、事件或 job 输入输出 schema 是什么？
+6. 每个输入契约会构造或影响哪些 Domain 对象？
+7. 目标对象的必填字段是否全部能从输入、派生、查表或系统生成中获得？
+8. 哪些字段名相近但语义不同，不得混同？
+9. 字段缺失时是 reject、derive、lookup、retry、dead-letter 还是暂停处理？
+10. 当前协议族完成后,每个 DTO / Event / Job 是否能回指 Step 6 对象、Step 7 port 和 Step 9 处理流？
+11. Query 的 response view、page、projection marker 是否有字段级 schema？
+12. Query 的 empty、not visible、stale、failed、rebuilding、disabled、missing state 对外 surface 是什么？
+13. Query response 中 read model / projection / cursor 的 id/ref 如何生成，repository key 是什么？
+14. Query response 字段引用的 enum / ref 是否归属到 contracts shared,或是否写明 domain 到 view 的正式映射？
+15. Query / repository 使用的 page helper 是否有 schema、归属和 public page DTO 映射？
+16. HLD `*Query`、DDD `*Request`、Rust DTO 名称是否存在收敛映射？
+17. Command result、event payload、consumer envelope / receipt、job report 中引用的 enum / ref / helper 是否都有 schema 和归属？
+18. Inbound consumer 的 envelope、receipt、duplicate、quarantine、delayed、no-op marker 是否有字段级 schema？
+19. 每个 command / event / job 的 actor 是 participant、system、integration 还是 trusted source actor？是否必须在 participant / visibility scope 中？
+20. 如果存在 trusted source actor 例外,适用的 source kind、actor kind、入口协议和不可绕过的 gate 是否写清？
+21. 每个协议失败时映射成什么错误？
+22. 哪些协议需要幂等键或审计记录？
+23. 所有协议族完成后,是否存在 public DTO 传递类型缺 schema、跨协议命名漂移、二级类型未归属或 protocol-to-flow 断裂？
 ```
 
 #### 期望产出
 
 ````md
 | 名称 | 类别 | 调用方 / 发布方 | 处理方 / 订阅方 | 传输方式 | 是否需要处理流 |
+|---|---|---|---|---|---|
+
+#### <ProtocolFamily> 定义批次表
+
+| 协议 | 所属模块 | 目标对象 / view / job | 依赖 port | 后续 flow | 停审状态 |
 |---|---|---|---|---|---|
 
 ### 7.x <ProtocolName>
@@ -901,6 +1032,16 @@ pub trait RepositoryName {
 
 | Query | Response DTO / View | 字段 | 类型 | 字段来源 | empty / not visible / degraded 口径 |
 |---|---|---|---|---|---|
+
+#### <ProtocolFamily> 停审记录
+
+| 审查项 | 结论 | 缺口 / 修正 |
+|---|---|---|
+
+#### 跨协议 public surface 闭环审计表
+
+| 审计项 | 结论 | 缺口 / 修正 |
+|---|---|---|
 ````
 
 #### 回填位置
@@ -911,6 +1052,8 @@ pub trait RepositoryName {
 #### 执行约束
 
 - 每个协议必须独立成小节。
+- Step 8 必须按协议族或所属模块分批定义协议,不得一次性生成无归属的全仓 schema 清单。
+- 每个协议族必须先写定义批次表,说明协议所属模块、目标对象 / view / job、依赖 port 和后续 flow。
 - 外部接口必须写路由或 RPC / topic 名称。
 - 内部命令和查询必须写 Rust DTO。
 - 事件必须写事件名、发布方、订阅方、schema 和版本策略。
@@ -925,11 +1068,13 @@ pub trait RepositoryName {
 - Actor / consumer / source actor 必须明确 authority kind、scope membership 要求和 trusted source 例外;例外不得隐式绕过 visibility、digest、source isolation、forbidden body、idempotency 或状态 gate。
 - Query 的分页、consistency、consumer / actor context 必须明确来自 query body 还是 metadata / envelope，不得双承载。
 - 引用类字段必须区分 contract ref、envelope ref、record ref、payload ref 等语义，不得用相近名称互相代替。
+- 每完成一个协议族,必须停审:DTO 是否能构造目标对象 / view / job、二级公开类型是否有 schema、错误 / 幂等 / actor / metadata 是否闭合、后续 flow 是否存在。
+- 所有协议族完成后,必须审计 public DTO 传递类型、名称映射、page helper、result / receipt / report surface、protocol-to-flow 覆盖和 contracts/domain 依赖方向。
 
 #### 进入下一步的条件
 
 ```text
-所有需要实现的协议入口都有明确签名、schema、错误映射、处理方和 DTO 到目标对象构造闭环。
+所有需要实现的协议入口都有明确签名、schema、错误映射、处理方和 DTO 到目标对象构造闭环；每个协议族已停审；跨协议 public surface 闭环审计没有 unresolved 冲突；Step 9 可以逐接口展开处理流而不需要重新猜 DTO 字段或二级类型。
 ```
 
 ---
@@ -950,6 +1095,7 @@ pub trait RepositoryName {
 #### 本步输出
 
 - 处理流总表
+- 按接口类别组织的处理流批次表
 - 每个接口一个独立处理流小节
 - 函数级调用图
 - 关键伪代码
@@ -958,18 +1104,24 @@ pub trait RepositoryName {
 - 错误映射
 - 状态与事件副作用
 - 测试切口
+- 单 flow 停审记录
+- 跨 flow 事务 / 状态 / outbox 审计表
 
 #### 应问的问题
 
 ```text
 1. 哪些协议必须拥有函数级处理流？
-2. 每个处理流的入口函数是什么？
-3. 入口函数调用哪些 application service、domain method、repository 和 outbox？
-4. 入口 DTO 在哪一步被校验、派生、转换或用于构造 Domain 对象？
-5. 如果构造目标对象所需字段缺失，处理流在哪个函数返回错误或进入恢复路径？
-6. 事务在哪里开始，在哪里提交，哪些错误触发回滚？
-7. 哪些状态会被修改，哪些事件会被写入？
-8. 每个处理流至少需要哪些测试切口？
+2. 这些处理流应按 Command、Query、Inbound Event、Outbound Event、Operations Job 或所属模块如何分批？
+3. 每个处理流的入口函数是什么？
+4. 入口函数调用哪些 application service、domain method、repository 和 outbox？
+5. 入口 DTO 在哪一步被校验、派生、转换或用于构造 Domain 对象？
+6. 如果构造目标对象所需字段缺失，处理流在哪个函数返回错误或进入恢复路径？
+7. 每个 port 调用是否已在 Step 7 定义,读取面 / 写入面是否足以支撑该 flow？
+8. 事务在哪里开始，在哪里提交，哪些错误触发回滚？
+9. 哪些状态会被修改，哪些事件会被写入？
+10. 每个处理流至少需要哪些测试切口？
+11. 当前 flow 完成后,DTO 构造、对象方法、port、事务、错误、状态和副作用是否通过停审？
+12. 所有 flow 完成后,是否存在跨 flow 事务边界冲突、状态触发冲突、outbox / trace / audit 副作用冲突或 phase boundary 越界？
 ```
 
 #### 期望产出
@@ -977,6 +1129,11 @@ pub trait RepositoryName {
 ````md
 | 处理流 | 对应协议 | 入口函数 | 主要事务 | 状态变化 | 测试切口 |
 |---|---|---|---|---|---|
+
+#### <FlowBatch> 处理流批次表
+
+| Flow | 协议 | 所属模块 | 目标对象 | 依赖 port | 状态 / 副作用 | 停审状态 |
+|---|---|---|---|---|---|---|
 
 #### 函数级调用图: <FlowName>
 
@@ -1001,6 +1158,16 @@ pub trait RepositoryName {
 // 开启本次命令处理的事务边界。
 let tx = unit_of_work.begin().await?;
 ```
+
+#### <FlowName> 停审记录
+
+| 审查项 | 结论 | 缺口 / 修正 |
+|---|---|---|
+
+#### 跨 flow 事务 / 状态 / outbox 审计表
+
+| 审计项 | 结论 | 缺口 / 修正 |
+|---|---|---|
 ````
 
 #### 回填位置
@@ -1010,16 +1177,22 @@ let tx = unit_of_work.begin().await?;
 #### 执行约束
 
 - 每个需要实现的 Command / Query / Event / Job 必须独立讨论。
+- Step 9 必须按接口类别或所属模块分批定义 flow,不得把多个无关 flow 压缩成一个通用流程。
+- 每条 flow 必须写批次表归属,并回指 Step 8 协议、Step 6 对象、Step 7 port 和后续 Step 10 状态机。
 - 处理流图必须使用 ASCII。
 - 关键伪代码必须标注 `对象.函数(Type 参数名)`。
 - 必须标注事务、错误、状态变化和事件副作用。
 - 处理流必须能回指 Step 8 的 DTO 构造闭环表。
+- 处理流中的每个 repository / outbox / projection / external call 必须能回指 Step 7 trait / port 函数;缺函数或返回面不足时不得在 flow 中临时发明。
+- 处理流中的每个状态变化必须能回指 Step 6 状态 enum 和 Step 10 状态矩阵候选。
 - 处理流不得引用后续 phase 才定义的对象或结果；如发现，必须进入 Step 17 的 phase boundary 复核。
+- 每完成一条 flow,必须停审:DTO 构造是否闭合、对象方法是否存在、port 是否存在、事务边界是否清楚、错误映射是否清楚、状态 / outbox / trace / audit 副作用是否闭合、测试切口是否存在。
+- 所有 flow 完成后,必须审计跨 flow 事务一致性、状态触发一致性、outbox / trace / audit 副作用、幂等重入、错误映射、phase boundary 和未展开协议原因。
 
 #### 进入下一步的条件
 
 ```text
-每个关键接口都已经具备可编码的函数级处理流，并能回指模块、对象、trait、协议契约和 DTO 构造闭环。
+每个关键接口都已经具备可编码的函数级处理流,每条 flow 已停审,并能回指模块、对象、trait、协议契约和 DTO 构造闭环；跨 flow 事务 / 状态 / outbox 审计没有 unresolved 冲突。
 ```
 
 ---
@@ -1042,25 +1215,46 @@ let tx = unit_of_work.begin().await?;
 - 状态转换图
 - 状态转换矩阵
 - 非法转换处理表
+- 按状态机组织的状态矩阵批次表
+- 单状态机停审记录
+- 跨状态机命名 / 触发 / 测试审计表
 
 #### 应问的问题
 
 ```text
 1. 当前仓有哪些正式状态机？
-2. 每个状态机的状态集合是什么？
-3. 哪些函数会触发状态转换？
-4. 每个转换的前置条件、副作用和错误是什么？
-5. 非法转换应该返回什么错误，是否写审计？
+2. 每个状态机归属于哪个模块和哪个 Step 6 状态 enum？
+3. 每个状态机的状态集合是什么？
+4. 哪些函数会触发状态转换,这些函数能否回指 Step 6 对象函数或 Step 9 flow？
+5. 每个转换的前置条件、副作用和错误是什么？
+6. 非法转换应该返回什么错误，是否写审计？
+7. 每个状态机完成后,状态名、触发函数、前置条件、非法转换和副作用是否通过停审？
+8. 所有状态机完成后,是否存在同名 / 近义状态语义冲突、触发函数缺失、测试 / 验收口径漂移或 phase reserved 状态被当前 boundary 调用？
 ```
 
 #### 期望产出
 
 ```md
+#### 状态矩阵批次表
+
+| 状态机 | 所属模块 | 状态 enum | 触发 flow / 函数 | 停审状态 |
+|---|---|---|---|---|
+
 | 状态 | 作用 | 是否终态 | 允许的关键操作 |
 |---|---|---|---|
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
+
+#### <StateMachineName> 停审记录
+
+| 审查项 | 结论 | 缺口 / 修正 |
+|---|---|---|
+
+#### 跨状态机命名 / 触发 / 测试审计表
+
+| 审计项 | 结论 | 缺口 / 修正 |
+|---|---|---|
 ```
 
 #### 回填位置
@@ -1073,11 +1267,18 @@ let tx = unit_of_work.begin().await?;
 - 触发函数必须能回指对象函数或处理流。
 - 非法转换必须明确错误类型。
 - 状态转换图必须使用 ASCII。
+- Step 10 必须按状态机逐个定义状态集合和转换矩阵,不得用一个全局状态总表混写多个对象的状态。
+- 每个状态机必须回指所属模块、Step 6 状态 enum、Step 9 触发 flow / 函数和后续测试切口。
+- 状态矩阵中的前置条件字段必须能回指 truth schema、DTO 输入、repository 读取面或 policy decision;不得写无法落码的自然语言条件。
+- 状态副作用必须说明是否写 outbox、trace、audit、history、projection stale 或 sidecar truth。
+- phase reserved 状态 / transition 必须显式标注 reserved 和当前 boundary 不调用口径。
+- 每完成一个状态机,必须停审:状态 enum 是否存在、状态名是否一致、触发函数是否存在、前置条件字段是否闭合、非法转换错误是否定义、副作用是否闭合。
+- 所有状态机完成后,必须审计同名 / 近义状态、触发函数覆盖、非法转换错误、测试 / 验收状态名、phase reserved 调用和跨状态机副作用一致性。
 
 #### 进入下一步的条件
 
 ```text
-所有状态转换、非法转换和触发函数都已经足够实现者写状态校验代码。
+所有状态转换、非法转换和触发函数都已经足够实现者写状态校验代码；每个状态机已停审；跨状态机命名 / 触发 / 测试审计没有 unresolved 冲突。
 ```
 
 ---

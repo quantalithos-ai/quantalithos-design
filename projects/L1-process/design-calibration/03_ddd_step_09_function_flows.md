@@ -808,11 +808,19 @@ Tests:rebuild read model;rebuild timeline;projection failed marker;duplicate job
 Steps:
 
 1. Reserve job idempotency.
-2. List reference states in `ExternalContextRefreshScope`.
+2. Convert `job.page` to application `PageRequest`,then call `ReferenceSnapshotRepository.list_reference_states_for_refresh(job.scope, page)` to list `Page<Versioned<ReferenceResolutionState>>`.
 3. Call matching resolver port by `ExternalContextKind`.
-4. Upsert snapshot and mark `ReferenceResolutionState::Resolved`.
-5. On source unavailable,mark `Unavailable` or keep stale according to Step 12 error policy and count partial failure.
+4. For each returned state,resolve by `ReferenceResolutionState.reference_ref` and matching `ExternalContextKind`;upsert the body-free snapshot / marker and mark the loaded `ReferenceResolutionState` as `Resolved` in the same UoW,using the returned `StorageVersion` when updating existing state.
+5. On source unavailable,mark `Unavailable` or keep stale according to Step 12 error policy,save the updated state with the returned `StorageVersion`,and count partial failure.
 6. Return `JobRunReceipt`.
+
+Rules:
+
+- `ExternalContextRefreshScope.context_kinds` is applied by the repository list method;an empty set means all registered external context kinds.
+- `ExternalContextRefreshScope.process_instance_ref` is applied through the repository's formal process-instance dependency index for reference states;the flow must not scan process truth or infer references from snapshot maps.
+- `ExternalContextRefreshScope.reference_state` filters by `ReferenceResolutionLifecycleState`.
+- Pagination order is stable `(ExternalContextKind, ExternalContextRef, ReferenceResolutionStateId)` as defined by Step 7.
+- The version returned with each listed state is the only allowed expected-version source for refresh success and failure updates.
 
 Tests:refresh method;refresh work;source unavailable partial;body rejected quarantine-equivalent;duplicate job.
 

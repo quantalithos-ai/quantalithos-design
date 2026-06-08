@@ -98,7 +98,7 @@
 | `TraceRepository` | append / handoff repository | `application/src/ports.rs` | `infra/src/repositories.rs` | trace / audit / handoff records | `append_trace`、`append_audit_record`、`save_handoff_ref` |
 | `ProcessOutboxRepository` | outbox repository | `application/src/ports.rs` | `infra/src/outbox_store.rs` | outbox record persistence with outbound payload snapshot | `append`、`list_pending`、`save_state` |
 | `ProjectionRepository` | projection repository | `application/src/ports.rs` | `infra/src/projection_stores.rs` | read model / timeline / summary / view state | `upsert_read_model`、`find_timeline`、`mark_view_state` |
-| `ReferenceSnapshotRepository` | snapshot repository | `application/src/ports.rs` | `infra/src/reference_stores.rs` | external snapshot / reference state | `upsert_method_snapshot`、`upsert_work_snapshot`、`upsert_runtime_feedback_summary`、`upsert_reference_state` |
+| `ReferenceSnapshotRepository` | snapshot repository | `application/src/ports.rs` | `infra/src/reference_stores.rs` | external snapshot / reference state | `upsert_method_snapshot`、`upsert_work_snapshot`、`upsert_runtime_feedback_summary`、`upsert_reference_state`、`list_reference_states_for_refresh` |
 | `ReconciliationReportRepository` | report repository | `application/src/ports.rs` | `infra/src/projection_stores.rs` | reconciliation report | `save_report`、`get_report` |
 | `ReadVisibilityPolicy` | query policy port | `application/src/ports.rs` | `application/src/query_policy.rs` or `infra/src/projection_stores.rs` fake | query visibility decision and marker source | `evaluate_read_visibility` |
 | `MethodDefinitionResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | method definition snapshot | `resolve_definition` |
@@ -1019,8 +1019,31 @@ pub trait ReferenceSnapshotRepository {
         &self,
         reference_ref: ExternalContextRef,
     ) -> Result<Option<ReferenceResolutionState>, RepositoryError>;
+
+    /// Lists registered external reference resolution states matching a refresh scope.
+    async fn list_reference_states_for_refresh(
+        &self,
+        scope: ExternalContextRefreshScope,
+        page: PageRequest,
+    ) -> Result<Page<Versioned<ReferenceResolutionState>>, RepositoryError>;
 }
 ```
+
+| 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
+|---|---|---|---|---|---|
+| `upsert_method_snapshot` | snapshot、UoW | `()` | `RepositoryError` | method consumer / refresh job | 保存 body-free method snapshot;不得保存 method definition body |
+| `get_method_snapshot` | definition ref、version ref | `Option<MethodDefinitionSnapshot>` | `RepositoryError` | shape/profile command / query | read-only;missing -> unresolved / degraded |
+| `upsert_work_snapshot` | snapshot、UoW | `()` | `RepositoryError` | work consumer / refresh job | 保存 body-free work context snapshot;不得保存 Work truth body |
+| `upsert_actor_capability_snapshot` | snapshot、UoW | `()` | `RepositoryError` | identity consumer / refresh job | 保存 body-free capability snapshot;不得保存 identity body |
+| `upsert_governance_decision_marker` | marker、UoW | `()` | `RepositoryError` | governance consumer / refresh job | 保存 decision marker;不得生成 Governance truth |
+| `upsert_artifact_evidence_marker` | marker、UoW | `()` | `RepositoryError` | artifact consumer / refresh job | 保存 evidence marker;不得保存 artifact body |
+| `upsert_runtime_feedback_marker` | marker、UoW | `()` | `RepositoryError` | runtime consumer / refresh job | 保存 feedback marker;不得保存 runtime log |
+| `upsert_runtime_feedback_summary` | summary、UoW | `()` | `RepositoryError` | runtime consumer / record feedback command | `contains_runtime_body = false` required |
+| `get_runtime_feedback_summary` | summary ref | `Option<RuntimeFeedbackSummary>` | `RepositoryError` | record feedback command / query | read-only;missing -> degraded / unavailable |
+| `upsert_conversation_context_marker` | marker、UoW | `()` | `RepositoryError` | conversation consumer / refresh job | 保存 context marker;不得保存 conversation body |
+| `upsert_reference_state` | state、UoW | `()` | `RepositoryError` | consumers / refresh job | 保存 reference resolution state;refresh update uses state loaded from versioned read when updating existing row |
+| `get_reference_state` | external context ref | `Option<ReferenceResolutionState>` | `RepositoryError` | command / query / consumer | single-ref read;read-only;not a scope expansion function |
+| `list_reference_states_for_refresh` | `ExternalContextRefreshScope`、`PageRequest` | `Page<Versioned<ReferenceResolutionState>>` | `RepositoryError` | `RefreshExternalContextSnapshotsFlow` | Expands the three formal filters: `context_kinds` limits by `ExternalContextKind`;`process_instance_ref` limits to states registered through process-instance dependency index;`reference_state` limits by `ReferenceResolutionLifecycleState`. Empty `context_kinds` means all registered external context kinds. Results must be stable sorted by `(ExternalContextKind, ExternalContextRef, ReferenceResolutionStateId)` before pagination. Empty page means no refreshable state / Noop. Returned versions are the only allowed `StorageVersion` source for refresh success / failure updates. Implementation must not full-scan storage, infer references from snapshot maps, or enumerate process repositories outside this formal index. |
 
 ##### 7.7.5 `ReconciliationReportRepository`
 

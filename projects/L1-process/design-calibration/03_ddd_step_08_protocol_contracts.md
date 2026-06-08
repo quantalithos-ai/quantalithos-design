@@ -3030,6 +3030,8 @@ pub struct RefreshExternalContextSnapshotsJob {
     pub metadata: JobMetadata,
     /// External context refresh scope.
     pub scope: ExternalContextRefreshScope,
+    /// Page request for listing registered reference states in the scope.
+    pub page: ProcessPageRequest,
     /// Maximum age allowed before a snapshot is refreshed.
     pub max_snapshot_age: RetentionDuration,
 }
@@ -3037,6 +3039,7 @@ pub struct RefreshExternalContextSnapshotsJob {
 
 Rules:
 
+- `page` is converted to Step 7 `PageRequest` and passed to `ReferenceSnapshotRepository.list_reference_states_for_refresh(scope, page)`.
 - `max_snapshot_age` uses conversation-local / process-local `RetentionDuration` style value object,not an undefined core `Duration`.
 - job writes snapshot / reference state only.
 - unavailable sources produce delayed / partial report;do not rewrite process truth.

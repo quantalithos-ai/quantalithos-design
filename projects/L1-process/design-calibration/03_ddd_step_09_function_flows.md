@@ -185,8 +185,8 @@ Command transaction rules:
   | call validate_query_request(Request)
   v
 [AuthorizedProcessQueryService]
-  | call ReadVisibilityPolicy.assert_can_read(...)
-  | denied -> ProcessQueryResponse { status: NotVisible }
+  | call ReadVisibilityPolicy.evaluate_read_visibility(...)
+  | hidden -> ProcessQueryResponse { status: NotVisible, visibility_marker }
   v
 [Repository / Projection]
   | call truth repository or ProjectionRepository
@@ -555,7 +555,8 @@ Tests:activate;pause;complete;skip;illegal transition;duplicate.
   | call get_*(request)
   v
 [AuthorizedProcessQueryService]
-  | call ReadVisibilityPolicy.assert_can_read(ProcessReadSubjectRef, ProcessConsumerRef)
+  | call ReadVisibilityPolicy.evaluate_read_visibility(ProcessReadSubjectRef, ProcessConsumerRef, ActorContext)
+  | hidden -> ProcessQueryResponse { status: NotVisible, visibility_marker }
   | call repository.get(subject_ref)
   | missing -> ProcessQueryResponse { status: Missing }
   v
@@ -566,8 +567,18 @@ Tests:activate;pause;complete;skip;illegal transition;duplicate.
 Pseudo:
 
 ```rust
-// [ReadVisibilityPolicy.assert_can_read(ProcessReadSubjectRef, ProcessConsumerRef)]
-self.read_policy.assert_can_read(subject_ref, consumer_ref)?;
+// [ReadVisibilityPolicy.evaluate_read_visibility(ProcessReadSubjectRef, ProcessConsumerRef, ActorContext)]
+let visibility = self.read_policy.evaluate_read_visibility(
+    subject_ref.clone(),
+    consumer_ref.clone(),
+    req.actor_context.clone(),
+)?;
+if visibility.visibility_decision == VisibilityDecision::Hidden {
+    return Ok(ProcessQueryResponse::not_visible(
+        subject_ref,
+        visibility.visibility_marker.required(),
+    ));
+}
 
 // [ProcessInstanceRepository.get(ProcessInstanceRef)]
 let Some(versioned) = self.instances.get(req.process_instance_ref).await? else {
@@ -577,7 +588,8 @@ let Some(versioned) = self.instances.get(req.process_instance_ref).await? else {
 
 Errors and surfaces:
 
-- visibility denied -> `ProcessViewStatus::NotVisible`.
+- visibility hidden -> `ProcessViewStatus::NotVisible` with `ProcessVisibilityMarker` from `ProcessReadVisibilityDecision`.
+- visibility filtered -> include visible body / items and `ProcessVisibilityMarker`;if filtering produces an empty page,return `ProcessViewStatus::NotVisible`.
 - repository missing -> `ProcessViewStatus::Missing`.
 - source snapshot stale -> `ProcessViewStatus::Degraded`.
 
@@ -590,7 +602,7 @@ Tests:available;missing;not visible;degraded marker.
 Steps:
 
 1. Validate actor and query metadata.
-2. Apply `ReadVisibilityPolicy`.
+2. Call `ReadVisibilityPolicy.evaluate_read_visibility(...)`;hidden returns `NotVisible` with marker before returning any body.
 3. Load primary truth object.
 4. Load secondary context:
    - activity status loads feedback reference state.
@@ -609,11 +621,12 @@ Steps:
 
 1. Convert `ProcessPageRequest` to Step 7 `PageRequest`.
 2. Validate page limit.
-3. Apply visibility policy before repository read when subject known;apply item filtering after repository read when item-level filtering is required.
+3. Call `ReadVisibilityPolicy.evaluate_read_visibility(...)` before repository read when subject known;hidden returns `NotVisible` with marker.
 4. Call `TraceRepository.list_trace_records` or `ProjectionRepository.search_instances`.
-5. Convert `PageInfo` to `ProcessPageInfo`.
-6. Map empty page to `Available` with `items = []`.
-7. Map trace gap / stale projection to `Degraded`.
+5. Apply item-level filtering after repository read when required;filtered pages include `ProcessVisibilityMarker`,and filtered-to-empty maps to `NotVisible`.
+6. Convert `PageInfo` to `ProcessPageInfo`.
+7. Map true empty page to `Available` with `items = []`.
+8. Map trace gap / stale projection to `Degraded`.
 
 Tests:empty page;next cursor;filtered page;projection disabled;trace gap degraded.
 

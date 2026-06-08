@@ -695,7 +695,7 @@ HasIssues --mark_failed-----------------------------------> Failed
 | Status | 来源 | 必须携带的 marker | 禁止事项 |
 |---|---|---|---|
 | `Available` | subject visible 且 projection/read model 可服务 | 无 | 不得掩盖 stale required ref |
-| `NotVisible` | read visibility policy 返回 hidden / filtered-to-empty | `ProcessVisibilityMarker` | 不得返回 hidden truth body |
+| `NotVisible` | `ReadVisibilityPolicy.evaluate_read_visibility(...)` 返回 `Hidden` 或 filtering 后 empty | `ProcessVisibilityMarker` from `ProcessReadVisibilityDecision` | 不得返回 hidden truth body;不得由 bare `ApplicationError` 临时拼 marker |
 | `Missing` | repository 无 subject 或 cursor 不存在 | 无 | 不得伪造 empty object |
 | `Degraded` | projection stale / rebuilding 或 reference unresolved / stale / unavailable | `ProcessDegradedMarker` 或 `ProjectionStatusMarker` | 不得静默返回 available |
 | `Unavailable` | projection disabled / failed 且无 fallback | `ProjectionStatusMarker` | 不得触发 rebuild 或修复 truth |

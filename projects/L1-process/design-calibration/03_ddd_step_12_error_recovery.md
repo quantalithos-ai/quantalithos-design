@@ -129,7 +129,7 @@
 | 内部错误 | HTTP / RPC / Event 映射 | 调用方应如何处理 |
 |---|---|---|
 | request DTO required field missing / invalid enum | `ProcessApiError::InvalidRequest`;consumer invalid envelope -> `ConsumerDisposition::Quarantined`;job -> `JobError::InvalidInput` | 修正请求或 event schema 后重试;不得进入 domain transition |
-| authorization / visibility denied | `ProcessApiError::NotAuthorized` 或 query `ProcessViewStatus::NotVisible` | caller 更换 actor / scope;不得通过 query 触发修复 |
+| authorization / visibility denied | invalid actor / authority context -> `ProcessApiError::NotAuthorized`;subject hidden / filtered-to-empty -> query `ProcessViewStatus::NotVisible` with `ProcessVisibilityMarker` from `ProcessReadVisibilityDecision` | caller 更换 actor / scope;不得通过 query 触发修复;query service 不得用 bare error 临时拼 visibility marker |
 | `IdempotencyReservation::Duplicate(result_ref)` and result exists | same operation + same key + same digest;command returns stored command result;consumer returns stored `ConsumerReceipt` with duplicate semantics;job returns previous `JobRunReceipt` | caller 接受原 result / receipt;不得重新执行 side effect |
 | duplicate result missing | `ProcessApiError::IdempotencyResultMissing(result_ref)`;job `JobError::DependencyUnavailable(DependencyRef)` | 人工修复 operation result store;不得从 current truth 重算 |
 | idempotency same operation + same key + different digest | `ProcessApiError::IdempotencyConflict`;job `JobError::IdempotencyConflict`;consumer quarantine/conflict receipt | caller 使用新 key 或原 request digest |

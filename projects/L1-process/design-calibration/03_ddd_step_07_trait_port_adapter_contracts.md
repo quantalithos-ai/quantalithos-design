@@ -52,6 +52,7 @@
 | `02-概要设计.md` §7 / §8 | Command / Query / Consumer / Job 只给处理骨架 | 本 Step 给 application services 可调用的 repository / external seam |
 | Step 6 对象契约 | 对象已定义,但没有保存 / 查询版本口径 | 本 Step 固定 `Versioned<T>` 与 optimistic save |
 | 幂等 duplicate result | 概要只要求 same key same digest 返回既有 result surface | 本 Step 增加 `OperationResultRepository`,避免只有 `result_ref` 无读取面 |
+| PH-06 visibility surface | Step 8 / Step 10 要求 `NotVisible` 必须带 `ProcessVisibilityMarker`,但只写 `assert_can_read` 无法提供 marker | 本 Step 定义 `ReadVisibilityPolicy.evaluate_read_visibility(...) -> ProcessReadVisibilityDecision` |
 | 相邻仓依赖 | 容易误写成 Cargo dependency 或直接 client | 本 Step 明确只通过 resolver / publisher / handoff port,不引入 sibling path dependency |
 
 ### 5. 改动前后对比
@@ -60,6 +61,7 @@
 |---|---|---|---|
 | repository 契约 | 只有名字 | 带 `Versioned<T>`、`StorageVersion`、`UnitOfWorkHandle` 的 trait | 支撑事务和并发 |
 | duplicate replay | 只有 `ApplicationResultRef` | 增加 operation result store 读取完整 result / receipt surface | 防止实现者自行重构 result |
+| query visibility | 只有 `assert_can_read(...) -> Result<(), ApplicationError>` | 返回 `ProcessReadVisibilityDecision`,显式承载 visible / filtered / hidden 和 marker | 支撑 `NotVisible` / filtered-to-empty 1:1 映射 |
 | external source | 只知道来源仓 | 每个来源仓一个 resolver port,返回 snapshot / marker | 不保存外部正文 |
 | outbox publish | 只知道 job | publisher port + outbox repository + publish outcome | 支撑 retry / failed 状态 |
 | handoff | 只知道 target boundary | trace / archive handoff port + receipt / error | 不把 observability / archive 作为编译期依赖 |
@@ -98,6 +100,7 @@
 | `ProjectionRepository` | projection repository | `application/src/ports.rs` | `infra/src/projection_stores.rs` | read model / timeline / summary / view state | `upsert_read_model`、`find_timeline`、`mark_view_state` |
 | `ReferenceSnapshotRepository` | snapshot repository | `application/src/ports.rs` | `infra/src/reference_stores.rs` | external snapshot / reference state | `upsert_method_snapshot`、`upsert_work_snapshot`、`upsert_runtime_feedback_summary`、`upsert_reference_state` |
 | `ReconciliationReportRepository` | report repository | `application/src/ports.rs` | `infra/src/projection_stores.rs` | reconciliation report | `save_report`、`get_report` |
+| `ReadVisibilityPolicy` | query policy port | `application/src/ports.rs` | `application/src/query_policy.rs` or `infra/src/projection_stores.rs` fake | query visibility decision and marker source | `evaluate_read_visibility` |
 | `MethodDefinitionResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | method definition snapshot | `resolve_definition` |
 | `WorkContextResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | work context snapshot | `resolve_work_context` |
 | `ActorCapabilityResolverPort` | external resolver | `application/src/ports.rs` | `infra/src/source_resolvers.rs` | actor capability snapshot | `resolve_actor_capability` |
@@ -173,6 +176,18 @@ pub struct PageCursor {
     /// Stable cursor value produced by the repository adapter.
     pub value: String,
 }
+
+/// Read visibility decision returned by the query visibility policy.
+pub struct ProcessReadVisibilityDecision {
+    /// Subject evaluated by the policy.
+    pub subject_ref: ProcessReadSubjectRef,
+    /// Consumer or actor requesting the view.
+    pub consumer_ref: ProcessConsumerRef,
+    /// Visibility decision copied into the public marker when needed.
+    pub visibility_decision: VisibilityDecision,
+    /// Marker required for Filtered or Hidden decisions.
+    pub visibility_marker: Option<ProcessVisibilityMarker>,
+}
 ```
 
 | 类型 | 归属 | 字段 / 变体 | 使用边界 |
@@ -183,6 +198,7 @@ pub struct PageCursor {
 | `Page<T>` | `application::ports` | `items`;`page_info` | list repository |
 | `PageInfo` | `application::ports` | `next_cursor`;`has_more` | list repository |
 | `PageCursor` | `application::ports` | `value: String` | list repository |
+| `ProcessReadVisibilityDecision` | `application::ports` | `subject_ref`;`consumer_ref`;`visibility_decision`;`visibility_marker` | query visibility policy result |
 | `RepositoryError` | `application::errors` | `NotFound`;`Conflict`;`StorageUnavailable`;`InvalidFilter`;`SerializationFailed` | repository adapter |
 | `ResolverError` | `application::errors` | `NotFound`;`UnsupportedVersion`;`SourceUnavailable`;`DigestMismatch`;`InvalidPayload`;`BodyNotAllowed` | external resolver |
 | `PublishError` | `application::errors` | `Retryable(PublishFailureRef)`;`Permanent(PublishFailureRef)`;`InvalidEvent` | publisher port |
@@ -980,7 +996,40 @@ pub trait ReconciliationReportRepository {
 }
 ```
 
-#### 7.8 External Resolver Port 契约
+#### 7.8 Read Visibility Policy 契约
+
+```rust
+/// Policy used by authorized process query services to evaluate read visibility.
+pub trait ReadVisibilityPolicy {
+    /// Evaluates whether one consumer can read a process read subject.
+    ///
+    /// The returned decision is the only source from which query services may
+    /// build `ProcessViewStatus::NotVisible` and `ProcessVisibilityMarker`.
+    fn evaluate_read_visibility(
+        &self,
+        subject_ref: ProcessReadSubjectRef,
+        consumer_ref: ProcessConsumerRef,
+        actor_context: ActorContext,
+    ) -> Result<ProcessReadVisibilityDecision, ApplicationError>;
+}
+```
+
+Decision mapping:
+
+| Decision | Required marker | Query mapping |
+|---|---|---|
+| `VisibilityDecision::Visible` | `None` | Continue repository / projection read and return `Available`, `Missing`, `Degraded`, or `Unavailable` according to the loaded source |
+| `VisibilityDecision::Filtered` | `Some(ProcessVisibilityMarker)` | Item-level query may return filtered items and include marker;filtered-to-empty page returns `status = NotVisible`, `items = []`, and the marker |
+| `VisibilityDecision::Hidden` | `Some(ProcessVisibilityMarker)` | Return `status = NotVisible`, `view = None` or `items = []`, and the marker without loading or returning hidden body |
+
+Rules:
+
+- `ReadVisibilityPolicy` replaces the older `assert_can_read(...) -> Result<(), ApplicationError>` shape for PH-06 query services.
+- `ProcessVisibilityMarker.consumer_ref` and `visibility_decision` must be copied from `ProcessReadVisibilityDecision`;`reason_ref` must be `Some` for `Hidden` and SHOULD be `Some` for `Filtered`.
+- `ApplicationError::NotAuthorized` remains reserved for invalid actor / authority context or policy dependency failure that prevents a public query surface. It is not the normal representation of subject-level hidden / filtered visibility.
+- Query services must not invent `ProcessVisibilityMarker` from a bare error or stringify policy internals.
+
+#### 7.9 External Resolver Port 契约
 
 Resolver 只能形成本仓允许保存的 snapshot / ref / summary / marker。任何 resolver 如果收到或解析到外部正文,必须返回 `ResolverError::BodyNotAllowed` 或丢弃正文后只返回正式 summary 字段。具体 event DTO 字段由 Step 8 定义。
 
@@ -1073,7 +1122,7 @@ Resolver 归属规则:
 - fake resolver 必须能注入 `Resolved`、`Unresolved`、`Stale`、`Invalid`、`Unavailable` 五类 resolution 结果,用于 service tests。
 - resolver 不得通过 Cargo path dependency 直接依赖 sibling implementation crate;只接收 / 返回本仓 contracts refs 和 summary。
 
-#### 7.9 Publisher / Handoff Port 契约
+#### 7.10 Publisher / Handoff Port 契约
 
 ```rust
 /// Publisher for outbound process events built from process outbox records.
@@ -1116,7 +1165,7 @@ pub trait ArchiveHandoffPort {
 - publish retryable failure 映射 `OutboxRetryReason`,permanent failure 映射 `OutboxFailureReason`。
 - handoff port 成功只返回 receipt / external ref marker,不得把 observability ledger 或 archive package 正文写入本仓。
 
-#### 7.10 Clock / Id Generator 契约
+#### 7.11 Clock / Id Generator 契约
 
 ```rust
 /// Clock used by application services and jobs.
@@ -1191,7 +1240,7 @@ pub trait IdGeneratorPort {
 - domain 工厂不得直接生成 id 或 timestamp;id / time 由 application 通过 port 提供后传入 domain。
 - fake id generator 必须支持 deterministic sequence,用于 contract / service tests。
 
-#### 7.11 Infra Adapter 矩阵
+#### 7.12 Infra Adapter 矩阵
 
 | Adapter | 文件 | 实现 trait | 数据来源 / 输出 | 必须支持的 fake 行为 |
 |---|---|---|---|---|
@@ -1216,7 +1265,7 @@ pub trait IdGeneratorPort {
 | `SystemClock` / `FixedClock` | `infra/src/clock_id.rs` | `ClockPort` | system or fixed time | deterministic timestamps |
 | `SequenceIdGenerator` | `infra/src/clock_id.rs` | `IdGeneratorPort` | deterministic sequence | stable refs in tests |
 
-#### 7.12 Step 8 前向引用闭合表
+#### 7.13 Step 8 前向引用闭合表
 
 本 Step 允许在 trait 签名中前向引用协议 DTO / scope / receipt 类型,但这些类型的字段级 schema 不在本 Step 展开。它们必须在 Step 8 正式闭合;若 Step 8 未闭合,实现阶段必须暂停,不得由 agent 自行补字段。
 
@@ -1245,7 +1294,7 @@ pub trait IdGeneratorPort {
 | `ArchiveHandoffTargetRef` | archive handoff port | target identity, destination kind, retention / package ref boundary |
 | `ArtifactEvidenceMarker` | artifact resolver result / reference marker repository input | evidence ref、evidence kind、resolution state;no artifact body |
 
-#### 7.13 禁止跨越的接缝
+#### 7.14 禁止跨越的接缝
 
 | 禁止事项 | 正确做法 |
 |---|---|

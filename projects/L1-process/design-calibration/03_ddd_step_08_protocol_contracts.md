@@ -216,6 +216,8 @@
 | `StageTarget` / `StageChangeReason` / `RhythmReason` / `StagePauseReason` / `StageCompletionReason` / `StageSkipReason` / `TimeboxReleaseReason` / `TimeboxInvalidReason` | `contracts/src/refs.rs` | PH-05 rhythm command target and reason schema;target-to-domain-method mapping is Step 6 §7.2.5 |
 | `ReferenceResolutionState` / `ReferenceResolutionLifecycleState` | `contracts/src/refs.rs` | public reference state reused by external reference markers、DTO、view、job、repository / resolver port and domain policy;contracts 不依赖 domain |
 | `GovernanceDecisionRef` / `ArtifactEvidenceMarker` / `RuntimeFeedbackRef` / `ConversationContextRef` | `contracts/src/refs.rs` | public external reference markers reused by protocol surface and domain;不得保存外部正文 |
+| `PageCursorRef` / `DegradedReasonRef` / `ProcessConsumerRef` / `VisibilityReasonRef` / `ReferenceResolutionStateId` / `ReferenceResolutionStateRef` / `DerivedProcessViewStateId` / `DerivedProcessViewStateRef` / `ProjectionFreshnessState` | `contracts/src/refs.rs` | PH-06 query page、degraded、visibility and projection marker helper schema;`ProjectionFreshnessState` enum is defined by Step 6 §9.7 and reused by protocol DTO |
+| `ProcessReadSubjectRef` / `ProcessSearchFilterRef` / `ProcessReadModelId` / `ProcessReadModelRef` / `ActivityStatusViewId` / `ProcessTimelineEntryRef` / `ProcessTimelineEntryRefSet` / `ProcessProgressSummaryId` / `ProcessProgressSummaryRef` / `ReconciliationReportId` / `ReconciliationReportRef` / `ReconciliationIssueRef` / `ReconciliationIssueRefSet` / `RecoveryStatusSubjectRef` / `ProcessTimelineFilterRef` / `ProcessSummarySubjectRef` / `ProcessTraceSubjectRef` / `ProcessAuditSubjectRef` | `contracts/src/refs.rs` | PH-06 public query subject、view identity、timeline、summary、trace and reconciliation helper refs;schema is Step 8 §7.4.1 |
 | `ProcessSearchFilter` | `contracts/src/queries.rs` | projection search filter derived from search request |
 | `ProcessReconciliationScopeRef` / `ReconciliationReportTargetRef` | `contracts/src/refs.rs` | reconciliation report scope and target |
 | `ArchiveDestinationRef` / `ArchiveScopeRef` / `ArchivePackageRef` | `contracts/src/refs.rs` | archive handoff destination、scope and package marker |
@@ -524,6 +526,227 @@ pub struct ProjectionStatusMarker {
 #### 7.4.1 public enum / helper schema
 
 以下类型被 command、query、event 或 job public DTO 直接引用,正式归属 `contracts/src/refs.rs` 或对应 protocol 文件,不得在实现侧临时补字段。
+
+##### PH-06 query / view helper refs
+
+这些 helper refs 是 Query request / response / view DTO 的 public schema。除 enum wrapper 外,所有 `value` 字段必须为非空 stable string,由 owning repository、projection builder 或 request canonicalization 生成;不得保存外部正文、runtime log、artifact body 或 conversation body。
+
+```rust
+/// Cursor token used by public query and job pages.
+pub struct PageCursorRef {
+    /// Opaque, stable cursor value produced by the repository or projection.
+    pub value: String,
+}
+
+/// Reason marker explaining degraded process query results.
+pub struct DegradedReasonRef {
+    /// Stable degraded reason code or reference.
+    pub value: String,
+}
+
+/// Process read consumer marker used by visibility policy and query markers.
+pub struct ProcessConsumerRef {
+    /// Stable consumer reference derived from actor context, authority, or approved integration identity.
+    pub value: String,
+}
+
+/// Reason marker explaining hidden or filtered query visibility.
+pub struct VisibilityReasonRef {
+    /// Stable visibility reason code or reference.
+    pub value: String,
+}
+
+/// Public reference to a stored external reference resolution state.
+pub struct ReferenceResolutionStateRef {
+    /// Resolution state identifier from `ReferenceResolutionState.reference_state_id`.
+    pub reference_state_id: ReferenceResolutionStateId,
+}
+
+/// Stable identifier for a stored external reference resolution state.
+pub struct ReferenceResolutionStateId {
+    /// Stable resolution state identifier.
+    pub value: String,
+}
+
+/// Public reference to a derived process view freshness state.
+pub struct DerivedProcessViewStateRef {
+    /// Derived view state identifier from `DerivedProcessViewState.view_state_id`.
+    pub view_state_id: DerivedProcessViewStateId,
+}
+
+/// Stable identifier for a derived process view state.
+pub struct DerivedProcessViewStateId {
+    /// Stable derived view state identifier.
+    pub value: String,
+}
+
+/// Stable identifier for a process read model projection.
+pub struct ProcessReadModelId {
+    /// Stable read model identifier.
+    pub value: String,
+}
+
+/// Public reference to a process read model projection.
+pub struct ProcessReadModelRef {
+    /// Read model identifier.
+    pub read_model_id: ProcessReadModelId,
+}
+
+/// Stable identity of an activity status view.
+pub struct ActivityStatusViewId {
+    /// Stable view identifier derived from `ActivityRef` or projection identity.
+    pub value: String,
+}
+
+/// Stable reference to one timeline entry.
+pub struct ProcessTimelineEntryRef {
+    /// Stable timeline entry reference.
+    pub value: String,
+}
+
+/// Ordered set of timeline entry references.
+pub struct ProcessTimelineEntryRefSet {
+    /// Timeline entry refs in committed trace order.
+    pub items: Vec<ProcessTimelineEntryRef>,
+}
+
+/// Stable identifier for a process progress summary projection.
+pub struct ProcessProgressSummaryId {
+    /// Stable summary identifier.
+    pub value: String,
+}
+
+/// Public reference to a process progress summary projection.
+pub struct ProcessProgressSummaryRef {
+    /// Summary identifier.
+    pub summary_id: ProcessProgressSummaryId,
+}
+
+/// Stable identifier for a reconciliation report.
+pub struct ReconciliationReportId {
+    /// Stable report identifier.
+    pub value: String,
+}
+
+/// Public reference to a reconciliation report.
+pub struct ReconciliationReportRef {
+    /// Report identifier.
+    pub report_id: ReconciliationReportId,
+}
+
+/// Public reference to a reconciliation issue.
+pub struct ReconciliationIssueRef {
+    /// Stable issue reference.
+    pub value: String,
+}
+
+/// Set of reconciliation issue references.
+pub struct ReconciliationIssueRefSet {
+    /// Issue references produced by a reconciliation report.
+    pub items: Vec<ReconciliationIssueRef>,
+}
+
+/// Subject represented by a process trace record or trace query.
+pub enum ProcessTraceSubjectRef {
+    /// Runtime process shape subject.
+    RuntimeShape(RuntimeProcessShapeRef),
+    /// Process profile subject.
+    ProcessProfile(ProcessProfileRef),
+    /// Process instance subject.
+    ProcessInstance(ProcessInstanceRef),
+    /// Activity subject.
+    Activity(ActivityRef),
+    /// Waiting gate subject.
+    WaitingGate(WaitingGateRef),
+    /// Process checkpoint subject.
+    Checkpoint(ProcessCheckpointRef),
+    /// Recovery attempt subject.
+    RecoveryAttempt(RecoveryAttemptRef),
+    /// Process stage subject.
+    ProcessStage(ProcessStageRef),
+    /// Process timebox binding subject.
+    TimeboxBinding(ProcessTimeboxBindingRef),
+    /// Derived process view subject.
+    DerivedView(DerivedProcessViewStateRef),
+}
+
+/// Subject represented by a process audit trail.
+pub enum ProcessAuditSubjectRef {
+    /// Trace subject audit scope.
+    TraceSubject(ProcessTraceSubjectRef),
+    /// Work context level audit scope.
+    WorkContext(WorkContextRef),
+}
+
+/// Stable reference to a canonicalized process search filter.
+pub struct ProcessSearchFilterRef {
+    /// Stable filter digest or repository key for `ProcessSearchFilter`.
+    pub value: String,
+}
+
+/// Public subject requested by a process query response wrapper.
+pub enum ProcessReadSubjectRef {
+    /// Runtime process shape query subject.
+    RuntimeShape(RuntimeProcessShapeRef),
+    /// Process profile query subject.
+    ProcessProfile(ProcessProfileRef),
+    /// Process instance query subject.
+    ProcessInstance(ProcessInstanceRef),
+    /// Activity status query subject.
+    Activity(ActivityRef),
+    /// Waiting gate query subject.
+    WaitingGate(WaitingGateRef),
+    /// Recovery status query subject.
+    RecoveryStatus(RecoveryStatusSubjectRef),
+    /// Process timeline query subject.
+    Timeline(ProcessInstanceRef),
+    /// Process progress summary query subject.
+    ProgressSummary(ProcessSummarySubjectRef),
+    /// Process search query scope.
+    Search(ProcessSearchFilterRef),
+    /// Process trace query subject.
+    Trace(ProcessTraceSubjectRef),
+    /// Reconciliation report query subject.
+    ReconciliationReport(ReconciliationReportRef),
+}
+
+/// Subject accepted by GetRecoveryStatus.
+pub enum RecoveryStatusSubjectRef {
+    /// Recovery status for a process instance.
+    ProcessInstance(ProcessInstanceRef),
+    /// Recovery status for a recovery attempt.
+    RecoveryAttempt(RecoveryAttemptRef),
+}
+
+/// Optional filter for a process timeline query.
+pub struct ProcessTimelineFilterRef {
+    /// Stable filter reference or canonical digest.
+    pub value: String,
+    /// Optional trace subject filter.
+    pub trace_subject_ref: Option<ProcessTraceSubjectRef>,
+    /// Optional lower trace record bound.
+    pub after_trace_record_ref: Option<ProcessTraceRecordRef>,
+    /// Optional committed truth change filter.
+    pub change_ref: Option<ProcessTruthChangeRef>,
+}
+
+/// Subject accepted by GetProcessProgressSummary.
+pub enum ProcessSummarySubjectRef {
+    /// Summary for one process instance.
+    ProcessInstance(ProcessInstanceRef),
+    /// Summary for a work context.
+    WorkContext(WorkContextRef),
+}
+```
+
+Query helper rules:
+
+- `ProjectionFreshnessState` is the public enum defined in Step 6 §9.7;Step 8 DTOs must reuse that enum and must not define a protocol-only duplicate.
+- `ReferenceResolutionStateRef.reference_state_id` must reference a stored `ReferenceResolutionState`;query markers may expose this ref,not external body or snapshot body.
+- `DerivedProcessViewStateRef.view_state_id` must reference a stored `DerivedProcessViewState`;projection markers must copy freshness and cursor from that stored state.
+- `ProcessTimelineEntryRefSet.items` and `ReconciliationIssueRefSet.items` preserve repository order and must not contain duplicate refs in one response.
+- `ProcessReadSubjectRef` is derived mechanically from the request subject field before visibility evaluation;service must not stringify request structs to invent a subject.
+- `ProcessTimelineFilterRef.value` and `ProcessSearchFilterRef.value` are canonical keys for the included filter fields;changing any semantic filter field changes the key.
 
 ```rust
 /// Process command kind used by idempotency operation names.
@@ -1724,6 +1947,8 @@ pub struct ProcessSearchResultPage {
     pub page_info: ProcessPageInfo,
     /// Response status.
     pub status: ProcessViewStatus,
+    /// Visibility marker when the search scope or all matching items are hidden.
+    pub visibility_marker: Option<ProcessVisibilityMarker>,
     /// Projection marker for the search index.
     pub projection_marker: Option<ProjectionStatusMarker>,
     /// Degraded marker when search data is stale or partial.
@@ -1731,7 +1956,7 @@ pub struct ProcessSearchResultPage {
 }
 ```
 
-Repository key:`ProcessSearchFilter`;fallback source:`ProjectionRepository::search_instances`. Empty search returns `items = []` and `status = Available`.
+Repository key:`ProcessSearchFilter`;fallback source:`ProjectionRepository::search_instances`. Empty search returns `items = []` and `status = Available`. If visibility filtering removes every visible item or the search scope is hidden,return `status = NotVisible`,`items = []`,and `visibility_marker = Some(marker)` from `ReadVisibilityPolicy`.
 
 ##### 7.9.10 `ProcessTraceView`
 
@@ -1756,12 +1981,14 @@ pub struct ProcessTraceView {
     pub entries: Vec<ProcessTraceEntryView>,
     /// Page metadata.
     pub page_info: ProcessPageInfo,
+    /// Response status.
+    pub status: ProcessViewStatus,
     /// Visibility marker when entries are filtered.
     pub visibility_marker: Option<ProcessVisibilityMarker>,
 }
 ```
 
-Repository key:`ProcessTraceSubjectRef`;fallback source:`TraceRepository::list_trace_records`.
+Repository key:`ProcessTraceSubjectRef`;fallback source:`TraceRepository::list_trace_records`. If the trace subject is hidden,return `status = NotVisible`,`entries = []`,and `visibility_marker = Some(marker)` from `ReadVisibilityPolicy`;if only some entries are filtered,return visible entries with `status = Available` and the same marker.
 
 ##### 7.9.11 `ReconciliationReportView`
 
@@ -1844,7 +2071,7 @@ pub struct GetProcessInstanceRequest {
 | 函数签名 | `get_process_instance(GetProcessInstanceRequest) -> Result<ProcessQueryResponse<ProcessInstanceView>, ProcessApiError>` |
 | RPC 名称 | `process.query.get_process_instance` |
 | repository key | `ProcessInstanceRef` |
-| not visible 口径 | `ReadVisibilityPolicy` reject -> `status = NotVisible` |
+| not visible 口径 | `ReadVisibilityPolicy.evaluate_read_visibility(...)` returns `Hidden` -> `status = NotVisible` with `visibility_marker` |
 
 ##### 7.10.4 `GetActivityStatus`
 

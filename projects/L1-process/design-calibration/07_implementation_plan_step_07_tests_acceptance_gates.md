@@ -43,8 +43,8 @@
 | PH-05 | rhythm command/domain/service tests;work boundary redaction | `EV-SERVICE-001` slice;`EV-SCRIPT-001` targeted | RL-PROC-ARCH-001;RL-PROC-DATA-002 | timebox / stage 只保存 refs / markers,不接管 Work truth |
 | PH-06 | `TC-PROC-QUERY-001~011`;projection/read model no-write tests | `EV-SERVICE-002`;`EV-SCRIPT-003` seed | AC-PROC-005/012;ST-PROC-QUERY-001;VF-PROC-006 | 11 Query hit/missing/degraded/not visible 均 no-write |
 | PH-07 | `TC-PROC-EVENT-001~007`;consumer dedup/quarantine/delayed tests | `EV-WORKER-001`;`EV-SCRIPT-001` targeted | AC-PROC-009;ST-PROC-EVENT-001;RL-PROC-DATA-002 | inbound consumer 不保存外部正文,重复不重复写 marker |
-| PH-08 | `TC-PROC-PUB-001`;outbox payload / publisher retry tests | `EV-WORKER-002`;topic map evidence | REQ-PROC-OUTBOX-001;ST-PROC-REC-001 | 10 outbound events ref-only,失败有 retry / failed marker |
-| PH-09 | `TC-PROC-JOB-001~007`;recovery-replay;partial report tests | `EV-JOB-001`;`EV-INTEGRATION-001` slice | AC-PROC-013;ST-PROC-JOB-001;VF-PROC-006/007 | jobs 不修业务 truth,只写允许 marker / report |
+| PH-08 | `TC-PROC-PUB-001`;outbox payload / publisher retry tests;publish job contract tests | `EV-WORKER-002`;topic map evidence | REQ-PROC-OUTBOX-001;ST-PROC-REC-001 | 10 outbound events ref-only,失败有 retry / failed marker,publish outbox job receipt / error stable |
+| PH-09 | `TC-PROC-JOB-001~007`;non-publish job contract tests;recovery-replay;partial report tests | `EV-JOB-001`;`EV-INTEGRATION-001` slice | AC-PROC-013;ST-PROC-JOB-001;VF-PROC-006/007 | non-publish jobs 不修业务 truth,只写允许 marker / report;full suite 汇总 publish + non-publish |
 | PH-10 | `TC-PROC-SCRIPT-001~003`;`TC-PROC-E2E-001`;redaction full scan;acceptance checklist | `EV-SCRIPT-*`;`EV-E2E-001`;acceptance handoff | AC-PROC-001~029;VF-PROC-001~008 | fixed run evidence 完整,无 VF failed |
 
 ### 3.2 Commit Boundary 门禁索引
@@ -70,11 +70,11 @@
 | commit-07-d | external reference consumer worker tests;targeted redaction | `TC-PROC-EVENT-001~005` |
 | commit-07-e | runtime/conversation consumer worker tests | `TC-PROC-EVENT-006~007`;`EV-WORKER-001` slice |
 | commit-08-a | outbound shared + shape/profile payload contract tests | topic map seed and ref-only payload stable |
-| commit-08-b | instance/activity/timing payload contract tests;outbox record persistence tests | `ProcessOutboxRecord.payload_snapshot` 在 accepted transaction 保存;truth change mapping stable |
-| commit-08-c | waiting/checkpoint/recovery payload contract tests | payload snapshot not recomputed from current truth |
-| commit-08-d | trace/view payload contract tests;payload redaction | all 10 event mapping stable |
-| commit-08-e | publisher retry/failure tests | `EV-WORKER-002` |
-| commit-09-a | shared job schema + publish job contract tests | receipt / error / report refs stable |
+| commit-08-b | instance/activity/waiting/checkpoint/recovery/timing payload contract tests;outbox record persistence tests;old call site grep | `ProcessOutboxRecord.payload_snapshot` 在 accepted transaction 保存;所有 PH-02~PH-05 accepted-flow outbox call site 已迁移到 formal record 保存面 |
+| commit-08-c | trace/view payload contract tests | payload snapshot not recomputed from current truth |
+| commit-08-d | full 10-event mapping contract tests;payload redaction | all 10 event mapping stable |
+| commit-08-e | publisher retry/failure + publish job contract tests | `EV-WORKER-002`;publish receipt / error stable |
+| commit-09-a | non-publish job shared foundation tests | remaining report refs / duplicate replay stable |
 | commit-09-b | projection/refresh/reconciliation job contract tests | invalid input / duplicate fixture |
 | commit-09-c | handoff/recovery job contract tests | no truth repair fixture |
 | commit-09-d | projection/refresh/reconciliation runner tests | partial report / no truth repair |

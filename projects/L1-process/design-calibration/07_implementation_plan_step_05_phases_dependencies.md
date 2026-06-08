@@ -123,11 +123,13 @@
 | PH-05 | Stage / timebox rhythm | 建立 stage state 和 timebox binding,只引用 Work 节奏,不接管 Work truth | PH-04 | rhythm command、stage/timebox domain、snapshot marker、outbox | rhythm command/state tests;RL-PROC-ARCH-001 |
 | PH-06 | Authorized query / projection / trace consumption | 建立 11 Query、read model、projection、trace、search / report read surface 和 no-write | PH-05 | query DTO、view DTO、projection store、query handler、trace read | `TC-PROC-QUERY-001~011`;`EV-SERVICE-002`;AC-PROC-005/012 |
 | PH-07 | Inbound consumers / reference snapshots / runtime feedback intake | 承接 7 inbound event,写 snapshot / stale / pending / quarantine marker | PH-06 | inbound DTO、consumer service、dedup、reference snapshot、runtime feedback marker | `TC-PROC-EVENT-001~007`;`EV-WORKER-001`;AC-PROC-009 |
-| PH-08 | Outbox publisher / outbound event protocol | 建立 10 outbound event payload、publisher dispatch、retry / failed state | PH-07 | outbox event DTO、payload builder、publisher fake、worker loop | `TC-PROC-PUB-001`;`EV-WORKER-002`;topic map / redaction |
-| PH-09 | Operations jobs / handoff / reconciliation / recovery maintenance | 建立 7 operations job、report、handoff、reference refresh、projection rebuild、no truth repair | PH-08 | job DTO、job runner、partial report、handoff fake、reconciliation report | `TC-PROC-JOB-001~007`;`EV-JOB-001`;VF-PROC-006/007 |
+| PH-08 | Outbox publisher / outbound event protocol | 建立 10 outbound event payload、publisher dispatch、retry / failed state 和 publish outbox job 最小执行面 | PH-07 | outbox event DTO、payload builder、publisher fake、`PublishProcessOutboxJob` DTO、worker/job loop | `TC-PROC-PUB-001`;`EV-WORKER-002`;topic map / redaction |
+| PH-09 | Operations jobs / handoff / reconciliation / recovery maintenance | 建立除 publish outbox 外的 6 个 operations job、report、handoff、reference refresh、projection rebuild、no truth repair,并汇总 7 job suite | PH-08 | non-publish job DTO、job runner、partial report、handoff fake、reconciliation report | `TC-PROC-JOB-001~007`;`EV-JOB-001`;VF-PROC-006/007 |
 | PH-10 | Release gates / reports / acceptance handoff | 执行 P0 gate,生成 fixed run reports、evidence index、redaction、veto 和 risk acceptance | PH-09 | gate script、report generator、redaction checker、acceptance handoff | `TC-PROC-SCRIPT-*`;`EV-SCRIPT-*`;`EV-E2E-001`;AC-PROC-001~029;VF-PROC-001~008 |
 
 PH-02~PH-05 中的 `outbox intent` 只表示 PH-08 前用于 command side-effect 验证的过渡保存面。进入 commit-08-b 后,所有旧 outbox intent port、fake store 和 accepted-flow call site 必须迁移为正式 `ProcessOutboxRecord` 保存面;旧 `event_kind + subject_ref + trace_ref` 形态不得继续作为并行 outbox path 或 publisher 输入。
+
+`PublishProcessOutboxJob` 是 PH-08 publisher loop 的正式 public job surface,不是 PH-09 才出现的内部 runner。因为 Step 8 / Step 9 已规定 `PublishProcessOutboxFlow` 接收 `PublishProcessOutboxJob` 并返回 `JobRunReceipt` / `JobError`,commit-08-e 必须允许提前引入 publish outbox 所需的最小 `contracts/src/jobs.rs` shared schema、publish job idempotency result replay 和 `ProcessOutboxService.publish_pending(...)` 签名。commit-09-a 起只承接 non-publish operations job 的 shared scope / report / runner foundation,不得再把 publish job DTO 作为后置 deliverable。
 
 ### 7.3 阶段顺序理由
 

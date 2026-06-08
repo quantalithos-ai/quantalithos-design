@@ -1306,6 +1306,9 @@ pub trait IdGeneratorPort {
     /// Creates a process trace id.
     fn new_process_trace_id(&self) -> ProcessTraceId;
 
+    /// Creates a trace or archive handoff reference.
+    fn new_trace_handoff_ref(&self) -> TraceHandoffRef;
+
     /// Creates an application result reference.
     fn new_application_result_ref(&self) -> ApplicationResultRef;
 }
@@ -1314,6 +1317,7 @@ pub trait IdGeneratorPort {
 约束:
 
 - domain 工厂不得直接生成 id 或 timestamp;id / time 由 application 通过 port 提供后传入 domain。
+- trace / archive handoff runner must obtain `TraceHandoffRef` from `IdGeneratorPort::new_trace_handoff_ref()` before calling `ProcessTraceRecord.prepare_handoff(...)` or `prepare_archive_handoff(...)`.
 - fake id generator 必须支持 deterministic sequence,用于 contract / service tests。
 
 #### 7.12 Infra Adapter 矩阵

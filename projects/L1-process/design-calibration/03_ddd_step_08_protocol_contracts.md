@@ -216,11 +216,12 @@
 | `StageTarget` / `StageChangeReason` / `RhythmReason` / `StagePauseReason` / `StageCompletionReason` / `StageSkipReason` / `TimeboxReleaseReason` / `TimeboxInvalidReason` | `contracts/src/refs.rs` | PH-05 rhythm command target and reason schema;target-to-domain-method mapping is Step 6 §7.2.5 |
 | `ReferenceResolutionState` / `ReferenceResolutionLifecycleState` | `contracts/src/refs.rs` | public reference state reused by external reference markers、DTO、view、job、repository / resolver port and domain policy;contracts 不依赖 domain |
 | `GovernanceDecisionRef` / `ArtifactEvidenceMarker` / `RuntimeFeedbackRef` / `ConversationContextRef` | `contracts/src/refs.rs` | public external reference markers reused by protocol surface and domain;不得保存外部正文 |
+| `TraceHandoffRef` / `TraceHandoffTargetRef` / `TraceHandoffTargetKind` / `TraceHandoffKind` / `HandoffFailureRef` / `HandoffFailureKind` / `HandoffCancelReason` | `contracts/src/refs.rs` | trace / archive handoff identity、stored target、kind、failure and cancel reason schema;schema is Step 6 §11.5 |
 | `PageCursorRef` / `DegradedReasonRef` / `ProcessConsumerRef` / `VisibilityReasonRef` / `ReferenceResolutionStateId` / `ReferenceResolutionStateRef` / `DerivedProcessViewStateId` / `DerivedProcessViewStateRef` / `ProjectionFreshnessState` | `contracts/src/refs.rs` | PH-06 query page、degraded、visibility and projection marker helper schema;`ProjectionFreshnessState` enum is defined by Step 6 §9.7 and reused by protocol DTO |
 | `ProcessReadSubjectRef` / `ProcessSearchFilterRef` / `ProcessReadModelId` / `ProcessReadModelRef` / `ActivityStatusViewId` / `ProcessTimelineEntryRef` / `ProcessTimelineEntryRefSet` / `ProcessProgressSummaryId` / `ProcessProgressSummaryRef` / `ReconciliationReportId` / `ReconciliationReportRef` / `ReconciliationIssueRef` / `ReconciliationIssueRefSet` / `RecoveryStatusSubjectRef` / `ProcessTimelineFilterRef` / `ProcessSummarySubjectRef` / `ProcessTraceSubjectRef` / `ProcessAuditSubjectRef` | `contracts/src/refs.rs` | PH-06 public query subject、view identity、timeline、summary、trace and reconciliation helper refs;schema is Step 8 §7.4.1 |
 | `ProcessSearchFilter` | `contracts/src/queries.rs` | projection search filter derived from search request |
 | `ProcessReconciliationScopeRef` / `ReconciliationReportTargetRef` | `contracts/src/refs.rs` | reconciliation report scope and target |
-| `ArchiveDestinationRef` / `ArchiveScopeRef` / `ArchivePackageRef` | `contracts/src/refs.rs` | archive handoff destination、scope and package marker |
+| `ArchiveDestinationRef` / `ArchiveScopeRef` / `ArchiveHandoffTargetRef` / `ArchivePackageRef` | `contracts/src/refs.rs` | archive handoff destination、scope、public target input and package marker;`ArchiveHandoffTargetRef.stored_target_ref` is the only stored `TraceHandoffRecord.target_ref` source |
 | `ProtocolErrorRef` / `DependencyRef` / `JobReportRef` / `HandoffReceiptRef` | `contracts/src/refs.rs` | public error、job report and handoff receipt refs |
 | `IdempotencyKey` / `EventDedupKey` / `JobIdempotencyKey` | `contracts/src/refs.rs` | operation-specific idempotency key value objects |
 | `RequestDigest` / `EventDigest` / `JobDigest` | `contracts/src/refs.rs` | canonical digest value objects |
@@ -2915,6 +2916,8 @@ pub struct TraceHandoffScope {
 
 /// Archive handoff target reference.
 pub struct ArchiveHandoffTargetRef {
+    /// Stable target identity stored on TraceHandoffRecord.
+    pub stored_target_ref: TraceHandoffTargetRef,
     /// Destination archive reference.
     pub destination_ref: ArchiveDestinationRef,
     /// Archive scope to prepare.
@@ -2951,6 +2954,12 @@ pub struct ArchiveHandoffReceipt {
     pub delivered_at: Timestamp,
 }
 ```
+
+Archive handoff target rules:
+
+- `stored_target_ref.target_kind` must be `TraceHandoffTargetKind::Archive`.
+- `TraceHandoffRecord.target_ref` for archive handoff is exactly `ArchiveHandoffTargetRef.stored_target_ref`;implementation must not derive it from `destination_ref.value`、`archive_scope_ref.value` or any adapter-private field.
+- `ArchiveHandoffPort.deliver_archive(...)` still receives the full `ArchiveHandoffTargetRef` so adapter validation can use destination and archive scope without persisting archive package body.
 
 Trace handoff scope rules:
 
@@ -3095,7 +3104,8 @@ pub struct PrepareProcessTraceHandoffJob {
 
 Rules:
 
-- job generates `TraceHandoffRef`,calls `ProcessTraceRecord::prepare_handoff(handoff_ref, target_ref)`,then calls `TraceHandoffPort::deliver_trace`.
+- `target_ref.target_kind` must be `TraceHandoffTargetKind::Observability`;archive handoff must use `PrepareProcessArchiveHandoffJob`.
+- job generates `TraceHandoffRef` via `IdGeneratorPort::new_trace_handoff_ref()`,calls `ProcessTraceRecord::prepare_handoff(handoff_ref, target_ref)`,then calls `TraceHandoffPort::deliver_trace`.
 - unprepared trace records come from `TraceRepository::list_trace_records_for_handoff(scope)`.
 - existing retryable records come from `TraceRepository::list_handoff_refs(scope)`.
 - success stores `TraceHandoffReceipt` marker.
@@ -3127,6 +3137,7 @@ Rules:
 - job delivers prepared handoff refs to archive via `ArchiveHandoffPort`.
 - unprepared trace records come from `TraceRepository::list_trace_records_for_handoff(scope)` before preparing archive handoff refs.
 - existing retryable records come from `TraceRepository::list_handoff_refs(scope)`.
+- application generates `TraceHandoffRef` via `IdGeneratorPort::new_trace_handoff_ref()`,calls `ProcessTraceRecord::prepare_archive_handoff(handoff_ref, target_ref.stored_target_ref)`,then calls `ArchiveHandoffPort::deliver_archive(handoff_ref, target_ref, metadata)`.
 - returned `ArchiveHandoffReceipt.archive_package_ref` is a reference only,not package body.
 
 ##### 7.19.7 `MaintainRecoveryAttemptsJob`

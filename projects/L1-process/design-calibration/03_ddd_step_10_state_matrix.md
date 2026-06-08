@@ -599,7 +599,7 @@ Failed --cancel------------------------------------------> Cancelled
 
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
-| factory | `Prepared` | `ProcessTraceRecord.prepare_handoff(TraceHandoffRef, TraceHandoffTargetRef)` / `TraceHandoffRecord::prepare(...)` | trace record 来自 committed truth;target ref 不要求外部正文 | 创建 handoff marker | `DomainError::ExternalBodyRejected` |
+| factory | `Prepared` | `ProcessTraceRecord.prepare_handoff(TraceHandoffRef, TraceHandoffTargetRef)` / `prepare_archive_handoff(TraceHandoffRef, TraceHandoffTargetRef)` / `TraceHandoffRecord::prepare(...)` | trace record 来自 committed truth;target ref 不要求外部正文;archive path 使用 `ArchiveHandoffTargetRef.stored_target_ref` | 创建 handoff marker | `DomainError::ExternalBodyRejected` |
 | `Prepared` / `Failed` | `Delivered` | `TraceHandoffRecord.mark_delivered(...)` / `mark_archived(...)` | handoff port 返回 receipt / external ref;不保存 observability / archive body | 保存 receipt marker、external handoff ref 或 archive package ref | `DomainError::InvalidStateTransition` |
 | `Prepared` | `Failed` | `TraceHandoffRecord.mark_failed(...)` | handoff port 返回 retryable/permanent failure | job receipt failed_count 增加 | `DomainError::InvalidStateTransition` |
 | `Prepared` / `Failed` | `Cancelled` | `TraceHandoffRecord.cancel(HandoffCancelReason, ActorRef)` | operations policy 允许取消;reason 必填 | 不再投递;不回滚 Process truth | `DomainError::InvalidStateTransition` |

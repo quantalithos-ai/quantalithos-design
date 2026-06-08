@@ -17,6 +17,8 @@
 | v0.13 | 2026-06-06 | 交付实现前闭环审计讨论规则 | 要求 Step 3 / 12 / 13 将按 phase / commit boundary 审计正式 `03/05/06/07` 作为实现移交门禁和永久记忆种子 |
 | v0.14 | 2026-06-06 | 设计修复后经验沉淀讨论规则 | 要求 Step 3 讨论永久记忆种子时覆盖设计修复后的经验沉淀检查、提交合并口径和示例补充 |
 | v0.15 | 2026-06-08 | Phase / commit boundary 小循环实施规划 | 明确 Step 5~7 / Step 11 必须按 phase 和 commit boundary 逐个停审,再做跨 boundary 依赖、门禁、提交粒度和证据闭环审计 |
+| v0.16 | 2026-06-09 | Commit boundary 经验复核讨论规则 | 要求 Step 6 为每个 commit boundary 从可落码性标准 §九选择适用经验项,逐项给出通过 / 不适用 / blocker 结论 |
+| v0.17 | 2026-06-09 | 设计者复核责任讨论规则 | 明确 Step 6 的经验复核由设计者在移交实现前完成,blocker 必须回写设计并重复核;实现者只做二次校验和阻塞回报 |
 | v0.9 | 2026-05-29 | 测试证据、报告生成与脚本目录讨论规则 | 在 Step 3 / 7 / 11 / 12 补充 scripts、artifacts/test/<run_id>、reports/runs/<run_id> 和 reports/acceptance 的输入输出 |
 | v0.8 | 2026-05-29 | 代码仓目录与命名前置讨论规则 | 在 Step 3 补充实现仓目录、workspace member、Cargo package、Rust crate 和 binary 命名检查 |
 | v0.7 | 2026-05-29 | 本地多仓依赖实施讨论规则 | 在 Step 3 / Step 8 补充 `/home/aris/Projects` sibling repo、编译期 path dependency、依赖检查和不可用时处理的输入输出 |
@@ -93,6 +95,7 @@ Phase 可验证目标
   -> commit boundary
   -> boundary 子功能分组
   -> 代码批次和编写顺序
+  -> boundary 经验适用性复核
   -> 测试 / 验收 / 证据门禁
   -> 提交 message 分组
   -> boundary 停审
@@ -110,6 +113,7 @@ Phase 可验证目标
 - boundary 是否可以独立 review、独立验证、必要时独立回退。
 - boundary 内多个子功能是否属于同一可验证增量,而不是无关功能拼接。
 - boundary 是否有开工前设计闭环复核、代码批次、测试门禁、证据输出和提交 message 分组。
+- boundary 是否已从 `设计真相源闭环与可落码性标准.md` §九选择适用经验项,并逐项给出通过 / 不适用 / blocker 结论。
 
 所有 phase / commit boundary 完成后,必须做跨 boundary 审计,检查依赖顺序、phase 越界、测试重复或缺失、验收覆盖、证据归属、提交粒度和 commit message scope 是否一致。
 
@@ -242,6 +246,34 @@ commit-04-b 开工门禁:
 - 代码、测试和验收会继续沿用不同真相源。
 
 如果 `设计真相源闭环与可落码性标准.md` §九的任一适用项未通过，实施计划必须把该项标为 blocker，并要求先回写设计真相源；不得把“实现时再确认”作为开工门禁通过条件。
+
+每个 commit boundary 还必须由设计者做一次经验适用性扫描。扫描时先判断该 boundary 涉及 command、query、event、job、outbox、projection、state、persistence、idempotency、evidence 中哪些设计面,再从 `设计真相源闭环与可落码性标准.md` §九选择适用经验项。讨论输出必须逐项记录 `通过 / 不适用 / blocker`;不适用项必须说明原因,不能只写 N/A。若存在 blocker,设计者必须先回写设计真相源、固定新的 design baseline 并重复核该 boundary,不得把该 boundary 标为“交给实现时再确认”。
+
+实现 agent 后续只承担二次校验和阻塞回报责任:开工前确认实现仓、设计 baseline 和复核结论一致;执行中发现不一致时暂停并回报具体设计缺口。实现 agent 不负责把经验复核表里的 blocker 现场补成代码实现。
+
+正确示例：
+
+```text
+commit-08-b 经验复核:
+  - 涉及设计面: outbound event / outbox / trace context。
+  - outbox record / payload snapshot 闭环: 通过,Step 6 / 7 / 9 已定义 record 保存面。
+  - public job surface 阶段闭环: 不适用,本 boundary 不引入 job DTO 或 job receipt。
+  - phase boundary: 通过,旧 outbox append call site 已纳入同一 boundary。
+```
+
+错误示例：
+
+```text
+commit-08-b:
+  - 实现 outbound event payload builder。
+  - 遵循可落码性标准。
+```
+
+错误原因：
+
+- 没有说明当前 boundary 触发哪些历史经验。
+- 没有检查旧 outbox port、payload snapshot、trace context 和 phase boundary。
+- 实现 agent 仍会在同一位置被迫暂停。
 
 实施计划进入正式实现移交前,还必须把 `设计真相源闭环与可落码性标准.md` 作为主动审计门禁执行一次:按 `07-实施计划.md` 的 phase / commit boundary 复核正式 `03-详细设计.md`、`05-测试方案.md`、`06-验收标准.md` 和 `07-实施计划.md`。这一步不是等实现 agent 报错后再补,也不是只写“遵循标准”;未通过项必须先回写设计仓并固定新的 design baseline。
 
@@ -742,6 +774,7 @@ git config user.email
 - 提交粒度判断表
 - 提交前检查清单
 - 每个 commit boundary 的子功能分组表
+- 每个 commit boundary 的经验复核表
 - Commit boundary 停审记录
 - 跨 boundary 粒度 / 依赖 / 门禁审计表
 
@@ -767,8 +800,15 @@ git config user.email
 18. 发现详细设计、测试方案、验收标准之间冲突时，是暂停、回写设计还是调整本阶段范围。
 19. 每个 commit boundary 内有哪些协作子功能,为什么这些子功能必须同提交。
 20. 每个 commit boundary 是否明确不包含哪些后续 boundary 内容。
-21. 每个 commit boundary 完成后是否通过停审。
-22. 所有 boundary 完成后,是否存在过细拆分、过粗合并、跨 phase 混入、测试门禁缺失或提交时机不清。
+21. 每个 commit boundary 涉及 command / query / event / job / outbox / projection / state / persistence / idempotency / evidence 中哪些设计面。
+22. 每个 commit boundary 从 `设计真相源闭环与可落码性标准.md` §九触发哪些历史经验项。
+23. 每个适用经验项是否已经有正式 schema、port、flow、state matrix、persistence 或测试证据位置。
+24. 哪些高风险经验项被判定为不适用,不适用理由是否具体到当前 boundary。
+25. 经验复核中是否存在 blocker,是否必须先回写设计真相源并固定新 baseline。
+26. 经验复核是否由设计者完成,是否需要在设计修复后重复核同一 boundary。
+27. 实现 agent 后续只需二次校验哪些 baseline / 文档 / 实现仓条件,发现不符时如何阻塞回报。
+28. 每个 commit boundary 完成后是否通过停审。
+29. 所有 boundary 完成后,是否存在过细拆分、过粗合并、跨 phase 混入、测试门禁缺失或提交时机不清。
 
 #### 期望产出
 
@@ -813,6 +853,12 @@ git config user.email
 | artifact materialization 闭环 | <runner 是否能解析 artifact location> | 暂停并回报设计缺口 |
 | phase boundary | <是否依赖后续 phase> | 调整阶段或回写设计 |
 
+#### Commit boundary 经验复核
+
+| Commit boundary | 涉及设计面 | 适用经验项 | 不适用理由 | 证据位置 | 结论 | 处理 | 复核责任 |
+|---|---|---|---|---|---|---|---|
+| commit-02-a | command / state / idempotency | DTO 构造闭环;状态闭环;idempotency 闭环 | outbox 不适用,本 boundary 不写出站事件 | 03 §x / 07 §x | 通过 / blocker | <回写设计或允许开工> | 设计者完成;实现者二次校验 |
+
 #### 提交粒度判断
 
 | 提交边界 | 粒度判断 | 是否可一句话描述 | 是否可独立验证 | 调整结论 |
@@ -841,6 +887,10 @@ git config user.email
 - 任务必须写明阶段内编写顺序。
 - 每个阶段必须输出代码实现批次表。
 - 每个阶段或 commit boundary 必须输出开工前设计闭环复核表。
+- 每个 commit boundary 必须输出经验复核表,从 `设计真相源闭环与可落码性标准.md` §九选择当前适用经验项,不能只写“遵循标准”。
+- 经验复核表中不适用项必须说明具体理由;适用项缺少正式设计证据时必须标为 blocker。
+- 经验复核由设计者在移交实现前完成;发现 blocker 后必须回写设计并重复核,不得留给实现 agent 现场补齐。
+- 实现 agent 只按实施计划和 design baseline 做二次校验;发现设计与实现条件不符时继续阻塞回报。
 - 代码批次必须按可验证功能切片拆分，不能按“所有 domain / 所有 repository / 所有测试”横向堆叠。
 - 单批预计超过 300 行应拆分；超过 500 行必须拆分。
 - 状态机、事务、并发、幂等、安全、审计、错误恢复和跨仓同步等高风险逻辑必须单独批次实现、单独验证。
@@ -860,6 +910,7 @@ git config user.email
 - 每个阶段都有任务表、编写顺序和提交边界。
 - 每个阶段都有代码实现批次表，且批次规模、验证门禁和提交关系清楚。
 - 每个阶段或 commit boundary 都有字段、DTO、状态和 phase boundary 开工前复核口径。
+- 每个 commit boundary 都有由设计者完成的经验复核表,且无未处理 blocker。
 - 每个提交边界都有提交前门禁。
 - 每个 commit boundary 已完成停审,跨 boundary 审计没有 unresolved 冲突。
 

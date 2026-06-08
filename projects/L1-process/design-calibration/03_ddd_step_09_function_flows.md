@@ -844,7 +844,7 @@ Steps:
 1. Reserve job idempotency.
 2. If `scope.include_unprepared_traces`,list trace records using `TraceRepository.list_trace_records_for_handoff(scope)`.
 3. List existing retryable handoff records using `TraceRepository.list_handoff_refs(scope)` when `scope.handoff_states` is non-empty.
-4. For each trace record,generate `TraceHandoffRef` and call `ProcessTraceRecord.prepare_handoff(handoff_ref, target_ref)`.
+4. For each trace record,generate `TraceHandoffRef` via `IdGeneratorPort.new_trace_handoff_ref()` and call `ProcessTraceRecord.prepare_handoff(handoff_ref, target_ref)`.
 5. Save prepared `TraceHandoffRecord`.
 6. Call `TraceHandoffPort.deliver_trace(handoff_record.handoff_ref, target_ref, metadata)` for prepared or retryable handoff records.
 7. On success mark delivered and save receipt marker.
@@ -859,7 +859,7 @@ Steps:
 1. Reserve job idempotency.
 2. If `scope.include_unprepared_traces`,list trace records using `TraceRepository.list_trace_records_for_handoff(scope)`.
 3. List existing retryable archive handoff records using `TraceRepository.list_handoff_refs(scope)` when `scope.handoff_states` is non-empty.
-4. Generate `TraceHandoffRef` and prepare `TraceHandoffRecord` for archive target for each unprepared trace record.
+4. Generate `TraceHandoffRef` via `IdGeneratorPort.new_trace_handoff_ref()` and call `ProcessTraceRecord.prepare_archive_handoff(handoff_ref, target_ref.stored_target_ref)` for each unprepared trace record.
 5. Call `ArchiveHandoffPort.deliver_archive(handoff_record.handoff_ref, target_ref, metadata)` for prepared or retryable handoff records.
 6. Save `ArchiveHandoffReceipt.archive_package_ref` as reference marker only.
 7. Return partial failure if some records fail.

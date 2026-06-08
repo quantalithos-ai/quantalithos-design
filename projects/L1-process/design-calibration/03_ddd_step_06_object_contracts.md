@@ -87,7 +87,7 @@
 
 | 模块 | 文件 | 对象 / 类型 |
 |---|---|---|
-| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker、command intent helper;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState`、`ReferenceResolutionLifecycleState`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RecoveryHistoryKind`、`RuntimeFeedbackSummaryRef`、`ProcessStartIntentRef`、`ProcessStartReason`、`ActivityProgressionIntentRef`、`ActivityProgressionTransition`、`ActivityFlowControlIntent`、`ProcessStageId`、`ProcessStageRef`、`ProfileStageRef`、`ProcessStageKind`、`ProcessTimingSubjectRef`、`ProcessTimingRef`、`ProcessTimeboxBindingId`、`ProcessTimeboxBindingRef`、`ProcessTimeboxRef`、`ExternalTimeboxKind`、`ExternalTimeboxRef`、`StageTarget`、`StageChangeReason`、`RhythmReason`、`StagePauseReason`、`StageCompletionReason`、`StageSkipReason`、`TimeboxReleaseReason`、`TimeboxInvalidReason`、`SourceDigest`、`PageCursorRef`、`DegradedReasonRef`、`ProcessConsumerRef`、`VisibilityReasonRef`、`ReferenceResolutionStateId`、`ReferenceResolutionStateRef`、`DerivedProcessViewStateId`、`DerivedProcessViewStateRef`、`ProcessReadSubjectRef`、`ProcessSearchFilterRef`、`ProcessReadModelId`、`ProcessReadModelRef`、`ActivityStatusViewId`、`ProcessTimelineEntryRef`、`ProcessTimelineEntryRefSet`、`ProcessProgressSummaryId`、`ProcessProgressSummaryRef`、`ReconciliationReportId`、`ReconciliationReportRef`、`ReconciliationIssueRef`、`ReconciliationIssueRefSet`、`RecoveryStatusSubjectRef`、`ProcessTimelineFilterRef`、`ProcessSummarySubjectRef`、`ProcessTraceSubjectRef`、`ProcessAuditSubjectRef` |
+| `contracts` | `refs.rs` | 所有 `*Id`、`*Ref`、`*Reason`、`*Kind`、public state enum、scope、cursor、marker、command intent helper;显式包括 `ProcessTruthRef`、`ProcessTruthRefKind`、`ProcessTruthCursorRef`、`ProcessTruthChangeRef`、`TraceHandoffRef`、`TraceHandoffTargetRef`、`TraceHandoffTargetKind`、`TraceHandoffKind`、`HandoffFailureRef`、`HandoffFailureKind`、`HandoffCancelReason`、`GovernanceDecisionRef`、`ArtifactEvidenceMarker`、`RuntimeFeedbackRef`、`ConversationContextRef`、`ReferenceResolutionState`、`ReferenceResolutionLifecycleState`、`ActivityKind`、`GatewayKind`、`RuntimeFeedbackKind`、`RecoveryHistoryKind`、`RuntimeFeedbackSummaryRef`、`ProcessStartIntentRef`、`ProcessStartReason`、`ActivityProgressionIntentRef`、`ActivityProgressionTransition`、`ActivityFlowControlIntent`、`ProcessStageId`、`ProcessStageRef`、`ProfileStageRef`、`ProcessStageKind`、`ProcessTimingSubjectRef`、`ProcessTimingRef`、`ProcessTimeboxBindingId`、`ProcessTimeboxBindingRef`、`ProcessTimeboxRef`、`ExternalTimeboxKind`、`ExternalTimeboxRef`、`StageTarget`、`StageChangeReason`、`RhythmReason`、`StagePauseReason`、`StageCompletionReason`、`StageSkipReason`、`TimeboxReleaseReason`、`TimeboxInvalidReason`、`SourceDigest`、`PageCursorRef`、`DegradedReasonRef`、`ProcessConsumerRef`、`VisibilityReasonRef`、`ReferenceResolutionStateId`、`ReferenceResolutionStateRef`、`DerivedProcessViewStateId`、`DerivedProcessViewStateRef`、`ProcessReadSubjectRef`、`ProcessSearchFilterRef`、`ProcessReadModelId`、`ProcessReadModelRef`、`ActivityStatusViewId`、`ProcessTimelineEntryRef`、`ProcessTimelineEntryRefSet`、`ProcessProgressSummaryId`、`ProcessProgressSummaryRef`、`ReconciliationReportId`、`ReconciliationReportRef`、`ReconciliationIssueRef`、`ReconciliationIssueRefSet`、`RecoveryStatusSubjectRef`、`ProcessTimelineFilterRef`、`ProcessSummarySubjectRef`、`ProcessTraceSubjectRef`、`ProcessAuditSubjectRef` |
 | `contracts` | `events.rs` | `ProcessOutboxEventKind`、`ProcessOutboundEventPayload` 及 outbound event payload DTO |
 | `contracts` | `views.rs` | `RuntimeProcessShapeView`、`ProcessProfileView`、`ProcessInstanceView`、`ActivityStatusView`、`ProcessTimelineView`、`ProcessProgressSummaryView`、`ReconciliationReportView` |
 | `domain` | `runtime_shape.rs` | `RuntimeProcessShape`、`RuntimeProcessShapeState` |
@@ -1964,8 +1964,38 @@ pub struct ActorCapabilitySnapshot {
 | `ArtifactEvidenceMarker` | `evidence_ref: ArtifactEvidenceRef`;`evidence_kind: ArtifactEvidenceKind`;`evidence_state: ReferenceResolutionState` | `same_evidence(&self, other: &Self)`;`from_artifact(...)` | 不保存 artifact body、package content 或 binary |
 | `RuntimeFeedbackRef` | `feedback_kind: RuntimeFeedbackKind`;`external_ref: ExternalRuntimeFeedbackRef`;`feedback_state: ReferenceResolutionState` | `is_completion_feedback()`;`same_feedback(&self, other: &Self)`;`from_runtime(...)` | 不保存 execution log;不成为 runtime truth |
 | `ConversationContextRef` | `conversation_ref: ConversationRef`;`context_kind: ConversationContextKind`;`context_state: ReferenceResolutionState` | `is_trace_context()`;`same_context(&self, other: &Self)`;`from_conversation(...)` | 不保存 conversation body;不拥有 visibility truth |
-| `TraceHandoffRef` | `value: String` | 无 domain 方法;仅作为 handoff record identity / public ref | 不保存 observability / archive body;不决定 Process truth |
+| `TraceHandoffRef` | `value: String` | 无 domain 方法;仅作为 handoff record identity / public ref | 不保存 observability / archive body;不决定 Process truth;必须由 application 通过 `IdGeneratorPort::new_trace_handoff_ref()` 生成后传入 domain |
+| `TraceHandoffTargetRef` | `value: String`;`target_kind: TraceHandoffTargetKind` | `from_archive_target(target: ArchiveHandoffTargetRef) -> Result<Self, ContractError>` | stored handoff target identity;不保存 observability / archive body;archive handoff 必须显式携带可保存的 stored target ref |
+| `TraceHandoffKind` | enum variants:`Observability`;`Archive` | 无 domain 方法;由 prepare factory 或 job target 决定 | 不得由 target ref 字符串反推 |
+| `HandoffFailureRef` | `value: String`;`failure_kind: HandoffFailureKind`;`retryable: bool` | `retryable(value: String) -> Result<Self, ContractError>`;`permanent(value: String) -> Result<Self, ContractError>` | 只保存 redacted failure marker;不保存 adapter error body |
+| `HandoffCancelReason` | `value: String` | `new(value: String) -> Result<Self, ContractError>` | cancel reason 必须显式传入;actor 由 `cancel(reason, actor)` 参数提供;不得由 Failed 状态隐式推导 |
 | `TraceHandoffRecord` | `handoff_ref: TraceHandoffRef`;`trace_record_ref: ProcessTraceRecordRef`;`target_ref: TraceHandoffTargetRef`;`handoff_kind: TraceHandoffKind`;`external_ref: Option<ExternalHandoffRef>`;`receipt_ref: Option<HandoffReceiptRef>`;`archive_package_ref: Option<ArchivePackageRef>`;`failure_ref: Option<HandoffFailureRef>`;`cancel_reason: Option<HandoffCancelReason>`;`handoff_state: TraceHandoffState`;`delivered_at: Option<Timestamp>` | `mark_delivered(receipt: TraceHandoffReceipt)`;`mark_archived(receipt: ArchiveHandoffReceipt)`;`mark_failed(failure_ref: HandoffFailureRef)`;`cancel(reason: HandoffCancelReason, actor: ActorRef)`;`prepare(...)` | 不保存 observability / archive body;不决定 Process truth |
+
+```rust
+/// Classifies the stable target identity stored by trace handoff records.
+pub enum TraceHandoffTargetKind {
+    /// Observability trace handoff target.
+    Observability,
+    /// Archive handoff target.
+    Archive,
+}
+
+/// Classifies the kind of handoff marker.
+pub enum TraceHandoffKind {
+    /// Handoff to observability boundary.
+    Observability,
+    /// Handoff to archive boundary.
+    Archive,
+}
+
+/// Classifies redacted handoff failure markers.
+pub enum HandoffFailureKind {
+    /// Target or adapter failure may be retried.
+    Retryable,
+    /// Target or adapter failure is permanent until configuration or input changes.
+    Permanent,
+}
+```
 
 ```rust
 /// Trace handoff lifecycle state.
@@ -1991,6 +2021,8 @@ pub enum TraceHandoffState {
 `TraceHandoffRecord` 字段规则:
 
 - `handoff_ref`、`trace_record_ref`、`target_ref`、`handoff_kind` 和 `handoff_state` 创建时必填。
+- trace handoff job calls `ProcessTraceRecord.prepare_handoff(handoff_ref, target_ref)` and sets `handoff_kind = TraceHandoffKind::Observability`.
+- archive handoff job must use `ArchiveHandoffTargetRef.stored_target_ref` as the stored `target_ref` and sets `handoff_kind = TraceHandoffKind::Archive`;domain never maps `ArchiveDestinationRef` / `ArchiveScopeRef` by string.
 - `external_ref` 和 `receipt_ref` 仅在 observability handoff `Delivered` 后填写。
 - `archive_package_ref` 仅在 archive handoff `Delivered` 后填写,只保存 archive package ref,不得保存 package body。
 - `failure_ref` 仅在 `Failed` 后填写;retryable / permanent 语义由 `HandoffFailureRef` / `HandoffError` 映射。
@@ -2024,6 +2056,7 @@ pub struct ProcessTraceRecord {
 |---|---|---|---|---|
 | `pub fn relates_to(&self, subject_ref: ProcessTraceSubjectRef) -> bool` | 判断关联对象 | subject | `bool` | 纯判断 |
 | `pub fn prepare_handoff(&self, handoff_ref: TraceHandoffRef, target_ref: TraceHandoffTargetRef) -> Result<TraceHandoffRecord, DomainError>` | 形成交接意图 | handoff ref、target ref | `Result<TraceHandoffRecord, DomainError>` | 不保存外部正文 |
+| `pub fn prepare_archive_handoff(&self, handoff_ref: TraceHandoffRef, target_ref: TraceHandoffTargetRef) -> Result<TraceHandoffRecord, DomainError>` | 形成归档交接意图 | handoff ref、archive stored target ref | `Result<TraceHandoffRecord, DomainError>` | `target_ref.target_kind` 必须为 `Archive`;不保存 archive package body |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|

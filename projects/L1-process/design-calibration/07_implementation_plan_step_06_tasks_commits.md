@@ -63,7 +63,7 @@
 | commit-01-a | PH-01 | workspace 和 7 crate skeleton 可编译后 | root `Cargo.toml`、7 crate、唯一 `core-contracts` dependency | 业务 DTO、domain、API route | `cargo check`;dependency scan |
 | commit-01-b | PH-01 | config / scripts / evidence roots 可检查后 | config fixtures、runtime builder skeleton、gate/report/redaction script shell、artifact/report roots | 业务测试完整实现、最终 EV page | script `--help`;path grep |
 | commit-02-a | PH-02 | shape/profile contracts + domain tests 通过后 | `SyncRuntimeProcessShape`、`AdoptProcessProfile`、`UpdateProcessProfileTailoring` DTO、shape/profile domain、fixtures | application service wiring | contract + domain tests |
-| commit-02-b | PH-02 | shape/profile write flow 可重复验证后 | service、handler、repo/UoW fake、idempotency、operation result、outbox intent | instance/activity | command service tests;rollback/duplicate tests |
+| commit-02-b | PH-02 | shape/profile write flow 可重复验证后 | service、handler、repo/UoW fake、idempotency、operation result、transitional outbox intent | instance/activity;正式 payload snapshot 保存面 | command service tests;rollback/duplicate tests |
 | commit-03-a | PH-03 | instance/activity contracts + domain tests 通过后 | `StartProcessInstance`、`AdvanceProcessActivity`、`RecordActivityFeedback` DTO、instance/activity/token/gateway domain | waiting/recovery、consumer | contract + state tests |
 | commit-03-b | PH-03 | instance/activity service 和 progression tests 通过后 | service、handler、progression UoW、trace/outbox/result | query、jobs | command / tx / idempotency tests |
 | commit-04-a | PH-04 | waiting/checkpoint/recovery contracts + domain tests 通过后 | gate/checkpoint/recovery DTO、domain state、fixtures | service orchestration | contract + recovery state tests |
@@ -79,7 +79,7 @@
 | commit-07-d | PH-07 | external reference consumer service tests 通过后 | method / work / identity / governance / artifact consumers、resolver fake、snapshot/stale/pending/quarantine store | runtime feedback consumer、outbound publisher | `TC-PROC-EVENT-001~005`;redaction |
 | commit-07-e | PH-07 | runtime feedback / conversation consumer tests 通过后 | runtime feedback consumer、conversation context consumer、duplicate/quarantine/delayed receipt replay | outbound publisher | `TC-PROC-EVENT-006~007`;`EV-WORKER-001` slice |
 | commit-08-a | PH-08 | outbound shared envelope / shape/profile payload tests 通过后 | outbound envelope、topic map seed、outbox event kind、`RuntimeProcessShapeChangedEvent`、`ProcessProfileChangedEvent` payload builders | instance/activity payloads、publisher loop | targeted publisher contract + redaction tests |
-| commit-08-b | PH-08 | instance / activity / timing payload builder tests 通过后 | `ProcessInstanceChangedEvent`、`ActivityProgressedEvent`、`ProcessTimingChangedEvent` DTO 和 payload builders | waiting/recovery/trace/view payloads、publisher loop | targeted payload mapping tests |
+| commit-08-b | PH-08 | formal outbox record 保存面迁移和 instance / activity / timing payload builder tests 通过后 | 将旧 outbox intent port / fake / accepted-flow call sites 迁移为 `ProcessOutboxRepository::append(ProcessOutboxRecord, ...)`;保存 `event_kind`、`truth_ref`、`trace_context`、`visibility_marker`、`payload_snapshot`;补 `ProcessInstanceChangedEvent`、`ActivityProgressedEvent`、`ProcessTimingChangedEvent` DTO 和 payload builders | waiting/recovery/trace/view payloads、publisher loop;按旧 `event_kind + subject_ref + trace_ref` 旁路保存 outbox | targeted payload mapping tests;outbox record persistence tests |
 | commit-08-c | PH-08 | waiting / checkpoint / recovery payload builder tests 通过后 | `WaitingGateChangedEvent`、`ProcessCheckpointCreatedEvent`、`RecoveryAttemptChangedEvent` DTO 和 payload builders | trace/view payloads、publisher loop | targeted payload mapping tests |
 | commit-08-d | PH-08 | trace / derived view outbound mapping tests 通过后 | `ProcessTraceAvailableEvent`、`DerivedProcessViewChangedEvent` DTO、complete 10-event mapping/redaction matrix | publisher loop | full outbound contract + redaction tests |
 | commit-08-e | PH-08 | publisher retry/failure tests 通过后 | publisher port/fake、worker loop、retry/failed state、topic map verification | operations jobs | `TC-PROC-PUB-001`;`EV-WORKER-002` |
@@ -122,7 +122,7 @@
 | PH-07 | IMPL-07-04 | 4 | 实现外部 reference consumer services 和 resolver fake | worker tests | accepted / duplicate / quarantine / delayed |
 | PH-07 | IMPL-07-05 | 5 | 实现 runtime feedback / conversation consumers | worker tests | receipt replay 与 targeted redaction |
 | PH-08 | IMPL-08-01 | 1 | 定义 outbound envelope、topic map seed、shape/profile payload | contract tests | payload ref-only / no body |
-| PH-08 | IMPL-08-02 | 2 | 定义 instance / activity / timing payload builder | contract tests | truth change mapping stable |
+| PH-08 | IMPL-08-02 | 2 | 先迁移正式 `ProcessOutboxRecord` 保存面,再定义 instance / activity / timing payload builder | contract + repository tests | payload snapshot 随 accepted transaction 保存;truth change mapping stable |
 | PH-08 | IMPL-08-03 | 3 | 定义 waiting / checkpoint / recovery payload builder | contract tests | payload snapshot 不重算 current truth |
 | PH-08 | IMPL-08-04 | 4 | 定义 trace / derived view payload builder 和完整映射矩阵 | contract tests | 10 event mapping / redaction complete |
 | PH-08 | IMPL-08-05 | 5 | 实现 publisher fake、topic map、retry / failed | worker tests | publish / retry / failed |

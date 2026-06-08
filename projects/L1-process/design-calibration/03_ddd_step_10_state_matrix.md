@@ -634,7 +634,7 @@ Failed --mark_retry--> RetryPending
 | From | To | 触发函数 | 前置条件 | 副作用 | 非法时错误 |
 |---|---|---|---|---|---|
 | factory | `Pending` | `ProcessOutboxRecord::from_truth_change(outbox_id, ProcessTruthChange)` | truth change 已提交;event kind 映射存在 | 创建 outbox;不影响 command truth 成立 | `DomainError::BoundaryViolation` |
-| `Pending` / `RetryPending` | `Published` | `ProcessOutboxRecord.mark_published(OutboxPublicationRef)` | publisher 返回 publication ref;event envelope 由 truth ref 构造 | 设置 `publication_ref`;job changed_count +1 | `DomainError::InvalidStateTransition` |
+| `Pending` / `RetryPending` | `Published` | `ProcessOutboxRecord.mark_published(OutboxPublicationRef)` | publisher 返回 publication ref;event envelope 由 `ProcessOutboxRecord` 的 `event_kind` / `truth_ref` / `trace_context` / `visibility_marker` / `payload_snapshot` 复制构造,不得按 `truth_ref` 重读 current truth 重算 payload | 设置 `publication_ref`;job changed_count +1 | `DomainError::InvalidStateTransition` |
 | `Pending` / `Failed` | `RetryPending` | `ProcessOutboxRecord.mark_retry(OutboxRetryReason)` | publisher failure retryable 或 operator retry | 保存 retry reason marker;不回滚 truth | `DomainError::InvalidStateTransition` |
 | `Pending` / `RetryPending` | `Failed` | `ProcessOutboxRecord.mark_failed(OutboxFailureReason)` | publisher failure permanent 或 retry exhausted | 保存 failure reason;job partial failure | `DomainError::InvalidStateTransition` |
 

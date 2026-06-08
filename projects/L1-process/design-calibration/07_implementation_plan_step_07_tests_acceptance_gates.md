@@ -70,7 +70,7 @@
 | commit-07-d | external reference consumer worker tests;targeted redaction | `TC-PROC-EVENT-001~005` |
 | commit-07-e | runtime/conversation consumer worker tests | `TC-PROC-EVENT-006~007`;`EV-WORKER-001` slice |
 | commit-08-a | outbound shared + shape/profile payload contract tests | topic map seed and ref-only payload stable |
-| commit-08-b | instance/activity/timing payload contract tests | truth change mapping stable |
+| commit-08-b | instance/activity/timing payload contract tests;outbox record persistence tests | `ProcessOutboxRecord.payload_snapshot` 在 accepted transaction 保存;truth change mapping stable |
 | commit-08-c | waiting/checkpoint/recovery payload contract tests | payload snapshot not recomputed from current truth |
 | commit-08-d | trace/view payload contract tests;payload redaction | all 10 event mapping stable |
 | commit-08-e | publisher retry/failure tests | `EV-WORKER-002` |

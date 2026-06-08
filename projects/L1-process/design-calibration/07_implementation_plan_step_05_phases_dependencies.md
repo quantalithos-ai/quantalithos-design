@@ -127,6 +127,8 @@
 | PH-09 | Operations jobs / handoff / reconciliation / recovery maintenance | 建立 7 operations job、report、handoff、reference refresh、projection rebuild、no truth repair | PH-08 | job DTO、job runner、partial report、handoff fake、reconciliation report | `TC-PROC-JOB-001~007`;`EV-JOB-001`;VF-PROC-006/007 |
 | PH-10 | Release gates / reports / acceptance handoff | 执行 P0 gate,生成 fixed run reports、evidence index、redaction、veto 和 risk acceptance | PH-09 | gate script、report generator、redaction checker、acceptance handoff | `TC-PROC-SCRIPT-*`;`EV-SCRIPT-*`;`EV-E2E-001`;AC-PROC-001~029;VF-PROC-001~008 |
 
+PH-02~PH-05 中的 `outbox intent` 只表示 PH-08 前用于 command side-effect 验证的过渡保存面。进入 commit-08-b 后,所有旧 outbox intent port、fake store 和 accepted-flow call site 必须迁移为正式 `ProcessOutboxRecord` 保存面;旧 `event_kind + subject_ref + trace_ref` 形态不得继续作为并行 outbox path 或 publisher 输入。
+
 ### 7.3 阶段顺序理由
 
 | 顺序 | 理由 |

@@ -589,6 +589,13 @@ pub trait WaitingGateRepository {
         page: PageRequest,
     ) -> Result<Page<Versioned<WaitingGate>>, RepositoryError>;
 
+    /// Finds currently open gates whose pause context requires the given resume requirement.
+    async fn find_open_by_resume_requirement(
+        &self,
+        resume_requirement_ref: ResumeRequirementRef,
+        page: PageRequest,
+    ) -> Result<Page<Versioned<WaitingGate>>, RepositoryError>;
+
     /// Loads the immutable pause context referenced by a waiting gate.
     async fn get_pause_context(
         &self,
@@ -623,6 +630,7 @@ pub trait WaitingGateRepository {
 |---|---|---|---|---|---|
 | `get_gate` | `WaitingGateRef` | `Option<Versioned<WaitingGate>>` | `RepositoryError` | resume command / query | command path 使用 gate version 保存;query path 只映射 view |
 | `find_open_by_instance` | `ProcessInstanceRef`、`PageRequest` | `Page<Versioned<WaitingGate>>` | `RepositoryError` | open gate guard / query | stable order;empty 表示无 open gate |
+| `find_open_by_resume_requirement` | `ResumeRequirementRef`、`PageRequest` | `Page<Versioned<WaitingGate>>` | `RepositoryError` | governance decision consumer | 必须通过 `WaitingGate.pause_context_ref -> PauseContext.resume_requirement_ref` 的正式索引或等价持久化索引查询;只返回 `Waiting` / `DecisionResolved` 这类非终态 open gate;empty 表示 no affected gate / Noop |
 | `get_pause_context` | `PauseContextRef` | `Option<PauseContext>` | `RepositoryError` | resume command / waiting gate query | pause context immutable;command missing -> domain rejected / invariant failure;query missing -> `ProcessViewStatus::Degraded` |
 | `save_gate` | gate、version、UoW | `StorageVersion` | `RepositoryError` | open / resume command | optimistic save |
 | `save_pause_context` | context、UoW | `()` | `RepositoryError` | open gate command | same UoW as gate create;immutable |
@@ -721,6 +729,13 @@ pub trait RhythmRepository {
         process_subject_ref: ProcessTimingSubjectRef,
     ) -> Result<Option<Versioned<ProcessTimeboxBinding>>, RepositoryError>;
 
+    /// Finds active or stale bindings affected by an external timebox reference.
+    async fn find_bindings_by_external_timebox(
+        &self,
+        external_timebox_ref: ExternalTimeboxRef,
+        page: PageRequest,
+    ) -> Result<Page<Versioned<ProcessTimeboxBinding>>, RepositoryError>;
+
     /// Saves a timebox binding using optimistic concurrency.
     async fn save_binding(
         &self,
@@ -730,6 +745,15 @@ pub trait RhythmRepository {
     ) -> Result<StorageVersion, RepositoryError>;
 }
 ```
+
+| 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
+|---|---|---|---|---|---|
+| `get_stage` | `ProcessStageRef` | `Option<Versioned<ProcessStageState>>` | `RepositoryError` | stage command / query | update path 使用 returned version |
+| `save_stage` | stage、version、UoW | `StorageVersion` | `RepositoryError` | stage command | optimistic save |
+| `get_binding` | `ProcessTimeboxBindingRef` | `Option<Versioned<ProcessTimeboxBinding>>` | `RepositoryError` | timing command / query | update path 使用 returned version |
+| `find_active_binding` | `ProcessTimingSubjectRef` | `Option<Versioned<ProcessTimeboxBinding>>` | `RepositoryError` | bind command uniqueness guard | 只查 subject 当前 active binding |
+| `find_bindings_by_external_timebox` | `ExternalTimeboxRef`、`PageRequest` | `Page<Versioned<ProcessTimeboxBinding>>` | `RepositoryError` | work context consumer | 必须按 `ProcessTimeboxBinding.external_timebox_ref` 的正式索引查询 `Active` / `Stale` binding;empty 表示 no affected binding / Noop;不得从 WorkContextRef 或字符串私推 subject |
+| `save_binding` | binding、version、UoW | `StorageVersion` | `RepositoryError` | bind / refresh consumer | optimistic save;consumer stale path 使用 loaded version |
 
 #### 7.7 Trace / Outbox / Projection / Snapshot Repository 契约
 
@@ -877,8 +901,35 @@ pub trait ProjectionRepository {
         &self,
         view_state_ref: DerivedProcessViewStateRef,
     ) -> Result<Option<DerivedProcessViewState>, RepositoryError>;
+
+    /// Lists already registered derived view states affected by a process subject.
+    async fn list_view_states_affected_by_subject(
+        &self,
+        subject_ref: ProcessTraceSubjectRef,
+        page: PageRequest,
+    ) -> Result<Page<DerivedProcessViewStateRef>, RepositoryError>;
+
+    /// Lists already registered derived view states affected by an actor capability change.
+    async fn list_view_states_affected_by_actor(
+        &self,
+        actor_ref: ActorRef,
+        page: PageRequest,
+    ) -> Result<Page<DerivedProcessViewStateRef>, RepositoryError>;
 }
 ```
+
+| 函数 | 参数 | 返回 | 错误 | 调用方 | 约束 |
+|---|---|---|---|---|---|
+| `upsert_read_model` | read model、UoW | `()` | `RepositoryError` | projection rebuild job | 只从 committed truth 构造 |
+| `find_read_model` | `ProcessInstanceRef` | `Option<ProcessReadModel>` | `RepositoryError` | query | read-only;不得修复 |
+| `upsert_timeline` | timeline、UoW | `()` | `RepositoryError` | projection rebuild job | 只从 trace / committed truth 构造 |
+| `find_timeline` | `ProcessInstanceRef` | `Option<ProcessTimelineView>` | `RepositoryError` | query | read-only |
+| `upsert_progress_summary` | summary、UoW | `()` | `RepositoryError` | projection rebuild job | 只从 committed truth 构造 |
+| `search_instances` | filter、page | `Page<ProcessReadModel>` | `RepositoryError` | query | read-only;visibility filtering 在 application policy |
+| `save_view_state` | view state、UoW | `()` | `RepositoryError` | projection job / consumer stale marker | 写入 freshness marker;不得写 source truth |
+| `get_view_state` | `DerivedProcessViewStateRef` | `Option<DerivedProcessViewState>` | `RepositoryError` | query / projection job | missing -> degraded / unavailable surface |
+| `list_view_states_affected_by_subject` | `ProcessTraceSubjectRef`、`PageRequest` | `Page<DerivedProcessViewStateRef>` | `RepositoryError` | external consumers | 只能返回已注册 public derived view state refs;不得临时拼接 view id;empty 表示 no stale marker needed / Noop |
+| `list_view_states_affected_by_actor` | `ActorRef`、`PageRequest` | `Page<DerivedProcessViewStateRef>` | `RepositoryError` | identity actor capability consumer | 必须基于已注册 projection dependency index 查 activity status / visibility dependent views;不得临时拼接 view id;empty 表示 no stale marker needed / Noop |
 
 ##### 7.7.4 `ReferenceSnapshotRepository`
 

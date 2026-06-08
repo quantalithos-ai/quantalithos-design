@@ -143,14 +143,14 @@
 | `activity_progression_records` | activity transition history | `progression_id` | `activity_ref`,`from_state`,`to_state` | append-only;optional `storage_version` |
 | `tokens` | token flow state | `token_id` | `process_instance_id`,`position_ref`,`token_state` | `storage_version` |
 | `gateways` | gateway flow state | `gateway_id` | `shape_node_ref`,`gateway_state`,`selected_route_ref` | `storage_version` |
-| `waiting_gates` | waiting gate truth | `waiting_gate_id` | `process_instance_id`,`activity_ref`,`gate_state`,`decision_ref` | `storage_version` |
-| `pause_contexts` | waiting pause context | `pause_context_id` | `activity_ref`,`resume_requirement_ref` | immutable or `storage_version` |
+| `waiting_gates` | waiting gate truth | `waiting_gate_id` | `process_instance_id`,`activity_ref`,`gate_state`,`decision_ref`,`pause_context_ref` | `storage_version` |
+| `pause_contexts` | waiting pause context | `pause_context_id`;index(`resume_requirement_ref`) | `activity_ref`,`resume_requirement_ref` | immutable or `storage_version` |
 | `waiting_gate_change_records` | waiting gate transition history | `change_id` | `waiting_gate_ref`,`from_state`,`to_state` | append-only;optional `storage_version` |
 | `process_checkpoints` | checkpoint truth | `checkpoint_id` | `process_instance_id`,`activity_ref`,`checkpoint_state` | `storage_version` |
 | `recovery_attempts` | recovery attempt truth | `recovery_attempt_id` | `process_instance_id`,`checkpoint_ref`,`recovery_state`,`failure_reason`,`abandon_reason` | `storage_version` |
 | `recovery_history_records` | recovery history | `history_id` | `process_instance_ref`,`checkpoint_ref`,`attempt_ref`,`history_kind` | append-only;optional `storage_version` |
 | `process_stage_states` | stage truth | `stage_id` | `process_instance_id`,`stage_kind`,`stage_state` | `storage_version` |
-| `process_timebox_bindings` | timebox binding truth | `binding_id`;unique(`process_subject_ref`) where `binding_state` in (`Active`,`Stale`) | `process_subject_ref`,`process_timebox_ref`,`external_timebox_ref`,`binding_state` | `storage_version` |
+| `process_timebox_bindings` | timebox binding truth | `binding_id`;unique(`process_subject_ref`) where `binding_state` in (`Active`,`Stale`);index(`external_timebox_ref`,`binding_state`) | `process_subject_ref`,`process_timebox_ref`,`external_timebox_ref`,`binding_state` | `storage_version` |
 | `method_definition_snapshots` | safe method summary | unique(`definition_ref`,`definition_version_ref`) | `definition_kind`,`snapshot_state.reference_ref` | `storage_version` |
 | `work_context_snapshots` | safe work summary | `work_context_ref` | `project_ref`,`iteration_ref`,`snapshot_state.reference_ref` | `storage_version` |
 | `actor_capability_snapshots` | safe identity capability summary | `actor_ref` | `member_ref`,`snapshot_state.reference_ref` | `storage_version` |
@@ -169,6 +169,7 @@
 | `process_progress_summaries` | summary projection | `summary_id`;unique(`process_instance_ref`) | `stage_ref`,`progress_state`,`view_state_ref` | projection `storage_version` |
 | `activity_status_views` | activity status projection | `activity_status_view_id`;unique(`activity_ref`) | `activity_state`,`assignee_ref`,`feedback_state.reference_ref` | projection `storage_version` |
 | `derived_process_view_states` | projection freshness state | `view_state_id`;unique(`projection_kind`,`source_cursor_ref`) when active | `projection_kind`,`freshness_state` | `storage_version` |
+| `projection_dependency_index` | derived view dependency lookup | unique(`dependency_kind`,`dependency_ref`,`view_state_ref`) | `dependency_kind`,`dependency_ref`,`view_state_ref` | rebuilt with projection;consumer read-only |
 | `reconciliation_reports` | reconciliation report | `report_id` | `scope_ref`,`result_state` | immutable or `storage_version` |
 | `idempotency_records` | command / event / job reservation and completion | operation-specific key;unique(`operation_kind`,`key`) | `request_digest`,`result_ref`,`metadata.trace_context`,`completed_at` | `storage_version` |
 | `operation_results` | duplicate replay surface | `result_ref` | `operation_result_kind` | immutable after commit |
@@ -205,6 +206,7 @@
 | `TokenGatewayRepository::list_tokens_by_instance(...)` | 分页读取 token | read-only page | `Page<Versioned<Token>>` | `RepositoryError` |
 | `TokenGatewayRepository::save_token(...)` / `save_gateway(...)` | 保存 token / gateway | optimistic save;与 instance/activity transition 同事务 | `StorageVersion` | `RepositoryError` |
 | `WaitingGateRepository::get_gate(...)` / `find_open_by_instance(...)` | 读取 waiting gate | update path 使用 returned version | `Option` / `Page<Versioned<WaitingGate>>` | `RepositoryError` |
+| `WaitingGateRepository::find_open_by_resume_requirement(...)` | 通过 `pause_contexts.resume_requirement_ref` 查找受 Governance decision 影响的 open waiting gate | update path 使用 returned gate version;必须通过 pause context / waiting gate 正式索引,不得扫描 event payload 私有字段 | `Page<Versioned<WaitingGate>>` | `RepositoryError` |
 | `WaitingGateRepository::get_pause_context(pause_context_ref)` | 读取 immutable pause context | read-only sidecar truth;不带 optimistic version | `Option<PauseContext>` | `RepositoryError` |
 | `WaitingGateRepository::save_gate(...)` | 保存 waiting gate | optimistic save;与 instance/token/pause context 同事务 | `StorageVersion` | `RepositoryError` |
 | `WaitingGateRepository::save_pause_context(...)` | 保存 pause context | open gate transaction 内;immutable semantics | `()` | `RepositoryError` |
@@ -215,6 +217,7 @@
 | `RecoveryRepository::save_attempt(...)` | 保存 recovery attempt | optimistic save;command path may also save instance | `StorageVersion` | `RepositoryError` |
 | `RecoveryRepository::append_history(...)` | 追加 recovery history | append-only;state changed transaction 内 | `()` | `RepositoryError` |
 | `RhythmRepository::get_stage(...)` / `get_binding(...)` / `find_active_binding(...)` | 读取 rhythm truth | update path 使用 returned version | `Option<Versioned<_>>` | `RepositoryError` |
+| `RhythmRepository::find_bindings_by_external_timebox(...)` | 按 `ProcessTimeboxBinding.external_timebox_ref` 查找受 Work context 变更影响的 active / stale binding | consumer stale path 使用 returned version 保存;不得从 `WorkContextRef` 或字符串反推 process subject | `Page<Versioned<ProcessTimeboxBinding>>` | `RepositoryError` |
 | `RhythmRepository::save_stage(...)` / `save_binding(...)` | 保存 stage / binding | optimistic save;with trace / outbox when Step 9 requires | `StorageVersion` | `RepositoryError` |
 | `TraceRepository::append_trace(...)` | 追加 trace record | 与 committed truth change 同事务 | `()` | `RepositoryError` |
 | `TraceRepository::append_audit_record(...)` | 追加 audit ref | 与 trace append 同事务 when required | `()` | `RepositoryError` |
@@ -226,6 +229,8 @@
 | `ProjectionRepository::upsert_read_model(...)` / `upsert_timeline(...)` / `upsert_progress_summary(...)` | 保存 projections | projection job transaction 内;同事务 save view state | `()` | `RepositoryError` |
 | `ProjectionRepository::find_read_model(...)` / `find_timeline(...)` / `search_instances(...)` | 读取 projections | query read-only;不得修复 | `Option` / `Page<_>` | `RepositoryError` |
 | `ProjectionRepository::save_view_state(...)` / `get_view_state(...)` | 保存 / 读取 freshness marker | save in projection / stale marker transaction | `()` / `Option<DerivedProcessViewState>` | `RepositoryError` |
+| `ProjectionRepository::list_view_states_affected_by_subject(...)` | 从 `projection_dependency_index` 按 `ProcessTraceSubjectRef` 枚举已注册 public derived views | read-only;consumer 只能 mark returned view state stale,不得临时拼接 view ref | `Page<DerivedProcessViewStateRef>` | `RepositoryError` |
+| `ProjectionRepository::list_view_states_affected_by_actor(...)` | 从 `projection_dependency_index` 按 actor capability dependency 枚举 activity status / visibility dependent views | read-only;identity consumer 使用;不得修改 identity truth | `Page<DerivedProcessViewStateRef>` | `RepositoryError` |
 | `ReferenceSnapshotRepository::upsert_method_snapshot(...)` / `upsert_work_snapshot(...)` / `upsert_actor_capability_snapshot(...)` | 保存 safe snapshot | consumer / refresh transaction 内 | `()` | `RepositoryError` |
 | `ReferenceSnapshotRepository::upsert_governance_decision_marker(...)` | 保存 governance decision marker | governance consumer / refresh transaction 内 | `()` | `RepositoryError` |
 | `ReferenceSnapshotRepository::upsert_artifact_evidence_marker(...)` | 保存 artifact evidence marker | artifact consumer / refresh transaction 内;no artifact body | `()` | `RepositoryError` |

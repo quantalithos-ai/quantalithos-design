@@ -688,9 +688,11 @@ Steps:
 1. Validate envelope / reserve event.
 2. Resolve `WorkContextSnapshot` or build snapshot from payload summary fields.
 3. Upsert work snapshot and reference state.
-4. Find active timebox bindings by external timebox when present.
-5. Mark matching `ProcessTimeboxBinding` stale and derived views stale.
-6. If no affected subject,return `Noop`.
+4. When payload `external_timebox_ref` is present,call `RhythmRepository.find_bindings_by_external_timebox(external_timebox_ref, page)`.
+5. For each returned `Versioned<ProcessTimeboxBinding>`,call `ProcessTimeboxBinding.mark_stale(ReferenceStaleReason)` and save with the loaded version.
+6. For each changed binding,call `ProjectionRepository.list_view_states_affected_by_subject(ProcessTraceSubjectRef::TimeboxBinding(binding_ref), page)`.
+7. For each returned view state ref,load via `ProjectionRepository.get_view_state(view_state_ref)`,call `DerivedProcessViewState.mark_stale(ProjectionStaleReason)`,then save via `ProjectionRepository.save_view_state(...)`.
+8. If `external_timebox_ref` is absent or both affected binding page and affected view page are empty,return `Noop` after snapshot/reference upsert and idempotency completion.
 
 Tests:accepted with binding stale;duplicate;noop;source unavailable;no Work truth mutation.
 
@@ -701,8 +703,9 @@ Steps:
 1. Validate envelope / reserve event.
 2. `ActorCapabilityResolverPort.resolve_actor_capability(actor_ref, source_version_ref)`.
 3. Upsert `ActorCapabilitySnapshot`.
-4. Mark activity status / visibility dependent projections stale.
-5. Complete event idempotency.
+4. Call `ProjectionRepository.list_view_states_affected_by_actor(actor_ref, page)`.
+5. For each returned view state ref,load via `ProjectionRepository.get_view_state(view_state_ref)`,call `DerivedProcessViewState.mark_stale(ProjectionStaleReason)`,then save via `ProjectionRepository.save_view_state(...)`.
+6. Complete event idempotency.
 
 Tests:accepted;duplicate;missing actor quarantine;source unavailable delayed;capability stale marker.
 
@@ -713,9 +716,11 @@ Steps:
 1. Validate envelope / reserve event.
 2. `GovernanceDecisionResolverPort.resolve_decision(decision_ref, source_digest)`.
 3. Upsert `GovernanceDecisionRef` marker / reference state.
-4. Locate waiting gates by `resume_requirement_ref` when present.
+4. When payload `resume_requirement_ref` is present,call `WaitingGateRepository.find_open_by_resume_requirement(resume_requirement_ref, page)`.
 5. Mark matching gates as decision-resolved marker only if Step 10 state matrix allows;do not call `WaitingGate.resume`.
-6. If no matching gate,return `Noop`.
+6. For each matched gate,call `ProjectionRepository.list_view_states_affected_by_subject(ProcessTraceSubjectRef::WaitingGate(waiting_gate_ref), page)`.
+7. For each returned view state ref,load via `ProjectionRepository.get_view_state(view_state_ref)`,call `DerivedProcessViewState.mark_stale(ProjectionStaleReason)`,then save via `ProjectionRepository.save_view_state(...)`.
+8. If `resume_requirement_ref` is absent or no matching open gate exists,return `Noop` after marker/reference upsert and idempotency completion.
 
 Tests:accepted marker;duplicate;decision mismatch noop;body rejected;does not resume gate.
 
@@ -726,8 +731,9 @@ Steps:
 1. Validate envelope / reserve event.
 2. `ArtifactEvidenceResolverPort.resolve_evidence(evidence_ref, source_digest)`.
 3. Upsert evidence marker and reference state.
-4. Mark related checkpoint / recovery projections stale when `checkpoint_ref` is present.
-5. Complete event idempotency.
+4. When `checkpoint_ref` is present,call `ProjectionRepository.list_view_states_affected_by_subject(ProcessTraceSubjectRef::Checkpoint(checkpoint_ref), page)`.
+5. For each returned view state ref,load via `ProjectionRepository.get_view_state(view_state_ref)`,call `DerivedProcessViewState.mark_stale(ProjectionStaleReason)`,then save via `ProjectionRepository.save_view_state(...)`.
+6. Complete event idempotency.
 
 Tests:accepted;duplicate;digest mismatch quarantine;checkpoint stale marker;no artifact body persisted.
 

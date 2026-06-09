@@ -35,8 +35,8 @@
 | `PageLimit` | positive integer | contracts / config parser 对齐 query page limit | 0、负数、非整数或超过实现上限 fail-fast |
 | `RetryBackoffConfig` | object:`initial_delay`、`max_delay`、`multiplier` | `infra/config.rs` | `initial_delay > 0`;`max_delay >= initial_delay`;`multiplier >= 1` |
 | `RetryPolicyConfig` | object:`max_attempts`、`backoff` | `infra/config.rs` | `max_attempts >= 0`;若 `max_attempts > 0`,backoff 必须有效 |
-| `ExternalAdapterConfig` | object:`adapter_kind` plus optional `endpoint_ref` / `credential_ref` | `infra/config.rs` | `fake` 必须可输出 fake marker;`endpoint` 必须有 endpoint ref;不得 fallback fake success |
-| `HandoffTargetConfig` | object:`adapter_kind` plus `destination_ref` / optional `credential_ref` | `infra/config.rs` | `fake` 必须可输出 fake marker;`endpoint` 必须有 destination ref |
+| `ExternalAdapterConfig` | object:`adapter_kind` plus optional `endpoint_ref` / `credential_ref` | `infra/config.rs` | `adapter_kind` 只允许 `fake` / `controlled` / `endpoint` / `disabled`;`fake` 必须可输出 fake marker;`controlled` 必须有 controlled endpoint ref;`endpoint` 必须有 endpoint ref;不得 fallback fake success |
+| `HandoffTargetConfig` | object:`adapter_kind` plus `destination_ref` / optional `endpoint_ref` / optional `credential_ref` | `infra/config.rs` | `fake` 必须可输出 fake marker;`controlled` 必须有 destination ref 和 controlled endpoint ref;`endpoint` 必须有 destination ref |
 | `ProcessTopicMapConfig` | object with 10 topic strings | `infra/config.rs` | 每个 `ProcessOutboxEventKind` 必须有 topic,默认匹配 Step 8 `.v1` topics |
 
 ### 4.2 配置项清单

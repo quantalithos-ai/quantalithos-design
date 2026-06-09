@@ -61,8 +61,8 @@
 | Step 2 | 确认 P0 配置聚焦 `ProcessRuntimeConfig` 已有 section 和 fake / in-memory / deterministic 默认可验证路径 | 否 | 无代码契约变化 | 无 | 无回写 |
 | Step 3 | 建立配置来源链、runtime builder 装配入口和控制面总览,不新增配置字段 | 否 | 无代码契约变化 | 无 | 无回写 |
 | Step 4 | 定义配置分类、冷 / job-run 生效口径和禁止配置化边界,承接已有红线 | 否 | 无代码契约变化 | 无 | 无回写 |
-| Step 5 | 定义 defaults < JSON < env 的普通来源优先级,entry args 只作局部输入,secret material 不进入普通覆盖链 | 否 | 无代码契约变化 | 无 | 无回写 |
-| Step 6 | 定义 local-dev / ci-test / integration-like / operations-replay P0 profile,staging-like / production-like 后移 | 否 | 无代码契约变化 | 无 | 无回写 |
+| Step 5 | 定义 defaults < JSON < env 的普通来源优先级,entry args 只作局部输入,并固定 CLI / env / binary 最小参数面 | 是 | entry binary 可落码契约 | `03-详细设计.md` §15 脚本 / entry 契约;`04` §5 | 已回写 |
+| Step 6 | 定义 local-dev / ci-test / integration-like / operations-replay P0 profile,staging-like / production-like 后移;integration-like 使用 `ExternalAdapterKind::Controlled` | 是 | adapter kind enum 闭合 | `03_ddd_step_14_config_external_binding.md`;`04` §6 | 已回写 |
 | Step 7 | 展开 `ProcessRuntimeConfig` 既有 10 个 section / 38 个 P0 配置项,给出默认值、来源、生效、失败策略和 JSONC 示例 | 否 | 配置默认值和文档示例,无代码契约变化 | 无 | 无回写 |
 | Step 8 | 明确 ref-only sensitive、credential ref、endpoint ref、topic map、handoff target 和 forbidden output 的脱敏规则 | 否 | 配置安全语义,无代码契约变化 | 无 | 无回写 |
 | Step 9 | 明确 defaults -> JSON -> env -> ref validation -> typed validation -> cross-field validation -> runtime builder 的加载链,P0 不支持核心 hot reload | 否 | 配置加载和生效规则,无代码契约变化 | 无 | 无回写 |

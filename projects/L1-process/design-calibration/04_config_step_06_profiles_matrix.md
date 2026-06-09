@@ -30,7 +30,7 @@
 
 ### 3.3 每个环境依赖哪些外部服务?
 
-local / CI 默认不依赖真实外部服务,使用 fake resolver、fake publisher、fake handoff、in-memory store。integration-like 可配置受控 resolver / publisher / handoff / store。production-like 后续由部署与运维定义。
+local / CI 默认不依赖真实外部服务,使用 fake resolver、fake publisher、fake handoff、in-memory store。integration-like 使用正式 `ExternalAdapterKind::Controlled` 配置受控 resolver / publisher / handoff / store seam。production-like 后续由部署与运维定义。
 
 ### 3.4 敏感配置在不同环境如何处理?
 
@@ -54,7 +54,7 @@ local / CI 默认不依赖真实外部服务,使用 fake resolver、fake publish
 |---|---|---|---|---|---|
 | local-dev | 本地开发、api / worker / job 手动验证、最小主链调试 | defaults + optional JSON + optional env + entry args | in-memory store、fake resolver、fake publisher、fake handoff、fixed clock / sequence id | fake ref 或无 secret;raw secret 禁止 | 不代表验收通过,但必须跑通默认路径 |
 | ci-test | 自动化测试、隔离目录、确定性 fixture | defaults + test JSON + CI env + job args | temporary in-memory store、deterministic fake adapters、fake publisher / handoff | fixture ref 或不可解析假引用;报告不得泄露 | 所有路径 run-scoped,失败可复现 |
-| integration-like | 跨入口和跨仓接缝验证 | JSON + env + entry args | configured local / controlled resolver、publisher、handoff、store profile | configured credential ref;raw material 不进入普通配置 | 验证接口接缝,不要求真实生产 endpoint |
+| integration-like | 跨入口和跨仓接缝验证 | JSON + env + entry args | controlled resolver、publisher、handoff、store profile;adapter kind 必须为 `controlled` 或明确 unsupported | controlled endpoint / credential ref;raw material 不进入普通配置 | 验证接口接缝和 failure mapping,不要求真实生产 endpoint |
 | operations-replay | outbox、projection、reference refresh、handoff、recovery maintenance、reconciliation 重跑 | replay JSON + env + job args | 脱敏历史状态、outbox、projection、reference snapshot、handoff 和 report ref | historical ref / fake ref;raw secret 禁止 | 验证恢复、幂等、partial failure 和 diagnostic |
 | staging-like | 后续跨仓集成和部署演练 | 部署材料定义,仍遵守 file / env / ref 边界 | real-like DB、event bus、resolver、handoff、secret provider | 只允许 ref,secret material 由运维注入 | P1,不阻塞 P0 |
 | production-like | 生产运行和运维语境 | 部署 / 运维材料定义 | real DB / event bus / source adapters / handoff / secret provider | raw secret 不进入 04;由安全运维管理 | P1/P2,04 只定义设计边界 |
@@ -65,7 +65,7 @@ local / CI 默认不依赖真实外部服务,使用 fake resolver、fake publish
 |---|---|---|
 | local-dev | 默认配置启动、fake adapter、local reports、非法路径 fail-fast | 默认可验证路径可运行,但不能单独代表生产验收 |
 | ci-test | duplicate key、illegal env、missing required、redaction check、deterministic fixtures | CI 能稳定复现成功路径和配置错误 |
-| integration-like | configured resolver / publisher / handoff、external unavailable、fake marker 区分 | configured 接缝不伪造 production success |
+| integration-like | controlled resolver / publisher / handoff、external unavailable、fake marker 区分 | controlled 接缝不伪造 production success |
 | operations-replay | replay、rerun、partial failure、idempotency window、reconciliation report | 恢复不产生第二 truth,证据路径稳定 |
 | staging-like | 真实依赖 dry-run、secret ref、deployment config validation | P1 接入前不能泄露 secret 或绕过红线 |
 | production-like | 运维变更、rollout / rollback、secret provider、audit | 真实值和 runbook 不在 04 中硬编码 |
@@ -74,13 +74,13 @@ local / CI 默认不依赖真实外部服务,使用 fake resolver、fake publish
 
 | 配置结论 | 是否影响 03 | 影响类型 | 03 回写位置 | 处理状态 |
 |---|---|---|---|---|
-| P0 profile 为 local-dev / ci-test / integration-like / operations-replay | 否 | 配置矩阵分类,不新增代码 enum | 无 | 无回写 |
+| P0 profile 为 local-dev / ci-test / integration-like / operations-replay | 是 | integration-like 要求 `ExternalAdapterKind::Controlled` 正式 enum | `03_ddd_step_14_config_external_binding.md` | 已回写 |
 | staging-like / production-like 后移 P1/P2 | 否 | 范围裁剪 | 无 | 无回写 |
 | fake / in-memory profile 必须输出 fake marker,不得伪装 production | 否 | 配置安全语义 | 无 | 无回写 |
 
 ## 6. 回填草稿
 
-`04-配置设计.md` §6 应说明 P0 profile 包括 `local-dev`、`ci-test`、`integration-like` 和 `operations-replay`。`staging-like` 与 `production-like` 只作为 P1/P2 承接方向。所有 profile 都禁止 raw secret,configured adapter 必须使用 ref,不得把 fake success 当作 production success。
+`04-配置设计.md` §6 应说明 P0 profile 包括 `local-dev`、`ci-test`、`integration-like` 和 `operations-replay`。`staging-like` 与 `production-like` 只作为 P1/P2 承接方向。所有 profile 都禁止 raw secret。`integration-like` 使用 `controlled` adapter kind 和 ref-only endpoint / credential,不得把 fake success 当作 production success。
 
 ## 7. 待确认事项
 

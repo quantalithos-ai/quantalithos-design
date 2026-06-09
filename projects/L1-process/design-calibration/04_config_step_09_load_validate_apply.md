@@ -55,7 +55,7 @@ JSON 必须是严格 JSON。完整文档示例可用 JSONC,但运行时配置不
 - `idempotency.reserved_record_max_age <= idempotency.command_retention`。
 - idempotency retention 不得短于配置的 retry / redelivery / rerun 窗口。
 - `outbox.topic_map` 必须覆盖 10 个 `ProcessOutboxEventKind`。
-- endpoint adapter 需要 endpoint ref;需要凭据时必须有 credential ref。
+- controlled adapter 需要 controlled endpoint ref;endpoint adapter 需要 endpoint ref;需要凭据时必须有 credential ref。
 - handoff configured target 需要 destination ref。
 - retry backoff 的 max delay 必须大于等于 initial delay。
 - `features.search_enabled = true` 时必须存在 configured search adapter;当前 P0 无 search adapter,因此启用时 fail-fast。
@@ -66,7 +66,7 @@ JSON 必须是严格 JSON。完整文档示例可用 JSONC,但运行时配置不
 | 生效方式 | 配置组 | 说明 |
 |---|---|---|
 | startup | store、boundary、idempotency、projection adapter、external、outbox publisher、topic map、handoff target、features、runtime | runtime 启动时读取,变更需重启 |
-| job-run-start | batch、parallelism、job timeout、retry backoff、job scope、report ref | job run 开始时冻结 |
+| job-run-start | batch、parallelism、job timeout、retry backoff、typed job DTO scope、report ref | job run 开始时冻结 |
 | reload | P0 无核心 reload | 后续若启用需补 03 runtime contract |
 | hot | P0 无 hot update | 后续若启用需补 reject / rollback / last-known-good 机制 |
 | static | truth ownership、external body exclusion、state matrix、query no-write、projection no-write、dependency discipline | 不是普通配置 |
@@ -111,8 +111,8 @@ JSON 必须是严格 JSON。完整文档示例可用 JSONC,但运行时配置不
 | `idempotency.*` | startup | duration 范围;retention vs retry / redelivery | startup | invalid fail-fast |
 | `projection.*` | startup / job-run-start | adapter enum、stale threshold、batch size | startup / job-run-start | invalid fail-fast |
 | `jobs.*` | startup / job-run-start | batch、parallelism、timeout、backoff | job-run-start | invalid job rejected |
-| `external.*` | startup | adapter kind、endpoint ref、credential ref、timeout、retry | startup | incomplete fail-fast;runtime unavailable explicit marker |
-| `outbox.publisher` | startup | adapter kind、endpoint ref、credential ref | startup | incomplete fail-fast |
+| `external.*` | startup | adapter kind、controlled / endpoint ref、credential ref、timeout、retry | startup | incomplete fail-fast;runtime unavailable explicit marker |
+| `outbox.publisher` | startup | adapter kind、controlled / endpoint ref、credential ref | startup | incomplete fail-fast |
 | `outbox.topic_map` | startup | all 10 event topics present,non-empty,stable suffix | startup | missing / unknown fail-fast |
 | `outbox.publish_*` | job-run-start | batch and retry policy | job-run-start | invalid job rejected |
 | `handoff.*` | startup / job-run-start | target config、destination ref、timeout、retry | startup / job-run-start | incomplete fail-fast;runtime unavailable failed marker |

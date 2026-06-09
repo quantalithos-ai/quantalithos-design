@@ -180,7 +180,7 @@ pub struct RetryBackoffConfig {
 pub struct ExternalAdapterConfig {
     /// Adapter mode.
     pub adapter_kind: ExternalAdapterKind,
-    /// Endpoint or fixture reference, depending on adapter kind.
+    /// Endpoint, fixture, or controlled seam reference, depending on adapter kind.
     pub endpoint_ref: Option<ExternalEndpointRef>,
     /// Credential reference, not raw secret material.
     pub credential_ref: Option<CredentialRef>,
@@ -190,6 +190,8 @@ pub struct ExternalAdapterConfig {
 pub enum ExternalAdapterKind {
     /// Fake adapter seeded by test fixtures.
     Fake,
+    /// Controlled local or integration seam with explicit success / failure injection.
+    Controlled,
     /// Runtime endpoint adapter.
     Endpoint,
     /// Disabled adapter that returns SourceUnavailable.
@@ -245,9 +247,20 @@ pub enum IdGeneratorKind {
 }
 ```
 
+External adapter kind validation:
+
+| adapter_kind | endpoint_ref | credential_ref | Runtime meaning | Failure mapping |
+|---|---|---|---|---|
+| `Fake` | optional fixture ref only | must be absent unless fixture explicitly requires ref | deterministic fake adapter seeded by tests;must emit fake marker where observable | fake failure only when fixture injects failure |
+| `Controlled` | required controlled seam ref | optional credential ref | integration-like configured local seam;may return controlled success,unavailable,retryable failure or permanent failure | explicit unavailable / retry / failed marker;must not fallback to fake success |
+| `Endpoint` | required endpoint ref | required when endpoint profile says protected | runtime endpoint adapter selected by staging / production-like profile | dependency unavailable / retry / failed marker according to port |
+| `Disabled` | must be absent | must be absent | adapter intentionally disabled by profile | SourceUnavailable / rejected job / degraded query surface according to caller |
+
+`Controlled` is not a production endpoint. It exists so `integration-like` can validate resolver / publisher / handoff seams and failure mapping without requiring real sibling services. Implementation must parse `controlled` as a first-class `ExternalAdapterKind` value, not as `Endpoint` and not as `Fake`.
+
 | Helper type | 归属 | 字段 / 变体说明 | 禁止事项 |
 |---|---|---|---|
-| `ExternalEndpointRef` | `infra/config.rs` | opaque endpoint identifier | 不保存 raw URL secret |
+| `ExternalEndpointRef` | `infra/config.rs` | opaque endpoint / fixture / controlled seam identifier | 不保存 raw URL secret |
 | `CredentialRef` | `infra/config.rs` | opaque credential reference | 不保存 raw secret / token |
 | `HandoffDestinationRef` | `infra/config.rs` | observability / archive destination ref | 不保存外部正文 |
 | `TopicName` | `infra/config.rs` | event bus topic string | 必须匹配 Step 8 stable topic |
@@ -280,8 +293,8 @@ pub enum IdGeneratorKind {
 | `ProcessRuntimeConfig.external.artifact` | `ExternalAdapterConfig` | `infra/source_resolvers.rs` | `Fake` | external adapters |
 | `ProcessRuntimeConfig.external.runtime` | `ExternalAdapterConfig` | `infra/source_resolvers.rs` | `Fake` | external adapters |
 | `ProcessRuntimeConfig.external.conversation` | `ExternalAdapterConfig` | `infra/source_resolvers.rs` | `Fake` | external adapters |
-| `ProcessRuntimeConfig.external.resolver_timeout` | `RetentionDuration` | all configured resolver adapters | 配置设计给出 | external adapters |
-| `ProcessRuntimeConfig.external.resolver_retry` | `RetryPolicyConfig` | resolver adapters when enabled | no retry in P0 fake unless configured | external retry |
+| `ProcessRuntimeConfig.external.resolver_timeout` | `RetentionDuration` | all controlled / endpoint resolver adapters | 配置设计给出 | external adapters |
+| `ProcessRuntimeConfig.external.resolver_retry` | `RetryPolicyConfig` | resolver adapters when enabled | no retry in P0 fake unless controlled / endpoint adapter is enabled | external retry |
 | `ProcessRuntimeConfig.outbox.publisher` | `ExternalAdapterConfig` | `infra/publishers.rs` | `Fake` | outbox / bus adapter |
 | `ProcessRuntimeConfig.outbox.publish_batch_size` | `PageLimit` | `worker/outbox_publisher.rs`;`jobs` | 配置设计给出 | outbox section |
 | `ProcessRuntimeConfig.outbox.publish_retry` | `RetryPolicyConfig` | publisher worker / job | 配置设计给出 | outbox retry |
@@ -304,7 +317,7 @@ pub enum IdGeneratorKind {
 | `idempotency` | `infra/idempotency_store.rs` | `IdempotencyRepository`、`OperationResultRepository` cleanup policy | 不允许清理未 reconcile 的 completed result |
 | `projection` | `infra/projection_stores.rs`;`jobs/projection_rebuild.rs` | projection repositories、rebuild job service | projection 不反写真相 |
 | `jobs` | `jobs/*`;`worker/*` | job runners、batch loop、parallelism controller | job duplicate 仍由 idempotency store 控制 |
-| `external` | `infra/source_resolvers.rs` | configured source resolver adapters | resolver 不返回外部正文 |
+| `external` | `infra/source_resolvers.rs` | fake / controlled / endpoint / disabled source resolver adapters | resolver 不返回外部正文 |
 | `outbox` | `infra/publishers.rs`;`worker/outbox_publisher.rs` | fake / bus publisher、topic mapper、retry policy | publisher 不拼 domain payload |
 | `handoff` | `infra/handoff_adapters.rs`;`jobs/*handoff*` | trace / archive handoff adapters | handoff 不保存 observability / archive body |
 | `features` | `infra/runtime_builder.rs` | optional service / adapter wiring | feature flag 不得改变 truth ownership |
@@ -370,7 +383,9 @@ pub enum IdGeneratorKind {
 | idempotency retention shorter than configured retry / redelivery window | startup config validation error |
 | outbox publisher enabled without topic mapping for every `ProcessOutboxEventKind` | startup config validation error |
 | handoff target enabled without destination ref / endpoint | startup config validation error |
+| resolver / publisher / handoff adapter configured as `Controlled` but missing controlled endpoint ref | startup config validation error |
 | resolver adapter configured as real endpoint but missing endpoint / credential reference | startup config validation error |
+| `integration-like` profile uses `Fake` for a seam that is declared controlled in the profile | startup config validation error;profile must not hide configured seam failure behind fake success |
 | feature flag tries to change truth ownership or enable cross-repo Cargo dependency | startup config validation error / design violation |
 | config includes raw source body allow-list | reject config;Process never stores external body |
 

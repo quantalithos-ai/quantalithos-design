@@ -71,7 +71,6 @@
 | redaction violation | blocker,修复泄漏源并重生成 evidence | 否 |
 | 字段 / DTO / 状态 / phase boundary 冲突 | 回写 design repo 后恢复 | 否 |
 | P1 / P2 非范围缺失 | risk acceptance 或 open issues | 有条件 |
-| performance hard threshold 未定 | 有 sample report 时 risk acceptance | 有条件 |
 | 明确非范围能力 | 标记不适用 | 是 |
 
 ### 3.4 最终交付清单

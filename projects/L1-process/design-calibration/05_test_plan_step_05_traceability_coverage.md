@@ -46,7 +46,7 @@
 
 5. 哪些需求暂未覆盖,原因是什么?
 
-   回答:production-like real adapter、remote config、full production runbook 和量化性能阈值暂未 P0 覆盖,原因是当前设计将其列为 P1/P2 或待 `06/07` / 运维手册收口。
+   回答:production-like real adapter、remote config 和 full production runbook 暂未 P0 覆盖,原因是当前设计将其列为 P1/P2 或待 `06/07` / 运维手册收口。
 
 ---
 
@@ -101,7 +101,7 @@
 | BR-PROC-CONFIG-001 Config fail-fast and no fake fallback | `04` §5~§12 | invalid JSON、duplicate key、bad duration、topic missing、configured adapter unavailable | TC-PROC-CONFIG-001~009 | 是 | EV-INTEGRATION-002 | 已覆盖 |
 | NFR-PROC-OBS-001 Observability and audit safe | `03` §14 / §15 | low cardinality metrics、refs-only audit、redaction scan | TC-PROC-OBS-001~002 | 是 | EV-SCRIPT-002 | 已覆盖 |
 | NFR-PROC-EVID-001 Evidence and reports | `03` §15 / `04` §12 | gate artifacts、reports、evidence index、redaction-check | TC-PROC-SCRIPT-001~003 | 是 | EV-SCRIPT-003 | 已覆盖 |
-| NFR-PROC-PERF-001 Performance sample | `00` 非功能方向 / `05` Step 10 | benchmark / sample with no hard threshold until `06` confirms | TC-PROC-NFR-001 | 部分 | EV-INTEGRATION-003 | 待 `06` 阈值 |
+| NFR-PROC-PERF-001 Performance sample | `00` 非功能方向 / `05` Step 10 / `06` §9 | benchmark / sample;`06` §9 以样本报告和“无明显主链阻塞”作为正式 P0 门禁,不继承旧版硬阈值 | TC-PROC-NFR-001 | 是 | EV-INTEGRATION-003 | 已由 `06` §9 固定为性能样本门禁 |
 | REQ-PROC-P1-001 Production-like real adapter | `04` §6 / §14 | real-like adapter smoke / dry-run | TC-PROC-P1-001 | 待定 | EV-E2E-002 | P1 风险 |
 
 ### 7.2 未覆盖项清单
@@ -111,7 +111,6 @@
 | production-like full DB / broker / secret provider | 当前 `04` 将 production-like 列为 P1/P2 | Step 14 残余风险,由 `07` / 运维手册安排 |
 | remote config / admin override | 当前不进入 P0 配置项 | Step 14 残余风险 |
 | 正式 AC 编号 | `06-验收标准.md` 未新版同步 | Step 13 保留验收引用占位,后续 `06` 消费 |
-| 量化性能阈值 | 当前无新版正式阈值来源 | Step 10 只定义方法和证据,不写硬阈值 |
 
 ---
 

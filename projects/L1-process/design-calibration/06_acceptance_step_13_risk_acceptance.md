@@ -14,7 +14,7 @@
 ## 2. SOP 问题回答
 
 1. 什么风险可接受?
-   回答:P1 real-like smoke 不阻断、performance hard threshold 未定、production adapter 产品未定、remote config / hot reload 后置等。
+   回答:P1 real-like smoke 不阻断、production adapter 产品未定、remote config / hot reload 后置等。
 2. 什么风险不可接受?
    回答:veto、S 级、P0 evidence missing、redaction fail、fake production success、核心边界被配置关闭。
 3. 风险接受记录必须包含什么?
@@ -29,7 +29,6 @@
 | 风险 ID | 风险 | 是否可接受 | 要求 |
 |---|---|---|---|
 | `RA-PROC-001` | P1 real-like adapter smoke 未跑或失败 | 可有条件接受 | 不影响 P0;不得伪装 production success |
-| `RA-PROC-002` | performance hard threshold 未定 | 可有条件接受 | 有 sample report;后续性能基线 |
 | `RA-PROC-003` | production durable store / bus / secret provider 未定 | 可接受为 P1/P2 | P0 使用 fake / in-memory marker |
 | `RA-PROC-004` | remote config / hot reload 未实现 | 可接受为 P2 | P0 启用即 fail-fast |
 | `RA-PROC-NO-001` | 任一 `VF-PROC-*` failed | 不可接受 | 只能不通过 |

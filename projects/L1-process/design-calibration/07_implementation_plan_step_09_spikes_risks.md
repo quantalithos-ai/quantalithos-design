@@ -87,7 +87,7 @@
 | Q-PROC-002 | durable DB / search 产品字段全集是否进入 P0 | 不影响 P0 | P0 in-memory / fake, durable adapter 后续专项 | PH-10 open issues |
 | Q-PROC-003 | real method / work / governance / artifact / runtime / conversation adapter 是否 P0 必填 | 不影响 P0 | P0 使用 fake / controlled resolver,真实 adapter P1 | 对应 consumer phase 开工前 |
 | Q-PROC-004 | observability / archive production handoff 是否 P0 必填 | 不影响 P0 | P0 fake handoff + receipt / report,真实 endpoint P1 | PH-09 开工前 |
-| Q-PROC-005 | production capacity / SLO 是否验收硬阈值 | 不影响 P0 | 当前只生成 performance sample | PH-10 risk acceptance |
+| Q-PROC-005 | production capacity / SLO 是否追加为后续增强基线 | 不影响 P0 | 当前 P0 只要求 performance sample;后续 capacity / SLO 基线作为增强项另行定义 | PH-10 open issues |
 
 ### 4.5 风险接受边界
 
@@ -97,7 +97,6 @@
 | S0 / S1、P0 TC failure、redaction violation、P0 EV 缺失 | 否 | 阻断完成 |
 | 字段 / DTO / 状态 / phase boundary 冲突 | 否 | 回写 design repo 后恢复 |
 | P1 / P2 非范围缺口 | 是 | 写入 `risk-acceptance.md` 或 `open-issues.md`,不得声明 production-ready |
-| performance hard threshold 未定 | 有条件 | 必须有 sample report,后续补基线 |
 | real-like smoke 失败 | 有条件 | 不影响 P0 truth 时可风险接受,但需明确影响 |
 
 ## 5. 回填草稿

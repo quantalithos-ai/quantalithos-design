@@ -42,7 +42,7 @@
 | 测试方案和验收标准是否足以定义阶段门禁 | 是。`05` 给出 TC / EV / suite / artifact / report;`06` 给出 AC / VF / evidence / risk acceptance。 |
 | 是否存在上游冲突 | 本步未发现阻塞 07 生成的冲突。旧 README 中 Python / PG 描述不作为本轮实现真相源。 |
 | 设计闭环是否可作为开工门禁 | 是。每个 phase / commit boundary 仍必须按 `设计真相源闭环与可落码性标准.md` 复核字段、DTO、状态、idempotency、projection、artifact 和 phase boundary。 |
-| 哪些缺口可继续 | 目标实现仓存在性、core baseline hash、P1 real-like adapter 可用性、性能硬阈值属于实施前置或风险项,不阻塞 07 文档生成。 |
+| 哪些缺口可继续 | 目标实现仓存在性、core baseline hash、P1 real-like adapter 可用性属于实施前置或 P1 风险项,不阻塞 07 文档生成。 |
 
 ## 4. 结构化中间产物
 

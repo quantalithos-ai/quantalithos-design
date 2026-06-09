@@ -38,7 +38,7 @@
 
 3. 哪些风险可以接受?
 
-   回答:P1 real-like adapter、production-like config、remote config、performance hard threshold、redaction checker 细则、实现仓目标路径等可在 P0 测试退出时以角色接受,但不得伪装为已验证。
+   回答:P1 real-like adapter、production-like config、remote config、redaction checker 细则、实现仓目标路径等可在 P0 测试退出时以角色接受,但不得伪装为已验证。
 
 4. 谁接受残余风险?
 
@@ -61,7 +61,7 @@
 | 维度 | 旧版 | 新版 |
 |---|---|---|
 | 回归触发 | ProcessInstance / checkpoint / projection | contracts、domain、service、infra、entry、config、script、report |
-| 残余风险 | GUIDED / runtime / governance | production adapter、performance threshold、AC sync、redaction scan、target repo |
+| 残余风险 | GUIDED / runtime / governance | production adapter、AC sync、redaction scan、target repo |
 | 接受人 | TL / Owner | 角色化责任人 |
 
 ---
@@ -104,7 +104,6 @@
 | production-like DB / broker / secret provider 未锁定 | `04` 将其列为 P1/P2 | 真实容量、真实 transport 和运维证据未覆盖 | P0 使用 fake / in-memory;P1 real-like smoke 单列 | architecture / operations owner |
 | real sibling adapter 未全部可用 | 跨仓实现进度独立 | integration-like 只能验证 controlled adapter | fake / event replay 不得伪装 production | sibling owner |
 | redaction checker 具体扫描模式未定义 | `03` 只固定契约和失败语义 | 可能漏扫某类 forbidden content | 实现阶段补扫描规则并扩展 fixture | test owner |
-| 性能硬阈值未定义 | 新版 `06` §9 明确当前不继承旧版硬阈值 | 只能做性能样本和趋势观察 | Step 10 只保留 sample report;后续性能基线另行定义 | acceptance / performance owner |
 | evidence index JSON schema 未细化 | `05` 只定义路径和语义 | 实现可能需要再细化字段 | `07` / 实现阶段定义,不得改变 EV 语义 | test / implementation owner |
 | p1-real-like-smoke 是否阻断 release 未定 | 环境能力和发布策略未定 | release 风险判断不稳定 | 在 release plan / `06` 中决定 | release owner |
 

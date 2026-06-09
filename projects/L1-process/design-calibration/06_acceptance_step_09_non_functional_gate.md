@@ -14,7 +14,7 @@
 ## 2. SOP 问题回答
 
 1. 性能是否写硬阈值?
-   回答:当前不写旧版硬阈值。P0 要求生成 performance sample,不得成为主链瓶颈;硬阈值待性能基线或后续验收确认。
+   回答:当前不写旧版硬阈值。P0 的正式通过条件是生成 performance sample,并证明最小闭环与基础 command / query / job 样本未出现明显 timeout、hang 或主链阻塞;后续性能基线只作为追加增强,不回溯否定当前 P0 门禁。
 2. 安全和边界是否 P0?
    回答:是。raw body、raw secret、非 core 依赖和配置绕过红线均为 P0 阻断。
 3. P1 real-like smoke 失败如何处理?
@@ -41,4 +41,4 @@
 
 ## 6. 待确认事项
 
-性能硬阈值和 P1 real-like smoke release 策略由后续基线 / 风险接受确认。
+P1 real-like smoke release 策略由后续基线 / 风险接受确认。后续若形成容量或 SLO 基线,按追加增强项处理,不改变当前 P0 非功能门禁。

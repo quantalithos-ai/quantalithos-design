@@ -1609,9 +1609,9 @@ pub struct OutboxPublicationRef(pub ExternalSourceRef);
 |---|---|---|---|
 | `GovernanceTraceId` / `GovernanceTraceRecordRef` | trace record identity / ref | command / consumer / job success path 由 application id generator 提供 | 不等同 observability log id |
 | `GovernanceTraceRecordRefSet` | audit trail 中关联 trace refs | ordered unique;去重依据 `GovernanceTraceId` | 不保存 trace body |
-| `GovernanceTraceSubjectRef` | 被追溯对象 | 来源于 truth change subject、view subject 或 handoff scope | 不保存外部正文 |
+| `GovernanceTraceSubjectRef` | 被追溯对象 | accepted truth path 来源于 Step 7 `GovernanceTruthChangeSubjectMapper` 生成的 canonical subject key;consumer / job marker 使用正式 marker subject | 不保存外部正文;不得拼 `ExternalSourceRef` 字符串 |
 | `GovernanceAuditTrailId` / `GovernanceAuditTrailRef` | audit trail identity / ref | start audit trail flow 或 repository load | 不替代 observability ledger |
-| `GovernanceAuditSubjectRef` | audit 对象 | 来源于 governance truth / trace subject | 不表达当前业务状态 |
+| `GovernanceAuditSubjectRef` | audit 对象 | accepted truth path 与 trace / outbox 使用同一个 canonical subject key,由 Step 7 `GovernanceTruthChangeSubjectMapper` 返回 | 不表达当前业务状态;不得由 audit repository 另行推导 |
 | `GovernanceOutboxId` / `GovernanceOutboxRef` | outbox record identity / ref | outbox enqueue 由 application id generator 提供 | 不等同 outbound event id |
 | `GovernanceOutboxSubjectRef` | outbox 对应变化对象 | 由正式 truth change 映射;command flow 必须通过 Step 7 `GovernanceTruthChangeSubjectMapper` 从对应 truth 的 `to_ref()` 或 branch-specific ref 转换 | 不保存 event payload body;不得拼 `ExternalSourceRef` 字符串 |
 | `OutboxPublicationRef` | 发布成功回执引用 | publisher / bus adapter 返回 | 不改变 Governance truth 是否成立 |
@@ -1619,6 +1619,7 @@ pub struct OutboxPublicationRef(pub ExternalSourceRef);
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
 | trace / audit 不保存外部正文 | artifact、conversation、runtime、observability、archive body 都只通过 ref / handoff 表达 |
+| accepted subject key 同源 | command accepted path 的 trace subject、audit subject 和 outbox subject 必须包装同一个 canonical `ExternalSourceRef`;context/input/gate/decision 等 flow 不得各自生成不同 subject |
 | outbox 不决定 truth | 只传播已成立 truth 或正式维护状态 |
 | publication ref 不是 source version | 只表示发布动作结果,不替代 event schema version |
 
@@ -2709,7 +2710,7 @@ pub struct GovernanceReconciliationInput {
 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|
 | `GovernanceTruthSnapshot` | policy guard、dashboard projection 和 reconciliation 的 body-free truth 摘要 | 由 repository / query assembler 从 committed truth refs 构造;不得包含 domain object body |
-| `GovernanceTruthChange` | outbox、trace、stale marker 的统一 accepted-change helper | 由 command service 在 truth save 成功进入同一 UoW 后,先用 Step 7 `GovernanceTruthChangeSubjectMapper` 映射 subject,再调用 Step 7 `assign_truth_change_cursor()` 取得 accepted boundary cursor,最后用 subject/event kind + cursor 构造;不得用于未提交变化;不携带 trace ref,避免 trace record factory 循环依赖 |
+| `GovernanceTruthChange` | outbox、trace、stale marker 的统一 accepted-change helper | 由 command service 在 truth save 成功进入同一 UoW 后,先用 Step 7 `GovernanceTruthChangeSubjectMapper` 映射 accepted subject refs,再调用 Step 7 `assign_truth_change_cursor()` 取得 accepted boundary cursor,最后用 `subject_refs.outbox_subject_ref` / event kind / cursor 构造;不得用于未提交变化;不携带 trace ref,避免 trace record factory 循环依赖 |
 | `GovernanceReconciliationInput` | reconciliation report factory 输入 | 由 reconciliation job 从 snapshot / projection / outbox refs 构造;不修复 truth |
 
 | 不变量 / 禁止事项 | 说明 |
@@ -3211,7 +3212,7 @@ pub struct Gate {
 | `context_ref` | `GovernanceContextRef` | 所属 governance context | 从 loaded `GovernanceContext` 派生;context 必须 `Ready` |
 | `gate_kind` | `GateKind` | Gate 业务类别 | HLD 未给有限变体,使用 non-empty newtype;来源于 command intent |
 | `gate_state` | `GateState` | gate lifecycle state | 初始为 `Open`;只能按 Step 9 允许迁移更新 |
-| `required_responsibility_ref` | `Option<ApprovalResponsibilityRef>` | 进入 pending decision 所需责任 | `request_decision(...)` 写入;不保存 responsibility body |
+| `required_responsibility_ref` | `Option<ApprovalResponsibilityRef>` | 进入 pending decision 所需责任 | 03-b/03-c responsibility binding path 写入;commit-03-a 只需保留字段和 `None` 初始值;不保存 responsibility body |
 | `decision_ref` | `Option<GovernanceDecisionRef>` | 已附加的正式 decision | `attach_decision(...)` 写入;`Decided` 必须有值 |
 | `expire_reason` | `Option<GateExpireReason>` | `Expired` 终态原因 | `expire(...)` 写入;其他状态必须为空 |
 | `cancel_reason` | `Option<GateCancelReason>` | `Cancelled` 终态原因 | `cancel(...)` 写入;其他状态必须为空 |
@@ -3220,7 +3221,7 @@ pub struct Gate {
 |---|---|---|---|---|
 | `pub fn to_ref(&self) -> GateRef` | 生成 gate ref | 无 | `GateRef` | 纯函数;只复制 `gate_id` |
 | `pub fn is_waiting_for_decision(&self) -> bool` | 判断 gate 是否处于待裁决状态 | 无 | `bool` | 只有 `PendingDecision` 返回 true |
-| `pub fn request_decision(&mut self, responsibility: &ApprovalResponsibility, actor: ActorRef) -> Result<(), DomainError>` | 进入待裁决状态并绑定责任 | loaded responsibility、transition actor | `Result<(), DomainError>` | 允许 `Open -> PendingDecision`;要求 responsibility context 与 gate context 一致;写入 `required_responsibility_ref` |
+| `pub fn request_decision_by_ref(&mut self, responsibility_ref: ApprovalResponsibilityRef, responsibility_context_ref: GovernanceContextRef, actor: ActorRef) -> Result<(), DomainError>` | 进入待裁决状态并绑定责任 ref | responsibility ref、responsibility context ref、transition actor | `Result<(), DomainError>` | 允许 `Open -> PendingDecision`;要求 `responsibility_context_ref == self.context_ref`;写入 `required_responsibility_ref`;不读取 `ApprovalResponsibility` body |
 | `pub fn attach_decision(&mut self, decision: &GovernanceDecision, actor: ActorRef) -> Result<(), DomainError>` | 关联正式裁决并关闭等待 | loaded decision、transition actor | `Result<(), DomainError>` | 允许 `PendingDecision -> Decided`;要求 decision gate ref 等于 self ref;写入 `decision_ref` |
 | `pub fn expire(&mut self, reason: GateExpireReason) -> Result<(), DomainError>` | 标记 Gate 过期 | expire reason | `Result<(), DomainError>` | 允许 `Open` / `PendingDecision -> Expired`;写入 `expire_reason`;终态不可再裁决 |
 | `pub fn cancel(&mut self, reason: GateCancelReason, actor: ActorRef) -> Result<(), DomainError>` | 取消不再适用的 Gate | cancel reason、transition actor | `Result<(), DomainError>` | 允许 `Open` / `PendingDecision -> Cancelled`;写入 `cancel_reason`;终态不可再裁决 |
@@ -3236,6 +3237,7 @@ pub struct Gate {
 | Decided 必须有 decision ref | `Decided` 状态没有 `decision_ref` 属于非法重建 |
 | Expired / Cancelled 为终态 | 终态 gate 不得 attach decision;需要新裁决入口时创建新 Gate |
 | 不由 UI 显化替代 | conversation card、dashboard item 或 external ticket 不能形成 Gate truth |
+| commit-03-a 不依赖 approval object | commit-03-a 只能实现 Gate 本地状态和 ref-only transition;`ApprovalResponsibility` / `ResponsibilityChain` 的创建、加载和策略校验从 commit-03-b/03-c 开始 |
 
 #### 11.5 `GovernanceDecision`
 
@@ -3283,8 +3285,8 @@ pub struct GovernanceDecision {
 | `pub fn to_ref(&self) -> GovernanceDecisionRef` | 生成 decision ref | 无 | `GovernanceDecisionRef` | 纯函数;只复制 `decision_id` |
 | `pub fn is_finalized(&self) -> bool` | 判断 decision 是否已有正式 outcome | 无 | `bool` | `Approved` / `Rejected` / `Waived` 返回 true |
 | `pub fn approve(&mut self, basis_ref: EvidenceSummaryRef, actor: ActorRef) -> Result<(), DomainError>` | 基于依据形成批准结论 | evidence basis、transition actor | `Result<(), DomainError>` | 允许 `Proposed -> Approved`;写入 `basis_ref`;不得创建 downstream work |
-| `pub fn reject(&mut self, reason: GovernanceRejectReason, actor: ActorRef) -> Result<(), DomainError>` | 形成拒绝结论 | reject reason、transition actor | `Result<(), DomainError>` | 允许 `Proposed -> Rejected`;写入 `reject_reason`;不得删除 Gate |
-| `pub fn waive(&mut self, reason: GovernanceWaiveReason, actor: ActorRef) -> Result<(), DomainError>` | 形成可追溯豁免结论 | waive reason、transition actor | `Result<(), DomainError>` | 允许 `Proposed -> Waived`;写入 `waive_reason`;豁免必须可追溯 |
+| `pub fn reject(&mut self, reason: GovernanceRejectReason, basis_ref: Option<EvidenceSummaryRef>, actor: ActorRef) -> Result<(), DomainError>` | 形成拒绝结论 | reject reason、optional evidence basis、transition actor | `Result<(), DomainError>` | 允许 `Proposed -> Rejected`;写入 `reject_reason`;若 `basis_ref` 为 `Some` 则写入 decision `basis_ref`;不得删除 Gate |
+| `pub fn waive(&mut self, reason: GovernanceWaiveReason, basis_ref: Option<EvidenceSummaryRef>, actor: ActorRef) -> Result<(), DomainError>` | 形成可追溯豁免结论 | waive reason、optional evidence basis、transition actor | `Result<(), DomainError>` | 允许 `Proposed -> Waived`;写入 `waive_reason`;若 `basis_ref` 为 `Some` 则写入 decision `basis_ref`;豁免必须可追溯 |
 | `pub fn supersede(&mut self, next_decision_ref: GovernanceDecisionRef, actor: ActorRef) -> Result<(), DomainError>` | 被后续裁决替代 | next decision ref、transition actor | `Result<(), DomainError>` | 允许 `Approved` / `Rejected` / `Waived -> Superseded`;next ref 不得等于自身 |
 | `pub fn revoke(&mut self, reason: GovernanceRevokeReason, actor: ActorRef) -> Result<(), DomainError>` | 撤销错误或不再适用的裁决 | revoke reason、transition actor | `Result<(), DomainError>` | 允许 `Approved` / `Rejected` / `Waived -> Revoked`;写入 `revoke_reason` |
 
@@ -4179,7 +4181,7 @@ pub struct GovernanceTraceRecord {
 | 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
 | `trace_id` | `GovernanceTraceId` | trace record identity | application id generator 生成;domain 不自行生成 |
-| `subject_ref` | `GovernanceTraceSubjectRef` | 被追溯对象 | 从 accepted `GovernanceTruthChange.subject_ref`、consumer marker subject 或 job / handoff subject 映射;不保存正文 |
+| `subject_ref` | `GovernanceTraceSubjectRef` | 被追溯对象 | accepted truth path 从 Step 7 mapper 返回的 `trace_subject_ref` 取得,且必须与 `GovernanceTruthChange.subject_ref` 包装同一个 canonical key;consumer marker / job / handoff 使用正式 marker subject;不保存正文 |
 | `trace_kind` | `GovernanceTraceKind` | 追溯类别 | 非空 newtype;由 factory input 或 flow 常量提供;不驱动业务状态 |
 | `core_trace_id` | `TraceId` | L0-core distributed trace 关联 | 来自 `CommandMetadata.request.trace_id`、`QueryMetadata.request.trace_id`、event envelope traceparent 或 job metadata;不得本仓重新定义额外 trace context wrapper |
 | `source_cursor` | `Option<GovernanceTruthCursor>` | accepted change 后的 cursor | truth change path 必须为 `Some(change.source_cursor)`;consumer / job marker 若无 truth cursor 可为 `None` |
@@ -4192,7 +4194,7 @@ pub struct GovernanceTraceRecord {
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn from_truth_change(trace_id: GovernanceTraceId, change: &GovernanceTruthChange, trace_kind: GovernanceTraceKind, core_trace_id: TraceId) -> Result<Self, DomainError>` | 从已成立 truth change 构造 trace | application generated id、accepted truth change、trace kind、core trace id | `Result<GovernanceTraceRecord, DomainError>` | command accepted path;`source_cursor = Some(change.source_cursor)` |
+| `pub fn from_truth_change(trace_id: GovernanceTraceId, change: &GovernanceTruthChange, trace_subject_ref: GovernanceTraceSubjectRef, trace_kind: GovernanceTraceKind, core_trace_id: TraceId) -> Result<Self, DomainError>` | 从已成立 truth change 构造 trace | application generated id、accepted truth change、same-key trace subject、trace kind、core trace id | `Result<GovernanceTraceRecord, DomainError>` | command accepted path;`trace_subject_ref` 必须来自同一 Step 7 mapper result,并与 `change.subject_ref` 包装同一个 canonical key;`source_cursor = Some(change.source_cursor)` |
 | `pub fn from_marker(trace_id: GovernanceTraceId, subject_ref: GovernanceTraceSubjectRef, trace_kind: GovernanceTraceKind, core_trace_id: TraceId, source_cursor: Option<GovernanceTruthCursor>) -> Result<Self, DomainError>` | 从 consumer / job marker 构造 trace | generated id、formal marker subject、kind、core trace id、optional cursor | `Result<GovernanceTraceRecord, DomainError>` | consumer accepted marker、rebuild / refresh / reconciliation job marker |
 
 | 不变量 / 禁止事项 | 说明 |
@@ -4220,20 +4222,20 @@ pub struct GovernanceAuditTrail {
 
 | 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
-| `audit_trail_id` | `GovernanceAuditTrailId` | audit trail identity | start audit trail flow 由 application id generator 提供;repository load 可重建 |
-| `subject_ref` | `GovernanceAuditSubjectRef` | 审计对象 | 从 governance truth ref、trace subject 或 report subject 映射;不表达当前状态 |
+| `audit_trail_id` | `GovernanceAuditTrailId` | audit trail identity | 首次 `start_for_subject(...)` 时由 application id generator 提供;更新既有 audit trail 时必须通过 `GovernanceAuditHistoryRepository.get_audit_trail_by_subject_with_version(subject_ref)` 按 `subject_ref` 唯一键读取既有 `audit_trail_id` 和 version;不得从 `GovernanceAuditSubjectRef` 派生或拼接 |
+| `subject_ref` | `GovernanceAuditSubjectRef` | 审计对象 | command accepted path 从 Step 7 mapper 返回的 `audit_subject_ref` 取得,且与 trace / outbox subject 包装同一个 canonical key;report / job marker subject 必须有对应正式 mapper | 不表达当前状态 |
 | `record_refs` | `GovernanceTraceRecordRefSet` | 关联 trace refs | ordered unique;append-only;只保存 ref,不保存 trace body |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `pub fn to_ref(&self) -> GovernanceAuditTrailRef` | 生成 audit trail ref | 无 | `GovernanceAuditTrailRef` | 纯函数;复制 `audit_trail_id` |
-| `pub fn append(&mut self, record: &GovernanceTraceRecord) -> Result<(), DomainError>` | 追加 trace ref | loaded trace record | `Result<(), DomainError>` | record subject 必须可映射到本 audit subject;按 trace id 去重;保持原有顺序 |
+| `pub fn append(&mut self, record: &GovernanceTraceRecord) -> Result<(), DomainError>` | 追加 trace ref | loaded trace record | `Result<(), DomainError>` | record subject 必须与本 audit subject 使用同一个 canonical key;按 trace id 去重;保持原有顺序 |
 | `pub fn has_gap(&self) -> bool` | 判断审计链是否存在缺口 | 无 | `bool` | Step 11 persistence / Step 12 error recovery 负责定义 gap marker 来源;本函数只读现有 marker / ordering |
 | `pub fn covers_subject(&self, subject_ref: &GovernanceAuditSubjectRef) -> bool` | 判断是否覆盖指定审计对象 | audit subject | `bool` | 纯判断 |
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn start_for_subject(audit_trail_id: GovernanceAuditTrailId, subject_ref: GovernanceAuditSubjectRef) -> Result<Self, DomainError>` | 为对象建立审计链 | application generated id、audit subject | `Result<GovernanceAuditTrail, DomainError>` | audit trail 首次创建;`record_refs` 初始为空 |
+| `pub fn start_for_subject(audit_trail_id: GovernanceAuditTrailId, subject_ref: GovernanceAuditSubjectRef) -> Result<Self, DomainError>` | 为对象建立审计链 | application generated id、audit subject | `Result<GovernanceAuditTrail, DomainError>` | 仅在 `get_audit_trail_by_subject_with_version(subject_ref)` 返回 `None` 时用于首次创建;`record_refs` 初始为空 |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
@@ -4956,6 +4958,8 @@ pub struct GovernanceContextPolicy {
 
 #### 14.4 `DecisionPolicy`
 
+Commit boundary: `DecisionPolicy` 不是 commit-03-a 的落码对象。commit-03-a 只实现 Gate / GovernanceDecision contracts 与本地 state transition；`DecisionPolicy` 从 commit-03-c 开始随责任链 service flow 落码。`SharedRuleSet` body 的 active/evaluation 校验不属于 PH-03,统一由 PH-04 `SharedRulesPolicy` 闭合；PH-03 `DecisionPolicy` 只携带并校验 shared rule set ref 没有被绕过。
+
 ```rust
 /// Guards formal Governance decisions before they can be attached to a gate.
 pub struct DecisionPolicy {
@@ -4978,7 +4982,7 @@ pub struct DecisionPolicy {
 |---|---|---|---|---|
 | `pub fn assert_can_decide(&self, gate: &Gate, chain: &ResponsibilityChain, actor: ActorRef) -> Result<(), DomainError>` | 校验 Gate 和责任链允许进入正式裁决 | loaded gate、loaded chain、command actor | `Result<(), DomainError>` | 要求 gate / chain ref 匹配 policy 字段、gate `PendingDecision`、chain `Satisfied`;不 attach decision |
 | `pub fn assert_basis_sufficient(&self, basis_ref: &EvidenceSummaryRef) -> Result<(), DomainError>` | 校验裁决依据可作为 decision basis | evidence summary ref | `Result<(), DomainError>` | 要求 basis 可被 `EvidenceSummaryRef::is_acceptable_for_decision()` 接受;不读取 evidence body |
-| `pub fn assert_shared_rules_satisfied(&self, shared_rules: Option<&SharedRuleSet>) -> Result<(), DomainError>` | 校验适用 shared rules 没有被绕过 | optional loaded shared rule set | `Result<(), DomainError>` | 若 `shared_rule_set_ref` 为 `Some`,必须传入同 ref 且 active 的 rule set;具体 rule evaluation 留给 `SharedRulesPolicy` |
+| `pub fn assert_shared_rule_ref_preserved(&self, applied_shared_rule_set_ref: Option<&SharedRuleSetRef>) -> Result<(), DomainError>` | 校验适用 shared rule set ref 没有被绕过 | flow 已确定的 optional shared rule set ref | `Result<(), DomainError>` | 若 `self.shared_rule_set_ref` 为 `Some`,必须传入同 ref;不加载 `SharedRuleSet`;active/evaluation 留给 PH-04 `SharedRulesPolicy` |
 | `pub fn assert_supersede_allowed(&self, current: &GovernanceDecision, next: &GovernanceDecision) -> Result<(), DomainError>` | 校验后续裁决可以替代既有裁决 | current decision、next decision | `Result<(), DomainError>` | 要求二者同 gate、current finalized、next proposed / same gate;不调用 `current.supersede(...)` |
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
@@ -4990,13 +4994,13 @@ pub struct DecisionPolicy {
 | 不允许无责任裁决 | gate 进入正式 decision 前必须有 satisfied responsibility chain 或 Step 9 明确的 reserved exception |
 | vote 不等于 decision | approval vote 只满足 chain,不能替代 `GovernanceDecision` |
 | process waiting 不替代 decision | process waiting gate 只能消费正式 `GovernanceDecisionRef`,不能成为 decision truth |
-| shared rules 不可绕过 | 有 `shared_rule_set_ref` 时必须加载并验证对应 active rule set;不得用配置关闭 |
+| shared rules 不可绕过 | PH-03 必须保留适用 `shared_rule_set_ref` 且不得以配置关闭;`SharedRuleSet` body 的 active/evaluation 校验由 PH-04 `SharedRulesPolicy` 执行 |
 | policy 不写 gate / decision | 本 policy 不调用 `Gate::attach_decision`、`GovernanceDecision::approve`、history、trace 或 outbox |
 
 | 与 HLD 骨架的收口差异 | 原因 |
 |---|---|
 | `for_gate(Gate, ResponsibilityChain)` 增加 `shared_rule_set_ref` 入参 | struct 字段包含 optional shared rules;factory 必须覆盖字段来源 |
-| `assert_shared_rules_satisfied(...)` 接收 optional loaded rule set | policy 不允许 repository lookup;application flow 负责加载 |
+| `assert_shared_rule_ref_preserved(...)` 不接收 `SharedRuleSet` body | 避免 PH-03 越界依赖 PH-04 shared rules object;active/evaluation 统一归 `SharedRulesPolicy` |
 | `assert_supersede_allowed(...)` 只判断不迁移 | 真正 supersede 由 `GovernanceDecision::supersede(...)` 和 Step 9 transaction 编排执行 |
 
 #### 14.5 `ApprovalResponsibilityPolicy`
@@ -7476,7 +7480,7 @@ pub struct GovernanceJobRunnerRegistryState {
 | control / compliance truth | `ControlApplicability`、`ControlReview`、`AIIAConclusion`、`SoAConclusion` | control/review/conclusion id 来自 id generator;control/source/evidence refs 来自 command或resolver;state/conclusion/reason 来自 compliance policy;actor/trace 来自 flow metadata | Step 7 evidence summary、control catalog summary、review repository;Step 8 assessment command;Step 9 compliance flow;Step 10 conclusion matrix | 需要读取 ISO/control正文、evidence body 或 GRC adapter body 才能判断 state;review conclusion enum 未闭合 |
 | nonconformity / corrective truth | `NonconformityRecord`、`CorrectiveAction`、`VerificationResult` | nc/action/verification id 来自 id generator;severity/reason/source/evidence refs 来自 accepted command/resolver;closure state 来自 `NonconformityClosurePolicy` | Step 7 nc/action repository、evidence resolver、assignee/capability port;Step 8 corrective command;Step 9 closure / verification flow;Step 10 nc/action state matrix | verification 需要 evidence body;closure reason、failure reason、assignee responsibility 或 due date source 未闭合 |
 | projection / reference local state | `DerivedGovernanceViewState`、external snapshot / mirror、reference state helpers | view/ref/snapshot identity 来自 typed ref;freshness/degraded/visibility from projection/reference policy;source_cursor from committed truth cursor;reference state from consumer/refresh outcome | Step 7 projection repository、affected view lookup、reference snapshot repository;Step 9 query/consumer/refresh flow;Step 11 projection identity and stale persistence | affected views 无正式读取面;reference refresh 成功/失败缺 version 来源;query 试图直接修复 stale/unresolved state |
-| trace / audit / history | `GovernanceTraceRecord`、`GovernanceAuditTrail`、history record group | trace/audit/history id 来自 id generator;subject/change/source_cursor/actor/core_trace_id 来自 accepted truth transition;history kind 来自 finite change enum | Step 7 trace/audit repository;Step 8 trace/query DTO;Step 9 append timing;Step 11 append-only persistence | trace record factory 缺 id、subject 或 core_trace_id;consumer marker 没有正式 trace subject;history kind 未定义 |
+| trace / audit / history | `GovernanceTraceRecord`、`GovernanceAuditTrail`、history record group | trace/audit/history id 来自 id generator;accepted subject refs 来自 Step 7 canonical mapper;change/source_cursor/actor/core_trace_id 来自 accepted truth transition;history kind 来自 finite change enum | Step 7 trace/audit repository;Step 8 trace/query DTO;Step 9 append timing;Step 11 append-only persistence | trace record factory 缺 id、subject 或 core_trace_id;consumer marker 没有正式 trace subject;history kind 未定义;trace/audit/outbox subject key 不同源 |
 | outbox / outbound publication | `GovernanceOutboxRecord`、publisher adapter state、outbox loop entry | outbox id 来自 id generator;event kind/subject/truth change/trace/visibility 来自 accepted transaction;publication state 来自 publisher result | Step 8 outbound event envelope/payload;Step 9 outbox append/publish flow;Step 11 payload snapshot persistence;Step 13 retry/idempotency | outbox record 无法回查 payload snapshot;publisher 从 current truth 现查现造 payload;expected version 无来源 |
 | public view / report DTO | dashboard、decision summary、policy effective、control coverage、nc status、reconciliation report | view/report ref、surface marker、freshness/degraded/visibility/source_cursor 来自 projection/query assembly;body 字段只使用 refs、summaries、state markers | Step 8 query response DTO;Step 9 query assembly;Step 11 projection storage;Step 16 query fixture | view/report 需要 domain-only type、external body、policy/control正文;NotVisible 缺 marker surface |
 | application helper objects | facade、operation context、idempotency record、stored result、visibility decision、job report assembly | operation name/key/digest/result ref 来自 command/event/job metadata and canonical digest;visibility decision 来自 read policy;stored result shell only stores surface refs | Step 7 result/idempotency repository;Step 8 command/event/job metadata;Step 13 duplicate replay;Step 12 error mapping | duplicate path 无 stored result 读取面;digest 算法字段不稳定;visibility denied 只能抛 error 无 marker |

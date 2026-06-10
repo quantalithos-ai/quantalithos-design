@@ -259,6 +259,7 @@
 | `GovernanceTraceRepository.get(trace_ref)` | 读取单条 trace | read-only;handoff/export must validate requested traces through this function | `Option<GovernanceTraceRecord>` | repository failure |
 | `GovernanceTraceRepository.list_by_subject(subject_ref, page)` | trace query / audit / handoff source scan | read-only;stable page order by trace cursor/time | `Page<GovernanceTraceRecord>` | repository failure |
 | `GovernanceAuditHistoryRepository.get_audit_trail_with_version(audit_ref)` | 读取 audit trail 和 version | read-only;trail update 使用返回 version | `Option<Versioned<GovernanceAuditTrail>>` | repository failure |
+| `GovernanceAuditHistoryRepository.get_audit_trail_by_subject_with_version(subject_ref)` | 按 audit subject 唯一键读取 audit trail 和 version | accepted command 更新 audit trail 前必须使用;返回已有 `audit_trail_id` 与 expected version;missing 表示首次创建 | `Option<Versioned<GovernanceAuditTrail>>` | repository failure |
 | `GovernanceAuditHistoryRepository.save_audit_trail(trail, expected_version, uow)` | 保存 audit trail ref chain | `None` create;`Some(version)` update;same UoW as accepted truth/trace | `GovernanceAuditTrailRef` | duplicate / version conflict |
 | `append_decision_record(record, uow)` | 追加 decision history | append-only;same UoW as decision/gate transition | `DecisionRecordRef` | duplicate record id |
 | `append_responsibility_record(record, uow)` | 追加 approval responsibility history | append-only;same UoW as responsibility/chain transition | `ResponsibilityTraceRecordRef` | duplicate record id |
@@ -452,12 +453,14 @@ load required truth with get_*_with_version / list_* returning Versioned<T>
 load body-free snapshots / reference states / policy guards
 call domain factory / transition methods
 save changed truth with expected_version
-subject_ref = GovernanceTruthChangeSubjectMapper.<subject>(changed_truth.to_ref())
+subject_refs = GovernanceTruthChangeSubjectMapper.<subject>s(changed_truth.to_ref())
 source_cursor = GovernanceUnitOfWork.assign_truth_change_cursor()
-build GovernanceTruthChange(s) from mapped subject_ref + event descriptor + source_cursor
+build GovernanceTruthChange(s) from subject_refs.outbox_subject_ref + event descriptor + source_cursor
 append applicable history records
-append GovernanceTraceRecord::from_truth_change(...)
-save / update GovernanceAuditTrail
+append GovernanceTraceRecord::from_truth_change(..., subject_refs.trace_subject_ref, ...)
+用 get_audit_trail_by_subject_with_version(subject_refs.audit_subject_ref) 按 subject 读取既有 GovernanceAuditTrail
+  Some(versioned trail) -> 追加 trace ref 并用 Some(versioned.version) 保存
+  None -> start_for_subject(new_audit_trail_id(), subject_refs.audit_subject_ref),追加 trace ref,并用 None 保存
 build GovernanceOutboxPayloadSnapshot from committed truth change
 append GovernanceOutboxRecord + payload snapshot
 list affected views through GovernanceProjectionRepository
@@ -472,6 +475,7 @@ commit GovernanceUnitOfWork
 | idempotency before mutation | duplicate/conflict must not create trace/outbox/history |
 | versioned read before transition | state transition and expected_version share same loaded truth |
 | truth save before trace/outbox | trace/outbox describe committed accepted truth,not speculative transition |
+| accepted subject before trace/audit/outbox | trace subject、audit subject 和 outbox subject 必须来自同一个 `GovernanceTruthChangeSubjectMapper` result;不得由各 repository 分别推导 |
 | source cursor after truth save | `GovernanceTruthChange.source_cursor` must be assigned by the same UoW after changed truth is saved/staged;validation failure、duplicate 和 rollback path 不分配 cursor |
 | history after transition | history fields come from from/to state and formal reason/basis |
 | payload snapshot before outbox append | record must reference immutable payload snapshot saved in same UoW |

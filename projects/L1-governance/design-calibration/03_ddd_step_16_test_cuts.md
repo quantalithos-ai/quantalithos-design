@@ -138,10 +138,10 @@ Step 15 observability and audit
 | 测试切口 | 对应契约 | 验证内容 | 建议测试类型 |
 |---|---|---|---|
 | `CreateGovernanceContext_contract` | `CreateGovernanceContextFlow` | context created;reference pending/ready branch;trace/audit/outbox/stale/result same UoW;duplicate replay;missing subject/source;resolver unavailable;outbox failure rollback | API + application |
-| `SubmitGovernanceInput_contract` | `SubmitGovernanceInputFlow` | input received/accepted/pending evidence;context missing/not ready;forbidden body;duplicate replay;reference unresolved;no external body saved | API + application |
-| `UpdateGovernanceInputState_contract` | `UpdateGovernanceInputStateFlow` | accept/reject/wait/supersede transitions;required reason/ref validation;terminal input reject;version conflict rollback | API + application |
-| `OpenGovernanceGate_contract` | `OpenGovernanceGateFlow` | gate open + optional approver requirement/responsibility;context not ready rejected;duplicate;missing requirement;history/trace/outbox saved | API + application |
-| `RecordGovernanceDecision_contract` | `RecordGovernanceDecisionFlow` | decision proposed/finalized and gate attached;approve/reject/waive branch;basis evidence unresolved;chain not satisfied;version conflict | API + application |
+| `SubmitGovernanceInput_contract` | `SubmitGovernanceInputFlow` | input received only;context missing / terminal context rejected;forbidden body;duplicate replay;no external body saved;no accepted / pending evidence branch | API + application |
+| `UpdateGovernanceInputState_contract` | `UpdateGovernanceInputStateFlow` | accept/reject/wait/supersede transitions;required reason/ref validation;pending evidence ref from request;accept resolves pending evidence when present;terminal input reject;version conflict rollback | API + application |
+| `OpenGovernanceGate_contract` | `OpenGovernanceGateFlow` | no requirement => final gate `Open` and `required_responsibility_ref = None`;with approver requirement => requirement/responsibility/chain saved and final gate `PendingDecision` with created responsibility ref;context not ready rejected;duplicate;missing requirement;history/trace/outbox saved | API + application |
+| `RecordGovernanceDecision_contract` | `RecordGovernanceDecisionFlow` | requires preexisting `PendingDecision` gate and never performs `Open -> PendingDecision`;decision proposed/finalized and gate attached;approve/reject/waive branch;basis evidence unresolved;chain not satisfied;version conflict | API + application |
 | `SupersedeGovernanceDecision_contract` | `SupersedeGovernanceDecisionFlow` | current finalized decision superseded by next;same gate guard;next finalization branch;superseded current cannot supersede again | API + application |
 | `AssignApprovalResponsibility_contract` | `AssignApprovalResponsibilityFlow` | responsibility required/assigned and chain updated;actor capability snapshot resolved;duplicate active actor;capability unavailable | API + application |
 | `RecordApprovalVote_contract` | `RecordApprovalVoteFlow` | vote recorded;chain satisfied branch;wrong actor rejected;duplicate vote;terminal responsibility reject | API + application |
@@ -229,7 +229,7 @@ Step 15 observability and audit
 |---|---|---|---|
 | `governance_context_state_transitions` | `GovernanceContextState` | `Draft/PendingReference -> Ready`;`Ready -> PendingReference`;`Invalid/Closed` terminal reject | domain unit |
 | `governance_input_state_transitions` | `GovernanceInputState` | `Received -> Accepted/Rejected/PendingEvidence/Superseded`;terminal reject;pending evidence guard | domain unit |
-| `gate_state_transitions` | `GateState` | `Open -> PendingDecision -> Decided`;expire/cancel;decided gate cannot attach second decision | domain unit |
+| `gate_state_transitions` | `GateState` | `Open -> PendingDecision -> Decided`;`OpenGovernanceGate` no-requirement path stays `Open`, requirement path calls `request_decision_by_ref`;expire/cancel;decided gate cannot attach second decision | domain unit |
 | `governance_decision_state_transitions` | `GovernanceDecisionState` | `Proposed -> Approved/Rejected/Waived`;finalized -> Superseded/Revoked;terminal guard | domain unit |
 | `approval_responsibility_state_transitions` | `ApprovalResponsibilityState` | `Required -> Assigned -> Accepted/Voted/Delegated`;released/terminal reject | domain unit |
 | `responsibility_chain_state_transitions` | `ResponsibilityChainState` | open/partially satisfied/satisfied/released;cannot vote after satisfied/released | domain unit |

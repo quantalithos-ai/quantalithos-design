@@ -182,7 +182,7 @@ pub trait GovernanceUnitOfWorkManager {
 | `Versioned<T>` | object + version 配对读取面 | 所有 mutation 前置读取必须使用 |
 | `ComplianceConclusionVersionedRef` | AIIA / SoA union list helper | query / projection / approval flow 可先列 ref+version,再按 branch 读取具体 object;不得把 AIIA 和 SoA 合并为一个 domain object |
 | `ExternalContextRefreshScope` | reference refresh repository scope helper | application-local helper;Step 8 若暴露 public job request 必须定义对应 DTO;不得由实现全表猜测或临时拼 source filter |
-| `GovernanceTruthChangeSubjectMapper` | accepted truth subject helper | 从 typed truth ref 映射 `GovernanceOutboxSubjectRef`;command service 不拼 `ExternalSourceRef` 字符串 |
+| `GovernanceTruthChangeSubjectMapper` | accepted truth subject helper | 从 typed truth ref 映射同源的 trace / audit / outbox subject refs;command service 不拼 `ExternalSourceRef` 字符串 |
 | `GovernanceUnitOfWork` | transaction write boundary | truth、trace、audit、outbox、projection stale、result 必须同事务提交;`assign_truth_change_cursor()` 是 command accepted path 的唯一 truth cursor 来源 |
 
 | UoW cursor rule | 正式口径 |
@@ -195,30 +195,55 @@ pub trait GovernanceUnitOfWorkManager {
 
 #### 7.1 Accepted truth change subject helper
 
-`GovernanceTruthChange.subject_ref` 必须由 application-local helper 从已保存 / 已加载的 typed truth ref 映射,不得让 command service 拼接 `ExternalSourceRef` 字符串。
+`GovernanceTruthChange.subject_ref`、`GovernanceTraceRecord.subject_ref` 和 `GovernanceAuditTrail.subject_ref` 必须由 application-local helper 从已保存 / 已加载的 typed truth ref 映射。Helper 为每个 truth ref 生成一个 canonical subject key,并把同一个 key 分别包装成 outbox、trace 和 audit subject ref。Command service、repository adapter 和 fake runtime 不得自行拼接 `ExternalSourceRef` 字符串。
 
 ```rust
-/// Maps typed Governance truth refs to body-free outbox subjects.
+/// Accepted subject refs that share one canonical Governance subject key.
+pub struct GovernanceAcceptedSubjectRefs {
+    pub outbox_subject_ref: GovernanceOutboxSubjectRef,
+    pub trace_subject_ref: GovernanceTraceSubjectRef,
+    pub audit_subject_ref: GovernanceAuditSubjectRef,
+}
+
+/// Maps typed Governance truth refs to body-free trace/audit/outbox subjects.
 pub trait GovernanceTruthChangeSubjectMapper {
-    fn context_subject(&self, context_ref: GovernanceContextRef) -> GovernanceOutboxSubjectRef;
-    fn input_subject(&self, input_ref: GovernanceInputRef) -> GovernanceOutboxSubjectRef;
-    fn gate_subject(&self, gate_ref: GateRef) -> GovernanceOutboxSubjectRef;
-    fn decision_subject(&self, decision_ref: GovernanceDecisionRef) -> GovernanceOutboxSubjectRef;
-    fn responsibility_subject(&self, responsibility_ref: ApprovalResponsibilityRef) -> GovernanceOutboxSubjectRef;
-    fn policy_fact_subject(&self, policy_fact_ref: PolicyEffectiveFactRef) -> GovernanceOutboxSubjectRef;
-    fn shared_rule_set_subject(&self, rule_set_ref: SharedRuleSetRef) -> GovernanceOutboxSubjectRef;
-    fn policy_conflict_subject(&self, conflict_ref: PolicyConflictRef) -> GovernanceOutboxSubjectRef;
-    fn control_applicability_subject(&self, applicability_ref: ControlApplicabilityRef) -> GovernanceOutboxSubjectRef;
-    fn compliance_conclusion_subject(&self, conclusion_ref: ComplianceConclusionRef) -> GovernanceOutboxSubjectRef;
-    fn nonconformity_subject(&self, nonconformity_ref: NonconformityRef) -> GovernanceOutboxSubjectRef;
+    fn context_subjects(&self, context_ref: GovernanceContextRef) -> GovernanceAcceptedSubjectRefs;
+    fn input_subjects(&self, input_ref: GovernanceInputRef) -> GovernanceAcceptedSubjectRefs;
+    fn gate_subjects(&self, gate_ref: GateRef) -> GovernanceAcceptedSubjectRefs;
+    fn decision_subjects(&self, decision_ref: GovernanceDecisionRef) -> GovernanceAcceptedSubjectRefs;
+    fn responsibility_subjects(&self, responsibility_ref: ApprovalResponsibilityRef) -> GovernanceAcceptedSubjectRefs;
+    fn policy_fact_subjects(&self, policy_fact_ref: PolicyEffectiveFactRef) -> GovernanceAcceptedSubjectRefs;
+    fn shared_rule_set_subjects(&self, rule_set_ref: SharedRuleSetRef) -> GovernanceAcceptedSubjectRefs;
+    fn policy_conflict_subjects(&self, conflict_ref: PolicyConflictRef) -> GovernanceAcceptedSubjectRefs;
+    fn control_applicability_subjects(&self, applicability_ref: ControlApplicabilityRef) -> GovernanceAcceptedSubjectRefs;
+    fn compliance_conclusion_subjects(&self, conclusion_ref: ComplianceConclusionRef) -> GovernanceAcceptedSubjectRefs;
+    fn nonconformity_subjects(&self, nonconformity_ref: NonconformityRef) -> GovernanceAcceptedSubjectRefs;
 }
 ```
 
 | helper rule | 正式口径 |
 |---|---|
 | input source | 只能接收 typed truth `to_ref()` 结果或 loaded relation ref |
-| output | 返回 `GovernanceOutboxSubjectRef` 供 `GovernanceTruthChange`、trace、outbox 和 event envelope 复制 |
-| forbidden | 不得在 service / adapter 中解析 ref 字符串、拼接 route path、使用 title/source body 或 event topic 代替 subject |
+| canonical key | helper 内部使用 `governance:<truth-kind>:<id>` 形成 canonical `ExternalSourceRef`;`<id>` 是 typed ref 内部 id newtype 的完整 opaque value,即使包含分隔符也作为剩余整体处理,业务逻辑不得解析 |
+| output | 返回 `GovernanceAcceptedSubjectRefs`;三个 subject ref 必须包装同一个 canonical key |
+| trace/outbox/audit relation | `GovernanceTruthChange.subject_ref = refs.outbox_subject_ref`;`GovernanceTraceRecord::from_truth_change(..., refs.trace_subject_ref, ...)`;accepted flow 必须先用 `GovernanceAuditHistoryRepository.get_audit_trail_by_subject_with_version(refs.audit_subject_ref)` 读取既有 trail;若不存在才用 `GovernanceAuditTrail.start_for_subject(new_audit_trail_id(), refs.audit_subject_ref)` 创建 |
+| fake / durable parity | fake runtime 和 durable adapter 必须按同一 canonical key table 生成 subject refs,测试可直接断言具体 key |
+| forbidden | 不得在 service / adapter 中解析 ref 字符串、拼接 route path、使用 title/source body、event topic、trace id 或 cursor 代替 subject |
+
+| typed truth ref | canonical subject key |
+|---|---|
+| `GovernanceContextRef { context_id }` | `governance:context:<context_id>` |
+| `GovernanceInputRef { input_id }` | `governance:input:<input_id>` |
+| `GateRef { gate_id }` | `governance:gate:<gate_id>` |
+| `GovernanceDecisionRef { decision_id }` | `governance:decision:<decision_id>` |
+| `ApprovalResponsibilityRef { responsibility_id }` | `governance:responsibility:<responsibility_id>` |
+| `PolicyEffectiveFactRef { policy_fact_id }` | `governance:policy-fact:<policy_fact_id>` |
+| `SharedRuleSetRef { rule_set_id }` | `governance:shared-rule-set:<rule_set_id>` |
+| `PolicyConflictRef { conflict_id }` | `governance:policy-conflict:<conflict_id>` |
+| `ControlApplicabilityRef { applicability_id }` | `governance:control-applicability:<applicability_id>` |
+| `ComplianceConclusionRef::AIIA(conclusion_ref)` | `governance:compliance-conclusion:aiia:<aiia_conclusion_id>` |
+| `ComplianceConclusionRef::SoA(conclusion_ref)` | `governance:compliance-conclusion:soa:<soa_conclusion_id>` |
+| `NonconformityRef { nonconformity_id }` | `governance:nonconformity:<nonconformity_id>` |
 
 ### 8. Application 基础 port 契约
 
@@ -806,6 +831,11 @@ pub trait GovernanceAuditHistoryRepository {
     async fn get_audit_trail_with_version(
         &self,
         audit_ref: GovernanceAuditTrailRef,
+    ) -> Result<Option<Versioned<GovernanceAuditTrail>>, ApplicationError>;
+
+    async fn get_audit_trail_by_subject_with_version(
+        &self,
+        subject_ref: GovernanceAuditSubjectRef,
     ) -> Result<Option<Versioned<GovernanceAuditTrail>>, ApplicationError>;
 
     async fn save_audit_trail(

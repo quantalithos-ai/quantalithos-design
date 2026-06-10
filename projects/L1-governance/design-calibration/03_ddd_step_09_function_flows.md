@@ -101,9 +101,9 @@
 | Flow | 协议 DTO | 所属模块 | 目标对象 | 主要 port | 状态 / 副作用 | 停审状态 |
 |---|---|---|---|---|---|---|
 | `CreateGovernanceContextFlow` | `CreateGovernanceContextRequest` | context | `GovernanceContext` | context repo, reference resolver/repo, trace, audit, outbox, projection, result | create context, trace/outbox/stale/result | 待审 |
-| `SubmitGovernanceInputFlow` | `SubmitGovernanceInputRequest` | context/input | `GovernanceInput` | context/input repo, trace, audit, outbox, projection, result | receive input, optional accepted path | 待审 |
+| `SubmitGovernanceInputFlow` | `SubmitGovernanceInputRequest` | context/input | `GovernanceInput` | context/input repo, trace, audit, outbox, projection, result | receive input as `Received` only | 待审 |
 | `UpdateGovernanceInputStateFlow` | `UpdateGovernanceInputStateRequest` | context/input | `GovernanceInput` | input/context repo, trace, audit, outbox, projection, result | accept/reject/wait/supersede | 待审 |
-| `OpenGovernanceGateFlow` | `OpenGovernanceGateRequest` | decision | `Gate`, optional requirement/responsibility | context/gate/requirement/responsibility/chain repo, trace, audit, outbox, projection, result | open gate, optional requirement | 待审 |
+| `OpenGovernanceGateFlow` | `OpenGovernanceGateRequest` | decision | `Gate`, optional requirement/responsibility | context/gate/requirement/responsibility/chain repo, trace, audit, outbox, projection, result | no requirement => open gate;with requirement => same-command pending decision binding | 待审 |
 | `RecordGovernanceDecisionFlow` | `RecordGovernanceDecisionRequest` | decision | `GovernanceDecision`, `Gate` | gate/decision/chain/shared rule repo, trace/history, outbox, projection, result | propose/finalize/attach decision | 待审 |
 | `SupersedeGovernanceDecisionFlow` | `SupersedeGovernanceDecisionRequest` | decision | `GovernanceDecision` | decision/gate/chain/shared rule repo, trace/history, outbox, projection, result | create next, finalize, supersede current | 待审 |
 | `AssignApprovalResponsibilityFlow` | `AssignApprovalResponsibilityRequest` | approval | `ApproverRequirement`, `ApprovalResponsibility`, `ResponsibilityChain` | context/responsibility/chain/reference repo, resolver, trace/history, outbox, projection, result | require/assign/append chain | 待审 |
@@ -163,12 +163,14 @@
   v
 [Persist accepted effects]
   | save all changed truth with expected_version
-  | subject_ref = GovernanceTruthChangeSubjectMapper.<subject>(changed_truth.to_ref())
+  | subject_refs = GovernanceTruthChangeSubjectMapper.<subject>s(changed_truth.to_ref())
   | source_cursor = tx.assign_truth_change_cursor()
-  | build GovernanceTruthChange(s) from mapped subject_ref + event descriptor + source_cursor
+  | build GovernanceTruthChange(s) from subject_refs.outbox_subject_ref + event descriptor + source_cursor
   | append history record when the object family has one
-  | append GovernanceTraceRecord::from_truth_change(...)
-  | save / update GovernanceAuditTrail
+  | append GovernanceTraceRecord::from_truth_change(..., subject_refs.trace_subject_ref, ...)
+  | existing_audit = audit_history_repo.get_audit_trail_by_subject_with_version(subject_refs.audit_subject_ref)
+  | 若 existing_audit 存在 -> 向已加载 trail 追加 trace,并用 Some(existing_audit.version) 保存
+  | 若 missing -> start_for_subject(new_audit_trail_id(), subject_refs.audit_subject_ref),追加 trace,并用 None 保存
   | build outbound payload snapshot from committed change
   | append GovernanceOutboxRecord::from_truth_change(...)
   | list_views_affected_by_truth_change(change, page)
@@ -192,6 +194,7 @@ let uow = unit_of_work.begin().await?;
 | idempotency reserve | `GovernanceIdempotencyRepository.reserve(...)` | duplicate 不得重跑 domain transition |
 | mutation read | `get_*_with_version(...)` / `list_*` 返回 `Versioned<T>` | 不得用 cursor、timestamp 或 hard-coded version 充当 expected_version |
 | domain transition | Step 6 object factory/member method/policy guard | 不得在 application 里直接改字段绕过 domain |
+| accepted subject | `GovernanceTruthChangeSubjectMapper.<subject>s(...)` returns trace/audit/outbox subjects with one canonical key | 不得让 service、repository 或 fake runtime 拼 `ExternalSourceRef` 字符串;trace/audit/outbox 不得使用不同 subject key |
 | source cursor | `GovernanceUnitOfWork.assign_truth_change_cursor()` after truth save | 不得从 page cursor、optimistic version、timestamp、trace id 或 id generator 推导 `GovernanceTruthChange.source_cursor` |
 | trace | `GovernanceTraceRecord::from_truth_change(...)` + `GovernanceTraceRepository.append(...)` | rejected path 不伪造 accepted trace |
 | outbox | `GovernanceOutboxRecord::from_truth_change(...)` + stored payload snapshot | publisher 不得回查 current truth 构造 payload |
@@ -336,11 +339,13 @@ let uow = unit_of_work.begin().await?;
 [Persistence]
   | context_repo.save(context, None, uow)
   | source_cursor = uow.assign_truth_change_cursor()
-  | subject_ref = truth_change_subjects.context_subject(context.to_ref())
-  | change = GovernanceTruthChange { subject_ref, event_kind: GovernanceOutboxEventKind::GovernanceContextChanged, source_cursor }
-  | GovernanceTraceRecord::from_truth_change(new_trace_id(), change, "GovernanceContextChanged", core_trace_id)
+  | subject_refs = truth_change_subjects.context_subjects(context.to_ref())
+  | change = GovernanceTruthChange { subject_ref: subject_refs.outbox_subject_ref, event_kind: GovernanceOutboxEventKind::GovernanceContextChanged, source_cursor }
+  | GovernanceTraceRecord::from_truth_change(new_trace_id(), change, subject_refs.trace_subject_ref, "GovernanceContextChanged", core_trace_id)
   | trace_repo.append(trace, uow)
-  | audit_history_repo.save_audit_trail(...)
+  | existing_audit = audit_history_repo.get_audit_trail_by_subject_with_version(subject_refs.audit_subject_ref)
+  | 若 existing_audit 为 Some(versioned) -> trail = versioned.object; trail.append(trace); audit_history_repo.save_audit_trail(trail, Some(versioned.version), uow)
+  | 若 existing_audit 为 None -> trail = GovernanceAuditTrail::start_for_subject(new_audit_trail_id(), subject_refs.audit_subject_ref); trail.append(trace); audit_history_repo.save_audit_trail(trail, None, uow)
   | outbox_repo.append(outbox_record, payload_snapshot, uow)
   | projection_repo.list_views_affected_by_truth_change(change, page)
   | projection_repo.mark_stale(affected, change.source_cursor, uow)
@@ -371,9 +376,9 @@ let context = GovernanceContext::from_subject(context_id, subject_ref, source_re
 | 入口函数 | `GovernanceContextCommandService.submit_governance_input(request, operation_context)` |
 | 目标对象 | `GovernanceInput`, loaded `GovernanceContext` |
 | 依赖 port | `GovernanceContextRepository`, `GovernanceInputRepository`, trace/audit/outbox/projection/result/idempotency/id generator |
-| 状态变化 | `GovernanceInputState::Received`;若 context ready 且 policy允许,可在同 flow 调用 `GovernanceInput::accept(...)` |
+| 状态变化 | factory -> `GovernanceInputState::Received`;本 flow 不调用 `accept(...)` 或 `wait_for_evidence(...)` |
 | outbound event | `GovernanceContextChanged` |
-| 测试切口 | receive success; context missing rejected; context not ready blocks accept; pending evidence path; duplicate replay |
+| 测试切口 | receive success; context missing rejected; terminal context rejected; duplicate replay; no external body saved |
 
 ```text
 [API handler]
@@ -385,9 +390,7 @@ let context = GovernanceContext::from_subject(context_id, subject_ref, source_re
   v
 [Domain]
   | GovernanceInput::receive(new_governance_input_id(), input_kind, source_ref, context_ref, actor)
-  | GovernanceContextPolicy::for_context(context, reference_state)
-  | if context ready and input acceptable -> input.accept(context, actor)
-  | else if evidence required -> input.wait_for_evidence(evidence_ref, actor)
+  | assert context exists and is not Invalid / Closed
   v
 [Persistence]
   | input_repo.save(input, None, uow)
@@ -403,10 +406,10 @@ let input = GovernanceInput::receive(input_id, input_kind, source_ref, context_r
 | 审查项 | 结论 | 缺口 / 修正 |
 |---|---|---|
 | DTO 构造 | 通过 | request 提供 context/input kind/source |
-| domain method | 通过 | `receive`、`accept`、`wait_for_evidence` 已定义 |
+| domain method | 通过 | 本 flow 只调用 `receive`;`accept` / `wait_for_evidence` 留给 `UpdateGovernanceInputStateFlow` |
 | port | 通过 | context read with version 和 input save 已定义 |
 | version 来源 | 通过 | loaded context version 只用于校验;new input save 使用 `None` |
-| 副作用 | 通过 | accepted input 写 trace/outbox/stale/result;不自动开 gate |
+| 副作用 | 通过 | command accepted path 写 trace/audit/outbox/stale/result;input state 仍为 `Received`;不自动开 gate |
 | 禁止事项 | 通过 | input accepted 不等于 decision;不保存 source body |
 
 #### 11.3 `UpdateGovernanceInputStateFlow`
@@ -416,7 +419,7 @@ let input = GovernanceInput::receive(input_id, input_kind, source_ref, context_r
 | 协议 | `GovernanceCommandRequest<UpdateGovernanceInputStateRequest>` |
 | 入口函数 | `GovernanceContextCommandService.update_governance_input_state(request, operation_context)` |
 | 目标对象 | `GovernanceInput`, loaded `GovernanceContext` when accepting |
-| 依赖 port | `GovernanceInputRepository`, `GovernanceContextRepository`, trace/audit/outbox/projection/result/idempotency/id generator |
+| 依赖 port | `GovernanceInputRepository`, `GovernanceContextRepository`, `ExternalGovernanceSourceResolverPort` when accepting evidence-backed input, trace/audit/outbox/projection/result/idempotency/id generator |
 | 状态变化 | `Received/PendingEvidence -> Accepted`;`Received -> Rejected`;`Received/Accepted/PendingEvidence -> Superseded`;pending evidence update |
 | outbound event | `GovernanceContextChanged` |
 | 测试切口 | accept requires ready context; reject requires reason; supersede requires next ref; illegal terminal transition rejected; optimistic conflict |
@@ -429,10 +432,13 @@ let input = GovernanceInput::receive(input_id, input_kind, source_ref, context_r
   | tx begin + idempotency reserve
   | input_v = input_repo.get_with_version(input_ref)
   | if target_state == Accepted -> context_v = context_repo.get_with_version(input.context_ref)
+  | if target_state == Accepted and request.pending_evidence_ref is Some -> resolve_evidence_summary(request.pending_evidence_ref)
+  | if target_state == Accepted and input.pending_evidence_ref is Some -> resolve_evidence_summary(input.pending_evidence_ref)
+  | if target_state == PendingEvidence -> validate pending_evidence_ref is present
   v
 [Domain]
   | match request.target_state:
-  |   Accepted -> input.accept(context, actor)
+  |   Accepted -> assert context ready and request/existing evidence resolved when present; input.accept(context, actor)
   |   PendingEvidence -> input.wait_for_evidence(pending_evidence_ref, actor)
   |   Rejected -> input.reject(reject_reason, actor)
   |   Superseded -> input.supersede(superseded_by, actor)
@@ -465,9 +471,11 @@ input.accept(&context, actor_ref)?;
 | 入口函数 | `GovernanceDecisionCommandService.open_governance_gate(request, operation_context)` |
 | 目标对象 | `Gate`, optional `ApproverRequirement`, optional `ApprovalResponsibility`, optional `ResponsibilityChain` |
 | 依赖 port | `GovernanceContextRepository`, `GateRepository`, `ApproverRequirementRepository`, `ApprovalResponsibilityRepository`, `ResponsibilityChainRepository`, resolver/reference repo when actor snapshot is needed, trace/audit/outbox/projection/result/id generator |
-| 状态变化 | `GateState::Open`;optional responsibility `Required/Assigned`;optional chain `Open` |
-| outbound event | `GateChanged`;optional `ApprovalResponsibilityChanged` if responsibility created |
-| 测试切口 | ready context opens gate; context not ready rejected; optional requirement creates responsibility; duplicate replay; affected views not ad hoc |
+| 状态变化 | no `approver_requirement_intent`: `GateState::Open`;with `approver_requirement_intent`: `GateState::Open -> PendingDecision` by `request_decision_by_ref(...)`;optional responsibility `Required/Assigned`;optional chain `Open` |
+| outbound event | `GateChanged` uses final saved gate state;optional `ApprovalResponsibilityChanged` if responsibility created |
+| 测试切口 | ready context opens gate; no requirement returns `Open` and `required_responsibility_ref = None`;requirement path creates responsibility/chain and returns `PendingDecision` with `required_responsibility_ref`;context not ready rejected;duplicate replay;affected views not ad hoc |
+
+Commit boundary note: commit-03-a 只实现 `Gate::open(...)` 与 Gate / Decision 本地状态测试。optional `ApproverRequirement` / `ApprovalResponsibility` / `ResponsibilityChain` 创建和 `request_decision_by_ref(...)` 绑定从 commit-03-b/03-c 开始,不得为了 03-a 提前落 approval domain。commit-03-c 的 `OpenGovernanceGateFlow` 必须按 request 分支保存最终 gate:无 requirement 时最终为 `Open`;有 requirement 时同事务绑定 responsibility ref 后最终为 `PendingDecision`。`RecordGovernanceDecisionFlow` 只校验已处于 `PendingDecision` 的 gate,不得在 precheck 中执行 `Open -> PendingDecision`。
 
 ```text
 [API handler]
@@ -486,11 +494,12 @@ input.accept(&context, actor_ref)?;
   |   ApprovalResponsibility::require(new_approval_responsibility_id(), context, requirement)
   |   ResponsibilityChain::start_for_context(new_responsibility_chain_id(), context, requirement)
   |   responsibility optional assign based on ActorCapabilitySnapshot
+  |   gate.request_decision_by_ref(responsibility.to_ref(), responsibility.context_ref, actor)
   v
 [Persistence]
-  | gate_repo.save(gate, None, uow)
   | approver_requirement_repo.save(requirement, uow) when created
   | save optional responsibility/chain
+  | gate_repo.save(gate, None, uow) after optional pending-decision binding
   | append trace/audit/outbox/stale/stored result
   | tx commit
 ```
@@ -503,10 +512,11 @@ let gate = Gate::open(gate_id, &context, gate_kind, actor_ref)?;
 | 审查项 | 结论 | 缺口 / 修正 |
 |---|---|---|
 | DTO 构造 | 通过 | request 提供 context/gate kind/optional requirement intent |
-| domain method | 通过 | `Gate::open`;requirement/responsibility/chain methods 已在 Step 6 定义 |
-| port | 通过 | context read、open gate lookup、gate save、optional responsibility/chain save 均已定义 |
+| domain method | 通过 | commit-03-a 只要求 `Gate::open`;requirement/responsibility/chain methods 与 conditional `request_decision_by_ref(...)` 绑定属于 commit-03-b/03-c |
+| port | 通过 | commit-03-a 只要求 context read、open gate lookup、gate save;optional responsibility/chain save 属于 commit-03-c |
 | version 来源 | 通过 | new gate/responsibility/chain save 使用 `None`;context version 只读校验 |
-| 副作用 | 通过 | gate truth 触发 `GateChanged`;optional responsibility 触发 approval side effect |
+| result 来源 | 通过 | `required_responsibility_ref` 来自同事务保存的 final gate;无 requirement 为 `None`,有 requirement 为 created responsibility ref |
+| 副作用 | 通过 | final gate truth 触发 `GateChanged`;optional responsibility 触发 approval side effect |
 | 禁止事项 | 通过 | process waiting gate 不替代 Governance gate |
 
 #### 11.5 `RecordGovernanceDecisionFlow`
@@ -516,11 +526,13 @@ let gate = Gate::open(gate_id, &context, gate_kind, actor_ref)?;
 | 协议 | `GovernanceCommandRequest<RecordGovernanceDecisionRequest>` |
 | 入口函数 | `GovernanceDecisionCommandService.record_governance_decision(request, operation_context)` |
 | 目标对象 | `GovernanceDecision`, `Gate` |
-| 依赖 port | `GateRepository`, `GovernanceDecisionRepository`, `ResponsibilityChainRepository`, `SharedRuleSetRepository`, `GovernanceAuditHistoryRepository`, trace/outbox/projection/result/id generator |
+| 依赖 port | `GateRepository`, `GovernanceDecisionRepository`, `ResponsibilityChainRepository`, `GovernanceAuditHistoryRepository`, trace/outbox/projection/result/id generator |
 | 状态变化 | `GovernanceDecisionState::Proposed -> Approved/Rejected/Waived`;`GateState::PendingDecision -> Decided` |
 | history | `DecisionRecord` |
 | outbound event | `GovernanceDecisionChanged`, `GateChanged` |
 | 测试切口 | satisfied chain required; approve requires basis; reject/waive reason; gate attach decision; history trace linked; duplicate replay |
+
+Commit boundary note: `DecisionPolicy` 和 responsibility chain guard 从 commit-03-c 随 service flow 落码,不属于 commit-03-a。PH-03 command request 没有 shared-rule selector,因此本 flow 固定以 `None` 构造 shared rule set ref,也不加载 `SharedRuleSet` body;若后续 PH-04 shared rules 适用于该 gate,由 PH-04 `SharedRulesPolicy` / policy flow 负责 active/evaluation 校验。
 
 ```text
 [API handler]
@@ -531,16 +543,16 @@ let gate = Gate::open(gate_id, &context, gate_kind, actor_ref)?;
   | gate_v = gate_repo.get_with_version(gate_ref)
   | current_decision = decision_repo.find_current_by_gate(gate_ref)
   | chain_v = responsibility_chain_repo.find_by_context(gate.context_ref)
-  | shared_rule_set = shared_rule_set_repo.find_active_by_scope(scope_ref)
   v
 [Domain]
-  | DecisionPolicy::for_gate(gate, chain, shared_rule_set_ref)
+  | DecisionPolicy::for_gate(gate, chain, None)
   | policy.assert_can_decide(gate, chain, actor)
+  | policy.assert_shared_rule_ref_preserved(None)
   | GovernanceDecision::propose(new_governance_decision_id(), gate, decision_kind, outcome_ref, actor)
   | match finalization_intent:
   |   Approve { basis_ref } -> policy.assert_basis_sufficient(basis_ref); decision.approve(basis_ref, actor)
-  |   Reject { reason } -> decision.reject(reason, actor)
-  |   Waive { reason } -> decision.waive(reason, actor)
+  |   Reject { reason, basis_ref } -> decision.reject(reason, basis_ref, actor)
+  |   Waive { reason, basis_ref } -> decision.waive(reason, basis_ref, actor)
   |   ProposeOnly -> keep Proposed
   | gate.attach_decision(decision, actor) when decision.is_finalized()
   v
@@ -561,7 +573,7 @@ let decision = GovernanceDecision::propose(decision_id, &gate, decision_kind, ou
 |---|---|---|
 | DTO 构造 | 通过 | request 提供 gate/kind/outcome/finalization intent |
 | domain method | 通过 | propose/approve/reject/waive/attach_decision 已定义 |
-| port | 通过 | gate/decision/chain/shared rule reads 与 saves 已定义 |
+| port | 通过 | gate/decision/chain reads 与 saves 已定义;shared rule body read 不属于 PH-03 |
 | version 来源 | 通过 | gate update 使用 `gate_v.version`;new decision 使用 `None` |
 | history / trace | 通过 | `DecisionRecord` 需要 generated id 和 trace ref,均由 Step 7 id/trace port 提供 |
 | 禁止事项 | 通过 | vote 不等于 decision;process waiting gate 不替代 decision |
@@ -573,11 +585,13 @@ let decision = GovernanceDecision::propose(decision_id, &gate, decision_kind, ou
 | 协议 | `GovernanceCommandRequest<SupersedeGovernanceDecisionRequest>` |
 | 入口函数 | `GovernanceDecisionCommandService.supersede_governance_decision(request, operation_context)` |
 | 目标对象 | current `GovernanceDecision`, next `GovernanceDecision` |
-| 依赖 port | `GovernanceDecisionRepository`, `GateRepository`, `ResponsibilityChainRepository`, `SharedRuleSetRepository`, trace/history/outbox/projection/result/id generator |
+| 依赖 port | `GovernanceDecisionRepository`, `GateRepository`, `ResponsibilityChainRepository`, trace/history/outbox/projection/result/id generator |
 | 状态变化 | current finalized -> `Superseded`;next proposed -> finalized or proposed by intent |
 | history | two `DecisionRecord` records or one compound accepted change with both refs in result |
 | outbound event | `GovernanceDecisionChanged` |
 | 测试切口 | current must be finalized; next same gate; basis/reason required; two saves use correct versions; duplicate replay |
+
+Commit boundary note: supersede 的本地 decision state 可在 commit-03-a 测试;责任链与 `DecisionPolicy` guard 从 commit-03-c service flow 落码;PH-03 command request 没有 shared-rule selector,因此 shared rule set ref 固定为 `None`,shared rules body 校验归 PH-04。
 
 ```text
 [API handler]
@@ -591,8 +605,10 @@ let decision = GovernanceDecision::propose(decision_id, &gate, decision_kind, ou
   v
 [Domain]
   | next = GovernanceDecision::propose(new_governance_decision_id(), gate, next_kind, next_outcome, actor)
-  | finalize next according to next_finalization_intent
-  | DecisionPolicy::for_gate(gate, chain, shared_rule_set_ref).assert_supersede_allowed(current, next)
+  | finalize next according to next_finalization_intent using same approve/reject/waive basis mapping as RecordGovernanceDecisionFlow
+  | policy = DecisionPolicy::for_gate(gate, chain, None)
+  | policy.assert_shared_rule_ref_preserved(None)
+  | policy.assert_supersede_allowed(current, next)
   | current.supersede(next.to_ref(), actor)
   v
 [Persistence]
@@ -2049,11 +2065,11 @@ reference_repo.save_actor_capability_snapshot(snapshot, expected_version, uow).a
 ```text
 [Command accepted transaction]
   | all truth objects saved with expected_version
-  | subject_ref = GovernanceTruthChangeSubjectMapper.<subject>(changed_truth.to_ref())
+  | subject_refs = GovernanceTruthChangeSubjectMapper.<subject>s(changed_truth.to_ref())
   | source_cursor = uow.assign_truth_change_cursor()
-  | change = GovernanceTruthChange { subject_ref, event_kind, source_cursor }
+  | change = GovernanceTruthChange { subject_ref: subject_refs.outbox_subject_ref, event_kind, source_cursor }
   | history/audit append or save complete
-  | trace = GovernanceTraceRecord::from_truth_change(new_trace_id(), change, trace_kind, core_trace_id)
+  | trace = GovernanceTraceRecord::from_truth_change(new_trace_id(), change, subject_refs.trace_subject_ref, trace_kind, core_trace_id)
   | trace_ref = trace_repo.append(trace, uow)
   v
 [Outbox append helper]

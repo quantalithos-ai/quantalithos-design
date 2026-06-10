@@ -159,24 +159,25 @@ Operations Job 必须从已持久化 truth、trace、outbox、snapshot 或 proje
 
 ## 5. 关键接口处理流
 
-#### CreateGovernanceContext / SubmitGovernanceInput 处理流
+#### Context / input command 处理流
 
 ```text
 +====================================================================+
 |              Governance Context and Input Command Flow              |
 +====================================================================+
-| CreateGovernanceContext / SubmitGovernanceInput                     |
-|   | ActorContext + CommandMetadata + GovernedSubjectRef              |
+| CreateGovernanceContext / SubmitGovernanceInput / UpdateInputState  |
+|   | ActorContext + CommandMetadata + GovernedSubjectRef or input ref  |
 |   v                                                                 |
 | GovernanceContextService                                            |
-|   | resolve GovernanceSourceRef through allowed snapshot / summary   |
+|   | resolve source / evidence only when the command owns that input   |
 |   v                                                                 |
 | GovernanceContextPolicy                                             |
-|   | assert_context_allowed(GovernedSubjectRef, GovernanceSourceRef,  |
-|   |                        ActorContext)                             |
+|   | Create: context allowed                                         |
+|   | Submit: context exists and receives input as Received            |
+|   | Update: accept / reject / wait / supersede input                 |
 |   v                                                                 |
 | GovernanceContext / GovernanceInput                                 |
-|   | create / accept / reject / mark pending evidence                 |
+|   | create context / receive input / transition input state          |
 |   v                                                                 |
 | Repositories + trace + audit + outbox                               |
 |   | save context or input; append trace; mark related views stale     |

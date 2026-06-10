@@ -298,14 +298,14 @@
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
 | commit-02-a | context/input contracts、fixtures、domain state 和 unit tests 通过后 | context/input refs、command/result DTO、fixtures、domain objects、policy/state tests;`GovernanceInput.actor_ref` 与 `GovernanceInputCommandResult.actor_ref` 必须在本 boundary 闭合 | application service、repository fake、handler、Gate/Decision/Policy、Query/View DTO、projection/read model | contract-domain-fast context/input slice;`cargo check`;`git diff --check` |
-| commit-02-b | context/input accepted service 纵切和 fake runtime tests 通过后 | application ports/UoW/idempotency基础、context/input services、minimal handler、in-memory repo、service tests;repository/fake 必须持久化和回读 `GovernanceInput.actor_ref` | Gate/Decision/Approval、Query/View DTO、Consumer、Outbox publisher、Job | service-flow-fast slice;infra-runtime-fake slice;`cargo check`;`git diff --check` |
+| commit-02-b | context/input command service 纵切和 fake runtime tests 通过后 | application ports/UoW/idempotency基础、context/input services、minimal handler、in-memory repo、service tests;`SubmitGovernanceInput` 只保存 `Received`;`UpdateGovernanceInputState` 承接 accepted / pending evidence / rejected / superseded;repository/fake 必须持久化和回读 `GovernanceInput.actor_ref` | Gate/Decision/Approval、Query/View DTO、Consumer、Outbox publisher、Job | service-flow-fast slice;infra-runtime-fake slice;`cargo check`;`git diff --check` |
 
 #### Commit boundary 子功能分组
 
 | Commit boundary | 子功能分组 | 必须同提交的原因 | 涉及批次 | 验证门禁 | 不包含 |
 |---|---|---|---|---|---|
 | commit-02-a | command-side public DTO + domain state + state tests | DTO 和 domain factory/state 构成最小 truth contract;actor surface 只覆盖 command result 和 domain truth | BATCH-02-01;BATCH-02-02 | contract-domain-fast slice | application service / repository fake / query view |
-| commit-02-b | ports/UoW/idempotency + service + fake runtime | accepted flow 需要 transaction、idempotency、repository fake 同时闭合才能验证;fake 必须承接 `actor_ref` persistence logical contract | BATCH-02-03~BATCH-02-05 | service-flow-fast;infra-runtime-fake | Gate/Decision/Policy/Query/Event/Job |
+| commit-02-b | ports/UoW/idempotency + service + fake runtime | context/input command flow 需要 transaction、idempotency、repository fake 同时闭合才能验证;fake 必须承接 `actor_ref` persistence logical contract;`SubmitGovernanceInput` receive-only 与 `UpdateGovernanceInputState` transition 分工必须同时验证 | BATCH-02-03~BATCH-02-05 | service-flow-fast;infra-runtime-fake | Gate/Decision/Policy/Query/Event/Job |
 
 #### PH-02 开工前设计闭环复核
 
@@ -352,7 +352,7 @@
 | Commit boundary | 审查项 | 结论 | 缺口 / 修正 |
 |---|---|---|---|
 | commit-02-a | context/input DTO 与 domain state 是否能单独验证 | 设计层通过 | actor_ref 只落 command result + domain truth;不得前移 query view 或 persistence fake |
-| commit-02-b | accepted flow 是否闭合 transaction/idempotency/repo fake | 设计层通过 | repository/fake 需承接 actor_ref 持久化;GovernanceInputView 仍留到 commit-05-a |
+| commit-02-b | context/input command flow 是否闭合 transaction/idempotency/repo fake | 设计层通过 | repository/fake 需承接 actor_ref 持久化;`SubmitGovernanceInput` 不做 accepted / pending evidence;GovernanceInputView 仍留到 commit-05-a |
 
 ### 7.5 PH-03 Gate / Decision / Approval 正式裁决纵切
 
@@ -361,7 +361,7 @@
 | 任务编号 | 编写顺序 | 实施动作 | 输入 | 输出 | 完成判定 |
 |---|---:|---|---|---|---|
 | IMPL-03-01 | 1 | 编写 Gate / Decision / ApprovalResponsibility public DTO、ref、reason、fixtures | `03` protocol/object contracts | contracts gate/decision/approval 子集 | contract tests 通过 |
-| IMPL-03-02 | 2 | 编写 Gate / GovernanceDecision domain state、policy 和 tests | `03` object/state/flow | `domain::{gate,decision}` | state tests 通过 |
+| IMPL-03-02 | 2 | 编写 Gate / GovernanceDecision domain local state 和 tests | `03` object/state matrix | `domain::{gate,decision}` | state tests 通过;不得依赖 ApprovalResponsibility / ResponsibilityChain / SharedRuleSet object |
 | IMPL-03-03 | 3 | 编写 ApprovalResponsibility / requirement / delegation domain state、policy 和 tests | `03` approval object/state | `domain::approval_responsibility` | approval state tests 通过 |
 | IMPL-03-04 | 4 | 扩展 application ports 和 in-memory repositories | `03` port/persistence | gate/decision/approval repositories | repository version tests 通过 |
 | IMPL-03-05 | 5 | 编写 OpenGate / RecordDecision / SupersedeDecision / approval command services and handlers | `03` function flows | services、handlers、stored result、trace/outbox | service-flow-fast 裁决 slice 通过 |
@@ -371,7 +371,7 @@
 | 批次编号 | 目标 | 输入 | 输出 | 预计规模 | 验证门禁 | 提交关系 |
 |---|---|---|---|---|---|---|
 | BATCH-03-01 | Gate / Decision contracts | `03` Step 8 | refs、commands、results、fixtures | 200~400 行 | contract tests | commit-03-a |
-| BATCH-03-02 | Gate / Decision domain | `03` Step 6/10 | domain state、policy、unit tests | 200~400 行 | domain tests | commit-03-a |
+| BATCH-03-02 | Gate / Decision local domain | `03` Step 6/10 | domain state、ref-only transition、unit tests | 200~400 行 | domain tests | commit-03-a |
 | BATCH-03-03 | Approval contracts/domain | `03` Step 6/8/10 | responsibility、requirement、vote、delegation DTO/domain/tests | 300~500 行;必要时拆 vote/delegation | contract-domain-fast | commit-03-b |
 | BATCH-03-04 | repositories and services | `03` Step 7/9/11/13 | ports、repos、services、handlers、tests | 300~500 行;事务/idempotency 单独验证 | service-flow-fast | commit-03-c |
 
@@ -379,17 +379,17 @@
 
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
-| commit-03-a | Gate / Decision DTO、domain state 和 tests 通过后 | OpenGate、RecordDecision、SupersedeDecision contracts/domain/state tests | ApprovalResponsibility service、Policy、Query、Consumer | contract-domain-fast gate/decision slice;`cargo check`;`git diff --check` |
+| commit-03-a | Gate / Decision DTO、domain local state 和 tests 通过后 | OpenGate、RecordDecision、SupersedeDecision contracts;Gate / GovernanceDecision 本地 state tests;Gate pending 只允许 ref-only `request_decision_by_ref` surface | ApprovalResponsibility / ResponsibilityChain / SharedRuleSet object dependency;DecisionPolicy;application service;Query;Consumer | contract-domain-fast gate/decision slice;`cargo check`;`git diff --check` |
 | commit-03-b | ApprovalResponsibility DTO、domain state、vote/delegation tests 通过后 | Assign/RecordVote/Delegate approval contracts/domain/tests | application service、query projection、policy/compliance | contract-domain-fast approval slice;`cargo check`;`git diff --check` |
-| commit-03-c | 裁决与 approval command service、handler、repo fake tests 通过后 | repositories、application services、handlers、stored results、trace/outbox accepted path | policy/control/compliance/NC、query/event/job | service-flow-fast decision/approval slice;infra-runtime-fake;`git diff --check` |
+| commit-03-c | 裁决与 approval command service、handler、repo fake tests 通过后 | repositories、application services、handlers、stored results、trace/outbox accepted path、DecisionPolicy responsibility-chain guard;OpenGovernanceGate requirement path same-command `request_decision_by_ref(...)` binding | PH-04 shared rule body evaluation、policy/control/compliance/NC、query/event/job;RecordGovernanceDecision precheck 不执行 `Open -> PendingDecision` | service-flow-fast decision/approval slice;infra-runtime-fake;`git diff --check` |
 
 #### Commit boundary 子功能分组
 
 | Commit boundary | 子功能分组 | 必须同提交的原因 | 涉及批次 | 验证门禁 | 不包含 |
 |---|---|---|---|---|---|
-| commit-03-a | gate/decision contracts + domain | Gate 和 Decision 构成同一正式裁决核心,domain state 需直接验证 DTO 意图 | BATCH-03-01;BATCH-03-02 | contract-domain-fast | approval service / policy |
+| commit-03-a | gate/decision contracts + local domain | Gate 和 Decision 构成同一正式裁决核心,但本提交只验证不依赖 approval object 的本地状态 | BATCH-03-01;BATCH-03-02 | contract-domain-fast | approval service / DecisionPolicy / shared rules guard |
 | commit-03-b | approval responsibility contracts + domain | vote/delegation/requirement 共用 responsibility state 和 policy | BATCH-03-03 | contract-domain-fast | application service |
-| commit-03-c | repositories + command services + handlers | 裁决 accepted flow 需要 repo version、UoW、stored result、trace/outbox 同时闭合 | BATCH-03-04 | service-flow-fast;infra-runtime-fake | query/event/job |
+| commit-03-c | repositories + command services + handlers + decision policy guard | 裁决 accepted flow 需要 repo version、UoW、stored result、trace/outbox 和 responsibility-chain guard 同时闭合 | BATCH-03-04 | service-flow-fast;infra-runtime-fake | PH-04 shared rule body evaluation;query/event/job |
 
 #### PH-03 开工前设计闭环复核
 
@@ -398,18 +398,18 @@
 | 字段闭环 | Gate、Decision、ApprovalResponsibility、Requirement、Vote、Delegation 的 required fields 有来源 | 开工前确认 | 回写 object/protocol contract |
 | DTO 构造闭环 | command request 能构造 open/record/supersede/assign/vote/delegate transition | 开工前确认 | 回写 Step 8/9 |
 | 状态闭环 | gate state、decision state、responsibility state、vote/delegation transition 与 matrix 一致 | 开工前确认 | 回写 Step 10 |
-| validation truth 闭环 | actor capability、context/input、policy guard、supersede target、delegate target 有正式 repository/resolver | 开工前确认 | 回写 Step 7/9 |
+| validation truth 闭环 | actor capability、context/input、policy guard、supersede target、delegate target 有正式 repository/resolver;commit-03-a 不得要求 approval/shared-rule body | 开工前确认 | 回写 Step 7/9 |
 | optimistic version 来源闭环 | update/supersede/vote/delegate expected_version 来源明确 | 开工前确认 | 补 versioned read |
 | history/trace/audit/outbox | accepted path 的 record id、subject、kind、payload source 闭合 | 开工前确认 | 补 record / outbox schema |
-| phase boundary | 不提前实现 Policy/Control/Query/Event/Job | 通过 | 越界移出 |
+| phase boundary | 不提前实现 DecisionPolicy / Approval service / Policy / Control / Query / Event / Job;PH-04 shared rule body evaluation 不进入 PH-03 | 通过 | 越界移出 |
 
 #### PH-03 Commit boundary 经验复核
 
 | Commit boundary | 涉及设计面 | 适用经验项 | 不适用理由 | 证据位置 | 结论 | 处理 | 复核责任 |
 |---|---|---|---|---|---|---|---|
-| commit-03-a | command/state | 字段闭环;DTO构造闭环;状态闭环;validation truth;phase boundary | Query/job 不适用 | `03` Step 6/8/9/10 | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
+| commit-03-a | command/local state | 字段闭环;DTO构造闭环;状态闭环;phase boundary;ref-only transition | Query/job、application service、DecisionPolicy、ApprovalResponsibility / ResponsibilityChain / SharedRuleSet body 不适用 | `03` Step 6/8/9/10 | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
 | commit-03-b | command/state/delegation | 字段闭环;DTO构造闭环;public target 穷尽闭环;状态闭环;phase boundary | Outbox publish/job 不适用 | `03` Step 6/8/9/10 | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
-| commit-03-c | flow/persistence/idempotency/outbox | optimistic version;idempotency;history/trace/audit;outbox source identity;validation truth | Query/job 不适用 | `03` Step 7/9/11/13/15 | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
+| commit-03-c | flow/persistence/idempotency/outbox/policy guard | optimistic version;idempotency;history/trace/audit;outbox source identity;validation truth;responsibility-chain guard | Query/job、PH-04 shared rule body evaluation 不适用 | `03` Step 7/9/11/13/15 | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
 
 #### PH-03 提交粒度判断
 
@@ -423,7 +423,7 @@
 
 | Commit boundary | 审查项 | 结论 | 缺口 / 修正 |
 |---|---|---|---|
-| commit-03-a | Gate / Decision 是否为同一可验证裁决增量 | 设计层通过 | 开工前复核 validation truth |
+| commit-03-a | Gate / Decision 是否为同一可验证裁决增量 | 设计层通过:只覆盖 DTO 与本地状态,不覆盖 DecisionPolicy / approval chain | 开工前复核 ref-only transition 与 phase boundary |
 | commit-03-b | Approval vote / delegation 是否同属 responsibility state | 设计层通过 | 开工前复核 target 穷尽 |
 | commit-03-c | accepted service 是否不依赖 query/event/job | 设计层通过 | 开工前复核 trace/outbox source |
 
@@ -837,7 +837,7 @@
 | PH-01 | commit-01-b | 建立 config skeleton、script shell、artifact/report roots | config parse smoke;scripts dry-run |
 | PH-02 | commit-02-a | 建立 context/input contracts and domain state | contract-domain-fast context/input |
 | PH-02 | commit-02-b | 打通 context/input accepted command service and fake runtime | service-flow-fast context/input |
-| PH-03 | commit-03-a | 建立 Gate / Decision contracts and domain state | contract-domain-fast gate/decision |
+| PH-03 | commit-03-a | 建立 Gate / Decision contracts and local domain state | contract-domain-fast gate/decision |
 | PH-03 | commit-03-b | 建立 ApprovalResponsibility contracts and domain state | contract-domain-fast approval |
 | PH-03 | commit-03-c | 打通裁决 / approval accepted services and handlers | service-flow-fast decision/approval |
 | PH-04 | commit-04-a | 建立 policy/shared rules/conflict contracts and domain state | contract-domain-fast policy |

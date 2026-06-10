@@ -398,7 +398,7 @@ pub struct GateCommandResult {
     pub context_ref: GovernanceContextRef,
     /// Current gate state after the command.
     pub gate_state: GateState,
-    /// Required responsibility when the gate is waiting for a decision.
+    /// Required responsibility when the command bound the gate to a pending decision.
     pub required_responsibility_ref: Option<ApprovalResponsibilityRef>,
     /// Attached decision when the gate is decided.
     pub decision_ref: Option<GovernanceDecisionRef>,
@@ -429,7 +429,7 @@ pub struct GovernanceDecisionCommandResult {
 |---|---|---|---|
 | `GovernanceContextCommandResult` | saved `GovernanceContext` + accepted trace/outbox refs | `GovernanceContextRef`、`GovernedSubjectRef`、`GovernanceSourceRef` | 不返回 subject/source body |
 | `GovernanceInputCommandResult` | saved `GovernanceInput` | `GovernanceInputRef`、`ActorRef`、`GovernanceContextRef` | 不把 input accepted 当 decision;不返回 actor profile body |
-| `GateCommandResult` | saved `Gate` | `GateRef`、optional responsibility/decision | 不等同 process waiting gate |
+| `GateCommandResult` | saved final `Gate` | `GateRef`、optional responsibility/decision | `OpenGovernanceGate` 无 requirement 时 responsibility 为 `None`;有 requirement 时来自 same-command pending-decision binding;不等同 process waiting gate |
 | `GovernanceDecisionCommandResult` | saved `GovernanceDecision` | decision/gate/outcome/basis refs | 不返回 evidence body 或 downstream work |
 
 #### 8.3 Context / input / gate / decision command DTO schema
@@ -507,9 +507,9 @@ pub struct SupersedeGovernanceDecisionRequest {
 | `CreateGovernanceContextRequest` | caller body + trusted actor envelope | `GovernanceContext::from_subject(new_id, subject_ref, source_ref, actor)` | missing subject/source => rejected before id generation |
 | `SubmitGovernanceInputRequest` | caller body + command actor context | `GovernanceInput::receive(new_id, input_kind, source_ref, context_ref, actor_ref)` | missing context/input kind/source/actor => rejected |
 | `UpdateGovernanceInputStateRequest` | caller body + loaded input/context | `accept` / `reject` / `wait_for_evidence` / `supersede` | target-specific reason/ref missing => rejected |
-| `OpenGovernanceGateRequest` | caller body + loaded context | `Gate::open(new_id, context, gate_kind, actor)`;optional requirement builder | context not ready => policy/domain rejected |
-| `RecordGovernanceDecisionRequest` | caller body + loaded gate | `GovernanceDecision::propose(new_id, gate, kind, outcome, actor)` then optional finalization | finalization-specific basis/reason missing => rejected |
-| `SupersedeGovernanceDecisionRequest` | caller body + loaded current decision/gate | create next decision, finalize, then current `supersede(next_ref, actor)` | current not finalized or next intent invalid => rejected |
+| `OpenGovernanceGateRequest` | caller body + loaded context | `Gate::open(new_id, context, gate_kind, actor)`;if `approver_requirement_intent` is absent, final gate remains `Open`;if present, create requirement/responsibility/chain and call `gate.request_decision_by_ref(created_responsibility_ref, context_ref, actor)` before saving final gate | context not ready => policy/domain rejected;missing/invalid requirement intent => rejected;`RecordGovernanceDecision` must not perform the `Open -> PendingDecision` precheck transition |
+| `RecordGovernanceDecisionRequest` | caller body + loaded gate | `GovernanceDecision::propose(new_id, gate, kind, outcome, actor)` then `approve(basis_ref, actor)` / `reject(reason, basis_ref, actor)` / `waive(reason, basis_ref, actor)` when finalization intent requests it | finalization-specific required basis/reason missing => rejected;Reject/Waive optional basis is passed through unchanged |
+| `SupersedeGovernanceDecisionRequest` | caller body + loaded current decision/gate | create next decision, apply the same finalization mapping, then current `supersede(next_ref, actor)` | current not finalized or next intent invalid => rejected |
 
 #### 8.4 Command route mapping for 8.1-a
 

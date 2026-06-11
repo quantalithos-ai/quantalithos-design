@@ -940,6 +940,26 @@ pub trait GovernanceProjectionRepository {
         view_ref: DerivedGovernanceViewRef,
     ) -> Result<Option<GovernanceProjectionTargetRef>, ApplicationError>;
 
+    async fn find_dashboard_view_ref_by_scope(
+        &self,
+        scope_ref: GovernanceScopeRef,
+    ) -> Result<Option<DerivedGovernanceViewRef>, ApplicationError>;
+
+    async fn find_policy_effective_view_ref_by_scope(
+        &self,
+        scope_ref: GovernanceScopeRef,
+    ) -> Result<Option<PolicyEffectiveViewRef>, ApplicationError>;
+
+    async fn find_control_coverage_view_ref_by_context(
+        &self,
+        context_ref: GovernanceContextRef,
+    ) -> Result<Option<ControlCoverageViewRef>, ApplicationError>;
+
+    async fn find_nonconformity_status_view_ref_by_nonconformity(
+        &self,
+        nonconformity_ref: NonconformityRef,
+    ) -> Result<Option<NonconformityStatusViewRef>, ApplicationError>;
+
     async fn get_state_with_version(
         &self,
         view_ref: DerivedGovernanceViewRef,
@@ -1029,6 +1049,10 @@ pub trait GovernanceProjectionRepository {
 | 函数 | 闭合点 |
 |---|---|
 | `resolve_projection_target` | `RebuildGovernanceProjections` 将 public `DerivedGovernanceViewRef` 映射为 typed replace path 和 source identity,不得按 view id 字符串猜测 |
+| `find_dashboard_view_ref_by_scope` | `GetGovernanceDashboard` 从 request `scope_ref` 读取 existing dashboard view ref;missing 返回 degraded/missing projection,不得创建或拼接 |
+| `find_policy_effective_view_ref_by_scope` | `GetPolicyEffectiveView` 从 request `scope_ref` 读取 existing policy view ref;query 不生成新 view identity |
+| `find_control_coverage_view_ref_by_context` | `GetControlCoverage` 从 request `context_ref` 读取 existing coverage view ref;query 不扫描 truth 聚合 view |
+| `find_nonconformity_status_view_ref_by_nonconformity` | `GetNonconformityStatus` 从 request `nonconformity_ref` 读取 existing status view ref;query 不从 nonconformity id 拼 view id |
 | `get_*_view` | public projection-backed query 必须有正式读取面,不得从 view ref 临时重建 body |
 | `list_pending_decision_summary_views` | `ListPendingGovernanceDecisions` 读取 existing decision summary page |
 | `search_governance_facts` | `SearchGovernanceFacts` 读取 body-free search projection page |

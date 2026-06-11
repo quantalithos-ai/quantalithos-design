@@ -170,14 +170,14 @@ Step 15 observability and audit
 | `GetGateDecision_query` | `GetGateDecisionFlow` | gate/decision summary hit;pending decision;decision missing degraded;not visible;query no-write | query handler |
 | `ListPendingGovernanceDecisions_query` | `ListPendingGovernanceDecisionsFlow` | projection page hit;empty page;stale/failed/rebuilding surface;per-item visibility filter | query handler |
 | `GetApprovalResponsibility_query` | `GetApprovalResponsibilityFlow` | responsibility view hit;chain summary;missing actor snapshot degraded;not visible | query handler |
-| `GetPolicyEffectiveView_query` | `GetPolicyEffectiveViewFlow` | policy projection fresh;stale;method snapshot unavailable;query does not rebuild | query handler |
+| `GetPolicyEffectiveView_query` | `GetPolicyEffectiveViewFlow` | policy projection index hit/missing;fresh;stale;method snapshot unavailable;query does not rebuild or create view ref | query handler |
 | `GetPolicyConflict_query` | `GetPolicyConflictFlow` | conflict truth summary hit;resolved/waived/invalidate surface;missing;not visible | query handler |
-| `GetControlCoverage_query` | `GetControlCoverageFlow` | coverage complete/gap/pending evidence/stale;not visible;no nonconformity auto-create | query handler |
+| `GetControlCoverage_query` | `GetControlCoverageFlow` | coverage projection index hit/missing;complete/gap/pending evidence/stale;not visible;no nonconformity auto-create | query handler |
 | `GetComplianceConclusion_query` | `GetComplianceConclusionFlow` | AIIA/SoA conclusion hit;artifact degraded;not visible;terminal state surface | query handler |
-| `GetNonconformityStatus_query` | `GetNonconformityStatusFlow` | nonconformity projection hit;stale;missing action/verification degraded;not visible | query handler |
+| `GetNonconformityStatus_query` | `GetNonconformityStatusFlow` | nonconformity projection index hit/missing;stale;missing action/verification degraded;not visible | query handler |
 | `SearchGovernanceFacts_query` | `SearchGovernanceFactsFlow` | search result page;empty;visibility filtered items;failed projection surface;no raw body | query handler |
 | `GetGovernanceTrace_query` | `GetGovernanceTraceFlow` | trace page;not visible trace redacted;empty page;no missing trace repair;no external body | query handler |
-| `GetGovernanceDashboard_query` | `GetGovernanceDashboardFlow` | dashboard projection hit;stale/degraded;missing source;query no-write | query handler |
+| `GetGovernanceDashboard_query` | `GetGovernanceDashboardFlow` | dashboard projection index hit/missing;stale/degraded;missing source;query no-write | query handler |
 | `GetGovernanceReconciliationReport_query` | `GetGovernanceReconciliationReportFlow` | clean/has-finding/failed report view;missing report;query does not repair drift | query handler |
 
 ## 12. Inbound Event Consumer 测试切口表
@@ -267,7 +267,7 @@ Step 15 observability and audit
 | `idempotency_complete_failure_rolls_back` | Step 11 ordering | complete 失败时 truth/history/trace/outbox/result 不提交 | service + fake UoW |
 | `outbox_enqueue_failure_rolls_back_truth` | Step 11 outbox consistency | outbox append / payload snapshot save failure rollback entire accepted command | service |
 | `outbox_publisher_parallel_single_winner` | Step 13 publish concurrency | 两个 publisher 对同 outbox 只有一个 mark succeeds;另一方 version conflict / partial report | worker / repository |
-| `projection_dependency_index_is_only_source` | Step 11 projection index | affected views 只能来自 `list_views_affected_by_*`;禁止 ad hoc view ref | application + repository |
+| `projection_dependency_index_is_only_source` | Step 11 projection index | affected views 只能来自 `list_views_affected_by_*`;projection-backed query view refs 只能来自 `find_*_view_ref_by_*`;禁止 ad hoc view ref | application + repository |
 | `projection_rebuild_race_preserves_newer_cursor` | Step 13 projection race | older cursor 不覆盖 newer fresh state;failed marker 不清除 newer state | projection fake |
 | `reference_scope_list_uses_tracked_state` | Step 11 reference scope index | refresh scope 只列 tracked `ReferenceResolutionState`;不扫描 sibling body | reference fake |
 | `reference_refresh_preserves_last_good_snapshot` | Step 12 / 13 reference failure | unavailable/digest mismatch/body rejected 不删除 last successful snapshot | reference fake |

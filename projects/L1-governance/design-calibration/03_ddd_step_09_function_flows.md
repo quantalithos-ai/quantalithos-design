@@ -1855,7 +1855,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 
 ```text
 [QueryService]
-  | map scope_ref -> stable PolicyEffectiveViewRef through projection index
+  | view_ref = projection_repo.find_policy_effective_view_ref_by_scope(scope_ref)
+  | if missing -> return degraded missing projection surface;do not create view ref
   | view = projection_repo.get_policy_effective_view(view_ref)
   | state = projection_repo.get_state_with_version(view.view_ref)
   | resolution = read_visibility_resolver.resolve_scope_read(scope_ref)
@@ -1871,6 +1872,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | write safety | 通过 | query does not rebuild stale policy view |
 | body boundary | 通过 | policy/rule body excluded |
 | scope/read subject 来源 | 通过 | `scope_ref` 来自 request,scope-level read subject 来自 `resolve_scope_read(scope_ref)` |
+| stable view ref 来源 | 通过 | `find_policy_effective_view_ref_by_scope(scope_ref)` 是唯一 query lookup;不得拼 `PolicyEffectiveViewRef` |
 
 #### 15.3 `GetControlCoverageFlow`
 
@@ -1884,7 +1886,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 
 ```text
 [QueryService]
-  | map context_ref -> stable ControlCoverageViewRef through projection index
+  | view_ref = projection_repo.find_control_coverage_view_ref_by_context(context_ref)
+  | if missing -> return degraded missing projection surface;do not create view ref
   | view = projection_repo.get_control_coverage_view(view_ref)
   | state = projection_repo.get_state_with_version(view.view_ref)
   | resolution = read_visibility_resolver.resolve_context_read(context_ref)
@@ -1899,6 +1902,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | write safety | 通过 | query does not plan review or assess control |
 | body boundary | 通过 | control/evidence/artifact body excluded |
 | scope/read subject 来源 | 通过 | `context_ref` 来自 request,scope/read subject 来自 `resolve_context_read(context_ref)` |
+| stable view ref 来源 | 通过 | `find_control_coverage_view_ref_by_context(context_ref)` 是唯一 query lookup;不得拼 `ControlCoverageViewRef` |
 
 #### 15.4 `GetNonconformityStatusFlow`
 
@@ -1912,7 +1916,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 
 ```text
 [QueryService]
-  | map nonconformity_ref -> stable NonconformityStatusViewRef through projection index
+  | view_ref = projection_repo.find_nonconformity_status_view_ref_by_nonconformity(nonconformity_ref)
+  | if missing -> return degraded missing projection surface;do not create view ref
   | view = projection_repo.get_nonconformity_status_view(view_ref)
   | state = projection_repo.get_state_with_version(view.view_ref)
   | resolution = read_visibility_resolver.resolve_nonconformity_read(nonconformity_ref)
@@ -1927,6 +1932,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | write safety | 通过 | query cannot close/reopen nonconformity |
 | body boundary | 通过 | corrective work/evidence body excluded |
 | scope/read subject 来源 | 通过 | `scope_ref` 和 read subject 来自 `resolve_nonconformity_read(nonconformity_ref)`;不得从 nonconformity id 推导 |
+| stable view ref 来源 | 通过 | `find_nonconformity_status_view_ref_by_nonconformity(nonconformity_ref)` 是唯一 query lookup;不得拼 `NonconformityStatusViewRef` |
 
 #### 15.5 `SearchGovernanceFactsFlow`
 
@@ -1998,7 +2004,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 
 ```text
 [QueryService]
-  | map scope_ref -> stable DerivedGovernanceViewRef for dashboard through projection index
+  | view_ref = projection_repo.find_dashboard_view_ref_by_scope(scope_ref)
+  | if missing -> return degraded missing projection surface;do not create view ref
   | view = projection_repo.get_dashboard_view(view_ref)
   | state = projection_repo.get_state_with_version(view.view_ref)
   | resolution = read_visibility_resolver.resolve_scope_read(scope_ref)
@@ -2013,6 +2020,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | write safety | 通过 | query does not rebuild dashboard |
 | body boundary | 通过 | dashboard contains ref sets only |
 | scope/read subject 来源 | 通过 | `scope_ref` 来自 request;scope-level read subject 来自 `resolve_scope_read(scope_ref)` |
+| stable view ref 来源 | 通过 | `find_dashboard_view_ref_by_scope(scope_ref)` 是唯一 query lookup;不得拼 `DerivedGovernanceViewRef` |
 
 #### 15.8 `GetGovernanceReconciliationReportFlow`
 
@@ -2047,7 +2055,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | 审查项 | 结论 | 缺口 / 修正 |
 |---|---|---|
 | 7 个 projection/search/trace/report query 是否覆盖 | 通过 | pending decisions、policy、control、nonconformity、search、trace、dashboard、report 已覆盖 |
-| Step 7 port 是否足够 | 通过 | projection view body read、search page、report repo 已补齐 |
+| Step 7 port 是否足够 | 通过 | projection view body read、projection index lookup、search page、report repo 已补齐 |
 | read-only 是否闭合 | 通过 | no save/append/mark/rebuild/refresh |
 | degraded/freshness 是否闭合 | 通过 | projection-backed query 读取 view state 并组装 surface |
 | phase boundary | 通过 | 不把 query 当 maintenance job,不创建 truth/outbox/trace |

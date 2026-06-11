@@ -143,10 +143,10 @@
 | `corrective_actions` | corrective action truth | PK `corrective_action_id` | `nonconformity_ref`,`owner_ref`,`action_state`,`work_ref` | `governance_version` |
 | `verification_results` | verification result truth | PK `verification_result_id`;unique latest by `(nonconformity_ref, verification_kind)` if policy requires | `nonconformity_ref`,`verification_state`,`evidence_ref` | `governance_version` |
 | `derived_governance_view_states` | projection freshness state | PK `derived_view_ref`;unique `(projection_kind, source_identity_ref)` | `freshness_state`,`source_cursor`,`last_issue_ref` | `governance_version` |
-| `governance_dashboard_views` | dashboard projection | PK `dashboard_view_ref`;unique `dashboard_subject_ref` | `context_ref`,`source_cursor`,`freshness_state` | replaced with state version |
+| `governance_dashboard_views` | dashboard projection | PK `dashboard_view_ref`;unique `scope_ref` for dashboard kind | `scope_ref`,`source_cursor`,`freshness_state` | replaced with state version |
 | `decision_summary_views` | decision summary projection | PK `decision_summary_view_ref`;unique `decision_ref` or configured summary target | `context_ref`,`gate_ref`,`decision_state`,`source_cursor` | replaced with state version |
-| `policy_effective_views` | policy effective projection | PK `policy_effective_view_ref`;unique `(scope_ref, policy_ref)` | `scope_ref`,`policy_state`,`source_cursor` | replaced with state version |
-| `control_coverage_views` | control coverage projection | PK `control_coverage_view_ref`;unique `(context_ref, control_ref)` | `context_ref`,`coverage_state`,`source_cursor` | replaced with state version |
+| `policy_effective_views` | policy effective projection | PK `policy_effective_view_ref`;unique `scope_ref` for policy effective view | `scope_ref`,`policy_state`,`source_cursor` | replaced with state version |
+| `control_coverage_views` | control coverage projection | PK `control_coverage_view_ref`;unique `context_ref` for coverage view | `context_ref`,`coverage_state`,`source_cursor` | replaced with state version |
 | `nonconformity_status_views` | nonconformity status projection | PK `nonconformity_status_view_ref`;unique `nonconformity_ref` | `context_ref`,`owner_ref`,`status_state`,`source_cursor` | replaced with state version |
 | `governance_search_facts` | search projection rows | PK `search_fact_ref`;unique `(fact_kind, fact_subject_ref)` | `context_ref`,`scope_ref`,`fact_kind`,`source_cursor` | replaced with state version |
 | `projection_dependency_index` | affected view lookup | unique `(dependency_kind, dependency_ref, derived_view_ref)` | `dependency_kind`,`dependency_ref`,`derived_view_ref` | rebuilt with projection;no standalone version |
@@ -282,6 +282,10 @@
 | 函数签名 | 作用 | 锁 / 事务要求 | 返回 | 错误 |
 |---|---|---|---|---|
 | `GovernanceProjectionRepository.resolve_projection_target(view_ref)` | 将 public derived view ref 解析为 typed target | read-only;must use `projection_dependency_index` / view metadata,不得字符串猜测 | `Option<GovernanceProjectionTargetRef>` | repository failure |
+| `find_dashboard_view_ref_by_scope(scope_ref)` | 按 scope 查 existing dashboard view ref | read-only;must use view metadata / projection index;missing 表示当前无已建 dashboard projection | `Option<DerivedGovernanceViewRef>` | repository failure |
+| `find_policy_effective_view_ref_by_scope(scope_ref)` | 按 scope 查 existing policy effective view ref | read-only;不得生成新 view identity | `Option<PolicyEffectiveViewRef>` | repository failure |
+| `find_control_coverage_view_ref_by_context(context_ref)` | 按 context 查 existing control coverage view ref | read-only;不得扫描 truth 临时聚合 view | `Option<ControlCoverageViewRef>` | repository failure |
+| `find_nonconformity_status_view_ref_by_nonconformity(nonconformity_ref)` | 按 nonconformity 查 existing status view ref | read-only;不得从 nonconformity id 拼接 view ref | `Option<NonconformityStatusViewRef>` | repository failure |
 | `GovernanceProjectionRepository.get_state_with_version(view_ref)` | 读取 projection freshness state 和 version | read-only;replace/failed/unavailable update 使用返回 version | `Option<Versioned<DerivedGovernanceViewState>>` | repository failure |
 | `GovernanceProjectionRepository.get_dashboard_view(view_ref)` | 读取 dashboard projection | read-only;query 不重建 | `Option<GovernanceDashboardView>` | repository failure |
 | `get_decision_summary_view(view_ref)` | 读取 decision summary projection | read-only | `Option<DecisionSummaryView>` | repository failure |
@@ -307,6 +311,7 @@
 | projection rule | 正式口径 |
 |---|---|
 | query no-write | query 不调用 `mark_stale`、`save_state` 或 `replace_*` |
+| query index lookup | projection-backed query 必须先通过正式 `find_*_view_ref_by_*` 读取 existing view ref;missing 只能返回 degraded/missing projection surface,不得创建或拼接 view ref |
 | stale identity | affected view refs 只能来自 repository list,不得拼接 |
 | replace atomicity | view body、view state、dependency index 必须在同一 UoW 替换 |
 | missing state | rebuild 可用 `expected_version = None` 创建 new state;query 不创建 |
@@ -721,7 +726,7 @@ Query path may call repository reads that return `Versioned<T>`,but it must not 
 
 ### 8.23 Projection dependency index schema
 
-`projection_dependency_index` is the formal source for `list_views_affected_by_truth_change(...)`, `list_views_affected_by_references(...)` and `resolve_projection_target(...)`.
+`projection_dependency_index` plus projection view metadata is the formal source for `list_views_affected_by_truth_change(...)`, `list_views_affected_by_references(...)`, `resolve_projection_target(...)`, and projection-backed query lookup functions such as `find_policy_effective_view_ref_by_scope(...)`.
 
 | Field | Type | Source | Rule |
 |---|---|---|---|
@@ -729,16 +734,22 @@ Query path may call repository reads that return `Versioned<T>`,but it must not 
 | `dependency_ref` | typed ref encoded as `GovernanceProjectionDependencyRef` | source truth/snapshot/view target | body-free typed identity only |
 | `derived_view_ref` | `DerivedGovernanceViewRef` | projection target | public view identity from Step 8 |
 | `projection_kind` | `GovernanceProjectionKind` | resolved target | used for stable list and replace branch |
+| `lookup_kind` | `GovernanceProjectionLookupKind` | projection replace assembler | finite enum for query lookup keys: dashboard-by-scope, policy-effective-by-scope, control-coverage-by-context, nonconformity-status-by-nonconformity |
+| `lookup_ref` | typed ref encoded as `GovernanceProjectionLookupRef` | source query identity | scope/context/nonconformity typed identity only;must match view body target fields |
 | `source_cursor` | `GovernanceTruthCursor` | rebuild source snapshot | not a version |
 
 | Function | Uses index how |
 |---|---|
 | `resolve_projection_target(view_ref)` | reads view metadata / dependency rows to map public view to typed target |
+| `find_dashboard_view_ref_by_scope(scope_ref)` | reads query lookup row `(dashboard-by-scope, scope_ref)` and returns an existing dashboard view ref |
+| `find_policy_effective_view_ref_by_scope(scope_ref)` | reads query lookup row `(policy-effective-by-scope, scope_ref)` and returns an existing policy view ref |
+| `find_control_coverage_view_ref_by_context(context_ref)` | reads query lookup row `(control-coverage-by-context, context_ref)` and returns an existing coverage view ref |
+| `find_nonconformity_status_view_ref_by_nonconformity(nonconformity_ref)` | reads query lookup row `(nonconformity-status-by-nonconformity, nonconformity_ref)` and returns an existing status view ref |
 | `list_views_affected_by_truth_change(change, page)` | maps truth change subject/ref/scope to existing view refs |
 | `list_views_affected_by_references(refs, page)` | maps external reference refs to existing view refs |
-| `replace_*_view` | replaces rows for the view atomically with view body/state |
+| `replace_*_view` | replaces rows for the view atomically with view body/state and lookup/dependency rows |
 
-No flow may derive a `DerivedGovernanceViewRef` by concatenating project/context/scope/ref strings. If index rows are missing, the flow must return empty affected page or failed item according to Step 9/12;it must not invent projection identity.
+No flow may derive a `DerivedGovernanceViewRef` by concatenating project/context/scope/ref strings. If dependency rows are missing, a stale/rebuild flow must return empty affected page or failed item according to Step 9/12. If query lookup rows are missing, a projection-backed query must return the formal missing / degraded projection surface. Neither path may invent projection identity.
 
 ### 8.24 Reference scope index schema
 

@@ -1375,6 +1375,11 @@ pub trait ExternalGovernanceSourceResolverPort {
         evidence_ref: EvidenceSummaryRef,
     ) -> Result<ReferenceResolutionState, ApplicationError>;
 
+    async fn resolve_artifact_ref(
+        &self,
+        artifact_ref: ArtifactRef,
+    ) -> Result<ReferenceResolutionState, ApplicationError>;
+
     async fn resolve_process_context(
         &self,
         context_ref: ProcessGovernanceContextRef,
@@ -1400,6 +1405,7 @@ pub trait ExternalGovernanceSourceResolverPort {
 
 | 函数 | 闭合点 |
 |---|---|
+| `resolve_artifact_ref(artifact_ref)` | 返回 body-free `ReferenceResolutionState`;用于 `SubmitAIIAConclusionFlow` / `SubmitSoAConclusionFlow` 在 draft 创建前判定 artifact ref 是否 resolved;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 必须 save 前 rejected,不得创建 AIIA / SoA truth,不得返回 artifact body |
 | `resolve_scope_subject_relation(subject_ref, scope_ref)` | 返回 body-free `GovernanceScopeSubjectRelation`;用于 `PolicyScopePolicy` 在 `ActivatePolicyEffectiveFactFlow` / `UpdateSharedRuleSetFlow` save 前判定 subject/scope mismatch;不得解析 ref 字符串、不得扫描 adapter 私有状态、不得返回 scope body |
 
 #### 11.2 Publisher port

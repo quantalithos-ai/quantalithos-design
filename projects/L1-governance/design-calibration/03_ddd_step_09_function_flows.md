@@ -1172,11 +1172,11 @@ let review = ControlReview::plan(review_id, &applicability, reviewer_ref)?;
 | 协议 | `GovernanceCommandRequest<SubmitAIIAConclusionRequest>` |
 | 入口函数 | `ControlComplianceService.submit_aiia_conclusion(request, operation_context)` |
 | 目标对象 | `AIIAConclusion` |
-| 依赖 port | `GovernanceContextRepository`, `ComplianceConclusionRepository`, trace/history/outbox/projection/result/id generator |
+| 依赖 port | `GovernanceContextRepository`, `ComplianceConclusionRepository`, `ExternalGovernanceSourceResolverPort.resolve_artifact_ref(...)`, trace/history/outbox/projection/result/id generator |
 | 状态变化 | new `Drafted`;optional `Drafted -> InReview` |
 | history | `ComplianceConclusionRecord` |
 | outbound event | `ComplianceConclusionChanged` |
-| 测试切口 | artifact ref body-free; submit requires evidence; context ready; duplicate replay; no artifact body saved |
+| 测试切口 | artifact ref body-free; artifact unresolved save-before rejected; submit requires evidence; context ready; duplicate replay; no artifact body saved |
 
 ```text
 [API handler]
@@ -1185,6 +1185,9 @@ let review = ControlReview::plan(review_id, &applicability, reviewer_ref)?;
 [ControlComplianceService]
   | tx begin + idempotency reserve
   | context_v = context_repo.get_with_version(context_ref)
+  | artifact_state = external_source_resolver.resolve_artifact_ref(artifact_ref)
+  | if artifact_state is not resolved:
+  |   complete rejected result;tx commit;return rejected(no conclusion/history/outbox/stale)
   v
 [Domain]
   | ComplianceConclusionPolicy::for_context(context, evidence_ref, None).assert_no_artifact_body(artifact_ref)
@@ -1209,9 +1212,10 @@ let conclusion = AIIAConclusion::from_artifact(aiia_id, &context, artifact_ref, 
 |---|---|---|
 | DTO 构造 | 通过 | request provides context/artifact/submission intent |
 | domain method | 通过 | from_artifact and submit_for_review 已定义 |
-| port | 通过 | context read and AIIA save 已定义 |
+| port | 通过 | context read、artifact resolution and AIIA save 已定义 |
 | version 来源 | 通过 | new conclusion save uses `None` |
 | 副作用 | 通过 | compliance history/trace/outbox/stale/result |
+| artifact unresolved | 通过 | service 在 `from_artifact(...)` 前调用 `resolve_artifact_ref(...)`;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 返回 rejected command result,不保存 AIIA truth、history、outbox 或 stale marker |
 | 禁止事项 | 通过 | 不保存 AIIA / artifact body |
 
 #### 13.4 `SubmitSoAConclusionFlow`
@@ -1221,11 +1225,11 @@ let conclusion = AIIAConclusion::from_artifact(aiia_id, &context, artifact_ref, 
 | 协议 | `GovernanceCommandRequest<SubmitSoAConclusionRequest>` |
 | 入口函数 | `ControlComplianceService.submit_soa_conclusion(request, operation_context)` |
 | 目标对象 | `SoAConclusion` |
-| 依赖 port | `GovernanceContextRepository`, `ComplianceConclusionRepository`, trace/history/outbox/projection/result/id generator |
+| 依赖 port | `GovernanceContextRepository`, `ComplianceConclusionRepository`, `ExternalGovernanceSourceResolverPort.resolve_artifact_ref(...)`, trace/history/outbox/projection/result/id generator |
 | 状态变化 | new `Drafted`;attach coverage;optional `Drafted -> InReview` |
 | history | `ComplianceConclusionRecord` |
 | outbound event | `ComplianceConclusionChanged` |
-| 测试切口 | coverage required; submit requires evidence; coverage does not rewrite control truth; duplicate replay |
+| 测试切口 | coverage required; artifact unresolved save-before rejected; submit requires evidence; coverage does not rewrite control truth; duplicate replay |
 
 ```text
 [API handler]
@@ -1234,6 +1238,9 @@ let conclusion = AIIAConclusion::from_artifact(aiia_id, &context, artifact_ref, 
 [ControlComplianceService]
   | tx begin + idempotency reserve
   | context_v = context_repo.get_with_version(context_ref)
+  | artifact_state = external_source_resolver.resolve_artifact_ref(artifact_ref)
+  | if artifact_state is not resolved:
+  |   complete rejected result;tx commit;return rejected(no conclusion/history/outbox/stale)
   v
 [Domain]
   | policy = ComplianceConclusionPolicy::for_context(context, evidence_ref, Some(control_coverage_ref))
@@ -1261,9 +1268,10 @@ conclusion.attach_control_coverage(control_coverage_ref, actor_ref)?;
 |---|---|---|
 | DTO 构造 | 通过 | request provides context/artifact/coverage/submission intent |
 | domain method | 通过 | from_artifact/attach_control_coverage/submit_for_review 已定义 |
-| port | 通过 | context read and SoA save 已定义 |
+| port | 通过 | context read、artifact resolution and SoA save 已定义 |
 | version 来源 | 通过 | new conclusion save uses `None` |
 | 副作用 | 通过 | compliance history/trace/outbox/stale/result |
+| artifact unresolved | 通过 | service 在 `from_artifact(...)` 前调用 `resolve_artifact_ref(...)`;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 返回 rejected command result,不保存 SoA truth、history、outbox 或 stale marker |
 | 禁止事项 | 通过 | coverage ref 不反写 control applicability/review truth |
 
 #### 13.5 `ApproveComplianceConclusionFlow`

@@ -822,11 +822,11 @@ responsibility.delegate_to(request.delegate_actor_ref, request.delegation_reason
 | 协议 | `GovernanceCommandRequest<ActivatePolicyEffectiveFactRequest>` |
 | 入口函数 | `PolicyGovernanceService.activate_policy_effective_fact(request, operation_context)` |
 | 目标对象 | `PolicyEffectiveFact`, optional `PolicyConflictRecord` |
-| 依赖 port | `PolicyEffectiveFactRepository`, `SharedRuleSetRepository`, `PolicyConflictRepository`, trace/history/outbox/projection/result/id generator |
+| 依赖 port | `PolicyEffectiveFactRepository`, `SharedRuleSetRepository`, `PolicyConflictRepository`, `ExternalGovernanceSourceResolverPort.resolve_scope_subject_relation`, trace/history/outbox/projection/result/id generator |
 | 状态变化 | new policy `Proposed`;optional `Proposed -> Effective`;optional conflict `Detected` |
 | history | `PolicyChangeRecord` |
 | outbound event | `PolicyEffectiveFactChanged`;optional `PolicyConflictChanged` |
-| 测试切口 | request subject drives `PolicyScopePolicy`;snapshot body-free and scope marker matches request scope; activate intent changes state; shared rule conflict creates conflict record; duplicate replay; no method body saved |
+| 测试切口 | request subject/scope 由 `resolve_scope_subject_relation(...)` 判定 relation; snapshot body-free and scope marker matches request scope; activate intent changes state; shared rule conflict creates conflict record; duplicate replay; no method body saved |
 
 ```text
 [API handler]
@@ -836,12 +836,13 @@ responsibility.delegate_to(request.delegate_actor_ref, request.delegation_reason
   | tx begin + idempotency reserve
   | subject_ref = request.subject_ref
   | scope_ref = request.scope_ref
+  | relation = external_source_resolver.resolve_scope_subject_relation(subject_ref, scope_ref)
   | active_policies = policy_repo.list_active_by_scope(scope_ref, page)
   | shared_rule_set = shared_rule_set_repo.find_active_by_scope(scope_ref)
   v
 [Domain]
   | scope_policy = PolicyScopePolicy::for_subject(subject_ref, scope_ref)
-  | scope_policy.assert_scope_matches_subject(scope_ref, subject_ref)
+  | scope_policy.assert_scope_matches_subject(relation)
   | reject if !policy_snapshot.matches_scope(scope_ref)
   | policy_fact = PolicyEffectiveFact::propose(new_policy_effective_fact_id(), policy_snapshot, scope_ref, priority, actor)
   | if activation_intent == Activate:
@@ -867,9 +868,9 @@ let policy_fact = PolicyEffectiveFact::propose(policy_fact_id, snapshot, scope_r
 |---|---|---|
 | DTO 构造 | 通过 | request 提供 policy snapshot、subject、scope、priority、activation intent;`subject_ref` 不得从 `scope_ref` 反推 |
 | snapshot scope 来源 | 通过 | `MethodPolicySnapshot.scope_ref` 来自 method safe summary / resolver;`matches_scope(...)` 只比较 stable scope identity |
-| scope policy 来源 | 通过 | `PolicyScopePolicy::for_subject(request.subject_ref, request.scope_ref)`;若 subject/scope 不匹配则 save 前 rejected |
+| scope policy 来源 | 通过 | service 调 `resolve_scope_subject_relation(request.subject_ref, request.scope_ref)` 取得 body-free relation decision;`PolicyScopePolicy::for_subject(...)` 只能消费该 relation 判定,不得做恒真同一性检查;`Mismatch` / `Unknown` save 前 rejected |
 | domain method | 通过 | propose/activate/detect conflict 已定义 |
-| port | 通过 | active policy list、shared rules lookup、conflict save 已定义 |
+| port | 通过 | active policy list、shared rules lookup、scope relation resolver、conflict save 已定义 |
 | version 来源 | 通过 | new policy/conflict save uses `None` |
 | 副作用 | 通过 | policy changed and optional conflict changed outbox/stale/result |
 | 禁止事项 | 通过 | 不保存 AIPolicyDef body;conflict 不修改 policy truth |
@@ -934,11 +935,11 @@ policy_fact.suspend(reason, actor_ref)?;
 | 协议 | `GovernanceCommandRequest<UpdateSharedRuleSetRequest>` |
 | 入口函数 | `PolicyGovernanceService.update_shared_rule_set(request, operation_context)` |
 | 目标对象 | `SharedRuleSet`, optional `PolicyConflictRecord` |
-| 依赖 port | `SharedRuleSetRepository`, `PolicyEffectiveFactRepository`, `PolicyConflictRepository`, trace/history/outbox/projection/result/id generator |
+| 依赖 port | `SharedRuleSetRepository`, `PolicyEffectiveFactRepository`, `PolicyConflictRepository`, `ExternalGovernanceSourceResolverPort.resolve_scope_subject_relation`, trace/history/outbox/projection/result/id generator |
 | 状态变化 | draft/activate/add/deprecate/retire;optional conflict detected |
 | history | `PolicyChangeRecord` |
 | outbound event | `SharedRuleSetChanged`;optional `PolicyConflictChanged` |
-| 测试切口 | request subject drives `PolicyScopePolicy`;draft requires subject/scope; non-draft requires existing rule set; lower policy conflict detected; duplicate replay; no rule body saved |
+| 测试切口 | request subject/scope 由 `resolve_scope_subject_relation(...)` 判定 relation; draft requires subject/scope; non-draft requires existing rule set; lower policy conflict detected; duplicate replay; no rule body saved |
 
 ```text
 [API handler]
@@ -948,13 +949,14 @@ policy_fact.suspend(reason, actor_ref)?;
   | tx begin + idempotency reserve
   | subject_ref = request.subject_ref
   | scope_ref = request.scope_ref
+  | relation = external_source_resolver.resolve_scope_subject_relation(subject_ref, scope_ref)
   | if rule_set_ref: rule_set_v = shared_rule_set_repo.get_with_version(rule_set_ref)
   | else: no existing rule set
   | active_policies = policy_repo.list_active_by_scope(scope_ref, page)
   v
 [Domain]
   | scope_policy = PolicyScopePolicy::for_subject(subject_ref, scope_ref)
-  | scope_policy.assert_scope_matches_subject(scope_ref, subject_ref)
+  | scope_policy.assert_scope_matches_subject(relation)
   | if update_intent == Draft:
   |   rule_set = SharedRuleSet::draft(new_shared_rule_set_id(), scope_ref, actor)
   | else:
@@ -983,9 +985,9 @@ rule_set.add_rule(rule_ref, actor_ref)?;
 | 审查项 | 结论 | 缺口 / 修正 |
 |---|---|---|
 | DTO 构造 | 通过 | request gives optional rule set, subject, scope and update intent;`subject_ref` 不得从 `scope_ref` 反推 |
-| scope policy 来源 | 通过 | `PolicyScopePolicy::for_subject(request.subject_ref, request.scope_ref)`;若 subject/scope 不匹配则 save 前 rejected |
+| scope policy 来源 | 通过 | service 调 `resolve_scope_subject_relation(request.subject_ref, request.scope_ref)` 取得 body-free relation decision;`PolicyScopePolicy::for_subject(...)` 只能消费该 relation 判定,不得做恒真同一性检查;`Mismatch` / `Unknown` save 前 rejected |
 | domain method | 通过 | draft/activate/add/deprecate/retire 已定义 |
-| port | 通过 | shared rules get/save、policy list、conflict save 已定义 |
+| port | 通过 | shared rules get/save、policy list、scope relation resolver、conflict save 已定义 |
 | version 来源 | 通过 | draft uses `None`; existing update uses loaded version |
 | 副作用 | 通过 | shared rule changed and optional conflict changed outbox/stale/result |
 | 禁止事项 | 通过 | 不保存 rule expression / standard body |

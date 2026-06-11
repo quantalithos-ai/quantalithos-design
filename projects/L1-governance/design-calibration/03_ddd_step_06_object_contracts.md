@@ -1211,6 +1211,23 @@ pub struct GovernanceScopeRef {
 | 不表达继承关系 | parent / child / inheritance allowed 留给 `PolicyScopePolicy` 和 Step 7 repository / resolver |
 | 不保存 scope 正文 | 不保存 organization、project、work、runtime、external GRC 或 method body |
 
+##### `GovernanceScopeRelationSourceRef`
+
+```rust
+/// References the formal source that produced a scope/subject relation decision.
+pub struct GovernanceScopeRelationSourceRef(pub ExternalSourceRef);
+```
+
+| 字段 | 类型 | 作用 | 约束 / 来源 |
+|---|---|---|---|
+| `0` | `ExternalSourceRef` | subject/scope relation 判定来源 marker | 来源于 external source resolver、scope relation registry 或 safe summary snapshot;不得保存 relation body / scope body / subject body |
+
+| 不变量 / 禁止事项 | 说明 |
+|---|---|
+| 只表达判定来源 | 不代表 relation 本身为 allowed;最终结果由 `GovernanceScopeRelationState` 表达 |
+| 不可由 service 拼接 | application service 不得用 `subject_ref + scope_ref` 拼出 source ref;必须复制 resolver 返回的正式 marker |
+| 不保存外部正文 | 不保存 organization tree、project membership、method body、external GRC rule 或 adapter 私有索引 |
+
 ##### `PolicyPriority`
 
 ```rust
@@ -5136,6 +5153,43 @@ pub struct SharedRulesPolicy {
 #### 14.8 `PolicyScopePolicy`
 
 ```rust
+/// Body-free relation decision proving whether a governed subject is inside a scope.
+pub struct GovernanceScopeSubjectRelation {
+    /// Governed subject being checked.
+    pub subject_ref: GovernedSubjectRef,
+    /// Governance scope being checked.
+    pub scope_ref: GovernanceScopeRef,
+    /// Whether the relation is formally allowed.
+    pub relation_state: GovernanceScopeRelationState,
+    /// Safe source marker for the relation decision.
+    pub relation_source_ref: GovernanceScopeRelationSourceRef,
+}
+
+pub enum GovernanceScopeRelationState {
+    Allowed,
+    Mismatch,
+    Unknown,
+}
+```
+
+| 字段 | 类型 | 作用 | 约束 / 来源 |
+|---|---|---|---|
+| `subject_ref` | `GovernedSubjectRef` | 被治理对象 | 来自 command request / loaded truth;不得从 `scope_ref` 解析 |
+| `scope_ref` | `GovernanceScopeRef` | 被判断 scope | 来自 command request / loaded truth;不得从 `subject_ref` 解析 |
+| `relation_state` | `GovernanceScopeRelationState` | subject 是否被正式允许处于 scope 内 | 来源于 Step 7 scope relation resolver / repository;`Allowed` 才可继续 accepted path |
+| `relation_source_ref` | `GovernanceScopeRelationSourceRef` | 关系判断来源 marker | 指向 body-free relation source / snapshot / registry marker;不得保存外部正文 |
+
+| 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
+|---|---|---|---|---|
+| `pub fn allows(&self, subject_ref: &GovernedSubjectRef, scope_ref: &GovernanceScopeRef) -> bool` | 判断 relation 是否允许 subject/scope | request subject/scope | `bool` | 仅当 relation 中的 subject/scope 与入参同一且 state 为 `Allowed` 时返回 true |
+
+| 不变量 / 禁止事项 | 说明 |
+|---|---|
+| relation 不保存正文 | 不保存 project / org / external GRC / method body 或 scope body |
+| 不从 opaque ref 推导 | service / domain 不得解析 `GovernanceScopeRef` 或 `GovernedSubjectRef` 字符串推导关系 |
+| Unknown 不等于 Allowed | resolver 无法确认关系时必须作为 rejected / unavailable 口径处理,不得默认允许 |
+
+```rust
 /// Guards policy scope matching, inheritance, and effective time semantics.
 pub struct PolicyScopePolicy {
     /// Scope checked by this policy.
@@ -5152,7 +5206,7 @@ pub struct PolicyScopePolicy {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn assert_scope_matches_subject(&self, scope_ref: &GovernanceScopeRef, subject_ref: &GovernedSubjectRef) -> Result<(), DomainError>` | 校验 scope 与 subject 匹配 | scope、subject | `Result<(), DomainError>` | 要求入参与 policy 字段一致或被正式 scope relation 允许;不读取 subject body |
+| `pub fn assert_scope_matches_subject(&self, relation: &GovernanceScopeSubjectRelation) -> Result<(), DomainError>` | 校验 scope 与 subject 匹配 | Step 7 resolver 返回的 subject/scope relation decision | `Result<(), DomainError>` | 要求 relation 的 subject/scope 与 policy 字段一致且 relation state 为 `Allowed`;不读取 subject body,不解析 scope ref |
 | `pub fn assert_scope_inheritance_allowed(&self, parent_scope_ref: &GovernanceScopeRef, child_scope_ref: &GovernanceScopeRef) -> Result<(), DomainError>` | 校验 scope 继承允许 | parent scope、child scope | `Result<(), DomainError>` | 只使用已传入 refs;完整 parent/child relation 读取面留给 Step 7 |
 | `pub fn assert_effective_at(&self, effective_at: GovernanceEffectiveAt) -> Result<(), DomainError>` | 校验 policy / shared rules 生效时间语义 | effective time | `Result<(), DomainError>` | 要求时间来自 command metadata、clock port 或 source summary;不读取 clock |
 | `pub fn scopes_are_comparable(&self, left: &GovernanceScopeRef, right: &GovernanceScopeRef) -> bool` | 判断两个 scope 是否可比较 priority | left / right scope | `bool` | 相同 scope 返回 true;跨 scope 是否可比由 Step 7 relation input 支撑 |
@@ -5168,10 +5222,12 @@ pub struct PolicyScopePolicy {
 | 不自造 scope kind | HLD 未给 finite `GovernanceScopeKind`;实现不得私自固定 Project / Workspace / Global enum |
 | 不读取 clock | effective time 由 application 传入;policy 不调用 clock port |
 | inheritance 需要正式读取面 | 若 Step 9 flow 需要跨 scope inheritance,Step 7 必须提供 scope relation / resolver port |
+| subject/scope relation 需要正式读取面 | `assert_scope_matches_subject(...)` 只能消费 Step 7 `ExternalGovernanceSourceResolverPort.resolve_scope_subject_relation(...)` 返回的 relation decision;不得做恒真同一性检查 |
 
 | 与 HLD 骨架的收口差异 | 原因 |
 |---|---|
 | `for_subject(GovernedSubjectRef)` 增加 `scope_ref` 入参 | struct 字段要求 `scope_ref`;factory 必须覆盖字段来源 |
+| `assert_scope_matches_subject(scope_ref, subject_ref)` 改为接收 relation decision | subject/scope 是否匹配不是两个 ref 的自我同一性,必须来自正式 relation source |
 | `assert_scope_inheritance_allowed(...)` 只判断传入 refs | scope relation 读取不是 Step 6 对象职责,留给 Step 7 port |
 | `assert_effective_at(...)` 不生成当前时间 | policy 不拥有 clock;application flow 传入正式 effective time |
 
@@ -7463,6 +7519,7 @@ pub struct GovernanceJobRunnerRegistryState {
 | `GovernanceApiValidationIssueRef` / `GovernanceWorkerValidationIssueRef` / `GovernanceJobValidationIssueRef` | api/worker/jobs result | entry-local helper | pre-application validation / redacted error mapping | Step 12 error model / Step 16 tests | 不得保存 request body、payload body、stack trace、secret |
 | `GovernancePageRequest` | query entry、job entry | contracts query helper | QueryMetadata / request DTO / job input | Step 8 / Step 14 | page limit 不得硬编码在 Step 6;query/job 不得用 page cursor 当 version |
 | `GovernanceScopeRef` | policy、dashboard、report、job entry | contracts shared ref | request / context subject / resolver summary / truth snapshot | Step 7 scope relation / Step 8 DTO | 不得自造 Project / Workspace / Global scope enum |
+| `GovernanceScopeRelationSourceRef` | `GovernanceScopeSubjectRelation.relation_source_ref` | contracts shared ref | Step 7 external source resolver / scope relation registry / safe summary snapshot | Step 7 relation resolver;Step 9 policy precheck | 不得由 service 拼接;不得保存 subject / scope / relation body |
 
 | 审计结论 | 说明 |
 |---|---|

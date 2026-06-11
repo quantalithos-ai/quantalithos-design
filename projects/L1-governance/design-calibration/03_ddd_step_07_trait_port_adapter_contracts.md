@@ -346,7 +346,7 @@ pub trait IdGeneratorPort {
 | submit / accept input | input versioned read / save / list by context/source | `context_service` | `infra::repositories` | Step 9 input flow |
 | gate / decision | gate active lookup、decision versioned read/save、decision history append | `decision_service` | `infra::repositories` | Step 9 decision flow |
 | approval / responsibility | approver requirement read/save、responsibility by context/actor、chain read/save | `approval_service` | `infra::repositories` | Step 9 approval flow |
-| policy / shared rules / conflict | active policy facts by scope、rule set by scope、conflict lookup/save | `policy_service` | `infra::repositories` | Step 9 policy flow |
+| policy / shared rules / conflict | active policy facts by scope、rule set by scope、conflict lookup/save、subject-scope relation resolve | `policy_service` | `infra::repositories` / external relation resolver | Step 9 policy flow |
 | control / compliance | control applicability/review/conclusion read/save | `control_compliance_service` | `infra::repositories` | Step 9 control flow |
 | nonconformity corrective | nonconformity/corrective/verification read/save/list | `nonconformity_service` | `infra::repositories` | Step 9 corrective flow |
 | body-free truth snapshot | committed truth refs by scope/context | `projection_service`、`reconciliation_service`、`export_service` | `infra::repositories` | Step 9 rebuild / reconciliation / export job flow |
@@ -1389,8 +1389,18 @@ pub trait ExternalGovernanceSourceResolverPort {
         &self,
         signal_ref: RuntimeSignalRef,
     ) -> Result<ReferenceResolutionState, ApplicationError>;
+
+    async fn resolve_scope_subject_relation(
+        &self,
+        subject_ref: GovernedSubjectRef,
+        scope_ref: GovernanceScopeRef,
+    ) -> Result<GovernanceScopeSubjectRelation, ApplicationError>;
 }
 ```
+
+| 函数 | 闭合点 |
+|---|---|
+| `resolve_scope_subject_relation(subject_ref, scope_ref)` | 返回 body-free `GovernanceScopeSubjectRelation`;用于 `PolicyScopePolicy` 在 `ActivatePolicyEffectiveFactFlow` / `UpdateSharedRuleSetFlow` save 前判定 subject/scope mismatch;不得解析 ref 字符串、不得扫描 adapter 私有状态、不得返回 scope body |
 
 #### 11.2 Publisher port
 

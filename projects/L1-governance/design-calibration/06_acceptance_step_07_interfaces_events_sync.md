@@ -21,7 +21,7 @@
 
 - 23 个 P0 Command 和 14 个 P0 Query 如何验收。
 - 9 个 Inbound Event Consumer 如何证明可消费、可拒绝 unsupported version、可重复回放且不保存外部正文。
-- 12 个 Outbound Event 如何证明 stored payload snapshot、topic-neutral key、publisher marker 和 topic completeness。
+- 13 个 Outbound Event 如何证明 stored payload snapshot、topic-neutral key、publisher marker 和 topic completeness。
 - 7 个 Operations Job 如何证明 input / report / duplicate replay / partial failure 和 no truth repair。
 - 跨仓依赖分别属于编译期依赖、运行期依赖、事件协作 / 追溯交接依赖,还是下游消费 / 运行期提供。
 - 下游未就绪时如何以 fake / controlled / disabled seam 判定 P0 接缝通过 / 失败 / residual。
@@ -47,7 +47,7 @@
 | 问题 | 回答 |
 |---|---|
 | 每个 P0 Command / Query 如何验收? | Command 按 7 组覆盖 23 个正式协议,必须验证 envelope metadata、idempotency、accepted transaction side effects、stored result 和负向 reject。Query 按 3 组覆盖 14 个正式协议,必须验证 visibility / missing / degraded / stale / failed / empty page 和 no-write。 |
-| 每个 P0 Event 如何证明可消费 / 可重放? | 9 个 inbound consumer 必须使用 `GovernanceInboundEventEnvelope<T>`、`GovernanceEventSchemaVersion("v1")`、consumer receipt 和 duplicate replay;unsupported version 不解析 payload、不写 snapshot/stale。12 个 outbound event 必须从 accepted transaction 存储的 outbox payload snapshot 发布,topic-neutral key 必须完整映射。 |
+| 每个 P0 Event 如何证明可消费 / 可重放? | 9 个 inbound consumer 必须使用 `GovernanceInboundEventEnvelope<T>`、`GovernanceEventSchemaVersion("v1")`、consumer receipt 和 duplicate replay;unsupported version 不解析 payload、不写 snapshot/stale。13 个 outbound event 必须从 accepted transaction 存储的 outbox payload snapshot 发布,topic-neutral key 必须完整映射。 |
 | 每个 P0 Job 如何证明幂等和恢复? | 7 个 job 使用 `GovernanceJobRequest<T>` / `GovernanceJobResponse` / stored job report;duplicate replay 返回 stored report,partial failure 写 report/marker,不得重跑 mutation 或修复业务 truth。 |
 | 跨仓同步成功标准是什么? | P0 不要求相邻仓完整实现。成功标准是本仓按正式 ref / snapshot / event / adapter / handoff seam 处理输入输出,保存 receipt/report/marker,并在下游 unavailable / disabled 时给出 delayed/rejected/failed/residual surface。 |
 | 下游未就绪时如何验接缝? | 使用 fake / controlled / disabled adapter 证明 P0 语义。运行期来源 unavailable 时进入 degraded / delayed / failed marker;external GRC disabled 时 job rejected 或 skipped with report,不得阻断核心 Governance truth。 |
@@ -134,7 +134,7 @@
 |---|---|---|---|
 | 运行期来源仓不可用 | 通过 degraded / delayed / failed marker 裁决 | fake / controlled adapter failure evidence、consumer receipt/report | 伪造外部 truth 或复制正文 |
 | inbound event unsupported version | rejected / dead-letter / no-write 裁决 | `TC-GOV-CONSUMER-010~012`;`EV-GOV-CONSUMER-001` | 解析 payload 后再拒绝 |
-| outbound publisher unavailable | accepted truth 不回滚;publication failed/retry/dead-letter marker | `TC-GOV-OUTBOX-013~015`;`EV-GOV-OUTBOX-001` | publisher failure 回滚 truth |
+| outbound publisher unavailable | accepted truth 不回滚;publication failed/retry/dead-letter marker | `TC-GOV-OUTBOX-014~016`;`EV-GOV-OUTBOX-001` | publisher failure 回滚 truth |
 | external GRC disabled | job rejected/skipped/failed with report;core truth unaffected | `TC-GOV-JOB-005~007`;`EV-GOV-JOB-001` | external GRC status 反写 truth |
 | real-like / staging-like 未运行 | P0 不受影响;进入 residual | `reports/acceptance/risk-acceptance.md` when relevant | 标成 P0 passed 或 P0 failed |
 
@@ -171,7 +171,7 @@
 
 正式 `06-验收标准.md` §7 应回填:
 
-- P0 接口验收覆盖 23 个 Command、14 个 Query、9 个 Inbound Event Consumer、12 个 Outbound Event 和 7 个 Operations Job。
+- P0 接口验收覆盖 23 个 Command、14 个 Query、9 个 Inbound Event Consumer、13 个 Outbound Event 和 7 个 Operations Job。
 - Command 必须证明 metadata、idempotency、accepted transaction side effects、stored result 和负向 reject;Query 必须证明 no-write 和 visibility/degraded surface。
 - Consumer 必须证明 v1 envelope、duplicate receipt replay、unsupported version no-parse/no-write、snapshot/reference/stale marker 和 body-free。
 - Outbound Event 必须证明 stored payload snapshot、topic-neutral key、topic completeness 和 publisher failure marker;不得发布时从 current truth 重算。

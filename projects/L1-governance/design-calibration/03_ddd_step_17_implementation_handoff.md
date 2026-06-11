@@ -68,7 +68,7 @@
 | 实施者需要先阅读哪些文档? | 必须阅读 L1-governance `00/01/02`、Step 1~19 校准链、Step 19 后的正式 `03`、后续正式 `04/05/06/07`、Rust 编码规范、目录组织规范、实施计划规范、项目 README 提交规范和可落码性标准。 |
 | 提交规范、git config 用户、Rust 编码规范和注释规范是否列入前置阅读? | 已列入。实现仓必须使用项目级 `git config user.name=quantalithos-labs` 和 `git config user.email=quantalithos.ai@gmail.com`;实现仓 commit message 使用英文,标题 `type(scope): subject`;源码标识符、rustdoc、普通注释和测试名默认英文;AI footer 前必须有真实空行。 |
 | 每个 Domain 必填字段是否能回指 DTO、event、派生规则、查表规则或系统生成规则? | 预复核通过。Step 6 字段来源可以回指 Step 8 DTO / Event / Job、Step 9 flow、Step 7 repository / resolver / id generator / clock 或 Step 11 查表 / cursor 规则。正式 `03` 装配时仍需逐章复核,发现断裂必须回写 Step 6 / 7 / 8 / 9。 |
-| 每个 Command / Event / Job 是否能构造目标对象,或明确缺失处理? | 预复核通过。23 个 Command、9 个 Inbound Consumer、12 个 Outbound Event 和 7 个 Operations Job 均有目标对象、port 或 marker / report surface。缺失处理必须按 reject、delayed、dead-letter、quarantine、failed marker、partial report 或 no-write surface 执行。 |
+| 每个 Command / Event / Job 是否能构造目标对象,或明确缺失处理? | 预复核通过。23 个 Command、9 个 Inbound Consumer、13 个 Outbound Event 和 7 个 Operations Job 均有目标对象、port 或 marker / report surface。缺失处理必须按 reject、delayed、dead-letter、quarantine、failed marker、partial report 或 no-write surface 执行。 |
 | 每个 Query 的 response view / page / marker、read model / projection / cursor id/ref 是否闭合? | 预复核通过。14 个 Query 使用正式 response / page / visibility / freshness / degraded surface。Query 不得 reserve idempotency、append trace/outbox、refresh reference、rebuild projection 或修 core truth。 |
 | 状态枚举、状态图、测试切口、验收口径是否使用同一套正式状态名? | Step 6 / 10 / 16 内部口径一致。后续正式 `05`、`06` 和 `07` 生成时必须引用 Step 10 正式状态名,不得继承旧 `03` 或旧测试方案中的口语状态。 |
 | 当前 phase / commit boundary 是否误用了后续 phase 才定义的对象、结果或证据? | 本 Step 不定义 phase / commit boundary,因此只做预复核。正式 `07` 必须按每个 phase / commit boundary 复核正式 `03/05/06/07`,并从可落码性标准 §九选择适用经验项给出通过 / 不适用 / blocker 结论。 |
@@ -238,7 +238,7 @@
 | 23 个 Command request | core Governance truth、history、trace、outbox、stored command result | 是 | id generator、clock、repository lookup、resolver、policy guard | command idempotency key != business object id | reject / not found / conflict / rollback | Step 9 Command flows |
 | 14 个 Query request | view / page / marker response | 是 | truth repository、projection repository、trace repository、report repository | query cursor != optimistic version | missing / empty / not visible / degraded / failed | Step 9 Query flows |
 | 9 个 Inbound Event envelope | snapshot、reference state、receipt、stale marker | 是 if envelope valid | source event metadata、schema version、dedup key、resolver | source event ref != local outbox id | duplicate / unsupported / delayed / rejected / dead-letter | Step 9 Consumer flows |
-| 12 个 Outbound Event | `GovernanceOutboundEventEnvelope<T>` and stored payload snapshot | 是 | committed truth change、trace context、visibility marker、outbox snapshot builder | outbound event id != truth object id | mark failed / retry | Step 9 Outbox publish flow |
+| 13 个 Outbound Event | `GovernanceOutboundEventEnvelope<T>` and stored payload snapshot | 是 | committed truth change、trace context、visibility marker、outbox snapshot builder | outbound event id != truth object id | mark failed / retry | Step 9 Outbox publish flow |
 | 7 个 Operations Job | report、projection、reference snapshot、handoff / export marker | 是 | job metadata、repository page、adapter result、stored job report | job run id != job idempotency key | invalid input / partial failure / stored replay | Step 9 Job flows |
 
 ### 12.4 Query response / view 闭环表

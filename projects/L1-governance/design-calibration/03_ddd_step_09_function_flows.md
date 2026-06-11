@@ -27,7 +27,7 @@
 
 ### 2. 本步目标
 
-把 Step 8 已定义的 22 个 Command、14 个 Query、9 个 Inbound Event Consumer、12 个 Outbound Event 和 7 个 Operations Job,逐一收口成可落码的函数级处理流。
+把 Step 8 已定义的 22 个 Command、14 个 Query、9 个 Inbound Event Consumer、13 个 Outbound Event 和 7 个 Operations Job,逐一收口成可落码的函数级处理流。
 
 本步必须为每条 flow 明确:
 
@@ -70,7 +70,7 @@
 | 9.2-a | simple truth queries | context/input/gate/approval/policy/conflict/compliance query flow | [x] 已写入 |
 | 9.2-b | projection / search / trace / dashboard queries | pending decision、coverage、nonconformity、search、trace、dashboard、reconciliation flow | [x] 已写入 |
 | 9.3 | inbound consumers | 9 个 consumer flow、unsupported/duplicate/delayed/rejected 口径 | [x] 已写入 |
-| 9.4 | outbound event append / publish | accepted command outbox append helper、12 个 outbound payload snapshot、publish job flow | [x] 已写入 |
+| 9.4 | outbound event append / publish | accepted command outbox append helper、13 个 outbound payload snapshot、publish job flow | [x] 已写入 |
 | 9.5 | maintenance jobs | rebuild、refresh、reconciliation job flow | [x] 已写入 |
 | 9.6 | handoff / export jobs | trace handoff、archive handoff、external GRC export flow | [x] 已写入 |
 | 9.7 | final audit | per-flow 停审汇总、跨 flow transaction/state/outbox/projection/idempotency 审计 | [x] 已写入 |
@@ -114,7 +114,7 @@
 | `UpdateSharedRuleSetFlow` | `UpdateSharedRuleSetRequest` | policy | `SharedRuleSet`, optional conflict | shared/policy/conflict repo, trace/history, outbox, projection, result | draft/activate/add/deprecate/retire | 待审 |
 | `ResolvePolicyConflictFlow` | `ResolvePolicyConflictRequest` | policy | `PolicyConflictRecord` | conflict/gate/decision repo, trace/history, outbox, projection, result | pending/resolve/waive/invalidate | 待审 |
 | `AssessControlApplicabilityFlow` | `AssessControlApplicabilityRequest` | control | `ControlApplicability` | context/control repo, trace/history, outbox, projection, result | assess and mark applicability | 待审 |
-| `RecordControlReviewFlow` | `RecordControlReviewRequest` | control | `ControlReview` | control/review/decision repo, trace/history, outbox, projection, result | plan/start/pass/fail/waive/supersede | 待审 |
+| `RecordControlReviewFlow` | `RecordControlReviewRequest` | control | `ControlReview` | control/review/decision repo, trace/history, outbox, projection, result | plan/start/pass/fail/waive/supersede;uses `control_review_subjects(review.to_ref())` | 待审 |
 | `SubmitAIIAConclusionFlow` | `SubmitAIIAConclusionRequest` | compliance | `AIIAConclusion` | context/compliance repo, trace/history, outbox, projection, result | draft/submit review | 待审 |
 | `SubmitSoAConclusionFlow` | `SubmitSoAConclusionRequest` | compliance | `SoAConclusion` | context/compliance repo, trace/history, outbox, projection, result | draft/attach coverage/submit review | 待审 |
 | `ApproveComplianceConclusionFlow` | `ApproveComplianceConclusionRequest` | compliance | `AIIAConclusion` / `SoAConclusion` | compliance/decision repo, trace/history, outbox, projection, result | approve/reject/revoke | 待审 |
@@ -1118,7 +1118,7 @@ let applicability = ControlApplicability::assess(applicability_id, &context, con
 | 依赖 port | `ControlApplicabilityRepository`, `ControlReviewRepository`, `GovernanceDecisionRepository`, trace/history/outbox/projection/result/id generator |
 | 状态变化 | plan `Planned`;`Planned -> InReview`;`InReview -> Passed/Failed/Waived`;`Planned/InReview -> Superseded` |
 | history | `ControlChangeRecord` |
-| outbound event | `ControlApplicabilityChanged` |
+| outbound event | `ControlReviewChanged` |
 | 测试切口 | plan requires applicable control; update requires review ref; waiver requires formal decision; failed review does not create nonconformity automatically |
 
 ```text
@@ -1146,8 +1146,9 @@ let applicability = ControlApplicability::assess(applicability_id, &context, con
   v
 [Persistence]
   | control_review_repo.save(review, expected_version, uow)
+  | subject_refs = GovernanceTruthChangeSubjectMapper.control_review_subjects(review.to_ref())
   | append ControlChangeRecord::from_review_change(...)
-  | append trace/audit/outbox/stale/stored result
+  | append trace/audit/ControlReviewChanged outbox/stale/stored result with same canonical subject key
   | tx commit
 ```
 
@@ -2139,7 +2140,8 @@ let record = GovernanceOutboxRecord::from_truth_change(outbox_id, &change, trace
 | `PolicyEffectiveFactChanged` | `PolicyEffectiveFactChangedPayload` | saved `PolicyEffectiveFact` | activate/update policy fact | policy fact ref, scope ref, state, method policy snapshot, cursor |
 | `SharedRuleSetChanged` | `SharedRuleSetChangedPayload` | saved `SharedRuleSet` | update shared rule set | rule set ref, scope ref, state, rule refs, cursor |
 | `PolicyConflictChanged` | `PolicyConflictChangedPayload` | saved `PolicyConflictRecord` | activate/update policy, update shared rule set, resolve conflict | conflict ref/state, scope, policy refs, optional decision, cursor |
-| `ControlApplicabilityChanged` | `ControlApplicabilityChangedPayload` | saved `ControlApplicability` or `ControlReview` linked to applicability | assess applicability、record review | applicability ref/state, context, method control snapshot, basis ref, cursor |
+| `ControlApplicabilityChanged` | `ControlApplicabilityChangedPayload` | saved `ControlApplicability` | assess applicability | applicability ref/state, context, method control snapshot, basis ref, cursor |
+| `ControlReviewChanged` | `ControlReviewChangedPayload` | saved `ControlReview` | record review | review ref, applicability ref, review state, reviewer ref, evidence ref, failure reason, waiver decision ref, superseded-by ref, cursor |
 | `ComplianceConclusionChanged` | `ComplianceConclusionChangedPayload` | saved `AIIAConclusion` or `SoAConclusion` | submit/approve compliance conclusion | conclusion ref/state, context, artifact ref, decision ref, coverage ref, cursor |
 | `NonconformityChanged` | `NonconformityChangedPayload` | saved `NonconformityRecord`, optional `CorrectiveAction` / `VerificationResult` | raise/confirm/plan/complete/verify nonconformity | nonconformity ref/state, context, active action ref, verification ref, cursor |
 

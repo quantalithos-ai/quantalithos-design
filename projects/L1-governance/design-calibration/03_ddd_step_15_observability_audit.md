@@ -31,7 +31,7 @@
 |---|---|---|
 | `03_ddd_step_06_object_contracts.md` | 已完成 | 固定 `GovernanceTraceRecord`、`GovernanceAuditTrail`、history record、`GovernanceOutboxRecord`、`GovernanceHandoffMarker`、job report、infra entry 和 forbidden body 边界 |
 | `03_ddd_step_07_trait_port_adapter_contracts.md` | 已完成 | 固定 trace、audit history、outbox、projection、reference、handoff、publisher、stored result、UoW、Clock、IdGenerator 和 adapter port 的打点位置 |
-| `03_ddd_step_08_protocol_contracts.md` | 已完成 | 固定 22 个 Command、14 个 Query、9 个 Inbound Consumer、12 个 Outbound Event、7 个 Operations Job 的协议字段和 receipt / report surface |
+| `03_ddd_step_08_protocol_contracts.md` | 已完成 | 固定 22 个 Command、14 个 Query、9 个 Inbound Consumer、13 个 Outbound Event、7 个 Operations Job 的协议字段和 receipt / report surface |
 | `03_ddd_step_09_function_flows.md` | 已完成 | 固定 command accepted transaction、query no-write、consumer accepted write、outbox publish、maintenance job、handoff/export flow 的顺序 |
 | `03_ddd_step_10_state_matrix.md` | 已完成 | 固定状态转换、terminal state、not-visible/degraded/unsupported/dead-letter/retry 的状态含义 |
 | `03_ddd_step_11_persistence_transaction_consistency.md` | 已完成 | 固定 trace/audit/outbox/projection/reference/result 的事务、append-only、optimistic version 和 payload snapshot 一致性 |

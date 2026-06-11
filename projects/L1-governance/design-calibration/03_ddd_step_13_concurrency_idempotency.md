@@ -35,7 +35,7 @@
 |---|---|---|
 | `03_ddd_step_06_object_contracts.md` | 已完成 | 提供 `GovernanceOperationContext`、`GovernanceIdempotencyRecord`、`StoredGovernanceOperationResult`、`GovernanceJobReportAssembly` 和 mutable truth 对象 |
 | `03_ddd_step_07_trait_port_adapter_contracts.md` | 已完成 | 提供 `Versioned<T>`、`GovernanceVersion`、truth repository、projection/reference/outbox/handoff repository、idempotency repository、stored result repository |
-| `03_ddd_step_08_protocol_contracts.md` | 已完成 | 提供 23 个 command、14 个 query、9 个 inbound consumer、12 个 outbound event、7 个 operations job 的 public DTO 和 metadata |
+| `03_ddd_step_08_protocol_contracts.md` | 已完成 | 提供 23 个 command、14 个 query、9 个 inbound consumer、13 个 outbound event、7 个 operations job 的 public DTO 和 metadata |
 | `03_ddd_step_09_function_flows.md` | 已完成 | 提供 command / query / consumer / outbox / job / handoff / export 的函数级处理顺序 |
 | `03_ddd_step_10_state_matrix.md` | 已完成 | 提供 domain 状态迁移、technical state、terminal state 和 duplicate / retry / failed disposition |
 | `03_ddd_step_11_persistence_transaction_consistency.md` | 已完成 | 提供 UoW 边界、atomic save / complete 顺序、payload snapshot、projection/reference/outbox version 来源和恢复规则 |

@@ -216,6 +216,7 @@ pub trait GovernanceTruthChangeSubjectMapper {
     fn shared_rule_set_subjects(&self, rule_set_ref: SharedRuleSetRef) -> GovernanceAcceptedSubjectRefs;
     fn policy_conflict_subjects(&self, conflict_ref: PolicyConflictRef) -> GovernanceAcceptedSubjectRefs;
     fn control_applicability_subjects(&self, applicability_ref: ControlApplicabilityRef) -> GovernanceAcceptedSubjectRefs;
+    fn control_review_subjects(&self, review_ref: ControlReviewRef) -> GovernanceAcceptedSubjectRefs;
     fn compliance_conclusion_subjects(&self, conclusion_ref: ComplianceConclusionRef) -> GovernanceAcceptedSubjectRefs;
     fn nonconformity_subjects(&self, nonconformity_ref: NonconformityRef) -> GovernanceAcceptedSubjectRefs;
 }

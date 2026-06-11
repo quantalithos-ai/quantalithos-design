@@ -205,6 +205,7 @@ Step 8 defines topic-neutral keys. Step 14 binds those keys to runtime publisher
 | `SharedRuleSetChanged` | `governance.shared-rule-set.changed.v1` | same | startup validation fails if shared rule outbox enabled |
 | `PolicyConflictChanged` | `governance.policy-conflict.changed.v1` | same | startup validation fails if conflict outbox enabled |
 | `ControlApplicabilityChanged` | `governance.control-applicability.changed.v1` | same | startup validation fails if control outbox enabled |
+| `ControlReviewChanged` | `governance.control-review.changed.v1` | same | startup validation fails if control review outbox enabled |
 | `ComplianceConclusionChanged` | `governance.compliance-conclusion.changed.v1` | same | startup validation fails if compliance outbox enabled |
 | `NonconformityChanged` | `governance.nonconformity.changed.v1` | same | startup validation fails if nonconformity outbox enabled |
 | `GovernanceTraceAvailable` | `governance.trace.available.v1` | required only when trace available emission feature is enabled | feature disabled -> no trace available outbox append |

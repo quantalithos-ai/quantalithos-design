@@ -34,7 +34,7 @@
 | `03_ddd_step_05_module_contracts.md` | 已完成 | 固定 `contracts`、`domain`、`application`、`infra`、`api`、`worker`、`jobs` 七个模块测试主轴 |
 | `03_ddd_step_06_object_contracts.md` | 已完成 | 固定对象不变量、factory、state enum、trace/audit/history/outbox/handoff/report object 的单元测试入口 |
 | `03_ddd_step_07_trait_port_adapter_contracts.md` | 已完成 | 固定 repository、port、adapter、UoW、Clock、IdGenerator、stored result、fake failure injection 测试入口 |
-| `03_ddd_step_08_protocol_contracts.md` | 已完成 | 固定 23 个 Command、14 个 Query、9 个 Inbound Consumer、12 个 Outbound Event、7 个 Operations Job 的协议测试入口 |
+| `03_ddd_step_08_protocol_contracts.md` | 已完成 | 固定 23 个 Command、14 个 Query、9 个 Inbound Consumer、13 个 Outbound Event、7 个 Operations Job 的协议测试入口 |
 | `03_ddd_step_09_function_flows.md` | 已完成 | 固定 accepted/rejected/duplicate/no-write/partial failure 的 application flow 测试入口 |
 | `03_ddd_step_10_state_matrix.md` | 已完成 | 固定 23 组状态机、合法转换、非法转换和 query no-write 状态约束 |
 | `03_ddd_step_11_persistence_transaction_consistency.md` | 已完成 | 固定 version、transaction、outbox snapshot、projection dependency index、reference scope index、stored result、handoff marker persistence 测试入口 |
@@ -206,6 +206,7 @@ Step 15 observability and audit
 | `SharedRuleSetChanged_event_schema` | `SharedRuleSetChangedPayload` | rule set scope/state/rule refs;no rule expression/standard body | contract + publisher |
 | `PolicyConflictChanged_event_schema` | `PolicyConflictChangedPayload` | conflict scope/state/policy refs/resolution ref;no policy body | contract + publisher |
 | `ControlApplicabilityChanged_event_schema` | `ControlApplicabilityChangedPayload` | applicability/context/state/control snapshot/evidence ref;no control definition/evidence body | contract + publisher |
+| `ControlReviewChanged_event_schema` | `ControlReviewChangedPayload` | review/applicability/state/reviewer/evidence/failure/waiver/superseded refs;no reviewer profile/control definition/evidence body | contract + publisher |
 | `ComplianceConclusionChanged_event_schema` | `ComplianceConclusionChangedPayload` | conclusion/context/state/artifact/decision/coverage refs;no artifact/AIIA/SoA body | contract + publisher |
 | `NonconformityChanged_event_schema` | `NonconformityChangedPayload` | nonconformity/action/verification refs and state;no work/evidence/runtime body | contract + publisher |
 | `GovernanceTraceAvailable_event_schema` | `GovernanceTraceAvailablePayload` | trace subject/ref/kind and optional handoff marker;no observability span body | contract + publisher |
@@ -321,7 +322,7 @@ Step 15 observability and audit
 | 23 个 Command 是否都有正向和异常切口 | 通过 | §10 逐项覆盖 |
 | 14 个 Query 是否都有 hit/missing/not-visible/degraded/no-write 切口 | 通过 | §11 逐项覆盖 |
 | 9 个 Inbound Consumer 是否都有 accepted/duplicate/unsupported/rejected/delayed 切口 | 通过 | §12 逐项覆盖 |
-| 12 个 Outbound Event 是否都有 payload snapshot / forbidden body / publish failure 切口 | 通过 | §13 逐项覆盖 |
+| 13 个 Outbound Event 是否都有 payload snapshot / forbidden body / publish failure 切口 | 通过 | §13 逐项覆盖 |
 | 7 个 Operations Job 是否都有 success/duplicate/invalid/partial/no-truth-repair 切口 | 通过 | §14 逐项覆盖 |
 | 状态机合法/非法转换是否有入口 | 通过 | §15 覆盖 Step 10 状态矩阵批次 |
 | 一致性 / 幂等 / 并发是否有入口 | 通过 | §16 覆盖 duplicate、stored result、UoW、outbox、projection、reference、handoff、query no-write |

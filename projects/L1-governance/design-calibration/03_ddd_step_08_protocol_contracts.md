@@ -80,7 +80,7 @@
 
 | 问题 | 回答 |
 |---|---|
-| 本轮需要定义哪些协议? | HLD Step 7 中列出的 22 个 Command、14 个 Query、9 个 Inbound Consumer、12 个 Outbound Event、7 个 Operations Job 全部进入本 Step。 |
+| 本轮需要定义哪些协议? | HLD Step 7 中列出的 22 个 Command、14 个 Query、9 个 Inbound Consumer、13 个 Outbound Event、7 个 Operations Job 全部进入本 Step。 |
 | API / Command / Query / Event / Job 是否按协议族拆分? | 是。Command 按业务模块拆分;Query 按 view / projection surface 拆分;Event 分 inbound/outbound;Job 分 shared metadata 和具体 job。 |
 | 每个 request / response / event / job 是否要有字段级 schema? | 是。每个 public DTO 必须列字段、类型、来源、目标对象 / port、必填约束和禁止保存的正文。 |
 | 二级公开类型是否必须闭合? | 是。只要字段类型出现在 public DTO / event / job / receipt / report 中,必须在 Step 6 已定义或在本 Step 明确归属和 schema。 |
@@ -1765,6 +1765,7 @@ pub struct GovernanceOutboundPayloadSnapshotBuilder;
 | `SharedRuleSetChanged` | `GovernanceOutboxEventKind("SharedRuleSetChanged")` | `governance.shared-rule-set.changed.v1` | `SharedRuleSetChangedPayload` |
 | `PolicyConflictChanged` | `GovernanceOutboxEventKind("PolicyConflictChanged")` | `governance.policy-conflict.changed.v1` | `PolicyConflictChangedPayload` |
 | `ControlApplicabilityChanged` | `GovernanceOutboxEventKind("ControlApplicabilityChanged")` | `governance.control-applicability.changed.v1` | `ControlApplicabilityChangedPayload` |
+| `ControlReviewChanged` | `GovernanceOutboxEventKind("ControlReviewChanged")` | `governance.control-review.changed.v1` | `ControlReviewChangedPayload` |
 | `ComplianceConclusionChanged` | `GovernanceOutboxEventKind("ComplianceConclusionChanged")` | `governance.compliance-conclusion.changed.v1` | `ComplianceConclusionChangedPayload` |
 | `NonconformityChanged` | `GovernanceOutboxEventKind("NonconformityChanged")` | `governance.nonconformity.changed.v1` | `NonconformityChangedPayload` |
 | `GovernanceTraceAvailable` | `GovernanceOutboxEventKind("GovernanceTraceAvailable")` | `governance.trace.available.v1` | `GovernanceTraceAvailablePayload` |
@@ -1908,6 +1909,28 @@ pub struct ControlApplicabilityChangedPayload {
     pub source_cursor: GovernanceTruthCursor,
 }
 
+/// Control review changed payload.
+pub struct ControlReviewChangedPayload {
+    /// Changed review ref.
+    pub review_ref: ControlReviewRef,
+    /// Reviewed control applicability.
+    pub applicability_ref: ControlApplicabilityRef,
+    /// Review state after change.
+    pub review_state: ControlReviewState,
+    /// Reviewer actor ref.
+    pub reviewer_ref: ActorRef,
+    /// Optional review evidence.
+    pub evidence_ref: Option<EvidenceSummaryRef>,
+    /// Optional failure reason.
+    pub failure_reason: Option<ControlFailureReason>,
+    /// Optional waiver decision.
+    pub waiver_decision_ref: Option<GovernanceDecisionRef>,
+    /// Optional superseding review.
+    pub superseded_by: Option<ControlReviewRef>,
+    /// Source cursor.
+    pub source_cursor: GovernanceTruthCursor,
+}
+
 /// Compliance conclusion changed payload.
 pub struct ComplianceConclusionChangedPayload {
     /// Changed conclusion union ref.
@@ -1953,6 +1976,7 @@ pub struct NonconformityChangedPayload {
 | `SharedRuleSetChangedPayload` | saved shared rule set | `SharedRuleSetChanged` | rule expression/standard body excluded |
 | `PolicyConflictChangedPayload` | saved conflict | `PolicyConflictChanged` | policy/rule body excluded |
 | `ControlApplicabilityChangedPayload` | saved applicability | `ControlApplicabilityChanged` | ControlDefinition/evidence body excluded |
+| `ControlReviewChangedPayload` | saved control review | `ControlReviewChanged` | evidence body/reviewer profile/control definition body excluded |
 | `ComplianceConclusionChangedPayload` | saved AIIA/SoA conclusion | `ComplianceConclusionChanged` | artifact/AIIA/SoA body excluded |
 | `NonconformityChangedPayload` | saved nonconformity/action/verification refs | `NonconformityChanged` | work/evidence/runtime body excluded |
 
@@ -1960,7 +1984,7 @@ pub struct NonconformityChangedPayload {
 
 | 检查项 | 结论 |
 |---|---|
-| 10 个 truth outbound payload 是否字段级闭合 | 是。每个 payload 都有 refs/state/cursor 字段和构造来源。 |
+| 11 个 truth outbound payload 是否字段级闭合 | 是。每个 payload 都有 refs/state/cursor 字段和构造来源。 |
 | Payload 是否能从 accepted truth 构造 | 是。字段均来自 saved object、truth change cursor、trace/outbox accepted context。 |
 | 是否保存 sibling body | 否。所有 payload 均只保存 refs、state、snapshot、summary ref。 |
 | event kind 映射是否闭合 | 是。每个 payload 均绑定 §11.3 的 event kind。 |

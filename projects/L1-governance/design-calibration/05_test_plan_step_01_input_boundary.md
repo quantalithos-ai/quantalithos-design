@@ -45,7 +45,7 @@
 | 问题 | 回答 |
 |---|---|
 | 当前测试方案要承接哪些需求、规则和非功能目标? | 承接 `00` 中 C-GOV-1~C-GOV-5、FR-GOV-001~010、BR-GOV-001~040、AC-GOV-001~031、VF-GOV-001~010、正文排除、truth / snapshot / reference / derived separation、唯一编译期依赖、可审计、幂等、一致性、安全、观测和外围增强不影响核心闭环等目标。 |
-| 哪些概要 / 详细设计章节直接影响测试对象? | `02` 的组件、关键对象、API 骨架、处理流、状态、异常和配置影响会影响测试对象抽取。`03` 的 Step 5~16 直接决定测试对象:七个模块、对象契约、trait / port / adapter、23 个 Command、14 个 Query、9 个 Inbound Consumer、12 个 Outbound Event、7 个 Operations Job、状态矩阵、持久化事务、错误恢复、并发幂等、配置外部绑定、观测审计和最小测试切口。 |
+| 哪些概要 / 详细设计章节直接影响测试对象? | `02` 的组件、关键对象、API 骨架、处理流、状态、异常和配置影响会影响测试对象抽取。`03` 的 Step 5~16 直接决定测试对象:七个模块、对象契约、trait / port / adapter、23 个 Command、14 个 Query、9 个 Inbound Consumer、13 个 Outbound Event、7 个 Operations Job、状态矩阵、持久化事务、错误恢复、并发幂等、配置外部绑定、观测审计和最小测试切口。 |
 | 哪些验收项需要测试方案提供证据? | `00` 的 AC-GOV-001~031 和 VF-GOV-001~010 需要测试证据支撑。测试方案还要为正文不入仓、Policy / shared rules 不被覆盖、query no-write、projection / job 不反写真相、outbox payload snapshot、duplicate replay、external GRC 不定义 truth、fake / controlled adapter 不伪成功、config fail-fast 和 redaction no-output 等红线提供 evidence。旧 `06` 中的 request / decision / eligibility / replay 方向只作为历史提示。 |
 | 哪些内容不应在测试方案中重新定义? | 不重新定义需求编号、业务规则、架构方案、对象字段、DTO、port、repository、flow、state、error、persistence、config key、runtime builder、部署命令、实施 commit 或验收裁决。测试方案只定义如何验证正式设计契约,不能补设计缺口。 |
 | 当前上游是否存在会阻塞测试设计的缺口? | 不阻塞 Step 2。新版 `00`~`04` 和 `03_ddd_step_16_test_cuts.md` 已足够启动测试目标与范围设计。旧 `05/06` 与新版设计不一致,但它们本来就是待重建文档,不是阻塞。具体产品未锁定也不阻塞 P0 测试设计,按 fake / controlled / disabled / product-neutral 接缝处理。 |

@@ -500,7 +500,7 @@ Operations Job 必须从已持久化 truth、trace、outbox、snapshot 或 proje
 | `RaiseNonconformity`、`ConfirmNonconformityCause`、`PlanCorrectiveAction`、`CompleteCorrectiveAction`、`VerifyNonconformity` | Nonconformity corrective command flow | verification 通过后才允许关闭 |
 | 14 个 Query | Authorized query flow 或 generic query read path | 单对象读取可用通用读路径;projection / visibility / trace / dashboard 查询走授权流 |
 | 9 个 Inbound Event Consumer | External context consumer flow | 只写 mirror / marker / stale,不写核心 truth |
-| 12 个 Outbound Event | Publish outbox flow | outbound event 从 outbox payload snapshot 发布 |
+| 13 个 Outbound Event | Publish outbox flow | outbound event 从 outbox payload snapshot 发布 |
 | 7 个 Operations Job | Outbox publish、maintenance、handoff 三个 job flow | 按传播可靠性、查询一致性、追溯交接分流 |
 
 ---

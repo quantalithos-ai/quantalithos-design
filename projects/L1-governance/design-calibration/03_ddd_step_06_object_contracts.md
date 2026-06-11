@@ -907,6 +907,8 @@ pub struct MethodPolicySnapshot {
     pub policy_ref: MethodPolicyRef,
     /// Source-side policy definition version.
     pub policy_version_ref: MethodPolicyVersionRef,
+    /// Governance scope marker declared by the body-free policy summary.
+    pub scope_ref: GovernanceScopeRef,
     /// Safe summary ref for the policy definition.
     pub summary_ref: SafeSummaryRef,
     /// Local resolution state for the snapshot source.
@@ -918,22 +920,24 @@ pub struct MethodPolicySnapshot {
 |---|---|---|---|
 | `policy_ref` | `MethodPolicyRef` | method-library Policy 定义引用 | 来源于 method event / resolver;不得保存 AIPolicyDef body |
 | `policy_version_ref` | `MethodPolicyVersionRef` | 来源版本 | 必填;不得用本地更新版本替代 |
+| `scope_ref` | `GovernanceScopeRef` | body-free policy summary 声明的适用治理范围 | 来源于 method event / resolver safe summary 的 scope marker;不得解析 AIPolicyDef body 或外部 scope 字符串 |
 | `summary_ref` | `SafeSummaryRef` | safe summary 引用 | 必填;summary body 不进入 Governance contracts |
 | `snapshot_state` | `ReferenceResolutionState` | 快照解析状态 | consumer / refresh job 写入;query 必须可见 stale / unavailable |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn matches_scope(&self, scope_ref: GovernanceScopeRef) -> bool` | 判断摘要是否可用于 scope | scope_ref 为治理范围 ref | `bool` | 只基于 summary ref / scope marker;不读取 policy body |
+| `pub fn matches_scope(&self, scope_ref: GovernanceScopeRef) -> bool` | 判断摘要是否可用于 scope | scope_ref 为治理范围 ref | `bool` | 只比较 `self.scope_ref.same_scope(&scope_ref)`;不读取 policy body、不解析 summary body、不做 scope 继承判断 |
 | `pub fn mark_stale(&mut self, reason: ReferenceStaleReason, checked_at: ReferenceCheckedAt) -> Result<(), ContractError>` | 标记快照过期 | reason、检查时间 | `Result<(), ContractError>` | 调用 `snapshot_state.mark_stale(reason, checked_at)`;不修改 `PolicyEffectiveFact` |
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn from_method_library(policy_ref: MethodPolicyRef, policy_version_ref: MethodPolicyVersionRef, summary_ref: SafeSummaryRef, snapshot_state: ReferenceResolutionState) -> Result<Self, ContractError>` | 从 method-library 摘要形成快照 | ref、version、safe summary、resolution state | `Result<MethodPolicySnapshot, ContractError>` | method consumer、policy activation precheck;`snapshot_state.source_version_ref` 必须与 `policy_version_ref` 对齐 |
+| `pub fn from_method_library(policy_ref: MethodPolicyRef, policy_version_ref: MethodPolicyVersionRef, scope_ref: GovernanceScopeRef, summary_ref: SafeSummaryRef, snapshot_state: ReferenceResolutionState) -> Result<Self, ContractError>` | 从 method-library 摘要形成快照 | ref、version、scope marker、safe summary、resolution state | `Result<MethodPolicySnapshot, ContractError>` | method consumer、policy activation precheck;`snapshot_state.source_version_ref` 必须与 `policy_version_ref` 对齐;`scope_ref` 必须来自 body-free safe summary / resolver |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
-| 不保存 AIPolicyDef 正文 | 只保存 ref、version、safe summary ref 和 resolution state |
+| 不保存 AIPolicyDef 正文 | 只保存 ref、version、scope ref、safe summary ref 和 resolution state |
 | 不形成 Policy truth | 生效事实由 `PolicyEffectiveFact` 在 domain 批次定义 |
+| scope 只做同一性判断 | `matches_scope(...)` 只判断快照 scope 与请求 scope 是否同一;跨 scope 继承、覆盖和可比较关系必须交给 `PolicyScopePolicy` / Step 7 读取面 |
 
 ##### `MethodControlSnapshot`
 
@@ -3515,14 +3519,14 @@ pub struct PolicyEffectiveFact {
 |---|---|---|---|---|
 | `pub fn to_ref(&self) -> PolicyEffectiveFactRef` | 生成 policy fact ref | 无 | `PolicyEffectiveFactRef` | 纯函数;只复制 `policy_fact_id` |
 | `pub fn is_effective(&self) -> bool` | 判断 policy fact 是否可被 guard 消费 | 无 | `bool` | 只有 `Effective` 返回 true |
-| `pub fn activate(&mut self, snapshot: MethodPolicySnapshot, actor: ActorRef) -> Result<(), DomainError>` | 基于定义快照生效或恢复 Policy | resolved method policy snapshot、actor | `Result<(), DomainError>` | 允许 `Proposed -> Effective` 和 `Suspended -> Effective`;更新 `policy_snapshot_ref`;清空 suspend reason |
+| `pub fn activate(&mut self, snapshot: MethodPolicySnapshot, actor: ActorRef) -> Result<(), DomainError>` | 基于定义快照生效或恢复 Policy | resolved method policy snapshot、actor | `Result<(), DomainError>` | 允许 `Proposed -> Effective` 和 `Suspended -> Effective`;要求 `snapshot.matches_scope(self.scope_ref)`;更新 `policy_snapshot_ref`;清空 suspend reason |
 | `pub fn suspend(&mut self, reason: PolicySuspendReason, actor: ActorRef) -> Result<(), DomainError>` | 暂停 policy 生效 | suspend reason、actor | `Result<(), DomainError>` | 允许 `Effective -> Suspended`;写入 `suspend_reason` |
 | `pub fn supersede(&mut self, next_ref: PolicyEffectiveFactRef, actor: ActorRef) -> Result<(), DomainError>` | 被新版本或新事实替代 | next policy fact ref、actor | `Result<(), DomainError>` | 允许 `Proposed` / `Effective` / `Suspended -> Superseded`;next ref 不得等于自身 |
 | `pub fn retire(&mut self, reason: PolicyRetireReason, actor: ActorRef) -> Result<(), DomainError>` | 退役不再适用的 policy fact | retire reason、actor | `Result<(), DomainError>` | 允许 `Proposed` / `Effective` / `Suspended -> Retired`;写入 retire reason |
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn propose(policy_fact_id: PolicyEffectiveFactId, snapshot: MethodPolicySnapshot, scope_ref: GovernanceScopeRef, priority: PolicyPriority, actor: ActorRef) -> Result<Self, DomainError>` | 从 method policy snapshot 和 scope 形成待生效事实 | application generated id、snapshot、scope、priority、actor | `Result<PolicyEffectiveFact, DomainError>` | `ActivatePolicyEffectiveFact`;初始 state 必须是 `Proposed` |
+| `pub fn propose(policy_fact_id: PolicyEffectiveFactId, snapshot: MethodPolicySnapshot, scope_ref: GovernanceScopeRef, priority: PolicyPriority, actor: ActorRef) -> Result<Self, DomainError>` | 从 method policy snapshot 和 scope 形成待生效事实 | application generated id、snapshot、scope、priority、actor | `Result<PolicyEffectiveFact, DomainError>` | `ActivatePolicyEffectiveFact`;要求 `snapshot.matches_scope(scope_ref)`;初始 state 必须是 `Proposed` |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|

@@ -1608,7 +1608,7 @@ pub struct ObservabilityAlertRaisedPayload {
 | `ProcessGovernanceContextChangedPayload` | process event safe summary | `save_process_context_ref` + reference state | 不保存 process instance/activity/waiting body |
 | `WorkGovernanceContextChangedPayload` | work event safe summary | `save_work_context_ref` + reference state | 不保存 work item/project body |
 | `ArtifactEvidenceChangedPayload` | artifact/evidence safe summary | `save_evidence_summary_ref` + reference state | 不保存 evidence / artifact body |
-| `MethodPolicyDefinitionChangedPayload` | method-library policy safe summary | `save_method_policy_snapshot` + reference state | 不保存 AIPolicyDef body |
+| `MethodPolicyDefinitionChangedPayload` | method-library policy safe summary, including body-free `policy_snapshot.scope_ref` | `save_method_policy_snapshot` + reference state | 不保存 AIPolicyDef body;不得从 summary body 或字符串临时推导 scope |
 | `MethodControlDefinitionChangedPayload` | method-library control safe summary | `save_method_control_snapshot` + reference state | 不保存 ControlDefinition / standard body |
 | `RuntimeSignalRecordedPayload` | runtime/capability event summary | `save_runtime_signal_ref` + optional pending input marker | 不保存 execution log |
 | `ConversationContextChangedPayload` | conversation event summary | source reference state / trace stale marker | 不保存 message body |
@@ -1636,7 +1636,7 @@ pub struct ObservabilityAlertRaisedPayload {
 | Process governance context | upsert process context ref | `process_context_ref.snapshot_state` | context / decision / dashboard related views |
 | Work governance context | upsert work context ref | `work_context_ref.snapshot_state` | context / nonconformity / dashboard related views |
 | Artifact evidence | upsert evidence ref | envelope `source_ref` + source version | compliance / control views |
-| Method policy definition | upsert method policy snapshot | `policy_snapshot.snapshot_state` | policy effective views |
+| Method policy definition | upsert method policy snapshot | `policy_snapshot.snapshot_state` and `policy_snapshot.scope_ref` | policy effective views |
 | Method control definition | upsert method control snapshot | `control_snapshot.snapshot_state` | control coverage views |
 | Runtime signal recorded | upsert runtime signal ref | `runtime_signal_ref.signal_state` | context / dashboard views |
 | Conversation context changed | save source reference state | envelope `source_ref` + optional read subject | trace / decision views |

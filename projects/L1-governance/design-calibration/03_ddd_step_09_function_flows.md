@@ -826,7 +826,7 @@ responsibility.delegate_to(request.delegate_actor_ref, request.delegation_reason
 | 状态变化 | new policy `Proposed`;optional `Proposed -> Effective`;optional conflict `Detected` |
 | history | `PolicyChangeRecord` |
 | outbound event | `PolicyEffectiveFactChanged`;optional `PolicyConflictChanged` |
-| 测试切口 | snapshot body-free; activate intent changes state; shared rule conflict creates conflict record; duplicate replay; no method body saved |
+| 测试切口 | snapshot body-free and scope marker matches request scope; activate intent changes state; shared rule conflict creates conflict record; duplicate replay; no method body saved |
 
 ```text
 [API handler]
@@ -839,6 +839,7 @@ responsibility.delegate_to(request.delegate_actor_ref, request.delegation_reason
   v
 [Domain]
   | scope_policy = PolicyScopePolicy::for_subject(subject_ref, scope_ref)
+  | reject if !policy_snapshot.matches_scope(scope_ref)
   | policy_fact = PolicyEffectiveFact::propose(new_policy_effective_fact_id(), policy_snapshot, scope_ref, priority, actor)
   | if activation_intent == Activate:
   |   policy_fact.activate(policy_snapshot, actor)
@@ -862,6 +863,7 @@ let policy_fact = PolicyEffectiveFact::propose(policy_fact_id, snapshot, scope_r
 | 审查项 | 结论 | 缺口 / 修正 |
 |---|---|---|
 | DTO 构造 | 通过 | request 提供 policy snapshot、scope、priority、activation intent |
+| snapshot scope 来源 | 通过 | `MethodPolicySnapshot.scope_ref` 来自 method safe summary / resolver;`matches_scope(...)` 只比较 stable scope identity |
 | domain method | 通过 | propose/activate/detect conflict 已定义 |
 | port | 通过 | active policy list、shared rules lookup、conflict save 已定义 |
 | version 来源 | 通过 | new policy/conflict save uses `None` |

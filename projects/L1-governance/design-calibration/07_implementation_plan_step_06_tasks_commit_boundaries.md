@@ -453,7 +453,7 @@
 
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
-| commit-04-a | policy/shared rules/conflict contracts/domain tests 通过后 | PolicyEffectiveFact、SharedRuleSet、PolicyConflictRecord DTO/domain/tests | control/compliance/NC service、query/event/job | contract-domain-fast policy slice;`cargo check`;`git diff --check` |
+| commit-04-a | policy/shared rules/conflict contracts/domain tests 通过后 | PolicyEffectiveFact、SharedRuleSet、PolicyConflictRecord DTO/domain/tests;MethodPolicySnapshot scope marker helper coverage | control/compliance/NC service、query/event/job | contract-domain-fast policy slice;snapshot scope mismatch targeted test;`cargo check`;`git diff --check` |
 | commit-04-b | control + compliance contracts/domain tests 通过后 | ControlApplicability、ControlReview、AIIAConclusion、SoAConclusion、Compliance approval DTO/domain/tests | NC、application service、query/event/job | contract-domain-fast control/compliance slice;`cargo check`;`git diff --check` |
 | commit-04-c | NC / corrective action / verification contracts/domain tests 通过后 | NonconformityRecord、CorrectiveAction、VerificationResult DTO/domain/tests | application services、query/event/job | contract-domain-fast NC slice;`cargo check`;`git diff --check` |
 | commit-04-d | PH-04 application services、handlers、fake repos 和 redaction targeted tests 通过后 | policy/control/compliance/NC services、repos、handlers、stored result、trace/outbox、redaction tests | query views、event consumers、jobs | service-flow-fast PH-04 slice;redaction-boundary targeted;`git diff --check` |

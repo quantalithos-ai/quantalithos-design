@@ -146,7 +146,7 @@ Step 15 observability and audit
 | `AssignApprovalResponsibility_contract` | `AssignApprovalResponsibilityFlow` | responsibility required/assigned and chain updated;actor capability snapshot resolved;duplicate active actor;capability unavailable | API + application |
 | `RecordApprovalVote_contract` | `RecordApprovalVoteFlow` | vote recorded;chain satisfied branch;wrong actor rejected;duplicate vote;terminal responsibility reject | API + application |
 | `DelegateApprovalResponsibility_contract` | `DelegateApprovalResponsibilityFlow` | delegate transition;delegate snapshot resolved;delegation policy reject;released/terminal responsibility reject | API + application |
-| `ActivatePolicyEffectiveFact_contract` | `ActivatePolicyEffectiveFactFlow` | policy fact activated;method policy snapshot required;conflict detection marker;duplicate;scope invalid;method unavailable | API + application |
+| `ActivatePolicyEffectiveFact_contract` | `ActivatePolicyEffectiveFactFlow` | policy fact activated;method policy snapshot required;`policy_snapshot.scope_ref` matches request scope;scope mismatch rejected before fact save;conflict detection marker;duplicate;method unavailable | API + application |
 | `UpdatePolicyEffectiveFactState_contract` | `UpdatePolicyEffectiveFactStateFlow` | activate/suspend/supersede/retire;required reason;terminal retired reject;conflict re-evaluation stale views | API + application |
 | `UpdateSharedRuleSet_contract` | `UpdateSharedRuleSetFlow` | draft/activate/add/deprecate/retire shared rules;rule refs body-free;policy conflict detection;invalid rule ref | API + application |
 | `ResolvePolicyConflict_contract` | `ResolvePolicyConflictFlow` | pending/resolve/waive/invalidate conflict;decision ref guard;wrong state reject;outbox/stale/result saved | API + application |
@@ -202,7 +202,7 @@ Step 15 observability and audit
 | `GateChanged_event_schema` | `GateChangedPayload` | gate/context/state/decision/responsibility refs;no process waiting body;publish failure marks outbox only | contract + publisher |
 | `GovernanceDecisionChanged_event_schema` | `GovernanceDecisionChangedPayload` | decision/gate/outcome/basis refs and state from committed decision;no evidence body | contract + publisher |
 | `ApprovalResponsibilityChanged_event_schema` | `ApprovalResponsibilityChangedPayload` | responsibility/chain/context/actor/vote refs only;no actor profile;stored snapshot publish | contract + publisher |
-| `PolicyEffectiveFactChanged_event_schema` | `PolicyEffectiveFactChangedPayload` | policy fact scope/state/method snapshot refs;no AIPolicyDef body | contract + publisher |
+| `PolicyEffectiveFactChanged_event_schema` | `PolicyEffectiveFactChangedPayload` | policy fact scope/state/method snapshot refs including snapshot scope marker;no AIPolicyDef body | contract + publisher |
 | `SharedRuleSetChanged_event_schema` | `SharedRuleSetChangedPayload` | rule set scope/state/rule refs;no rule expression/standard body | contract + publisher |
 | `PolicyConflictChanged_event_schema` | `PolicyConflictChangedPayload` | conflict scope/state/policy refs/resolution ref;no policy body | contract + publisher |
 | `ControlApplicabilityChanged_event_schema` | `ControlApplicabilityChangedPayload` | applicability/context/state/control snapshot/evidence ref;no control definition/evidence body | contract + publisher |
@@ -233,7 +233,7 @@ Step 15 observability and audit
 | `governance_decision_state_transitions` | `GovernanceDecisionState` | `Proposed -> Approved/Rejected/Waived`;finalized -> Superseded/Revoked;terminal guard | domain unit |
 | `approval_responsibility_state_transitions` | `ApprovalResponsibilityState` | `Required -> Assigned -> Accepted/Voted/Delegated`;released/terminal reject | domain unit |
 | `responsibility_chain_state_transitions` | `ResponsibilityChainState` | open/partially satisfied/satisfied/released;cannot vote after satisfied/released | domain unit |
-| `policy_effective_state_transitions` | `PolicyEffectiveState` | proposed/active/suspended/superseded/retired transitions;retired terminal guard | domain unit |
+| `policy_effective_state_transitions` | `PolicyEffectiveState` | proposed/active/suspended/superseded/retired transitions;scope mismatch rejects before propose / activate;retired terminal guard | domain unit |
 | `shared_rule_set_state_transitions` | `SharedRuleSetState` | draft/active/deprecated/retired and add/deprecate rule guards | domain unit |
 | `policy_conflict_state_transitions` | `PolicyConflictState` | detected/pending decision/resolved/waived/invalidated;resolved/waived terminal guard | domain unit |
 | `control_applicability_state_transitions` | `ControlApplicabilityState` | assessed/applicable/not applicable/excluded/superseded;invalid evidence guard | domain unit |

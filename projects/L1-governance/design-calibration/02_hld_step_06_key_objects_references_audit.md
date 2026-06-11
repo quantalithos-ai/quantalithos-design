@@ -113,22 +113,24 @@
 |---|---|---|
 | `policy_ref` | `MethodPolicyRef` | method-library Policy 定义引用 |
 | `policy_version_ref` | `MethodPolicyVersionRef` | 来源版本 |
+| `scope_ref` | `GovernanceScopeRef` | body-free policy summary 声明的适用治理范围 |
 | `summary_ref` | `SafeSummaryRef` | safe summary 引用 |
 | `snapshot_state` | `ReferenceResolutionState` | 快照解析和过期状态 |
 
 | 成员函数 | 作用 |
 |---|---|
-| `matches_scope(GovernanceScopeRef scope_ref)` | 判断定义摘要是否适用于 scope |
+| `matches_scope(GovernanceScopeRef scope_ref)` | 只比较 snapshot 的 `scope_ref` 与入参是否为同一 stable scope identity |
 | `mark_stale(ReferenceStaleReason reason)` | 标记快照过期 |
 
 | 工厂函数 | 作用 |
 |---|---|
-| `from_method_library(MethodPolicyRef policy_ref, MethodPolicyVersionRef policy_version_ref, SafeSummaryRef summary_ref)` | 从 method-library 摘要形成快照 |
+| `from_method_library(MethodPolicyRef policy_ref, MethodPolicyVersionRef policy_version_ref, GovernanceScopeRef scope_ref, SafeSummaryRef summary_ref)` | 从 method-library 摘要形成快照 |
 
 | 禁止事项 | 说明 |
 |---|---|
 | 不保存 AIPolicyDef 正文 | 只保存 ref、version 和 safe summary |
 | 不形成 Policy truth | 生效事实由 PolicyEffectiveFact 表达 |
+| 不做 scope 继承判断 | 跨 scope 继承 / 覆盖由详细设计中的 `PolicyScopePolicy` 承接 |
 
 ---
 

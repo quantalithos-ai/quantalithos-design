@@ -262,7 +262,7 @@
 | `GovernanceAuditHistoryRepository.get_audit_trail_by_subject_with_version(subject_ref)` | 按 audit subject 唯一键读取 audit trail 和 version | accepted command 更新 audit trail 前必须使用;返回已有 `audit_trail_id` 与 expected version;missing 表示首次创建 | `Option<Versioned<GovernanceAuditTrail>>` | repository failure |
 | `GovernanceAuditHistoryRepository.save_audit_trail(trail, expected_version, uow)` | 保存 audit trail ref chain | `None` create;`Some(version)` update;same UoW as accepted truth/trace | `GovernanceAuditTrailRef` | duplicate / version conflict |
 | `append_decision_record(record, uow)` | 追加 decision history | append-only;same UoW as decision/gate transition | `DecisionRecordRef` | duplicate record id |
-| `append_responsibility_record(record, uow)` | 追加 approval responsibility history | append-only;same UoW as responsibility/chain transition | `ResponsibilityTraceRecordRef` | duplicate record id |
+| `append_responsibility_record(record, uow)` | 追加 approval responsibility history | append-only;same UoW as responsibility/chain transition;includes `OpenGovernanceGateFlow` requirement path when it creates `ApprovalResponsibility` | `ResponsibilityTraceRecordRef` | duplicate record id |
 | `append_policy_record(record, uow)` | 追加 policy/shared/conflict history | append-only;same UoW as policy/rule/conflict transition | `PolicyChangeRecordRef` | duplicate record id |
 | `append_control_record(record, uow)` | 追加 control applicability/review history | append-only;same UoW as control transition | `ControlChangeRecordRef` | duplicate record id |
 | `append_compliance_record(record, uow)` | 追加 AIIA/SoA conclusion history | append-only;same UoW as conclusion transition | `ComplianceConclusionRecordRef` | duplicate record id |
@@ -273,6 +273,7 @@
 | identity | record id 必须来自 `IdGeneratorPort`,不得由 repository 拼接 |
 | construction timing | record 字段若来自多个 truth transition,必须等所有字段来源形成后由 application flow 构造 |
 | transaction | accepted command path 必须与 source truth save 同 UoW append |
+| embedded object change | command flow 若在主对象之外创建 / 更新 secondary truth object 并发出该对象的 changed event,必须显式裁定是否 append 该对象家族的 history;`OpenGovernanceGateFlow` requirement path 创建 `ApprovalResponsibility` 时必须 append `ResponsibilityTraceRecord` |
 | duplicate | duplicate replay 不追加新 record;直接读取 stored result |
 | query | query 只能读取 record,不得补写缺失 history |
 

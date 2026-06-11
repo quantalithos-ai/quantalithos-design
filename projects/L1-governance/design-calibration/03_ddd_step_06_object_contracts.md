@@ -4420,7 +4420,7 @@ pub struct ResponsibilityTraceRecord {
 |---|---|---|---|
 | `record_id` | `ResponsibilityTraceRecordId` | responsibility history identity | responsibility change flow 从 application id generator 取得;domain 不自行生成 |
 | `responsibility_ref` | `ApprovalResponsibilityRef` | 被追溯的 responsibility | 从 loaded / transitioned `ApprovalResponsibility.to_ref()` 取得;不保存 responsibility body |
-| `change_kind` | `ResponsibilityChangeKind` | 责任变化类别 | 来源于 responsibility transition / command flow;非空 newtype |
+| `change_kind` | `ResponsibilityChangeKind` | 责任变化类别 | 来源于 responsibility transition / command flow;非空 newtype;`OpenGovernanceGateFlow` requirement path 使用 `responsibility-required` 或 `responsibility-assigned` |
 | `resulting_state` | `ApprovalResponsibilityState` | 变化完成后的 responsibility state | 从 transitioned `ApprovalResponsibility.responsibility_state` 复制;不解析 change kind |
 | `actor_ref` | `ActorRef` | 执行动作 actor | 来自 command actor context、assigned actor、delegate actor 或 accepted service actor;不保存 identity body |
 | `trace_ref` | `GovernanceTraceRecordRef` | 同一 accepted change 的 trace | application 先创建 trace record,再传入 history factory |
@@ -4435,7 +4435,7 @@ pub struct ResponsibilityTraceRecord {
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn from_responsibility_change(record_id: ResponsibilityTraceRecordId, responsibility: &ApprovalResponsibility, change_kind: ResponsibilityChangeKind, actor_ref: ActorRef, trace_ref: GovernanceTraceRecordRef, audit_required: bool) -> Result<Self, DomainError>` | 从 accepted responsibility transition 构造 history | generated id、transitioned responsibility、change kind、actor、trace ref、audit flag | `Result<ResponsibilityTraceRecord, DomainError>` | assign / accept / vote / delegate / release path;`resulting_state` 从 responsibility 复制 |
+| `pub fn from_responsibility_change(record_id: ResponsibilityTraceRecordId, responsibility: &ApprovalResponsibility, change_kind: ResponsibilityChangeKind, actor_ref: ActorRef, trace_ref: GovernanceTraceRecordRef, audit_required: bool) -> Result<Self, DomainError>` | 从 accepted responsibility transition 构造 history | generated id、transitioned responsibility、change kind、actor、trace ref、audit flag | `Result<ResponsibilityTraceRecord, DomainError>` | `OpenGovernanceGateFlow` requirement path、assign / accept / vote / delegate / release path;`resulting_state` 从 responsibility 复制 |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|

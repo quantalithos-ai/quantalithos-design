@@ -103,7 +103,7 @@
 | `CreateGovernanceContextFlow` | `CreateGovernanceContextRequest` | context | `GovernanceContext` | context repo, reference resolver/repo, trace, audit, outbox, projection, result | create context, trace/outbox/stale/result | 待审 |
 | `SubmitGovernanceInputFlow` | `SubmitGovernanceInputRequest` | context/input | `GovernanceInput` | context/input repo, trace, audit, outbox, projection, result | receive input as `Received` only | 待审 |
 | `UpdateGovernanceInputStateFlow` | `UpdateGovernanceInputStateRequest` | context/input | `GovernanceInput` | input/context repo, trace, audit, outbox, projection, result | accept/reject/wait/supersede | 待审 |
-| `OpenGovernanceGateFlow` | `OpenGovernanceGateRequest` | decision | `Gate`, optional requirement/responsibility | context/gate/requirement/responsibility/chain repo, trace, audit, outbox, projection, result | no requirement => open gate;with requirement => same-command pending decision binding | 待审 |
+| `OpenGovernanceGateFlow` | `OpenGovernanceGateRequest` | decision | `Gate`, optional requirement/responsibility | context/gate/requirement/responsibility/chain repo, trace/history, audit, outbox, projection, result | no requirement => open gate;with requirement => same-command pending decision binding and responsibility history | 待审 |
 | `RecordGovernanceDecisionFlow` | `RecordGovernanceDecisionRequest` | decision | `GovernanceDecision`, `Gate` | gate/decision/chain/shared rule repo, trace/history, outbox, projection, result | propose/finalize/attach decision | 待审 |
 | `SupersedeGovernanceDecisionFlow` | `SupersedeGovernanceDecisionRequest` | decision | `GovernanceDecision` | decision/gate/chain/shared rule repo, trace/history, outbox, projection, result | create next, finalize, supersede current | 待审 |
 | `AssignApprovalResponsibilityFlow` | `AssignApprovalResponsibilityRequest` | approval | `ApproverRequirement`, `ApprovalResponsibility`, `ResponsibilityChain` | context/responsibility/chain/reference repo, resolver, trace/history, outbox, projection, result | require/assign/append chain | 待审 |
@@ -470,10 +470,11 @@ input.accept(&context, actor_ref)?;
 | 协议 | `GovernanceCommandRequest<OpenGovernanceGateRequest>` |
 | 入口函数 | `GovernanceDecisionCommandService.open_governance_gate(request, operation_context)` |
 | 目标对象 | `Gate`, optional `ApproverRequirement`, optional `ApprovalResponsibility`, optional `ResponsibilityChain` |
-| 依赖 port | `GovernanceContextRepository`, `GateRepository`, `ApproverRequirementRepository`, `ApprovalResponsibilityRepository`, `ResponsibilityChainRepository`, resolver/reference repo when actor snapshot is needed, trace/audit/outbox/projection/result/id generator |
+| 依赖 port | `GovernanceContextRepository`, `GateRepository`, `ApproverRequirementRepository`, `ApprovalResponsibilityRepository`, `ResponsibilityChainRepository`, resolver/reference repo when actor snapshot is needed, trace/history/audit/outbox/projection/result/id generator |
 | 状态变化 | no `approver_requirement_intent`: `GateState::Open`;with `approver_requirement_intent`: `GateState::Open -> PendingDecision` by `request_decision_by_ref(...)`;optional responsibility `Required/Assigned`;optional chain `Open` |
+| history | no requirement: none for responsibility;with requirement: append `ResponsibilityTraceRecord` for the created `ApprovalResponsibility` in the same UoW |
 | outbound event | `GateChanged` uses final saved gate state;optional `ApprovalResponsibilityChanged` if responsibility created |
-| 测试切口 | ready context opens gate; no requirement returns `Open` and `required_responsibility_ref = None`;requirement path creates responsibility/chain and returns `PendingDecision` with `required_responsibility_ref`;context not ready rejected;duplicate replay;affected views not ad hoc |
+| 测试切口 | ready context opens gate; no requirement returns `Open` and `required_responsibility_ref = None`;requirement path creates responsibility/chain, appends responsibility history, and returns `PendingDecision` with `required_responsibility_ref`;context not ready rejected;duplicate replay;affected views not ad hoc |
 
 Commit boundary note: commit-03-a 只实现 `Gate::open(...)` 与 Gate / Decision 本地状态测试。optional `ApproverRequirement` / `ApprovalResponsibility` / `ResponsibilityChain` 创建和 `request_decision_by_ref(...)` 绑定从 commit-03-b/03-c 开始,不得为了 03-a 提前落 approval domain。commit-03-c 的 `OpenGovernanceGateFlow` 必须按 request 分支保存最终 gate:无 requirement 时最终为 `Open`;有 requirement 时同事务绑定 responsibility ref 后最终为 `PendingDecision`。`RecordGovernanceDecisionFlow` 只校验已处于 `PendingDecision` 的 gate,不得在 precheck 中执行 `Open -> PendingDecision`。
 
@@ -494,13 +495,19 @@ Commit boundary note: commit-03-a 只实现 `Gate::open(...)` 与 Gate / Decisio
   |   ApprovalResponsibility::require(new_approval_responsibility_id(), context, requirement)
   |   ResponsibilityChain::start_for_context(new_responsibility_chain_id(), context, requirement)
   |   responsibility optional assign based on ActorCapabilitySnapshot
+  |   responsibility_change_kind = "responsibility-assigned" when resulting responsibility state is Assigned, otherwise "responsibility-required"
   |   gate.request_decision_by_ref(responsibility.to_ref(), responsibility.context_ref, actor)
   v
 [Persistence]
   | approver_requirement_repo.save(requirement, uow) when created
   | save optional responsibility/chain
   | gate_repo.save(gate, None, uow) after optional pending-decision binding
-  | append trace/audit/outbox/stale/stored result
+  | append GateChanged trace/audit/outbox/stale for final gate
+  | when responsibility created:
+  |   append ApprovalResponsibilityChanged trace using the responsibility truth change source cursor
+  |   append ResponsibilityTraceRecord::from_responsibility_change(new_responsibility_trace_record_id(), responsibility, responsibility_change_kind, actor, responsibility_trace_ref, audit_required = true)
+  |   append ApprovalResponsibilityChanged audit/outbox/stale in the same UoW
+  | store command result after all accepted side effects are appended
   | tx commit
 ```
 
@@ -516,7 +523,7 @@ let gate = Gate::open(gate_id, &context, gate_kind, actor_ref)?;
 | port | 通过 | commit-03-a 只要求 context read、open gate lookup、gate save;optional responsibility/chain save 属于 commit-03-c |
 | version 来源 | 通过 | new gate/responsibility/chain save 使用 `None`;context version 只读校验 |
 | result 来源 | 通过 | `required_responsibility_ref` 来自同事务保存的 final gate;无 requirement 为 `None`,有 requirement 为 created responsibility ref |
-| 副作用 | 通过 | final gate truth 触发 `GateChanged`;optional responsibility 触发 approval side effect |
+| 副作用 | 通过 | final gate truth 触发 `GateChanged`;optional responsibility 触发 `ApprovalResponsibilityChanged`、`ResponsibilityTraceRecord`、approval audit/outbox/stale side effect |
 | 禁止事项 | 通过 | process waiting gate 不替代 Governance gate |
 
 #### 11.5 `RecordGovernanceDecisionFlow`

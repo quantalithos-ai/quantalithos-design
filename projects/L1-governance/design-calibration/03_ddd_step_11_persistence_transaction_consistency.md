@@ -319,6 +319,7 @@
 | `ReferenceSnapshotRepository.get_reference_state_with_version(reference_ref)` | 读取 tracked reference state 和 version | read-only;refresh success/failure update 必须使用返回 version | `Option<Versioned<ReferenceResolutionState>>` | repository failure |
 | `ReferenceSnapshotRepository.list_reference_states(scope, page)` | 按 refresh scope 列 tracked refs | read-only;stable page;returns `Versioned<T>` for per-item update | `Page<Versioned<ReferenceResolutionState>>` | repository failure |
 | `ReferenceSnapshotRepository.save_reference_state(state, expected_version, uow)` | 保存 reference resolution state | `None` create only when flow explicitly tracks new ref;`Some(version)` update existing | `ExternalGovernanceReferenceRef` | version conflict |
+| `ReferenceSnapshotRepository.get_actor_capability_snapshot(actor_ref)` | 按 actor ref 读取本地 body-free actor capability snapshot | read-only;query visibility / approval view / responsibility command 使用;不得触发 external resolver 或 identity refresh | `Option<ActorCapabilitySnapshot>` | repository failure |
 | `save_actor_capability_snapshot(snapshot, expected_version, uow)` | 保存 actor capability body-free snapshot | `None` create;`Some(version)` update;same UoW as reference state save when from consumer/refresh | `ActorCapabilitySnapshotRef` | version conflict |
 | `save_method_policy_snapshot(snapshot, expected_version, uow)` | 保存 method policy snapshot | same UoW as reference state;must persist `policy_ref` / `policy_version_ref` / `scope_ref` / `summary_ref` / `snapshot_state`;no method body | `MethodPolicySnapshotRef` | version conflict |
 | `save_method_control_snapshot(snapshot, expected_version, uow)` | 保存 method control snapshot | same UoW as reference state;no control body | `MethodControlSnapshotRef` | version conflict |
@@ -332,6 +333,13 @@
 | `ExplicitRefs(refs)` | 返回已存在 tracked refs;缺失 ref 由 job report 记录 failed/rejected item | existing state uses returned version;不得隐式创建 unknown state |
 | `UnhealthyReferences` | 返回 `Unresolved/Stale/Unavailable/Invalid` 或 Step 10 定义的不健康 state | per-item update with returned version |
 | `GovernanceScope(scope_ref)` | 通过 scope reference index 枚举关联 refs,再返回 tracked states | scope index 只能来自 Governance truth/snapshot metadata,不得扫描 sibling body |
+
+Actor capability snapshot read 语义:
+
+- `get_actor_capability_snapshot(actor_ref)` 只能读取已经由 `ConsumeIdentityActorCapabilityChangedFlow` 或 `RefreshExternalContextSnapshots` 保存的本地 body-free snapshot。
+- `None` 在 query visibility 中映射为 degraded / not-visible marker;在 responsibility command guard 中按对应 flow 映射为 rejected / degraded,不得默认放行。
+- `ReferenceResolutionState` 只表达 tracked external reference state,不能替代 `ActorCapabilitySnapshot` 传给 `ReadVisibilityPolicy`、`ApprovalResponsibilityPolicy` 或 `ApprovalResponsibilityView.actor_snapshot`。
+- query path 不得调用 `ExternalGovernanceSourceResolverPort.resolve_actor_capability(...)` 主动刷新 identity;刷新只属于 consumer / refresh job / command precheck 已声明路径。
 
 ### 8.8 Outbox repository / publisher persistence 语义
 

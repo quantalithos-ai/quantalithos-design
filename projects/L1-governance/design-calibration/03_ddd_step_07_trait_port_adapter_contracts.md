@@ -1178,6 +1178,11 @@ pub trait ReferenceSnapshotRepository {
         uow: &dyn GovernanceUnitOfWork,
     ) -> Result<ExternalGovernanceReferenceRef, ApplicationError>;
 
+    async fn get_actor_capability_snapshot(
+        &self,
+        actor_ref: ActorRef,
+    ) -> Result<Option<ActorCapabilitySnapshot>, ApplicationError>;
+
     async fn save_actor_capability_snapshot(&self, snapshot: ActorCapabilitySnapshot, expected_version: Option<GovernanceVersion>, uow: &dyn GovernanceUnitOfWork) -> Result<ActorCapabilitySnapshotRef, ApplicationError>;
     async fn save_method_policy_snapshot(&self, snapshot: MethodPolicySnapshot, expected_version: Option<GovernanceVersion>, uow: &dyn GovernanceUnitOfWork) -> Result<MethodPolicySnapshotRef, ApplicationError>;
     async fn save_method_control_snapshot(&self, snapshot: MethodControlSnapshot, expected_version: Option<GovernanceVersion>, uow: &dyn GovernanceUnitOfWork) -> Result<MethodControlSnapshotRef, ApplicationError>;
@@ -1192,6 +1197,7 @@ pub trait ReferenceSnapshotRepository {
 |---|---|
 | `get_reference_state_with_version` | refresh success/failure 的 expected_version 来源 |
 | `list_reference_states(scope, page)` | `RefreshExternalContextSnapshots` 不做全表猜测 |
+| `get_actor_capability_snapshot(actor_ref)` | query visibility、approval view 和 responsibility command 读取本地 body-free actor capability snapshot;缺失返回 `None` 并按 flow 映射为 degraded / rejected,不得调用 identity resolver 刷新 |
 | `save_*_snapshot` | consumer / refresh 只保存 body-free snapshot/ref |
 
 | `ExternalContextRefreshScope` branch | repository list rule | 禁止事项 |

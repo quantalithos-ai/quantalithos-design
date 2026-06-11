@@ -1601,8 +1601,9 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | operation_context.assert_query_no_write()
   | resolve GovernanceReadVisibilityResolution from request explicit scope, loaded view/report fields, or GovernanceReadVisibilityResolverPort
   | never derive scope/read subject from raw id strings, cursor, timestamp, or page token
-  | optional actor snapshot read through ReferenceSnapshotRepository when policy needs it
-  | visibility = resolution.policy_for_actor(actor).evaluate_*(resolution.read_subject_ref, actor_snapshot)
+  | optional reader_actor_snapshot = reference_repo.get_actor_capability_snapshot(actor) when policy/view needs it
+  | missing optional reader snapshot maps to degraded visibility marker;query must not call external resolver or refresh identity
+  | visibility = resolution.policy_for_actor(actor).evaluate_*(resolution.read_subject_ref, reader_actor_snapshot)
   | if !visibility.is_visible -> return response body None
   v
 [Read repositories]
@@ -1620,6 +1621,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | denied surface | 通过 | visibility marker carries not-visible;body empty |
 | degraded/freshness | 通过 | projection-backed reads attach view state,truth reads may attach reference degraded marker |
 | body boundary | 通过 | all views expose refs/state/surface only |
+| actor snapshot 来源 | 通过 | optional reader actor snapshot 来自 `ReferenceSnapshotRepository.get_actor_capability_snapshot(actor_ref)`;`ReferenceResolutionState` 不能替代 `ActorCapabilitySnapshot`;query 不调用 external resolver 刷新 identity |
 
 | Query family | `GovernanceReadVisibilityResolution` 正式来源 | 备注 |
 |---|---|---|
@@ -1729,9 +1731,11 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | validate responsibility_ref or context_ref
   | responsibility_v = responsibility_repo.get_with_version(ref) or list_by_context(context_ref, page).first_visible
   | chain_v = chain_repo.find_by_context(responsibility.context_ref)
-  | actor_snapshot = reference_repo.get_reference_state_with_version(actor external ref) when actor_ref exists and available
+  | reader_actor_snapshot = reference_repo.get_actor_capability_snapshot(actor) when visibility policy needs it
+  | assigned_actor_snapshot = reference_repo.get_actor_capability_snapshot(responsibility.actor_ref) when responsibility.actor_ref exists
   | resolution = responsibility_ref ? read_visibility_resolver.resolve_responsibility_read(responsibility_ref) : read_visibility_resolver.resolve_context_read(context_ref)
-  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
+  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, reader_actor_snapshot)
+  | missing assigned_actor_snapshot -> assemble view with actor_snapshot None + degraded marker;do not refresh identity
   | assemble ApprovalResponsibilityView
 ```
 
@@ -1742,6 +1746,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | write safety | 通过 | no snapshot refresh; stale snapshot only degraded |
 | body boundary | 通过 | actor profile/credential body excluded |
 | scope/read subject 来源 | 通过 | responsibility_ref 分支走 `resolve_responsibility_read`;context_ref 分支走 `resolve_context_read`;不得从 responsibility id 推导 scope |
+| actor snapshot 来源 | 通过 | reader snapshot 与 assigned actor snapshot 均来自 `get_actor_capability_snapshot(actor_ref)` typed read;missing assigned snapshot 只降级 view,不得用 `get_reference_state_with_version` 或 resolver 替代 |
 
 #### 14.6 `GetPolicyConflictFlow`
 

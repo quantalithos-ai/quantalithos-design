@@ -1599,7 +1599,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 [AuthorizedGovernanceQueryService]
   | build operation context with channel Query
   | operation_context.assert_query_no_write()
-  | resolve GovernanceReadVisibilityResolution from request explicit scope, loaded view/report fields, or GovernanceReadVisibilityResolverPort
+  | resolve GovernanceReadVisibilityResolution from request explicit scope, loaded view/report fields that are formally defined as resolution sources, or GovernanceReadVisibilityResolverPort
+  | context/input/responsibility truth queries use resolver-first;loaded truth fields are consistency-check/view-assembly inputs, not scope derivation shortcuts
   | never derive scope/read subject from raw id strings, cursor, timestamp, or page token
   | optional reader_actor_snapshot = reference_repo.get_actor_capability_snapshot(actor) when policy/view needs it
   | missing optional reader snapshot maps to degraded visibility marker;query must not call external resolver or refresh identity
@@ -1625,7 +1626,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 
 | Query family | `GovernanceReadVisibilityResolution` 正式来源 | 备注 |
 |---|---|---|
-| context/input/responsibility truth query | `GovernanceReadVisibilityResolverPort.resolve_*_read(...)`;loaded truth 字段只能作为 resolver input,不得拼 scope | request 通常只有 truth ref |
+| context/input/responsibility truth query | `GovernanceReadVisibilityResolverPort.resolve_*_read(...)`;loaded truth 字段只能作为 resolver input、一致性校验或 view assembly,不得生成 scope/read subject | request 通常只有 truth ref |
 | conflict/compliance truth query | query service 调用对应 `resolve_*_read(...)`;loaded truth 的 `scope_ref` / `context_ref` 只做一致性校验或 view assembly | AIIA / SoA union branch 保留 |
 | gate/decision query | gate_ref 分支走 `resolve_gate_read`,decision_ref / item 分支走 `resolve_decision_read` | 不从 gate / decision id 拼 scope |
 | projection-backed query | request 显式 `scope_ref` / `context_ref` / item ref 先走 resolver;loaded view 字段只能作为 body/freshness 来源 | stale view 不触发 rebuild |
@@ -1647,6 +1648,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | operation_context.assert_query_no_write()
   | context_v = context_repo.get_with_version(context_ref)
   | resolution = read_visibility_resolver.resolve_context_read(context_ref)
+  | resolution.assert_matches_loaded_context(context_v.value)
   | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | if denied -> body None
   | else assemble GovernanceContextView from loaded context + pending reference state
@@ -1658,7 +1660,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | context versioned read exists |
 | write safety | 通过 | no write port used |
 | visibility | 通过 | denied marker body-free |
-| scope/read subject 来源 | 通过 | `scope_ref` 和 `GovernanceReadSubjectRef` 来自 `resolve_context_read(context_ref)`;不得从 `context_id` 拼接 |
+| scope/read subject 来源 | 通过 | `scope_ref` 和 `GovernanceReadSubjectRef` 来自 `resolve_context_read(context_ref)`;loaded context 只做 `assert_matches_loaded_context(...)` 和 view assembly;不得从 `context_id` 或 loaded context 自行生成 resolution |
 
 #### 14.3 `GetGovernanceInputFlow`
 

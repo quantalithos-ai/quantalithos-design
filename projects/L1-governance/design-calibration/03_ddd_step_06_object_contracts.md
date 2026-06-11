@@ -6117,15 +6117,15 @@ pub struct GovernanceReadVisibilityResolution {
 
 | 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
-| `read_subject_ref` | `GovernanceReadSubjectRef` | `ReadVisibilityPolicy.evaluate_*` 的正式 subject 输入 | 来自 query request、loaded truth、view body、trace subject、report body 或 Step 7 `GovernanceReadVisibilityResolverPort`;不得由 implementation 拼接字符串 |
-| `scope_ref` | `GovernanceScopeRef` | `ReadVisibilityPolicy::for_actor(...)` 的正式 scope 输入 | 只能来自 request 显式字段、loaded truth/report/view 的 scope 字段,或 resolver summary;不得从裸 id、page cursor、trace cursor、timestamp 推断 |
-| `governed_subject_ref` | `Option<GovernedSubjectRef>` | subject-aware query 的 optional governed subject 输入 | context query 从 loaded `GovernanceContext.subject_ref` 复制;scope-only report/dashboard 可为 `None` |
+| `read_subject_ref` | `GovernanceReadSubjectRef` | `ReadVisibilityPolicy.evaluate_*` 的正式 subject 输入 | 来自 query request 显式字段、view/report/trace 已闭合字段或 Step 7 `GovernanceReadVisibilityResolverPort`;不得由 implementation 拼接字符串 |
+| `scope_ref` | `GovernanceScopeRef` | `ReadVisibilityPolicy::for_actor(...)` 的正式 scope 输入 | 只能来自 request 显式字段、view/report 已闭合 scope 字段,或 resolver summary;context/input/responsibility 等 request 不携带 scope 的 truth query 必须走 resolver,不得从 loaded truth 或裸 id 反推 |
+| `governed_subject_ref` | `Option<GovernedSubjectRef>` | subject-aware query 的 optional governed subject 输入 | context query 从 resolver summary 取得,loaded `GovernanceContext.subject_ref` 只用于一致性校验和 view assembly;scope-only report/dashboard 可为 `None` |
 | `resolution_source_ref` | `GovernanceReadVisibilityResolutionSourceRef` | 追溯本次解析依据 | body-free marker;用于实现 / fake / tests 断言解析路径,不得保存 query body 或 truth body |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn for_loaded_context(context: &GovernanceContext, source_ref: GovernanceReadVisibilityResolutionSourceRef) -> Result<Self, ApplicationError>` | 从 loaded context 形成读取可见性解析结果 | loaded context、解析来源 marker | `Result<GovernanceReadVisibilityResolution, ApplicationError>` | `scope_ref` 必须来自 context subject resolver summary 或正式 context-scope index,不得从 `context_id` 拼接 |
 | `pub fn from_resolver(read_subject_ref: GovernanceReadSubjectRef, scope_ref: GovernanceScopeRef, governed_subject_ref: Option<GovernedSubjectRef>, source_ref: GovernanceReadVisibilityResolutionSourceRef) -> Result<Self, ApplicationError>` | 从 Step 7 resolver summary 形成解析结果 | read subject、scope、optional governed subject、source marker | `Result<GovernanceReadVisibilityResolution, ApplicationError>` | 只做结构校验;不读取 repository |
+| `pub fn assert_matches_loaded_context(&self, context: &GovernanceContext) -> Result<(), ApplicationError>` | 校验 resolver 结果与 loaded context 一致 | 已解析 resolution、loaded context | `Result<(), ApplicationError>` | 只校验 `governed_subject_ref == Some(context.subject_ref)` 等 body-free 一致性;不得从 `context_id` 或 loaded context 生成 `scope_ref` / `read_subject_ref` |
 | `pub fn policy_for_actor(&self, actor_ref: ActorRef) -> Result<ReadVisibilityPolicy, DomainError>` | 构造 `ReadVisibilityPolicy` | actor | `Result<ReadVisibilityPolicy, DomainError>` | 调用 `ReadVisibilityPolicy::for_actor(actor_ref, self.scope_ref.clone(), self.governed_subject_ref.clone())` |
 
 ```rust
@@ -6136,7 +6136,8 @@ pub struct GovernanceReadVisibilityResolutionSourceRef(pub ExternalSourceRef);
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
 | resolution 是 application-local helper | 不进入 public query DTO,不作为 persisted truth |
-| 不从裸 id 推导 scope | context/input/responsibility/trace/report 查询若 request 未显式携带 scope,必须通过 loaded truth/report/view 字段或 Step 7 resolver summary 取得 |
+| resolver-first truth query | context/input/responsibility/trace/report 查询若 request 未显式携带 scope,必须先通过 Step 7 resolver summary 取得 `GovernanceReadVisibilityResolution`;loaded truth/report/view 字段只能用于一致性校验或 view assembly,除非对应 flow 明文定义为 resolution source |
+| 不从裸 id 推导 scope | 不得从 `context_id`、input id、responsibility id、trace subject 字符串、report id、page cursor、timestamp 或 adapter 私有索引推导 scope / read subject |
 | 不读取外部正文 | resolver summary 只能返回 typed refs、scope、subject 和 marker,不得返回 policy、artifact、work、runtime、trace body |
 | denied 前也要解析 | visibility denied path 仍必须有 `read_subject_ref` 和 `scope_ref`,以便返回 body-free marker |
 | fake runtime 必须同义实现 | in-memory fake 不得用不同规则拼 scope;必须按 port / loaded field 返回相同 resolution |

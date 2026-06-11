@@ -170,9 +170,9 @@ Digest v1 must use deterministic field ordering and stable enum variant names. `
 | `AssignApprovalResponsibility` | `CommandMetadata` key | actor scope、`context_ref`、`requirement_intent`、`actor_ref`、`chain_ref`、expected version when present | stored `ApprovalResponsibilityCommandResult` |
 | `RecordApprovalVote` | `CommandMetadata` key | actor scope、`responsibility_ref`、`vote`、`evidence_ref`、expected version when present | stored `ApprovalResponsibilityCommandResult` |
 | `DelegateApprovalResponsibility` | `CommandMetadata` key | actor scope、`responsibility_ref`、`delegate_actor_ref`、`delegation_reason`、expected version when present | stored `ApprovalResponsibilityCommandResult` |
-| `ActivatePolicyEffectiveFact` | `CommandMetadata` key | actor scope、`policy_snapshot` ref/state/digest fields、`scope_ref`、`priority`、`activation_intent` | stored `PolicyCommandResult` |
+| `ActivatePolicyEffectiveFact` | `CommandMetadata` key | actor scope、`policy_snapshot` ref/state/digest fields、`subject_ref`、`scope_ref`、`priority`、`activation_intent` | stored `PolicyCommandResult` |
 | `UpdatePolicyEffectiveFactState` | `CommandMetadata` key | actor scope、`policy_fact_ref`、`update_intent` including snapshot/reason/next ref、expected version when present | stored `PolicyCommandResult` |
-| `UpdateSharedRuleSet` | `CommandMetadata` key | actor scope、`rule_set_ref`、`scope_ref`、`update_intent` including rule/reason、expected version when present | stored `SharedRuleCommandResult` |
+| `UpdateSharedRuleSet` | `CommandMetadata` key | actor scope、`rule_set_ref`、`subject_ref`、`scope_ref`、`update_intent` including rule/reason、expected version when present | stored `SharedRuleCommandResult` |
 | `ResolvePolicyConflict` | `CommandMetadata` key | actor scope、`conflict_ref`、`resolution_intent` including gate/decision/reason、expected version when present | stored `PolicyConflictCommandResult` |
 | `AssessControlApplicability` | `CommandMetadata` key | actor scope、`context_ref`、`control_snapshot` ref/state/digest fields、`assessment_intent` | stored `ControlCommandResult` |
 | `RecordControlReview` | `CommandMetadata` key | actor scope、`review_ref`、`applicability_ref`、`review_intent` including reviewer/evidence/reason/decision/next ref、expected version when present | stored `ControlReviewCommandResult` |

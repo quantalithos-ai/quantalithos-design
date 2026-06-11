@@ -706,6 +706,8 @@ pub enum PolicyConflictResolutionIntent {
 pub struct ActivatePolicyEffectiveFactRequest {
     /// Method policy snapshot used to create the fact.
     pub policy_snapshot: MethodPolicySnapshot,
+    /// Governed subject whose policy scope is being evaluated.
+    pub subject_ref: GovernedSubjectRef,
     /// Governance scope where the fact applies.
     pub scope_ref: GovernanceScopeRef,
     /// Policy priority inside comparable scope.
@@ -726,6 +728,8 @@ pub struct UpdatePolicyEffectiveFactStateRequest {
 pub struct UpdateSharedRuleSetRequest {
     /// Existing rule set, when updating an existing set.
     pub rule_set_ref: Option<SharedRuleSetRef>,
+    /// Governed subject whose shared-rule scope is being evaluated.
+    pub subject_ref: GovernedSubjectRef,
     /// Scope required when drafting a new set.
     pub scope_ref: GovernanceScopeRef,
     /// Requested shared rule operation.
@@ -743,9 +747,9 @@ pub struct ResolvePolicyConflictRequest {
 
 | Request DTO | 字段来源 | 构造 / 调用目标 | 缺失字段处理 |
 |---|---|---|---|
-| `ActivatePolicyEffectiveFactRequest` | method snapshot resolver/consumer + caller scope/priority | `PolicyEffectiveFact::propose(new_id, snapshot, scope, priority, actor)` then optional `activate` | missing snapshot/scope/priority => rejected |
+| `ActivatePolicyEffectiveFactRequest` | method snapshot resolver/consumer + caller subject/scope/priority | `PolicyScopePolicy::for_subject(subject_ref, scope_ref)` precheck, then `PolicyEffectiveFact::propose(new_id, snapshot, scope, priority, actor)` and optional `activate` | missing snapshot/subject/scope/priority => rejected |
 | `UpdatePolicyEffectiveFactStateRequest` | caller body + loaded policy fact | `activate` / `suspend` / `supersede` / `retire` | state-specific reason/snapshot/next ref missing => impossible by enum shape |
-| `UpdateSharedRuleSetRequest` | caller body + loaded or new rule set | `SharedRuleSet::draft` then `activate` / `add_rule` / `deprecate_rule` / `retire` | missing scope for draft or missing existing set for non-draft => rejected |
+| `UpdateSharedRuleSetRequest` | caller body + loaded or new rule set + caller subject/scope | `PolicyScopePolicy::for_subject(subject_ref, scope_ref)` precheck, then `SharedRuleSet::draft` or `activate` / `add_rule` / `deprecate_rule` / `retire` | missing subject/scope for draft or missing existing set for non-draft => rejected |
 | `ResolvePolicyConflictRequest` | caller body + loaded conflict/gate/decision | `mark_pending_decision` / `resolve` / `waive` / `invalidate` | missing formal decision for resolve/waive impossible by enum shape |
 
 #### 8.9 Command route mapping for 8.1-b

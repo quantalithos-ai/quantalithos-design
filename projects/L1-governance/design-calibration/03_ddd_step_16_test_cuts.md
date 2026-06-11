@@ -163,6 +163,8 @@ Step 15 observability and audit
 
 ## 11. Query 接口测试切口汇总表
 
+所有 API query handler 测试必须断言 `GovernanceApiHandlerResult::query_surface(...)` 的 disposition 规则:visible 且非 degraded 的 query 返回 `Accepted` 且 `application_result_ref = None`;visibility denied 返回 `NotVisible`;存在 `is_degraded = true` 的 degraded marker 返回 `Degraded`;三类 query surface 均不得写 truth、trace、audit、outbox、stored result、projection 或 reference repair。
+
 | 测试切口 | 对应契约 | 验证内容 | 建议测试类型 |
 |---|---|---|---|
 | `GetGovernanceContext_query` | `GetGovernanceContextFlow` | context view hit;missing;not visible body-free surface;degraded reference;query no-write | query handler |

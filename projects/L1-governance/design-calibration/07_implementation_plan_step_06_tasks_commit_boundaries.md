@@ -548,14 +548,14 @@
 |---|---|---|---|---|---|
 | commit-05-a | query contracts + views + projection identity | Query response 必须与 view identity/status marker 同时闭合;本提交只落 `contracts` DTO / marker / pure helper,不得引用 domain truth 或 `ReadVisibilityPolicy` | BATCH-05-01~BATCH-05-03 | contract-domain-fast | service/handler/domain truth assembler/visibility policy |
 | commit-05-b | query ports + services + no-write guards | Query service 需要 read repositories、read visibility resolver、domain truth -> public view fields assembler、visibility/freshness/degraded decision 一起验证 | BATCH-05-04;BATCH-05-05 | query no-write;visibility tests | API/event/job |
-| commit-05-c | API query handlers + error mapping | Entry 层必须只调用 query service,不能直接访问 repository | BATCH-05-06 | API handler tests | consumers/outbox/jobs |
+| commit-05-c | API query handlers + error mapping | Entry 层必须只调用 query service,不能直接访问 repository;visible non-degraded query surface maps to `Accepted` with `application_result_ref = None` | BATCH-05-06 | API handler tests | consumers/outbox/jobs |
 
 #### PH-05 开工前设计闭环复核
 
 | 复核项 | 检查内容 | 结论 | 失败处理 |
 |---|---|---|---|
 | Query response 闭环 | 每个 query response/view/page/status marker 的字段、empty/missing/not visible/degraded/stale surface 有来源 | 开工前确认 | 回写 query/view schema |
-| Query status marker 来源闭环 | `NotAuthorized` / `NotVisible` / `Degraded` / stale marker 来自正式 decision/result | 开工前确认 | 补 visibility/freshness/degraded result schema |
+| Query status marker 来源闭环 | `NotAuthorized` / `NotVisible` / `Degraded` / stale marker 来自正式 decision/result;API handler visible non-degraded query maps to `Accepted`,not a separate query disposition | 开工前确认 | 补 visibility/freshness/degraded result schema |
 | public read-model identity | 每个 view ref/cursor/search item identity 有 schema、repository key、派生规则 | 开工前确认 | 补 public ref schema |
 | Projection stale/rebuild/read lookup 闭环 | 当前 read surface 的 stale state、freshness、rebuild source 和 query view_ref lookup 有 committed truth 或 projection index 来源 | 开工前确认 | 补 projection truth/source 或 index lookup read surface |
 | Ref-scope 解析闭环 | query subject/scope 到 context/input/decision/policy/NC 的 lookup path 和 visibility scope 已定义 | 开工前确认 | 补 resolver/repository |

@@ -986,13 +986,14 @@ Step 10 正式选择:所有 `GovernanceHandoffMarker.trace_refs` 必须非空,�
 [GovernanceApiHandlerResult]
   entry validation -> Accepted
   entry validation -> Rejected
+  query visible non-degraded -> Accepted
   query visibility -> NotVisible
   query degraded -> Degraded
 ```
 
 | 状态 | 作用 | 是否终态 | 允许的关键操作 |
 |---|---|---|---|
-| `Accepted` | handler 调用 application 并返回 result ref | result disposition | transport maps success |
+| `Accepted` | handler 调用 application 并返回 command result ref,或 query handler 返回 visible non-degraded surface | result disposition | transport maps success |
 | `Rejected` | pre-application validation rejected | result disposition | transport maps validation/error response |
 | `NotVisible` | query 被 visibility policy 隐藏 | result disposition | transport returns not-visible surface with marker |
 | `Degraded` | query 成功但结果 degraded | result disposition | transport returns degraded marker |
@@ -1001,6 +1002,7 @@ Step 10 正式选择:所有 `GovernanceHandoffMarker.trace_refs` 必须非空,�
 |---|---|---|---|---|---|---|---|
 | entry validation | `Accepted` | `GovernanceApiHandlerResult::accepted_command(...)` | API command handler -> command service | command metadata complete;application returned stored result ref | build result shell with application result ref | transport response only;no domain mutation in API layer | `ApiError::InvalidStateTransition` |
 | entry validation | `Rejected` | `GovernanceApiHandlerResult::rejected(...)` | API command/query validation | missing metadata/body forbidden/invalid route;redacted issue refs present | build rejected result;no application result | application service not called;no id generated for domain | `ApiError::InvalidStateTransition` |
+| query surface assembly | `Accepted` | `GovernanceApiHandlerResult::query_surface(...)` | query flows | visibility marker is visible;no degraded marker with `is_degraded = true`;query remains read-only | result disposition accepted;attach visibility marker;`application_result_ref = None` | transport returns visible query surface;no stored result,trace,audit,outbox,projection/reference repair | `ApiError::InvalidStateTransition` |
 | query visibility | `NotVisible` | query surface result assembly | query flows | visibility policy returns not-visible marker;query remains read-only | result disposition not visible;attach marker | transport returns not-visible;no projection/reference repair | `ApiError::InvalidStateTransition` |
 | query degraded | `Degraded` | query surface result assembly | query flows | query surface has degraded marker from stale/unavailable/reference/adapter | result disposition degraded;attach degraded marker | transport returns degraded;query no-write | `ApiError::InvalidStateTransition` |
 
@@ -1008,7 +1010,7 @@ Step 10 正式选择:所有 `GovernanceHandoffMarker.trace_refs` 必须非空,�
 |---|---|---|
 | enum 是否存在 | 通过 | `GovernanceApiHandlerDisposition` 已在 Step 6 定义 |
 | 状态名是否一致 | 通过 | `Accepted/Rejected/NotVisible/Degraded` 全部一致 |
-| 触发函数是否存在 | 通过 | handler result factories and query assembly exist |
+| 触发函数是否存在 | 通过 | `accepted_command(...)`,`rejected(...)` and `query_surface(...)` exist;query visible success maps to `Accepted` |
 | 前置条件是否闭合 | 通过 | metadata, result ref, visibility marker, degraded marker are formal |
 | 副作用是否闭合 | 通过 | API layer never writes domain truth except through application service |
 | 测试切口 | 通过 | not visible includes marker;rejected no application call;query no idempotency |

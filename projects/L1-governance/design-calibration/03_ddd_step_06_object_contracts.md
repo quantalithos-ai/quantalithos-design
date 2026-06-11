@@ -6837,7 +6837,7 @@ pub struct GovernanceQueryDtoName(pub String);
 
 /// Classifies handler completion before transport mapping.
 pub enum GovernanceApiHandlerDisposition {
-    /// Handler accepted the request and returned an application result surface.
+    /// Handler completed successfully and returned an application result or visible query surface.
     Accepted,
     /// Handler rejected the request before application execution.
     Rejected,
@@ -6855,7 +6855,7 @@ pub enum GovernanceApiHandlerDisposition {
 | `GovernanceApiEntryKind` | command / query entry 分类 | command 可写;query 必须只读 |
 | `GovernanceCommandDtoName` | command DTO 名称 | 必须与 Step 8 command DTO 名称一致;不定义字段 |
 | `GovernanceQueryDtoName` | query DTO 名称 | 必须与 Step 8 query DTO 名称一致;不定义字段 |
-| `GovernanceApiHandlerDisposition` | handler completion 分类 | 只用于 API error/result mapping;不表达 domain state |
+| `GovernanceApiHandlerDisposition` | handler completion 分类 | 只用于 API error/result mapping;不表达 domain state;`Accepted` 同时覆盖 accepted command result 和 visible non-degraded query surface |
 
 ##### `GovernanceApiCommandEntry`
 
@@ -6973,8 +6973,8 @@ pub struct GovernanceApiHandlerResult {
 |---|---|---|---|
 | `entry_kind` | `GovernanceApiEntryKind` | command / query | 来自 entry object |
 | `route_ref` | `GovernanceApiRouteRef` | handler route | 来自 entry object |
-| `disposition` | `GovernanceApiHandlerDisposition` | handler result 分类 | accepted / rejected / not visible / degraded |
-| `application_result_ref` | `Option<GovernanceApplicationResultRef>` | accepted command result ref | command accepted path 可为 `Some`;query 通常为 `None` |
+| `disposition` | `GovernanceApiHandlerDisposition` | handler result 分类 | accepted / rejected / not visible / degraded;query visible 且非 degraded 时为 `Accepted` |
+| `application_result_ref` | `Option<GovernanceApplicationResultRef>` | accepted command result ref | command accepted path 可为 `Some`;query 必须为 `None` |
 | `visibility` | `Option<GovernanceVisibilityMarker>` | query visibility marker | query response surface 传入;command 不使用 |
 | `degraded` | `Option<GovernanceDegradedMarker>` | query degraded marker | stale / unavailable / partial response 时存在 |
 | `validation_issue_refs` | `GovernanceApiValidationIssueRefSet` | pre-application rejected issues | accepted path 必须为空;不保存 request body |
@@ -6989,7 +6989,9 @@ pub struct GovernanceApiHandlerResult {
 |---|---|---|---|---|
 | `pub fn accepted_command(route_ref: GovernanceApiRouteRef, result_ref: GovernanceApplicationResultRef) -> Result<Self, ApiError>` | 构造 accepted command result shell | route、application result ref | `Result<GovernanceApiHandlerResult, ApiError>` | command handler accepted path |
 | `pub fn rejected(entry_kind: GovernanceApiEntryKind, route_ref: GovernanceApiRouteRef, issue_refs: GovernanceApiValidationIssueRefSet) -> Result<Self, ApiError>` | 构造 rejected handler result | entry kind、route、issues | `Result<GovernanceApiHandlerResult, ApiError>` | validation failure / missing metadata |
-| `pub fn query_surface(route_ref: GovernanceApiRouteRef, visibility: GovernanceVisibilityMarker, degraded: Option<GovernanceDegradedMarker>) -> Result<Self, ApiError>` | 构造 query surface result shell | route、visibility、optional degraded | `Result<GovernanceApiHandlerResult, ApiError>` | query handler response assembly |
+| `pub fn query_surface(route_ref: GovernanceApiRouteRef, visibility: GovernanceVisibilityMarker, degraded: Option<GovernanceDegradedMarker>) -> Result<Self, ApiError>` | 构造 query surface result shell | route、visibility、optional degraded | `Result<GovernanceApiHandlerResult, ApiError>` | query handler response assembly;disposition 按 `!visibility.is_visible => NotVisible`,否则 `degraded.is_some() && degraded.is_degraded => Degraded`,否则 `Accepted` |
+
+`query_surface(...)` 的 `Accepted` 只表示 API query handler 成功返回 visible non-degraded surface,不表示 command accepted truth mutation,也不允许生成 `application_result_ref`、idempotency stored result、trace / audit / outbox 或 projection write。
 
 ##### `GovernanceApiRouteRegistryState`
 

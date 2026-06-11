@@ -1213,6 +1213,14 @@ pub struct GetApprovalResponsibilityRequest {
 | `ListPendingGovernanceDecisionsRequest` | decision/projection page | `GovernancePageResponse<DecisionSummaryView>` | page missing => rejected |
 | `GetApprovalResponsibilityRequest` | responsibility repository + optional identity snapshot | `GovernanceQueryResponse<ApprovalResponsibilityView>` | both refs missing => rejected |
 
+| Request DTO | Visibility resolution source | 正式闭口 |
+|---|---|---|
+| `GetGovernanceContextRequest` | `GovernanceReadVisibilityResolverPort.resolve_context_read(context_ref)` | request 不新增 `scope_ref`;scope/read subject 不得从 `context_id` 拼接;loaded context 只用于组装 view 和校验 resolver 一致性 |
+| `GetGovernanceInputRequest` | `GovernanceReadVisibilityResolverPort.resolve_input_read(input_ref)` | input request 只有 `input_ref`;context / scope 必须由 resolver 或 loaded input -> context resolver 取得 |
+| `GetGateDecisionRequest` | gate_ref 分支走 `resolve_gate_read(gate_ref)` 取得 precheck surface;decision_ref 分支走 `resolve_decision_read(decision_ref)`;定位 current decision 后 item visibility 仍使用 `resolve_decision_read(decision_ref)` | gate/decision request 不新增 scope;不得从 gate id 或 decision id 推导 |
+| `ListPendingGovernanceDecisionsRequest` | scope_ref 分支走 `resolve_scope_read(scope_ref)`;context_ref 分支走 `resolve_context_read(context_ref)`;每个 `DecisionSummaryView.decision_ref` item 走 `resolve_decision_read(decision_ref)` | page item visibility 必须逐项 resolution;不得用 page cursor 或 projection cursor 当 scope |
+| `GetApprovalResponsibilityRequest` | responsibility_ref 分支走 `resolve_responsibility_read(responsibility_ref)`;context_ref 分支走 `resolve_context_read(context_ref)` | responsibility active lookup 前后都必须拿到正式 scope/read subject,不得从 responsibility id 推导 |
+
 #### 9.3 Query route mapping for 8.2-a
 
 | Route / RPC neutral entry | Request envelope | Response envelope | Write behavior |
@@ -1322,6 +1330,13 @@ pub struct GetNonconformityStatusRequest {
 | `GetControlCoverageRequest` | projection control coverage view | `GovernanceQueryResponse<ControlCoverageView>` | missing context => rejected;stale => freshness marker |
 | `GetComplianceConclusionRequest` | compliance conclusion repository | `GovernanceQueryResponse<ComplianceConclusionView>` | union branch must be preserved;missing => degraded marker |
 | `GetNonconformityStatusRequest` | projection status view or nonconformity summary | `GovernanceQueryResponse<NonconformityStatusView>` | missing nonconformity => degraded marker |
+
+| Request DTO | Visibility resolution source | 正式闭口 |
+|---|---|---|
+| `GetPolicyConflictRequest` | `GovernanceReadVisibilityResolverPort.resolve_policy_conflict_read(conflict_ref)` | `scope_ref` 来自 resolver summary;loaded `PolicyConflictRecord.scope_ref` 只用于一致性校验,不得由 query service 从 conflict id 推导 |
+| `GetControlCoverageRequest` | `GovernanceReadVisibilityResolverPort.resolve_context_read(context_ref)` | coverage query 的 scope/read subject 由 context 正式解析;projection view 只作为 body 来源 |
+| `GetComplianceConclusionRequest` | `GovernanceReadVisibilityResolverPort.resolve_compliance_conclusion_read(conclusion_ref)` | AIIA / SoA union branch 必须保留;scope/read subject 来自 conclusion 所属 context 的正式解析 |
+| `GetNonconformityStatusRequest` | `GovernanceReadVisibilityResolverPort.resolve_nonconformity_read(nonconformity_ref)` | nonconformity request 不携带 scope;scope/read subject 不得从 nonconformity id 推导 |
 
 #### 9.7 Query route mapping for 8.2-b
 
@@ -1436,6 +1451,13 @@ pub struct GetGovernanceReconciliationReportRequest {
 | `GetGovernanceTraceRequest` | `GovernanceTraceRepository.list_by_subject` | `GovernancePageResponse<GovernanceTraceRecordView>` | missing subject/page => rejected |
 | `GetGovernanceDashboardRequest` | dashboard projection | `GovernanceQueryResponse<GovernanceDashboardView>` | stale/missing projection => degraded marker |
 | `GetGovernanceReconciliationReportRequest` | report repository / latest report index | `GovernanceQueryResponse<GovernanceReconciliationReportView>` | both report and scope missing => rejected |
+
+| Request DTO | Visibility resolution source | 正式闭口 |
+|---|---|---|
+| `SearchGovernanceFactsRequest` | scope filter 走 `resolve_scope_read(scope_ref)`;read subject filter 走 `resolve_read_subject(read_subject_ref)`;每个 result item 走 `resolve_read_subject(item.read_subject_ref)` | search page 不得用 index cursor、highlight 或 fact id 推导 visibility scope |
+| `GetGovernanceDashboardRequest` | `GovernanceReadVisibilityResolverPort.resolve_scope_read(scope_ref)` | dashboard 是 scope-level read;read subject 由 resolver summary 取得 |
+| `GetGovernanceTraceRequest` | `GovernanceReadVisibilityResolverPort.resolve_trace_subject_read(subject_ref)` | trace query request 只有 `GovernanceTraceSubjectRef`;scope/read subject 必须由 resolver summary 取得,不得切分 trace subject 字符串 |
+| `GetGovernanceReconciliationReportRequest` | `scope_ref` 分支使用 `GovernanceReadVisibilityResolverPort.resolve_scope_read(scope_ref)`;`report_ref` 分支先 `report_repo.get(report_ref)`,再走 `resolve_reconciliation_report_read(report_ref)` 并校验 resolution.scope_ref 与 `report.scope_ref` 一致 | report query 不从 report id 推导 scope;loaded report scope 只作为一致性校验来源 |
 
 #### 9.11 Query route mapping for 8.2-c
 

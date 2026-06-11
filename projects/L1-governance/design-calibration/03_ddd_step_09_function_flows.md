@@ -1599,9 +1599,10 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 [AuthorizedGovernanceQueryService]
   | build operation context with channel Query
   | operation_context.assert_query_no_write()
-  | map request -> GovernanceReadSubjectRef + GovernanceScopeRef
+  | resolve GovernanceReadVisibilityResolution from request explicit scope, loaded view/report fields, or GovernanceReadVisibilityResolverPort
+  | never derive scope/read subject from raw id strings, cursor, timestamp, or page token
   | optional actor snapshot read through ReferenceSnapshotRepository when policy needs it
-  | visibility = ReadVisibilityPolicy::for_actor(actor, scope, subject).evaluate_*(...)
+  | visibility = resolution.policy_for_actor(actor).evaluate_*(resolution.read_subject_ref, actor_snapshot)
   | if !visibility.is_visible -> return response body None
   v
 [Read repositories]
@@ -1620,6 +1621,15 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | degraded/freshness | 通过 | projection-backed reads attach view state,truth reads may attach reference degraded marker |
 | body boundary | 通过 | all views expose refs/state/surface only |
 
+| Query family | `GovernanceReadVisibilityResolution` 正式来源 | 备注 |
+|---|---|---|
+| context/input/responsibility truth query | `GovernanceReadVisibilityResolverPort.resolve_*_read(...)`;loaded truth 字段只能作为 resolver input,不得拼 scope | request 通常只有 truth ref |
+| conflict/compliance truth query | query service 调用对应 `resolve_*_read(...)`;loaded truth 的 `scope_ref` / `context_ref` 只做一致性校验或 view assembly | AIIA / SoA union branch 保留 |
+| gate/decision query | gate_ref 分支走 `resolve_gate_read`,decision_ref / item 分支走 `resolve_decision_read` | 不从 gate / decision id 拼 scope |
+| projection-backed query | request 显式 `scope_ref` / `context_ref` / item ref 先走 resolver;loaded view 字段只能作为 body/freshness 来源 | stale view 不触发 rebuild |
+| trace query | `resolve_trace_subject_read(subject_ref)` | trace subject 字符串不得被实现切分 |
+| reconciliation report query | scope_ref 分支走 `resolve_scope_read`;report_ref 分支走 `resolve_reconciliation_report_read` 并校验 loaded report scope 一致 | report id 不可推导 scope |
+
 #### 14.2 `GetGovernanceContextFlow`
 
 | 项目 | 内容 |
@@ -1634,7 +1644,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 [QueryService]
   | operation_context.assert_query_no_write()
   | context_v = context_repo.get_with_version(context_ref)
-  | visibility = ReadVisibilityPolicy.evaluate_read_subject(context read subject, actor_snapshot)
+  | resolution = read_visibility_resolver.resolve_context_read(context_ref)
+  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | if denied -> body None
   | else assemble GovernanceContextView from loaded context + pending reference state
 ```
@@ -1645,6 +1656,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | context versioned read exists |
 | write safety | 通过 | no write port used |
 | visibility | 通过 | denied marker body-free |
+| scope/read subject 来源 | 通过 | `scope_ref` 和 `GovernanceReadSubjectRef` 来自 `resolve_context_read(context_ref)`;不得从 `context_id` 拼接 |
 
 #### 14.3 `GetGovernanceInputFlow`
 
@@ -1659,8 +1671,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 ```text
 [QueryService]
   | input_v = input_repo.get_with_version(input_ref)
-  | map input.context_ref -> read subject
-  | visibility = ReadVisibilityPolicy.evaluate_read_subject(...)
+  | resolution = read_visibility_resolver.resolve_input_read(input_ref)
+  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | if visible -> assemble GovernanceInputView from input
 ```
 
@@ -1670,6 +1682,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | input versioned read exists |
 | write safety | 通过 | no save/append/mark call |
 | body boundary | 通过 | evidence/source body excluded |
+| scope/read subject 来源 | 通过 | `scope_ref` 和 read subject 来自 `resolve_input_read(input_ref)`;loaded input.context_ref 只能作为 resolver input |
 
 #### 14.4 `GetGateDecisionFlow`
 
@@ -1686,7 +1699,9 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | validate exactly one of gate_ref / decision_ref
   | if gate_ref -> gate_v = gate_repo.get_with_version(gate_ref); decision_v = decision_repo.find_current_by_gate(gate_ref)
   | if decision_ref -> decision_v = decision_repo.get_with_version(decision_ref); gate_v = gate_repo.get_with_version(decision.gate_ref)
-  | visibility = ReadVisibilityPolicy.evaluate_can_read_decision(decision_ref, read_subject, actor_snapshot)
+  | resolution = decision_ref ? read_visibility_resolver.resolve_decision_read(decision_ref) : read_visibility_resolver.resolve_gate_read(gate_ref)
+  | if decision_v present -> decision_resolution = read_visibility_resolver.resolve_decision_read(decision_v.to_ref())
+  | visibility = decision_v present ? decision_resolution.policy_for_actor(actor).evaluate_can_read_decision(decision_v.to_ref(), decision_resolution.read_subject_ref, actor_snapshot) : resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | if visible -> assemble or load DecisionSummaryView
   | attach freshness from projection state when projection summary is used
 ```
@@ -1697,6 +1712,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | gate/decision reads and projection summary reads exist |
 | write safety | 通过 | query does not repair stale summary |
 | visibility | 通过 | decision denied returns marker body none |
+| scope/read subject 来源 | 通过 | gate_ref 分支走 `resolve_gate_read`;decision 或 current decision item 走 `resolve_decision_read`;不得从 gate/decision id 推导 |
 
 #### 14.5 `GetApprovalResponsibilityFlow`
 
@@ -1714,7 +1730,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | responsibility_v = responsibility_repo.get_with_version(ref) or list_by_context(context_ref, page).first_visible
   | chain_v = chain_repo.find_by_context(responsibility.context_ref)
   | actor_snapshot = reference_repo.get_reference_state_with_version(actor external ref) when actor_ref exists and available
-  | visibility = ReadVisibilityPolicy.evaluate_read_subject(...)
+  | resolution = responsibility_ref ? read_visibility_resolver.resolve_responsibility_read(responsibility_ref) : read_visibility_resolver.resolve_context_read(context_ref)
+  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | assemble ApprovalResponsibilityView
 ```
 
@@ -1724,6 +1741,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | responsibility list/get and chain find exist |
 | write safety | 通过 | no snapshot refresh; stale snapshot only degraded |
 | body boundary | 通过 | actor profile/credential body excluded |
+| scope/read subject 来源 | 通过 | responsibility_ref 分支走 `resolve_responsibility_read`;context_ref 分支走 `resolve_context_read`;不得从 responsibility id 推导 scope |
 
 #### 14.6 `GetPolicyConflictFlow`
 
@@ -1738,7 +1756,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 ```text
 [QueryService]
   | conflict_v = conflict_repo.get_with_version(conflict_ref)
-  | visibility = ReadVisibilityPolicy.evaluate_read_subject(conflict read subject, actor_snapshot)
+  | resolution = read_visibility_resolver.resolve_policy_conflict_read(conflict_ref)
+  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | if visible -> assemble PolicyConflictView from conflict
 ```
 
@@ -1748,6 +1767,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | conflict versioned read exists |
 | write safety | 通过 | conflict query does not resolve/invalidate conflict |
 | body boundary | 通过 | policy/rule body excluded |
+| scope/read subject 来源 | 通过 | `scope_ref` 可从 loaded `PolicyConflictRecord.scope_ref` 复制给 resolver,最终 resolution 来自 `resolve_policy_conflict_read(conflict_ref)` |
 
 #### 14.7 `GetComplianceConclusionFlow`
 
@@ -1764,7 +1784,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | match conclusion_ref:
   |   AIIA(ref) -> aiia_v = compliance_repo.get_aiia_with_version(ref)
   |   SoA(ref) -> soa_v = compliance_repo.get_soa_with_version(ref)
-  | visibility = ReadVisibilityPolicy.evaluate_can_read_compliance(conclusion_ref, read_subject, actor_snapshot)
+  | resolution = read_visibility_resolver.resolve_compliance_conclusion_read(conclusion_ref)
+  | visibility = resolution.policy_for_actor(actor).evaluate_can_read_compliance(conclusion_ref, resolution.read_subject_ref, actor_snapshot)
   | if visible -> assemble ComplianceConclusionView preserving union branch
 ```
 
@@ -1774,6 +1795,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | branch-specific versioned reads exist |
 | write safety | 通过 | query does not approve/revoke conclusion |
 | body boundary | 通过 | artifact/AIIA/SoA body excluded |
+| scope/read subject 来源 | 通过 | AIIA / SoA 所属 `context_ref` 只能作为 resolver input;`scope_ref` 和 read subject 来自 `resolve_compliance_conclusion_read(conclusion_ref)` |
 
 #### 14.8 9.2-a stop-review
 
@@ -1799,9 +1821,11 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 ```text
 [QueryService]
   | operation_context.assert_query_no_write()
+  | page_resolution = scope_ref ? read_visibility_resolver.resolve_scope_read(scope_ref) : context_ref ? read_visibility_resolver.resolve_context_read(context_ref) : None
   | views = projection_repo.list_pending_decision_summary_views(context_ref, scope_ref, page)
   | for each view:
-  |   visibility = ReadVisibilityPolicy.evaluate_can_read_decision(view.decision_ref, read_subject, actor_snapshot)
+  |   item_resolution = read_visibility_resolver.resolve_decision_read(view.decision_ref)
+  |   visibility = item_resolution.policy_for_actor(actor).evaluate_can_read_decision(view.decision_ref, item_resolution.read_subject_ref, actor_snapshot)
   |   if denied -> omit or redacted item per page policy
   | return page with GovernanceViewSurface
 ```
@@ -1812,6 +1836,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | Step 7 `list_pending_decision_summary_views` 已补 |
 | write safety | 通过 | stale projection does not trigger rebuild |
 | visibility | 通过 | item-level denied does not leak body |
+| scope/read subject 来源 | 通过 | page filter 走 scope/context resolver;每个 decision summary item 走 `resolve_decision_read(view.decision_ref)` |
 
 #### 15.2 `GetPolicyEffectiveViewFlow`
 
@@ -1828,7 +1853,9 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | map scope_ref -> stable PolicyEffectiveViewRef through projection index
   | view = projection_repo.get_policy_effective_view(view_ref)
   | state = projection_repo.get_state_with_version(view.view_ref)
-  | visibility = ReadVisibilityPolicy.evaluate_can_read_policy(..., read_subject, actor_snapshot)
+  | resolution = read_visibility_resolver.resolve_scope_read(scope_ref)
+  | for each policy_ref in view.policy_refs:
+  |   visibility = resolution.policy_for_actor(actor).evaluate_can_read_policy(policy_ref, resolution.read_subject_ref, actor_snapshot)
   | assemble surface with freshness from state
 ```
 
@@ -1838,6 +1865,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | `get_policy_effective_view` and state read exist |
 | write safety | 通过 | query does not rebuild stale policy view |
 | body boundary | 通过 | policy/rule body excluded |
+| scope/read subject 来源 | 通过 | `scope_ref` 来自 request,scope-level read subject 来自 `resolve_scope_read(scope_ref)` |
 
 #### 15.3 `GetControlCoverageFlow`
 
@@ -1854,7 +1882,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | map context_ref -> stable ControlCoverageViewRef through projection index
   | view = projection_repo.get_control_coverage_view(view_ref)
   | state = projection_repo.get_state_with_version(view.view_ref)
-  | visibility = ReadVisibilityPolicy.evaluate_read_subject(context read subject, actor_snapshot)
+  | resolution = read_visibility_resolver.resolve_context_read(context_ref)
+  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | assemble surface with freshness/degraded
 ```
 
@@ -1864,6 +1893,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | `get_control_coverage_view` exists |
 | write safety | 通过 | query does not plan review or assess control |
 | body boundary | 通过 | control/evidence/artifact body excluded |
+| scope/read subject 来源 | 通过 | `context_ref` 来自 request,scope/read subject 来自 `resolve_context_read(context_ref)` |
 
 #### 15.4 `GetNonconformityStatusFlow`
 
@@ -1880,7 +1910,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | map nonconformity_ref -> stable NonconformityStatusViewRef through projection index
   | view = projection_repo.get_nonconformity_status_view(view_ref)
   | state = projection_repo.get_state_with_version(view.view_ref)
-  | visibility = ReadVisibilityPolicy.evaluate_read_subject(nonconformity read subject, actor_snapshot)
+  | resolution = read_visibility_resolver.resolve_nonconformity_read(nonconformity_ref)
+  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | assemble view surface
 ```
 
@@ -1890,6 +1921,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | `get_nonconformity_status_view` exists |
 | write safety | 通过 | query cannot close/reopen nonconformity |
 | body boundary | 通过 | corrective work/evidence body excluded |
+| scope/read subject 来源 | 通过 | `scope_ref` 和 read subject 来自 `resolve_nonconformity_read(nonconformity_ref)`;不得从 nonconformity id 推导 |
 
 #### 15.5 `SearchGovernanceFactsFlow`
 
@@ -1903,9 +1935,12 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 
 ```text
 [QueryService]
+  | if scope_ref present -> scope_resolution = read_visibility_resolver.resolve_scope_read(scope_ref)
+  | if read_subject_ref present -> filter_resolution = read_visibility_resolver.resolve_read_subject(read_subject_ref)
   | search_page = projection_repo.search_governance_facts(scope_ref, fact_kind, read_subject_ref, page)
   | for each item:
-  |   visibility = ReadVisibilityPolicy.evaluate_read_subject(item.read_subject_ref, actor_snapshot)
+  |   item_resolution = read_visibility_resolver.resolve_read_subject(item.read_subject_ref)
+  |   visibility = item_resolution.policy_for_actor(actor).evaluate_read_subject(item.read_subject_ref, actor_snapshot)
   |   denied item omitted or body-free redacted per page policy
   | return GovernancePageResponse with page_info
 ```
@@ -1916,6 +1951,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | `search_governance_facts` exists |
 | write safety | 通过 | no index rebuild/refresh in query |
 | body boundary | 通过 | search item contains ref/kind/surface only |
+| scope/read subject 来源 | 通过 | search filter 和每个 item 的 `GovernanceReadSubjectRef` 都走 `resolve_read_subject`;scope filter 走 `resolve_scope_read` |
 
 #### 15.6 `GetGovernanceTraceFlow`
 
@@ -1929,10 +1965,11 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 
 ```text
 [QueryService]
+  | resolution = read_visibility_resolver.resolve_trace_subject_read(subject_ref)
   | traces = trace_repo.list_by_subject(subject_ref, page)
   | filter trace_kind in memory only if repository has no typed filter
   | for each trace:
-  |   visibility = ReadVisibilityPolicy.evaluate_can_read_trace(trace, actor_snapshot)
+  |   visibility = resolution.policy_for_actor(actor).evaluate_can_read_trace(trace, actor_snapshot)
   | assemble GovernanceTraceRecordView items
 ```
 
@@ -1942,6 +1979,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | `list_by_subject` exists |
 | write safety | 通过 | query does not append missing trace or repair audit |
 | body boundary | 通过 | trace view excludes command/event payload body |
+| scope/read subject 来源 | 通过 | `scope_ref` 和 read subject 来自 `resolve_trace_subject_read(subject_ref)`;不得从 `GovernanceTraceSubjectRef` 字符串切分 |
 
 #### 15.7 `GetGovernanceDashboardFlow`
 
@@ -1958,7 +1996,8 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | map scope_ref -> stable DerivedGovernanceViewRef for dashboard through projection index
   | view = projection_repo.get_dashboard_view(view_ref)
   | state = projection_repo.get_state_with_version(view.view_ref)
-  | visibility = ReadVisibilityPolicy.evaluate_read_subject(scope read subject, actor_snapshot)
+  | resolution = read_visibility_resolver.resolve_scope_read(scope_ref)
+  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | assemble dashboard response surface
 ```
 
@@ -1968,6 +2007,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | `get_dashboard_view` exists |
 | write safety | 通过 | query does not rebuild dashboard |
 | body boundary | 通过 | dashboard contains ref sets only |
+| scope/read subject 来源 | 通过 | `scope_ref` 来自 request;scope-level read subject 来自 `resolve_scope_read(scope_ref)` |
 
 #### 15.8 `GetGovernanceReconciliationReportFlow`
 
@@ -1982,9 +2022,9 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 ```text
 [QueryService]
   | validate one of report_ref or scope_ref
-  | if report_ref -> report = report_repo.get(report_ref)
-  | if scope_ref -> report = report_repo.find_latest_by_scope(scope_ref)
-  | visibility = ReadVisibilityPolicy.evaluate_read_subject(report read subject, actor_snapshot)
+  | if report_ref -> report = report_repo.get(report_ref); resolution = read_visibility_resolver.resolve_reconciliation_report_read(report_ref); assert resolution.scope_ref == report.scope_ref
+  | if scope_ref -> report = report_repo.find_latest_by_scope(scope_ref); resolution = read_visibility_resolver.resolve_scope_read(scope_ref)
+  | visibility = resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
   | if denied -> body None
   | else assemble GovernanceReconciliationReportView
 ```
@@ -1995,6 +2035,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | port | 通过 | Step 7 report repository get/latest read 已补 |
 | write safety | 通过 | query does not run reconciliation or save report |
 | body boundary | 通过 | not visible report body empty |
+| scope/read subject 来源 | 通过 | report_ref 分支走 `resolve_reconciliation_report_read(report_ref)` 并校验 loaded `GovernanceReconciliationReport.scope_ref`;scope_ref 分支走 `resolve_scope_read(scope_ref)`;不得从 report id 推导 |
 
 #### 15.9 9.2-b stop-review
 
@@ -2005,6 +2046,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 | read-only 是否闭合 | 通过 | no save/append/mark/rebuild/refresh |
 | degraded/freshness 是否闭合 | 通过 | projection-backed query 读取 view state 并组装 surface |
 | phase boundary | 通过 | 不把 query 当 maintenance job,不创建 truth/outbox/trace |
+| visibility resolution 是否闭合 | 通过 | trace/report scope 与 read subject 来源均由 Step 7 resolver 或 loaded report scope 字段闭合 |
 
 ---
 

@@ -2942,7 +2942,7 @@ pub struct GovernanceDegradedMarker {
 
 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|
-| `GovernanceReadSubjectRef` | `ReadVisibilityPolicy.evaluate_* -> GovernanceVisibilityMarker` 的 subject 输入 | 由 query request、view ref、truth ref 或 trace subject 映射;不保存正文 |
+| `GovernanceReadSubjectRef` | `ReadVisibilityPolicy.evaluate_* -> GovernanceVisibilityMarker` 的 subject 输入 | 由 query request、view ref、truth ref、trace subject 或 `GovernanceReadVisibilityResolution` 映射;不保存正文 |
 | `GovernanceVisibilityReason` | not visible / redacted 原因 | 非空;不得泄露被隐藏对象正文或敏感存在性细节 |
 | `GovernanceDegradedReason` | stale / failed / unavailable / missing trace 等降级原因 | 非空;来源于 projection、reference、trace 或 config surface |
 | `GovernanceVisibilityMarker` | query response 的可见性表面 | not visible 时 view body 必须为空或按 Step 8/10 定义 redacted |
@@ -5559,23 +5559,23 @@ pub struct DecisionSummaryView {
 | 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
 | `view_ref` | `DecisionSummaryViewRef` | decision summary view identity | projection builder / repository 生成;不替代 `GovernanceDecisionRef` |
-| `decision_ref` | `GovernanceDecisionRef` | 对应正式裁决 | 从 loaded `GovernanceDecision.to_ref()` 复制;不得指向 vote / report / runtime cache |
-| `gate_ref` | `GateRef` | 对应 Gate | 从 loaded `Gate.to_ref()` 或 decision `gate_ref` 复制;不得指向 process waiting gate |
+| `decision_ref` | `GovernanceDecisionRef` | 对应正式裁决 | 由 application query assembler 从 loaded decision truth 复制后以 typed ref 传入;`contracts` 不接收 `GovernanceDecision` |
+| `gate_ref` | `GateRef` | 对应 Gate | 由 application query assembler 从 loaded gate truth 或 decision gate ref 复制后以 typed ref 传入;`contracts` 不接收 `Gate` |
 | `summary_state` | `DecisionSummaryState` | 摘要可读性状态 | projection/query assembler 计算;`NotVisible` 只作为 query-scoped surface |
 | `surface` | `GovernanceViewSurface` | public query marker | visibility / freshness / degraded marker;不写状态 |
 | `source_cursor` | `GovernanceTruthCursor` | 组装摘要的 truth cursor | 来源于 accepted truth cursor、trace cursor 或 projection state |
-| `basis_ref` | `Option<EvidenceSummaryRef>` | 可见依据摘要 | 从 decision `basis_ref` 复制;只保存 evidence summary ref |
+| `basis_ref` | `Option<EvidenceSummaryRef>` | 可见依据摘要 | 由 application query assembler 从 decision basis 复制后传入;只保存 evidence summary ref |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `pub fn matches_decision(&self, decision_ref: &GovernanceDecisionRef) -> bool` | 判断是否属于指定 decision | decision ref | `bool` | 纯判断;比较 decision id |
 | `pub fn matches_gate(&self, gate_ref: &GateRef) -> bool` | 判断是否属于指定 gate | gate ref | `bool` | 纯判断;比较 gate id |
-| `pub fn is_visible_to(&self, policy: &ReadVisibilityPolicy, read_subject_ref: &GovernanceReadSubjectRef, actor_snapshot: Option<&ActorCapabilitySnapshot>) -> Result<GovernanceVisibilityMarker, DomainError>` | 判断 summary 是否可输出给 actor | visibility policy、mapped read subject、optional actor snapshot | `Result<GovernanceVisibilityMarker, DomainError>` | 调用 visibility guard;不改变 `summary_state` |
+| `pub fn visibility_marker(&self) -> &GovernanceVisibilityMarker` | 返回 view surface 中的 visibility marker | 无 | `&GovernanceVisibilityMarker` | 纯字段 helper;不调用 `ReadVisibilityPolicy`;不改变 `summary_state` |
 | `pub fn is_stale(&self) -> bool` | 判断 summary 是否过期 | 无 | `bool` | `summary_state == Stale` 或 surface freshness 非 fresh 时返回 true |
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn from_decision(view_ref: DecisionSummaryViewRef, decision: &GovernanceDecision, gate: &Gate, surface: GovernanceViewSurface, source_cursor: GovernanceTruthCursor) -> Result<Self, ContractError>` | 从已成立 decision 和 gate 构造摘要 | stable view ref、loaded decision、loaded gate、view surface、source cursor | `Result<DecisionSummaryView, ContractError>` | decision projection build / query assembly |
+| `pub fn from_fields(view_ref: DecisionSummaryViewRef, decision_ref: GovernanceDecisionRef, gate_ref: GateRef, summary_state: DecisionSummaryState, surface: GovernanceViewSurface, source_cursor: GovernanceTruthCursor, basis_ref: Option<EvidenceSummaryRef>) -> Result<Self, ContractError>` | 从已投影字段构造摘要 DTO | stable view ref、decision ref、gate ref、summary state、view surface、source cursor、optional basis ref | `Result<DecisionSummaryView, ContractError>` | commit-05-a contract DTO / projection identity tests;domain truth 到字段的组装由 commit-05-b query assembler 执行 |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
@@ -5585,11 +5585,13 @@ pub struct DecisionSummaryView {
 | NotVisible 不持久化为 truth | `summary_state = NotVisible` 是 query scoped surface,不得写回 decision 或 gate |
 | 不生成 downstream work | summary 可供消费,但不能创建 work、process signal、artifact 或 outbox |
 | stale 需要 surface | stale / unavailable summary 必须通过 `GovernanceViewSurface` 暴露 freshness / degraded marker |
+| `contracts` 不引用 domain / visibility policy | 本 view 位于 `governance-contracts`;不得接收 `GovernanceDecision`、`Gate` 或 `ReadVisibilityPolicy`;这些组装与可见性判断属于 application query assembler / query service |
 
 | 与 HLD 骨架的收口差异 | 原因 |
 |---|---|
 | factory 增加 `view_ref`、`surface`、`source_cursor` 入参 | view 字段必填,不能从 decision / gate 隐式推导 |
-| `is_visible_to(...)` 返回 `GovernanceVisibilityMarker` | 与 `ReadVisibilityPolicy` 收口一致,denied 不是普通错误 |
+| `is_visible_to(...)` 移出 `contracts` view | `ReadVisibilityPolicy` 属于 domain/query visibility surface,并在 commit-05-b query assembler / service 中调用;commit-05-a 只落 DTO 和纯字段 helper |
+| `from_decision(...)` 改为 `from_fields(...)` | `contracts` 不能依赖 domain truth;loaded decision / gate 到 refs 的复制由 application query assembler 完成 |
 | 增加 `basis_ref` | HLD 禁止 evidence body,但 summary 需要可追溯依据引用;只保存 body-free ref |
 
 #### 15.3 `PolicyEffectiveView`
@@ -5741,13 +5743,13 @@ pub struct NonconformityStatusView {
 | 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
 | `view_ref` | `NonconformityStatusViewRef` | nonconformity status view identity | projection builder / repository 生成;不替代 nonconformity truth |
-| `nonconformity_ref` | `NonconformityRef` | 对应正式不符合记录 | 从 loaded `NonconformityRecord.to_ref()` 复制;不得使用 bug / alert / work blocker id |
+| `nonconformity_ref` | `NonconformityRef` | 对应正式不符合记录 | 由 application query assembler 从 loaded nonconformity truth 复制后以 typed ref 传入;`contracts` 不接收 `NonconformityRecord` |
 | `status_state` | `NonconformityStatusViewState` | public 摘要状态 | projection / query assembler 计算;不得替代 `NonconformityState` |
 | `freshness_state` | `DerivedGovernanceViewFreshnessState` | projection freshness | 从 view state / query assembler 传入 |
 | `surface` | `GovernanceViewSurface` | public query marker | visibility / freshness / degraded marker;不写状态 |
 | `source_cursor` | `GovernanceTruthCursor` | 组装视图的 truth cursor | 来源于 projection state、trace cursor 或 accepted truth cursor |
-| `active_action_ref` | `Option<CorrectiveActionRef>` | 当前纠正动作引用 | 从 nonconformity truth 的 `active_action_ref` 或 action projection source 复制;不保存 Work truth |
-| `verification_ref` | `Option<VerificationResultRef>` | 关闭或复验结果引用 | 从 nonconformity truth 的 `closure_verification_ref` 或 verification projection source 复制 |
+| `active_action_ref` | `Option<CorrectiveActionRef>` | 当前纠正动作引用 | 由 application query assembler 从 nonconformity truth 或 action projection source 复制后传入;不保存 Work truth |
+| `verification_ref` | `Option<VerificationResultRef>` | 关闭或复验结果引用 | 由 application query assembler 从 nonconformity truth 或 verification projection source 复制后传入 |
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
@@ -5758,7 +5760,7 @@ pub struct NonconformityStatusView {
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn from_nonconformity(view_ref: NonconformityStatusViewRef, record: &NonconformityRecord, status_state: NonconformityStatusViewState, surface: GovernanceViewSurface, freshness_state: DerivedGovernanceViewFreshnessState, source_cursor: GovernanceTruthCursor) -> Result<Self, ContractError>` | 从 loaded nonconformity truth 构造 status view | stable view ref、loaded nonconformity、status summary、surface、freshness、cursor | `Result<NonconformityStatusView, ContractError>` | nonconformity projection build / query assembly |
+| `pub fn from_fields(view_ref: NonconformityStatusViewRef, nonconformity_ref: NonconformityRef, status_state: NonconformityStatusViewState, surface: GovernanceViewSurface, freshness_state: DerivedGovernanceViewFreshnessState, source_cursor: GovernanceTruthCursor, active_action_ref: Option<CorrectiveActionRef>, verification_ref: Option<VerificationResultRef>) -> Result<Self, ContractError>` | 从已投影字段构造 status view DTO | stable view ref、nonconformity ref、status summary、surface、freshness、cursor、optional action / verification refs | `Result<NonconformityStatusView, ContractError>` | commit-05-a contract DTO / projection identity tests;domain truth 到字段的组装由 commit-05-b query assembler 执行 |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
@@ -5767,11 +5769,13 @@ pub struct NonconformityStatusView {
 | status state 不替代 truth state | `NonconformityStatusViewState` 是 public summary newtype,不得驱动 closure flow |
 | 不保存 evidence / work body | verification evidence、corrective work、artifact body 和 runtime log 不进入 view |
 | stale 需要 surface | stale / failed / unavailable 必须通过 freshness / degraded marker 暴露 |
+| `contracts` 不引用 domain truth | 本 view 位于 `governance-contracts`;不得接收 `NonconformityRecord`;loaded truth 到 public fields 的复制属于 application query assembler / query service |
 
 | 与 HLD 骨架的收口差异 | 原因 |
 |---|---|
 | factory 增加 `view_ref`、`status_state`、`surface`、`freshness_state`、`source_cursor` | view 字段必填且 query marker 不能隐式推导 |
 | 增加 `active_action_ref` / `verification_ref` | HLD 责任包含纠正和复验摘要;必须用 body-free refs 承载 |
+| `from_nonconformity(...)` 改为 `from_fields(...)` | `contracts` 不能依赖 domain truth;loaded nonconformity 到 refs / summary state 的复制由 application query assembler 完成 |
 | `is_open()` 不读取 repository | contracts view 只能基于自身字段判断;truth 展开由 query flow 负责 |
 
 #### 15.6 `GovernanceReconciliationReport`
@@ -6096,6 +6100,46 @@ pub struct StoredGovernanceOperationResult {
 | `pub fn from_surface(result_ref: GovernanceApplicationResultRef, result_kind: GovernanceStoredResultKind, surface_ref: GovernanceStoredResultSurfaceRef, core_trace_id: TraceId) -> Result<Self, ApplicationError>` | 建立 stored result shell | result ref、kind、surface ref、core trace id | `Result<StoredGovernanceOperationResult, ApplicationError>` | command accepted result、command rejected result、consumer receipt、job report save path |
 
 ##### `GovernanceReadVisibilityDecision`
+
+```rust
+/// Application-local resolution required before invoking ReadVisibilityPolicy.
+pub struct GovernanceReadVisibilityResolution {
+    /// Canonical read subject evaluated by visibility policy.
+    pub read_subject_ref: GovernanceReadSubjectRef,
+    /// Scope in which the read is evaluated.
+    pub scope_ref: GovernanceScopeRef,
+    /// Optional governed subject when the query targets a governed subject.
+    pub governed_subject_ref: Option<GovernedSubjectRef>,
+    /// Source that produced this resolution.
+    pub resolution_source_ref: GovernanceReadVisibilityResolutionSourceRef,
+}
+```
+
+| 字段 | 类型 | 作用 | 约束 / 来源 |
+|---|---|---|---|
+| `read_subject_ref` | `GovernanceReadSubjectRef` | `ReadVisibilityPolicy.evaluate_*` 的正式 subject 输入 | 来自 query request、loaded truth、view body、trace subject、report body 或 Step 7 `GovernanceReadVisibilityResolverPort`;不得由 implementation 拼接字符串 |
+| `scope_ref` | `GovernanceScopeRef` | `ReadVisibilityPolicy::for_actor(...)` 的正式 scope 输入 | 只能来自 request 显式字段、loaded truth/report/view 的 scope 字段,或 resolver summary;不得从裸 id、page cursor、trace cursor、timestamp 推断 |
+| `governed_subject_ref` | `Option<GovernedSubjectRef>` | subject-aware query 的 optional governed subject 输入 | context query 从 loaded `GovernanceContext.subject_ref` 复制;scope-only report/dashboard 可为 `None` |
+| `resolution_source_ref` | `GovernanceReadVisibilityResolutionSourceRef` | 追溯本次解析依据 | body-free marker;用于实现 / fake / tests 断言解析路径,不得保存 query body 或 truth body |
+
+| 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
+|---|---|---|---|---|
+| `pub fn for_loaded_context(context: &GovernanceContext, source_ref: GovernanceReadVisibilityResolutionSourceRef) -> Result<Self, ApplicationError>` | 从 loaded context 形成读取可见性解析结果 | loaded context、解析来源 marker | `Result<GovernanceReadVisibilityResolution, ApplicationError>` | `scope_ref` 必须来自 context subject resolver summary 或正式 context-scope index,不得从 `context_id` 拼接 |
+| `pub fn from_resolver(read_subject_ref: GovernanceReadSubjectRef, scope_ref: GovernanceScopeRef, governed_subject_ref: Option<GovernedSubjectRef>, source_ref: GovernanceReadVisibilityResolutionSourceRef) -> Result<Self, ApplicationError>` | 从 Step 7 resolver summary 形成解析结果 | read subject、scope、optional governed subject、source marker | `Result<GovernanceReadVisibilityResolution, ApplicationError>` | 只做结构校验;不读取 repository |
+| `pub fn policy_for_actor(&self, actor_ref: ActorRef) -> Result<ReadVisibilityPolicy, DomainError>` | 构造 `ReadVisibilityPolicy` | actor | `Result<ReadVisibilityPolicy, DomainError>` | 调用 `ReadVisibilityPolicy::for_actor(actor_ref, self.scope_ref.clone(), self.governed_subject_ref.clone())` |
+
+```rust
+/// Body-free marker for how a read visibility resolution was obtained.
+pub struct GovernanceReadVisibilityResolutionSourceRef(pub ExternalSourceRef);
+```
+
+| 不变量 / 禁止事项 | 说明 |
+|---|---|
+| resolution 是 application-local helper | 不进入 public query DTO,不作为 persisted truth |
+| 不从裸 id 推导 scope | context/input/responsibility/trace/report 查询若 request 未显式携带 scope,必须通过 loaded truth/report/view 字段或 Step 7 resolver summary 取得 |
+| 不读取外部正文 | resolver summary 只能返回 typed refs、scope、subject 和 marker,不得返回 policy、artifact、work、runtime、trace body |
+| denied 前也要解析 | visibility denied path 仍必须有 `read_subject_ref` 和 `scope_ref`,以便返回 body-free marker |
+| fake runtime 必须同义实现 | in-memory fake 不得用不同规则拼 scope;必须按 port / loaded field 返回相同 resolution |
 
 ```rust
 /// Application-local visibility decision produced for a read subject.

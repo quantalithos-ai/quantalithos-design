@@ -1066,6 +1066,95 @@ pub trait GovernanceReconciliationReportRepository {
 | `find_latest_by_scope` | `GetGovernanceReconciliationReport(scope_ref)` 不得临时扫描或猜 latest |
 | `save` | reconciliation job 保存 report,query 只读 report |
 
+#### 10.2.2 Read visibility resolution resolver
+
+```rust
+/// Resolves read subject and scope before public query visibility policy is invoked.
+pub trait GovernanceReadVisibilityResolverPort {
+    async fn resolve_read_subject(
+        &self,
+        read_subject_ref: GovernanceReadSubjectRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_scope_read(
+        &self,
+        scope_ref: GovernanceScopeRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_context_read(
+        &self,
+        context_ref: GovernanceContextRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_input_read(
+        &self,
+        input_ref: GovernanceInputRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_gate_read(
+        &self,
+        gate_ref: GateRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_decision_read(
+        &self,
+        decision_ref: GovernanceDecisionRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_responsibility_read(
+        &self,
+        responsibility_ref: ApprovalResponsibilityRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_policy_conflict_read(
+        &self,
+        conflict_ref: PolicyConflictRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_compliance_conclusion_read(
+        &self,
+        conclusion_ref: ComplianceConclusionRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_nonconformity_read(
+        &self,
+        nonconformity_ref: NonconformityRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_trace_subject_read(
+        &self,
+        subject_ref: GovernanceTraceSubjectRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+
+    async fn resolve_reconciliation_report_read(
+        &self,
+        report_ref: GovernanceReconciliationReportRef,
+    ) -> Result<Option<GovernanceReadVisibilityResolution>, ApplicationError>;
+}
+```
+
+| 函数 | 闭合点 |
+|---|---|
+| `resolve_read_subject` | `SearchGovernanceFacts` item-level visibility 在只有 `GovernanceReadSubjectRef` 时取得 scope;不得从 read subject string 切分 |
+| `resolve_scope_read` | `GetGovernanceDashboard`、`GetGovernanceReconciliationReport(scope_ref)`、scope-filtered projection / search query 取得 scope-level read subject;不得从 scope string 拼 subject |
+| `resolve_context_read` | `GetGovernanceContext` 在 request 只有 `context_ref` 时取得 `GovernanceReadSubjectRef` + `GovernanceScopeRef`;实现不得从 `context_id` 拼 scope |
+| `resolve_input_read` | `GetGovernanceInput` 在 request 只有 `input_ref` 时取得 input 所属 context / subject / scope 的正式读取解析 |
+| `resolve_gate_read` | `GetGateDecision(gate_ref)` 在 decision 尚未定位或缺失时仍可形成 body-free visibility/degraded surface |
+| `resolve_decision_read` | `GetGateDecision(decision_ref)`、`ListPendingGovernanceDecisions` item-level visibility 取得正式 decision read subject / scope |
+| `resolve_responsibility_read` | `GetApprovalResponsibility(responsibility_ref)` 取得 responsibility 所属 context / subject / scope;context_ref 分支可先按 context resolver 解析 |
+| `resolve_policy_conflict_read` | `GetPolicyConflict` 取得 conflict scope 和 read subject;可基于 loaded `PolicyConflictRecord.scope_ref` 与正式 subject index,不得解析 conflict id |
+| `resolve_compliance_conclusion_read` | `GetComplianceConclusion` 取得 AIIA / SoA 所属 context / subject / scope,union branch 必须保留 |
+| `resolve_nonconformity_read` | `GetNonconformityStatus(nonconformity_ref)` 取得 nonconformity 所属 context / subject / scope;不得从 nonconformity id 推导 |
+| `resolve_trace_subject_read` | `GetGovernanceTrace` 从 trace subject 取得 read subject 与 scope;不得从 trace subject 字符串切分或用 trace cursor 代替 scope |
+| `resolve_reconciliation_report_read` | `GetGovernanceReconciliationReport(report_ref)` 在 request 未提供 scope 时取得 report 的 scope/read subject;resolver 必须保证返回的 `scope_ref` 与 loaded report 的 `scope_ref` 一致,query service 不从 report id 或 report body自行推导 |
+
+| 约束 | 说明 |
+|---|---|
+| resolver 返回 body-free summary | 只返回 `GovernanceReadVisibilityResolution`;不得返回 query body、truth body、artifact / work / runtime / policy body |
+| request 显式 scope 优先但仍需 subject | 当 request 已携带 `scope_ref` 时,query service 可以直接使用该 scope,但 `read_subject_ref` 仍必须来自 request/view item 或 resolver summary |
+| missing resolution 不是 visible | `None` 必须映射为 body-free degraded / not-visible surface 或 rejected malformed query,不得默认放行 |
+| fake 与 durable 同规则 | in-memory fake 必须使用同一 typed ref / scope relation,不得使用字符串拼接捷径 |
+
 #### 10.3 Reference snapshot repository
 
 ```rust

@@ -538,16 +538,16 @@
 
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
-| commit-05-a | query/view DTO、projection identity/state、trace read helper tests 通过后 | query shared types、14 query DTO、view DTO、projection state、trace read helper | query services、API handlers、consumer stale marker | contract-domain-fast query/view slice;`cargo check`;`git diff --check` |
-| commit-05-b | query ports/services、visibility/freshness/degraded/no-write tests 通过后 | query repositories, projection store, read visibility decision, 14 query services | API handlers、event consumers、jobs | query no-write;projection/visibility tests;`cargo check`;`git diff --check` |
+| commit-05-a | query/view DTO、projection identity/state、trace read helper tests 通过后 | query shared types、14 query DTO、view DTO、projection state、trace read helper;view DTO 只能包含 fields、typed refs、surface marker 和纯字段 helper | query services、API handlers、consumer stale marker、`ReadVisibilityPolicy` 调用、domain truth 到 view 的 assembler、任何 `contracts -> domain` 依赖 | contract-domain-fast query/view slice;`cargo check`;`git diff --check` |
+| commit-05-b | query ports/services、visibility/freshness/degraded/no-write tests 通过后 | query repositories, projection store, read visibility resolver port, read visibility decision, domain truth 到 public view fields 的 query assembler, 14 query services | API handlers、event consumers、jobs | query no-write;projection/visibility tests;`cargo check`;`git diff --check` |
 | commit-05-c | API query handlers and response mapping tests 通过后 | API query handlers、search/dashboard/reconciliation read entry、error mapping | inbound consumers/outbox/jobs | API query handler tests;query no-write regression;`git diff --check` |
 
 #### Commit boundary 子功能分组
 
 | Commit boundary | 子功能分组 | 必须同提交的原因 | 涉及批次 | 验证门禁 | 不包含 |
 |---|---|---|---|---|---|
-| commit-05-a | query contracts + views + projection identity | Query response 必须与 view identity/status marker 同时闭合 | BATCH-05-01~BATCH-05-03 | contract-domain-fast | service/handler |
-| commit-05-b | query ports + services + no-write guards | Query service 需要 read repositories、visibility/freshness/degraded decision 一起验证 | BATCH-05-04;BATCH-05-05 | query no-write;visibility tests | API/event/job |
+| commit-05-a | query contracts + views + projection identity | Query response 必须与 view identity/status marker 同时闭合;本提交只落 `contracts` DTO / marker / pure helper,不得引用 domain truth 或 `ReadVisibilityPolicy` | BATCH-05-01~BATCH-05-03 | contract-domain-fast | service/handler/domain truth assembler/visibility policy |
+| commit-05-b | query ports + services + no-write guards | Query service 需要 read repositories、read visibility resolver、domain truth -> public view fields assembler、visibility/freshness/degraded decision 一起验证 | BATCH-05-04;BATCH-05-05 | query no-write;visibility tests | API/event/job |
 | commit-05-c | API query handlers + error mapping | Entry 层必须只调用 query service,不能直接访问 repository | BATCH-05-06 | API handler tests | consumers/outbox/jobs |
 
 #### PH-05 开工前设计闭环复核
@@ -569,6 +569,16 @@
 | commit-05-a | query/view/projection identity | Query response闭环;Query status marker来源闭环;public read-model identity;phase boundary | idempotency/outbox/job 不适用,本 boundary 不写 mutation | `03` Step 6/8/10 | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
 | commit-05-b | query service/read ports/visibility | Query response闭环;Ref-scope解析闭环;Sidecar truth读取面;Projection stale闭环;validation truth | command idempotency/job 不适用 | `03` Step 7/9/11 | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
 | commit-05-c | API query entry | Query response闭环;phase boundary;path baseline | outbox/job 不适用 | `03` Step 8/9;API layout | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
+
+#### PH-05 commit-05-a / commit-05-b crate 依赖闭口
+
+| 闭口项 | 正式口径 | 影响 |
+|---|---|---|
+| `contracts` view DTO factory | commit-05-a 只允许 `from_fields(...)` / field validation / pure helper;不得接收 `GovernanceDecision`、`Gate`、`NonconformityRecord` 等 domain truth | 避免 `contracts -> domain` 依赖环 |
+| `ReadVisibilityPolicy` 调用位置 | `ReadVisibilityPolicy` 属于 commit-05-b query service / read visibility decision surface;commit-05-a view DTO 不调用该 policy | 避免 commit-05-a 提前拉入 05-b surface |
+| `GovernanceReadVisibilityResolverPort` | commit-05-b 必须落 application port + fake/durable 等价语义,用于把 query request / loaded truth / view / report 映射为 `GovernanceReadVisibilityResolution` | 实现者不得在 query service 中从 context/input/conflict/report id 字符串自行推导 scope/read subject |
+| domain truth -> view fields assembler | 由 commit-05-b application query assembler / query service 从 repository-loaded truth 复制 typed refs、status marker、basis / action / verification refs 后调用 `contracts` view `from_fields(...)` | 保持 crate 方向 `domain -> contracts`,不反转依赖 |
+| not visible / degraded / freshness marker | commit-05-a 只定义 marker fields 和 response surface;marker 的判定来源由 commit-05-b query ports / visibility / freshness decision 闭合 | 实现者不得在 DTO 层自行判断权限或 freshness |
 
 #### PH-05 提交粒度判断
 

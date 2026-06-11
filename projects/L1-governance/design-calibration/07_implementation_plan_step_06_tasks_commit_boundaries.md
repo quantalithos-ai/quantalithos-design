@@ -437,7 +437,7 @@
 | IMPL-04-02 | 2 | 编写 ControlApplicability / ControlReview contracts、domain、tests | `03` control object/protocol/state | control DTO/domain | contract-domain-fast control slice |
 | IMPL-04-03 | 3 | 编写 AIIAConclusion / SoAConclusion / Compliance approval contracts、domain、tests | `03` compliance object/protocol/state | compliance DTO/domain | contract-domain-fast compliance slice |
 | IMPL-04-04 | 4 | 编写 Nonconformity / CorrectiveAction / VerificationResult contracts、domain、tests | `03` NC object/protocol/state | NC / CA / verification DTO/domain | contract-domain-fast NC slice |
-| IMPL-04-05 | 5 | 编写 policy/control/compliance/NC application services、repos、handlers、redaction targeted tests | `03` flows/ports/persistence;`05` redaction | services、fake repos、handlers、tests | service-flow-fast + redaction targeted |
+| IMPL-04-05 | 5 | 先补 PH-04 已闭合前置 surface,再编写 policy/control/compliance/NC application services、repos、handlers、redaction targeted tests | `03` Step 6/7/8/9/11/13 flows/ports/persistence/idempotency;`05` redaction | PH-04 id generator、subject mapper、repo traits、history records、outbox payloads、stored result variants、services、fake repos、handlers、tests | service-flow-fast + redaction targeted |
 
 #### 代码实现批次
 
@@ -447,7 +447,10 @@
 | BATCH-04-02 | control applicability/review contracts+domain | `03` Step 6/8/10 | DTO、domain、state tests | 200~400 行 | contract-domain-fast | commit-04-b |
 | BATCH-04-03 | compliance conclusion contracts+domain | `03` Step 6/8/10 | AIIA/SoA/approval DTO、domain、tests | 300~500 行 | contract-domain-fast | commit-04-b |
 | BATCH-04-04 | nonconformity/corrective action/verification contracts+domain | `03` Step 6/8/10 | NC/CA/verification DTO、domain、tests | 300~500 行;可按 NC/CA 拆写 | contract-domain-fast | commit-04-c |
-| BATCH-04-05 | services/repos/handlers/redaction | `03` Step 7/9/11/13;`05` redaction | ports、repos、services、handlers、redaction tests | 500 行以上;按 policy/control/compliance/NC 服务分批 | service-flow-fast;redaction-boundary targeted | commit-04-d |
+| BATCH-04-05a | PH-04 prerequisite surface repair | `03` Step 6/7/8/13 | `IdGeneratorPort` PH-04 ids、`GovernanceTruthChangeSubjectMapper` PH-04 subject helpers、PH-04 repository traits、history record types、outbox payload DTOs、stored command result variants | 300~500 行;只补已在 `03` 闭合的 surface,不写 query/event/job | compile/contract smoke;`git diff --check` | commit-04-d |
+| BATCH-04-05b | policy services/repos/handlers/redaction | `03` Step 7/9/11/13;`05` redaction | policy fact/shared rule/conflict services、fake repos、handlers、redaction tests | 300~500 行 | service-flow-fast policy;redaction-boundary targeted | commit-04-d |
+| BATCH-04-05c | control/compliance services/repos/handlers/redaction | `03` Step 7/9/11/13;`05` redaction | control applicability/review、AIIA/SoA services、fake repos、handlers、redaction tests | 300~500 行 | service-flow-fast control/compliance;redaction-boundary targeted | commit-04-d |
+| BATCH-04-05d | NC/corrective action services/repos/handlers/redaction | `03` Step 7/9/11/13;`05` redaction | NC/CA/verification services、fake repos、handlers、redaction tests | 300~500 行 | service-flow-fast NC;redaction-boundary targeted | commit-04-d |
 
 #### 提交边界
 
@@ -456,7 +459,7 @@
 | commit-04-a | policy/shared rules/conflict contracts/domain tests 通过后 | PolicyEffectiveFact、SharedRuleSet、PolicyConflictRecord DTO/domain/tests;MethodPolicySnapshot scope marker helper coverage | control/compliance/NC service、query/event/job | contract-domain-fast policy slice;snapshot scope mismatch targeted test;`cargo check`;`git diff --check` |
 | commit-04-b | control + compliance contracts/domain tests 通过后 | ControlApplicability、ControlReview、AIIAConclusion、SoAConclusion、Compliance approval DTO/domain/tests | NC、application service、query/event/job | contract-domain-fast control/compliance slice;`cargo check`;`git diff --check` |
 | commit-04-c | NC / corrective action / verification contracts/domain tests 通过后 | NonconformityRecord、CorrectiveAction、VerificationResult DTO/domain/tests | application services、query/event/job | contract-domain-fast NC slice;`cargo check`;`git diff --check` |
-| commit-04-d | PH-04 application services、handlers、fake repos 和 redaction targeted tests 通过后 | policy/control/compliance/NC services、repos、handlers、stored result、trace/outbox、redaction tests | query views、event consumers、jobs | service-flow-fast PH-04 slice;redaction-boundary targeted;`git diff --check` |
+| commit-04-d | PH-04 前置 surface、application services、handlers、fake repos 和 redaction targeted tests 通过后 | 先补 `03` 已闭合的 PH-04 prerequisite surface: `IdGeneratorPort` PH-04 ids、`GovernanceTruthChangeSubjectMapper` PH-04 subject helpers、`PolicyEffectiveFactRepository` / `SharedRuleSetRepository` / `PolicyConflictRepository` / `ControlApplicabilityRepository` / `ControlReviewRepository` / `ComplianceConclusionRepository` / `NonconformityRepository` / `CorrectiveActionRepository`、`PolicyChangeRecord` / `ControlChangeRecord` / `ComplianceConclusionRecord` / `NonconformityChangeRecord`、PH-04 outbox payload DTO、PH-04 stored result variants;再实现 policy/control/compliance/NC services、repos、handlers、stored result、trace/outbox、redaction tests | query views、event consumers、jobs;不得新增未在 `03` 闭合的 schema/port/status/phase | prerequisite surface compile;service-flow-fast PH-04 slice;redaction-boundary targeted;`git diff --check` |
 
 #### Commit boundary 子功能分组
 
@@ -465,7 +468,7 @@
 | commit-04-a | policy fact + shared rules + conflict | 三者共同定义 policy effective surface 和 conflict resolution truth | BATCH-04-01 | contract-domain-fast | control/compliance/NC |
 | commit-04-b | control + compliance conclusion | control applicability/review 与 AIIA/SoA conclusion 构成合规判断输入输出 | BATCH-04-02;BATCH-04-03 | contract-domain-fast | NC/service |
 | commit-04-c | nonconformity + corrective action + verification | NC lifecycle 必须包含 cause/action/verify 才能独立验证闭环 | BATCH-04-04 | contract-domain-fast | services/query/event |
-| commit-04-d | PH-04 services + repos + handlers + redaction | accepted flow 需要 persistence/idempotency/trace/outbox 和敏感字段边界一起验证 | BATCH-04-05 | service-flow-fast;redaction-boundary | query/event/job |
+| commit-04-d | PH-04 prerequisite surface + services + repos + handlers + redaction | accepted flow 需要先有同 boundary 可用的 id、subject、repo、history、payload、stored-result surface,再验证 persistence/idempotency/trace/outbox 和敏感字段边界 | BATCH-04-05a~BATCH-04-05d | prerequisite surface compile;service-flow-fast;redaction-boundary | query/event/job;未在 `03` 闭合的 schema/port |
 
 #### PH-04 开工前设计闭环复核
 
@@ -477,6 +480,7 @@
 | validation truth 闭环 | method policy/control snapshot、evidence summary、actor capability、decision context 有 resolver/port | 开工前确认 | 回写 Step 7/9 |
 | public target 穷尽闭环 | AIIA/SoA target、NC subject、corrective action target、verification outcome variant 穷尽 | 开工前确认 | 回写 protocol/flow |
 | optimistic version 来源闭环 | update/approve/resolve/complete/verify 均有 version source | 开工前确认 | 补 versioned read |
+| prerequisite surface 边界闭环 | commit-04-d 需要的 id generator、subject mapper、PH-04 repo traits、history records、outbox payload DTO、stored result variants 已在同 boundary 首批落码 | 通过:已纳入 BATCH-04-05a 和 commit-04-d 包含内容 | 若实现仓缺这些前置面,先写 BATCH-04-05a,不得绕过或新增未闭合 schema |
 | redaction boundary | evidence summary / external GRC / policy body 不泄露正文 | 开工前确认 | 回写 redaction rules |
 | phase boundary | 不提前写 Query / Consumer / Job / release evidence | 通过 | 越界移出 |
 
@@ -487,7 +491,7 @@
 | commit-04-a | policy command/state | 字段闭环;DTO构造闭环;状态闭环;validation truth;public target 穷尽;phase boundary | query/job 不适用 | `03` Step 6/8/9/10 | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
 | commit-04-b | control/compliance command/state | 字段闭环;DTO构造闭环;状态闭环;validation truth;redaction;phase boundary | outbox publish/job 不适用 | `03` Step 6/8/9/10;`05` redaction | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
 | commit-04-c | NC lifecycle/state | 字段闭环;DTO构造闭环;状态闭环;history构造闭环;public target 穷尽 | query/job 不适用 | `03` Step 6/8/9/10/15 | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
-| commit-04-d | service/persistence/idempotency/outbox/redaction | optimistic version;idempotency;validation truth;history/trace/audit;outbox source identity;redaction | query/job 不适用 | `03` Step 7/9/11/13/15;`05` §redaction | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
+| commit-04-d | prerequisite surface/service/persistence/idempotency/outbox/redaction | prerequisite surface;optimistic version;idempotency;validation truth;history/trace/audit;outbox source identity;redaction | query/job 不适用 | `03` Step 6/7/8/9/11/13/15;`05` §redaction | 通过:前置 surface repair 纳入同 boundary 首批 | 实现先补 BATCH-04-05a;若发现 `03` 未闭合项再 blocker 回写设计 | 设计者完成;实现者二次校验 |
 
 #### PH-04 提交粒度判断
 
@@ -496,7 +500,7 @@
 | commit-04-a | 适中 | 是 | 是 | 保留 |
 | commit-04-b | 适中 | 是 | 是 | 保留 |
 | commit-04-c | 适中 | 是 | 是 | 保留 |
-| commit-04-d | 偏大但必要 | 是 | 是 | 代码按服务分批写,同 boundary 提交 |
+| commit-04-d | 偏大但必要 | 是 | 是 | 先写 prerequisite surface repair,再按 policy/control/compliance/NC 服务分批写,同 boundary 提交 |
 
 #### PH-04 停审记录
 
@@ -505,7 +509,7 @@
 | commit-04-a | policy/shared rules/conflict 是否同属 policy truth 增量 | 设计层通过 | 开工前复核 policy body-free 边界 |
 | commit-04-b | control + compliance 是否可作为合规事实增量 | 设计层通过 | 开工前复核 evidence summary / method snapshot 来源 |
 | commit-04-c | NC lifecycle 是否完整到可单独验证 | 设计层通过 | 开工前复核 closure / verification reason |
-| commit-04-d | service accepted path 是否闭合且不做 query/event/job | 设计层通过 | 开工前复核 version/idempotency/outbox/redaction |
+| commit-04-d | service accepted path 是否闭合且不做 query/event/job | 设计层通过 | 已明确同 boundary 首批补 PH-04 prerequisite surface;开工前复核 version/idempotency/outbox/redaction |
 
 ### 7.7 PH-05 Authorized Query / Projection / Trace 消费追溯
 
@@ -843,7 +847,7 @@
 | PH-04 | commit-04-a | 建立 policy/shared rules/conflict contracts and domain state | contract-domain-fast policy |
 | PH-04 | commit-04-b | 建立 control/compliance contracts and domain state | contract-domain-fast control/compliance |
 | PH-04 | commit-04-c | 建立 nonconformity/corrective action/verification contracts and domain state | contract-domain-fast NC |
-| PH-04 | commit-04-d | 打通 PH-04 accepted services, repositories, handlers and redaction tests | service-flow-fast PH-04;redaction targeted |
+| PH-04 | commit-04-d | 补齐 PH-04 prerequisite surface 并打通 accepted services, repositories, handlers and redaction tests | prerequisite surface compile;service-flow-fast PH-04;redaction targeted |
 | PH-05 | commit-05-a | 建立 query/view/projection identity contracts and read state | contract-domain-fast query/view |
 | PH-05 | commit-05-b | 打通 query services, visibility/freshness/degraded and no-write guard | query no-write;visibility tests |
 | PH-05 | commit-05-c | 建立 API query handlers and response mapping | API query handler tests |

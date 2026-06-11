@@ -311,9 +311,10 @@ Publisher rule: publisher may only use `GovernanceOutboxPayloadSnapshot`. It mus
 
 | 场景 | 检测位置 | 处理方式 | 是否写审计 / 事件 |
 |---|---|---|---|
-| Command validation failed | API/application request validator | return protocol rejection;do not call application mutation body | no trace,no audit,no outbox,no stored command result unless Step 13 defines rejected result persistence |
+| Command validation failed before idempotency reserve | API request validator / metadata parser | return protocol rejection;do not call application mutation body | no trace,no audit,no outbox,no stored command result |
+| Command save-before rejected after idempotency reserve | application guard / resolver / domain policy before accepted truth save | save `CommandRejection` stored result,complete idempotency,return `GovernanceCommandOutcome::Rejected` | no truth/history/trace/outbox/stale;stored rejection only |
 | Command authorization denied | authorization / visibility policy before mutation | return not authorized/domain rejected | no success trace/outbox;redacted runtime log only |
-| Command duplicate same digest | idempotency reserve | rollback current UoW,load stored command result,return replay | no new trace/audit/outbox/stale |
+| Command duplicate same digest | idempotency reserve | rollback current UoW,load stored command result or command rejection by stored kind,return replay | no new trace/audit/outbox/stale |
 | Command idempotency conflict | idempotency reserve | mark conflict if Step 13 says;return conflict | no domain mutation;no success trace/outbox |
 | Command target not found | repository read | rollback;return not found | no success trace/outbox |
 | Command dependency unresolved | resolver/reference state guard | rollback;return dependency unavailable/domain rejected | no success trace/outbox;reference marker only if flow explicitly owns precheck marker |
@@ -381,7 +382,7 @@ Publisher rule: publisher may only use `GovernanceOutboxPayloadSnapshot`. It mus
 | accepted command truth change | yes,success trace | yes when object family requires | yes,stored payload snapshot | yes,affected stale | only if command formally updates reference | no unless command is handoff-related and Step 9 says | command result |
 | command validation rejected | no | no | no | no | no | no | normally no;Step 13 may persist rejected result |
 | command domain rejected | no success trace | no success history | no | no | no | no | rejection response only |
-| command duplicate replay | no new trace | no | no | no | no | no | read stored command result |
+| command duplicate replay | no new trace | no | no | no | no | no | read stored command result or command rejection |
 | query not visible/degraded | no | no | no | no | no | no | query surface only |
 | consumer accepted snapshot/reference | optional marker trace if Step 9 requires | no business history | no unless explicitly defined | yes if affected views exist | yes | no | consumer receipt |
 | consumer unsupported version | no | no | no | no | no | no | unsupported receipt/dead-letter by Step 13 |

@@ -5897,7 +5897,7 @@ pub enum GovernanceIdempotencyState {
 | `GovernanceOperationIdempotencyKey` | application 归一化后的幂等 key | command 来源于 `CommandMetadata` idempotency key;event 来源于 event dedup key;job 来源于 `GovernanceJobIdempotencyKey`;query 不使用 |
 | `GovernanceRequestDigest` | canonical payload digest | 只覆盖稳定业务输入;不得包含 request id、requested_at、trace id、随机 id 或当前时间 |
 | `GovernanceApplicationResultId` | stored result identity | application id generator 生成;不得使用 truth id、trace id、job run id 替代 |
-| `GovernanceApplicationResultRef` | duplicate replay 的 result 指针 | 必须能在 Step 13 继续闭合到 command result / consumer receipt / job report stored surface |
+| `GovernanceApplicationResultRef` | duplicate replay 的 result 指针 | 必须能在 Step 13 继续闭合到 accepted command result / rejected command result / consumer receipt / job report stored surface |
 | `GovernanceIdempotencyConflictReason` | key 重用冲突说明 | 非空;不得携带 request body、event body 或外部正文 |
 | `GovernanceIdempotencyState` | idempotency reservation state | `Completed` / `Conflict` 不得回到 `Reserved` |
 
@@ -6054,6 +6054,8 @@ pub struct GovernanceIdempotencyRecord {
 pub enum GovernanceStoredResultKind {
     /// Stored command result DTO surface.
     CommandResult,
+    /// Stored command protocol rejection surface.
+    CommandRejection,
     /// Stored inbound consumer receipt surface.
     ConsumerReceipt,
     /// Stored operations job report surface.
@@ -6079,7 +6081,7 @@ pub struct StoredGovernanceOperationResult {
 | 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
 | `result_ref` | `GovernanceApplicationResultRef` | result identity | application id generator + operation name;duplicate replay 使用同一 ref |
-| `result_kind` | `GovernanceStoredResultKind` | result surface 分类 | command / consumer / job 三类;query 不存 result |
+| `result_kind` | `GovernanceStoredResultKind` | result surface 分类 | command accepted result / command rejected result / consumer / job 四类;query 不存 result |
 | `surface_ref` | `GovernanceStoredResultSurfaceRef` | serialized result surface ref | 指向 result store 中的 DTO surface;完整 DTO schema 留给 Step 8 / 13 |
 | `core_trace_id` | `TraceId` | result trace 关联 | 来自 `GovernanceOperationContext.core_trace_id`;不得重新生成 |
 
@@ -6087,10 +6089,11 @@ pub struct StoredGovernanceOperationResult {
 |---|---|---|---|---|
 | `pub fn matches_ref(&self, result_ref: &GovernanceApplicationResultRef) -> bool` | 判断是否为指定 stored result | result ref | `bool` | 纯判断;不读取 result body |
 | `pub fn is_job_report(&self) -> bool` | 判断是否为 job report surface | 无 | `bool` | `result_kind == JobReport` 返回 true |
+| `pub fn is_command_rejection(&self) -> bool` | 判断是否为 command rejection surface | 无 | `bool` | `result_kind == CommandRejection` 返回 true |
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn from_surface(result_ref: GovernanceApplicationResultRef, result_kind: GovernanceStoredResultKind, surface_ref: GovernanceStoredResultSurfaceRef, core_trace_id: TraceId) -> Result<Self, ApplicationError>` | 建立 stored result shell | result ref、kind、surface ref、core trace id | `Result<StoredGovernanceOperationResult, ApplicationError>` | command accepted result、consumer receipt、job report save path |
+| `pub fn from_surface(result_ref: GovernanceApplicationResultRef, result_kind: GovernanceStoredResultKind, surface_ref: GovernanceStoredResultSurfaceRef, core_trace_id: TraceId) -> Result<Self, ApplicationError>` | 建立 stored result shell | result ref、kind、surface ref、core trace id | `Result<StoredGovernanceOperationResult, ApplicationError>` | command accepted result、command rejected result、consumer receipt、job report save path |
 
 ##### `GovernanceReadVisibilityDecision`
 
@@ -6129,7 +6132,7 @@ pub struct GovernanceReadVisibilityDecision {
 | application helper 不反写真相 | 本节所有对象不得创建、修改或删除 Governance domain truth |
 | duplicate replay 不重跑 domain transition | `GovernanceApplicationResultRef` duplicate path 必须读取 stored surface;不得重新执行 command / job |
 | query no-write | `GovernanceOperationContext::Query` 与 `GovernanceReadVisibilityDecision` 不得 reserve idempotency、append trace、mark stale 或 rebuild |
-| stored result shell 不等于读取闭环 | 本节只给 result shell;Step 7/13 必须继续定义 save / get repository 和 missing result error |
+| stored result shell 不等于读取闭环 | 本节只给 result shell;Step 7/13 必须继续定义 accepted command result、rejected command result、consumer receipt、job report 的 save / get repository 和 missing result error |
 | no body leak | digest、conflict reason、surface ref、visibility reason 不得保存 command body、event body、artifact body、work / process / method / runtime body |
 | service facade 不隐藏 port | 具体 repository / port trait 仍必须在 Step 7 暴露,不得通过 facade 字段绕过正式 port contract |
 

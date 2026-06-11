@@ -289,13 +289,22 @@ pub struct GovernanceProtocolRejection {
     /// Optional degraded marker for dependency or adapter unavailable cases.
     pub degraded: Option<GovernanceDegradedMarker>,
 }
+
+/// Public command outcome returned by handlers and duplicate replay.
+pub enum GovernanceCommandOutcome<T> {
+    /// Command accepted and returned a typed command result.
+    Accepted(GovernanceCommandResponse<T>),
+    /// Command rejected before accepted truth mutation.
+    Rejected(GovernanceProtocolRejection),
+}
 ```
 
 | 规则 | 说明 |
 |---|---|
 | validation issue body-free | issue ref 不保存 request body、event body、adapter response、stack trace 或 secret |
 | application error mapping | 具体 `ApplicationError` / `DomainError` 到 protocol rejection 的映射留给 Step 12;本 Step 固定 payload surface |
-| policy denied command | command policy denied 是 rejected error surface,不得伪造 command result / trace / outbox |
+| policy denied command | command policy denied 是 rejected outcome surface,不得伪造 accepted command result / trace / outbox |
+| command outcome union | command handler / service 对可预期协议拒绝返回 `GovernanceCommandOutcome::Rejected`;只有 infrastructure failure / consistency defect 使用 `ApplicationError` |
 | query visibility denied | query visibility denied 不走 `GovernanceProtocolRejection`,而走 `GovernanceQueryResponse.surface.visibility` |
 
 ---
@@ -513,7 +522,7 @@ pub struct SupersedeGovernanceDecisionRequest {
 
 #### 8.4 Command route mapping for 8.1-a
 
-| Route / RPC neutral entry | Request envelope | Response envelope | Idempotency |
+| Route / RPC neutral entry | Request envelope | Accepted response envelope | Idempotency |
 |---|---|---|---|
 | `CreateGovernanceContext` | `GovernanceCommandRequest<CreateGovernanceContextRequest>` | `GovernanceCommandResponse<GovernanceContextCommandResult>` | required |
 | `SubmitGovernanceInput` | `GovernanceCommandRequest<SubmitGovernanceInputRequest>` | `GovernanceCommandResponse<GovernanceInputCommandResult>` | required |
@@ -521,6 +530,8 @@ pub struct SupersedeGovernanceDecisionRequest {
 | `OpenGovernanceGate` | `GovernanceCommandRequest<OpenGovernanceGateRequest>` | `GovernanceCommandResponse<GateCommandResult>` | required |
 | `RecordGovernanceDecision` | `GovernanceCommandRequest<RecordGovernanceDecisionRequest>` | `GovernanceCommandResponse<GovernanceDecisionCommandResult>` | required |
 | `SupersedeGovernanceDecision` | `GovernanceCommandRequest<SupersedeGovernanceDecisionRequest>` | `GovernanceCommandResponse<GovernanceDecisionCommandResult>` | required |
+
+所有 command route 的 public handler 返回形态是 `Result<GovernanceCommandOutcome<T>, ApplicationError>`。`Accepted` 分支包裹上表 `GovernanceCommandResponse<T>`;`Rejected` 分支包裹 `GovernanceProtocolRejection`。同一幂等键 same digest 的 duplicate replay 必须按 stored result kind 回放 accepted result 或 rejected outcome,不得把 rejected outcome 抛成 infrastructure `ApplicationError`。
 
 #### 8.5 8.1-a stop-review
 
@@ -754,7 +765,7 @@ pub struct ResolvePolicyConflictRequest {
 
 #### 8.9 Command route mapping for 8.1-b
 
-| Route / RPC neutral entry | Request envelope | Response envelope | Idempotency |
+| Route / RPC neutral entry | Request envelope | Accepted response envelope | Idempotency |
 |---|---|---|---|
 | `AssignApprovalResponsibility` | `GovernanceCommandRequest<AssignApprovalResponsibilityRequest>` | `GovernanceCommandResponse<ApprovalResponsibilityCommandResult>` | required |
 | `RecordApprovalVote` | `GovernanceCommandRequest<RecordApprovalVoteRequest>` | `GovernanceCommandResponse<ApprovalResponsibilityCommandResult>` | required |
@@ -1057,7 +1068,7 @@ pub struct VerifyNonconformityRequest {
 
 #### 8.15 Command route mapping for 8.1-c
 
-| Route / RPC neutral entry | Request envelope | Response envelope | Idempotency |
+| Route / RPC neutral entry | Request envelope | Accepted response envelope | Idempotency |
 |---|---|---|---|
 | `AssessControlApplicability` | `GovernanceCommandRequest<AssessControlApplicabilityRequest>` | `GovernanceCommandResponse<ControlCommandResult>` | required |
 | `RecordControlReview` | `GovernanceCommandRequest<RecordControlReviewRequest>` | `GovernanceCommandResponse<ControlReviewCommandResult>` | required |

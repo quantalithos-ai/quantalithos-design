@@ -149,7 +149,7 @@
 [Application service]
   | tx = GovernanceUnitOfWorkManager.begin()
   | reservation = GovernanceIdempotencyRepository.reserve(operation, key, digest, tx)
-  | if Duplicate -> rollback tx, load StoredGovernanceResultRepository.get_command_result(result_ref), return replay
+  | if Duplicate -> rollback tx, load StoredGovernanceResultRepository.get_command_result(result_ref) or get_command_rejection(result_ref) by stored kind, return replay
   | if Conflict -> mark_conflict, commit tx, return protocol rejection
   v
 [Load and guard]
@@ -180,7 +180,7 @@
   | commit tx
   v
 [Response]
-  | return GovernanceCommandResponse<T>
+  | return GovernanceCommandOutcome::Accepted(GovernanceCommandResponse<T>)
 ```
 
 ```rust
@@ -1187,7 +1187,8 @@ let review = ControlReview::plan(review_id, &applicability, reviewer_ref)?;
   | context_v = context_repo.get_with_version(context_ref)
   | artifact_state = external_source_resolver.resolve_artifact_ref(artifact_ref)
   | if artifact_state is not resolved:
-  |   complete rejected result;tx commit;return rejected(no conclusion/history/outbox/stale)
+  |   save StoredGovernanceOperationResult(CommandRejection: GovernanceProtocolRejection)
+  |   complete idempotency with rejected result_ref;tx commit;return GovernanceCommandOutcome::Rejected(no conclusion/history/outbox/stale)
   v
 [Domain]
   | ComplianceConclusionPolicy::for_context(context, evidence_ref, None).assert_no_artifact_body(artifact_ref)
@@ -1215,7 +1216,7 @@ let conclusion = AIIAConclusion::from_artifact(aiia_id, &context, artifact_ref, 
 | port | 通过 | context read、artifact resolution and AIIA save 已定义 |
 | version 来源 | 通过 | new conclusion save uses `None` |
 | 副作用 | 通过 | compliance history/trace/outbox/stale/result |
-| artifact unresolved | 通过 | service 在 `from_artifact(...)` 前调用 `resolve_artifact_ref(...)`;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 返回 rejected command result,不保存 AIIA truth、history、outbox 或 stale marker |
+| artifact unresolved | 通过 | service 在 `from_artifact(...)` 前调用 `resolve_artifact_ref(...)`;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 保存 `CommandRejection` stored result 并返回 `GovernanceCommandOutcome::Rejected`,不保存 AIIA truth、history、outbox 或 stale marker |
 | 禁止事项 | 通过 | 不保存 AIIA / artifact body |
 
 #### 13.4 `SubmitSoAConclusionFlow`
@@ -1240,7 +1241,8 @@ let conclusion = AIIAConclusion::from_artifact(aiia_id, &context, artifact_ref, 
   | context_v = context_repo.get_with_version(context_ref)
   | artifact_state = external_source_resolver.resolve_artifact_ref(artifact_ref)
   | if artifact_state is not resolved:
-  |   complete rejected result;tx commit;return rejected(no conclusion/history/outbox/stale)
+  |   save StoredGovernanceOperationResult(CommandRejection: GovernanceProtocolRejection)
+  |   complete idempotency with rejected result_ref;tx commit;return GovernanceCommandOutcome::Rejected(no conclusion/history/outbox/stale)
   v
 [Domain]
   | policy = ComplianceConclusionPolicy::for_context(context, evidence_ref, Some(control_coverage_ref))
@@ -1271,7 +1273,7 @@ conclusion.attach_control_coverage(control_coverage_ref, actor_ref)?;
 | port | 通过 | context read、artifact resolution and SoA save 已定义 |
 | version 来源 | 通过 | new conclusion save uses `None` |
 | 副作用 | 通过 | compliance history/trace/outbox/stale/result |
-| artifact unresolved | 通过 | service 在 `from_artifact(...)` 前调用 `resolve_artifact_ref(...)`;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 返回 rejected command result,不保存 SoA truth、history、outbox 或 stale marker |
+| artifact unresolved | 通过 | service 在 `from_artifact(...)` 前调用 `resolve_artifact_ref(...)`;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 保存 `CommandRejection` stored result 并返回 `GovernanceCommandOutcome::Rejected`,不保存 SoA truth、history、outbox 或 stale marker |
 | 禁止事项 | 通过 | coverage ref 不反写 control applicability/review truth |
 
 #### 13.5 `ApproveComplianceConclusionFlow`

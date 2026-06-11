@@ -113,7 +113,7 @@
 | `GovernanceReconciliationReport` | `contracts/reports.rs` / `GovernanceReconciliationReportRepository` | reconciliation job | query、operations、archive/export | report only;does not repair truth/projection/outbox |
 | `GovernanceHandoffMarker` | `domain/audit.rs` / `GovernanceHandoffMarkerRepository` | trace/archive/external GRC handoff jobs | operations query、archive/export audit、duplicate job report | body-free marker;prepared/delivered/failed state persisted;failed marker does not delete package ref |
 | `GovernanceIdempotencyRecord` | `application/idempotency.rs` / `GovernanceIdempotencyRepository` | command/consumer/job service | same operation duplicate path | key+operation+digest unique;complete points to stored result in same UoW |
-| `StoredGovernanceOperationResult` | `application/results.rs` / `StoredGovernanceResultRepository` | command/consumer/job accepted or conflict path | duplicate replay、API/worker/job runner | immutable replay surface;duplicate does not rebuild result from current truth |
+| `StoredGovernanceOperationResult` | `application/results.rs` / `StoredGovernanceResultRepository` | command accepted / command rejected / consumer / job path | duplicate replay、API/worker/job runner | immutable replay surface;duplicate does not rebuild result from current truth |
 | adapter/runtime state | `infra/*` | runtime builder / adapter registry / health checks | API/worker/jobs/application service availability checks | infra state only;no raw config/secret/body;does not mutate Governance truth |
 
 ### 8.2 Logical store / collection / projection 契约表
@@ -375,16 +375,17 @@
 | `GovernanceIdempotencyRepository.reserve(operation_name, key, digest, uow)` | reserve command / consumer / job operation | first write in operation UoW;unique `(operation,key)`;same digest duplicate returns result ref if completed | `GovernanceIdempotencyReservation` | repository failure |
 | `GovernanceIdempotencyRepository.complete(idempotency_ref, result_ref, uow)` | 将 reservation 完成到 stored result | same UoW as stored result save;must not complete before result exists | `()` | version/state conflict |
 | `GovernanceIdempotencyRepository.mark_conflict(idempotency_ref, reason, uow)` | 记录 key digest conflict | conflict UoW;must not run domain mutation | `()` | repository failure |
-| `StoredGovernanceResultRepository.save(result, uow)` | 保存 command result / consumer receipt / job report | same UoW before idempotency complete;immutable after save | `GovernanceApplicationResultRef` | duplicate result id |
+| `StoredGovernanceResultRepository.save(result, uow)` | 保存 command result / command rejection / consumer receipt / job report | same UoW before idempotency complete;immutable after save | `GovernanceApplicationResultRef` | duplicate result id |
 | `StoredGovernanceResultRepository.get(result_ref)` | 读取 stored operation result | read-only;duplicate replay path | `Option<StoredGovernanceOperationResult>` | repository failure |
 | `get_command_result(result_ref)` | 读取 command result envelope | read-only;must validate result kind | `Option<GovernanceCommandResultEnvelope>` | wrong kind / repository failure |
+| `get_command_rejection(result_ref)` | 读取 command rejection envelope | read-only;must validate result kind | `Option<GovernanceCommandRejectionEnvelope>` | wrong kind / repository failure |
 | `get_consumer_receipt(result_ref)` | 读取 consumer receipt | read-only;must validate result kind | `Option<GovernanceConsumerReceipt>` | wrong kind / repository failure |
 | `get_job_report(result_ref)` | 读取 job report | read-only;must validate result kind | `Option<GovernanceJobReport>` | wrong kind / repository failure |
 
 | idempotency rule | 正式口径 |
 |---|---|
 | digest stability | digest excludes volatile timestamp,generated id,trace id,result ref and adapter latency |
-| duplicate same digest | rollback current UoW if needed,read stored result,return replay |
+| duplicate same digest | rollback current UoW if needed,read stored result by stored kind,return replay |
 | conflict different digest | mark conflict or return conflict per Step 13;do not run mutation |
 | missing stored result | completed idempotency without stored result is consistency defect;Step 12 maps to internal consistency error |
 | job duplicate | duplicate job returns stored `GovernanceJobReport`;does not rescan page,republish outbox,refresh refs or prepare handoff |
@@ -420,7 +421,8 @@
 | 场景 | 开始位置 | 提交位置 | 回滚条件 | 同事务内必须完成 |
 |---|---|---|---|---|
 | Command accepted path | application command service after request validation and before idempotency reserve | stored result saved and idempotency completed | idempotency conflict,missing truth,domain invalid transition,policy guard failure,repository failure,payload build failure,projection affected-view lookup failure | reserve idempotency,load versioned truth,save truth,assign truth change cursor,append applicable history,append trace,save audit trail,build and append outbox payload snapshot,mark affected views stale,save stored command result,complete idempotency |
-| Command duplicate same digest | application command service after reserve returns `Duplicate` | no business commit;current UoW rolled back before read-only replay | stored result missing/wrong kind | rollback current UoW,read stored command result,return replay;no truth/history/trace/outbox/stale write |
+| Command save-before rejected path | application command service after idempotency reserve but before accepted truth save | rejected result saved and idempotency completed | resolver/reference unresolved,policy/domain rejected,dependency unavailable mapped to protocol rejection,result store failure | reserve idempotency,build body-free `GovernanceProtocolRejection`,save `StoredGovernanceOperationResult::CommandRejection`,complete idempotency;do not save truth/history/trace/outbox/stale |
+| Command duplicate same digest | application command service after reserve returns `Duplicate` | no business commit;current UoW rolled back before read-only replay | stored result missing/wrong kind | rollback current UoW,read stored command result or command rejection by stored kind,return replay;no truth/history/trace/outbox/stale write |
 | Command idempotency conflict | application command service after reserve returns `Conflict` | conflict marker committed only if Step 13 requires persistence | digest mismatch or operation mismatch | optional `mark_conflict`;no domain mutation,no trace/outbox/stale |
 | Command validation rejected before reserve | API/application validation before `begin()` or before reserve | no write transaction | invalid DTO,missing metadata,unsupported public route | no repository write;rejected response assembled by handler/service |
 | Query read-only path | query service after request validation | no write commit | visibility denied,missing truth,repository failure | no write UoW;read truth/projection/reference/trace/report only;return body/not-visible/degraded/unavailable marker |
@@ -448,7 +450,7 @@
 validate public request and operation metadata
 begin GovernanceUnitOfWork
 reserve idempotency(operation, key, digest)
-  Duplicate -> rollback, read stored command result, return replay
+  Duplicate -> rollback, read stored command result or command rejection by result kind, return replay
   Conflict  -> mark conflict if required, commit or rollback per Step 13, return conflict
 load required truth with get_*_with_version / list_* returning Versioned<T>
 load body-free snapshots / reference states / policy guards
@@ -483,6 +485,31 @@ commit GovernanceUnitOfWork
 | affected views after truth change known | affected view lookup needs formal `GovernanceTruthChange` and source cursor |
 | stored result before idempotency complete | duplicate replay cannot point to missing result |
 | no writes after idempotency complete | completed record declares operation durable |
+
+### 8.13-a Command save-before rejected ordering
+
+当 command 已完成 idempotency reserve,但在 accepted truth save 前被 resolver、reference state、domain policy 或 application guard 正式拒绝时,必须使用下列相对顺序。该路径不分配 truth cursor,不构造 `GovernanceTruthChange`,不 append history / trace / audit / outbox,不 mark projection stale。
+
+```text
+validate public request and operation metadata
+begin GovernanceUnitOfWork
+reserve idempotency(operation, key, digest)
+  Duplicate -> rollback, read stored command result or command rejection by result kind, return replay
+  Conflict  -> mark conflict if required, commit or rollback per Step 13, return conflict
+load only the refs/snapshots needed for precheck
+build body-free GovernanceProtocolRejection
+save StoredGovernanceOperationResult::CommandRejection(...)
+complete idempotency(idempotency_ref, rejected_result_ref)
+commit GovernanceUnitOfWork
+return GovernanceCommandOutcome::Rejected(...)
+```
+
+| Ordering point | Required reason |
+|---|---|
+| rejection result before idempotency complete | duplicate replay cannot point to missing rejection |
+| no truth cursor | no accepted truth was saved or staged |
+| no trace/history/outbox/stale | rejected path must not look like accepted truth propagation |
+| no writes after idempotency complete | completed record declares rejected outcome durable |
 
 ### 8.14 Consumer transaction ordering
 
@@ -733,14 +760,15 @@ If a scope link points to a ref with no tracked `ReferenceResolutionState`, the 
 |---|---|---|---|
 | `application_result_ref` | `GovernanceApplicationResultRef` | id generator / result store | PK;referenced by idempotency complete |
 | `operation_kind` | `GovernanceOperationKind` | command / consumer / job service | must match idempotency operation |
-| `result_kind` | `StoredGovernanceResultKind` | service branch | command result / consumer receipt / job report |
+| `result_kind` | `StoredGovernanceResultKind` | service branch | command result / command rejection / consumer receipt / job report |
 | `serialized_surface` | typed result DTO or body-free serialized shell | Step 8 result/receipt/report builder | immutable;redacted-safe |
 | `trace_record_ref` | optional `GovernanceTraceRecordRef` | accepted path trace | optional for rejected/unsupported/no-write results |
 | `created_at` | `GovernanceTimestamp` | `ClockPort.now()` | metadata;not version |
 
 | Replay branch | Required read | If missing |
 |---|---|---|
-| command duplicate | `get_command_result(result_ref)` | internal consistency error;do not reconstruct |
+| command accepted duplicate | `get_command_result(result_ref)` | internal consistency error;do not reconstruct |
+| command rejected duplicate | `get_command_rejection(result_ref)` | internal consistency error;do not rerun resolver or policy |
 | consumer duplicate | `get_consumer_receipt(result_ref)` | internal consistency error;do not reparse event |
 | job duplicate | `get_job_report(result_ref)` | internal consistency error;do not rerun job |
 

@@ -1254,6 +1254,18 @@ pub struct GovernanceCommandResultEnvelope {
     pub surface_ref: GovernanceStoredResultSurfaceRef,
 }
 
+/// Stored command rejection envelope for save-before rejected command paths.
+pub struct GovernanceCommandRejectionEnvelope {
+    /// Stored result reference.
+    pub result_ref: GovernanceApplicationResultRef,
+    /// Command operation name.
+    pub operation_name: GovernanceOperationName,
+    /// Surface ref for the serialized command rejection envelope.
+    pub surface_ref: GovernanceStoredResultSurfaceRef,
+    /// Public protocol rejection surface.
+    pub rejection: GovernanceProtocolRejection,
+}
+
 /// Stored consumer receipt placeholder closed by Step 8.
 pub struct GovernanceConsumerReceipt {
     /// Stored result reference.
@@ -1271,7 +1283,8 @@ pub struct GovernanceConsumerReceipt {
 |---|---|---|
 | `GovernanceIdempotencyRef` | application-local idempotency record ref | 不进入 public DTO;repository save/load identity |
 | `GovernanceIdempotencyReservation` | reserve 结果 | `Duplicate` 必须携带 stored result ref;不得要求 caller 重跑 operation |
-| `GovernanceCommandResultEnvelope` | command duplicate replay placeholder | 完整 command result variants 由 Step 8 闭合;本 Step 只固定 stored lookup surface |
+| `GovernanceCommandResultEnvelope` | command accepted duplicate replay placeholder | 完整 command result variants 由 Step 8 闭合;本 Step 只固定 stored lookup surface |
+| `GovernanceCommandRejectionEnvelope` | command rejected duplicate replay placeholder | 保存 `GovernanceProtocolRejection` 和 surface ref;用于 save-before rejected command duplicate replay;不得包含 command body、artifact body、adapter response 或 stack trace |
 | `GovernanceConsumerReceipt` | consumer duplicate replay placeholder | unsupported / accepted / delayed / rejected receipt body 由 Step 8/12 闭合;本 Step 固定 stored receipt lookup |
 
 ```rust
@@ -1318,6 +1331,11 @@ pub trait StoredGovernanceResultRepository {
         result_ref: GovernanceApplicationResultRef,
     ) -> Result<Option<GovernanceCommandResultEnvelope>, ApplicationError>;
 
+    async fn get_command_rejection(
+        &self,
+        result_ref: GovernanceApplicationResultRef,
+    ) -> Result<Option<GovernanceCommandRejectionEnvelope>, ApplicationError>;
+
     async fn get_consumer_receipt(
         &self,
         result_ref: GovernanceApplicationResultRef,
@@ -1333,6 +1351,8 @@ pub trait StoredGovernanceResultRepository {
 | 函数 | 闭合点 |
 |---|---|
 | `reserve` | duplicate / conflict 判断不重跑 mutation |
+| `save(StoredGovernanceOperationResult)` | accepted command result、rejected command result、consumer receipt、job report 都必须在 same UoW 内先保存 stored surface,再 complete idempotency |
+| `get_command_rejection(result_ref)` | duplicate same digest 且 stored kind 为 `CommandRejection` 时返回保存的 `GovernanceProtocolRejection`;不得重新调用 resolver、domain policy 或 repository |
 | `complete` | idempotency record 指向 stored result |
 | `get_job_report` | operations job duplicate replay 返回既有 report |
 

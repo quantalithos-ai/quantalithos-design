@@ -22,7 +22,7 @@
 - 哪些入口必须 reserve idempotency,哪些入口必须保持 read-only。
 - Command、Inbound Event Consumer、Operations Job 的幂等键来自哪里。
 - `GovernanceRequestDigest` 覆盖哪些稳定输入,明确排除哪些易变 metadata。
-- duplicate same digest 如何返回 stored command result / consumer receipt / job report。
+- duplicate same digest 如何返回 stored accepted command result / stored command rejection / consumer receipt / job report。
 - same key different digest、in-flight reservation、commit status unknown、stored result missing 如何处理。
 - dual publisher、projection rebuild、reference refresh、handoff/export 等 job 重入如何防止重复副作用。
 - Step 16 应如何拆出并发和幂等测试切口。
@@ -59,7 +59,7 @@
 | 哪些处理流可能并发修改同一资源? | 所有 23 个 Command 写路径都可能并发修改 Governance-owned mutable truth。9 个 Inbound Event Consumer 可能并发修改 reference state、snapshot、stale marker 和 stored receipt。7 个 Operations Job 可能并发修改 outbox publication state、projection state/body、reference state、reconciliation report、handoff/export marker 和 stored job report。Query 只读,不得参与写并发。 |
 | 哪些接口、事件或 job 可能被重复调用? | 所有 Command 可能因客户端超时 / retry 重复。所有 Inbound Event 可能因 event bus redelivery / upstream ack 丢失重复。所有 Operations Job 可能因 scheduler rerun、worker crash、operator retry 重复。Outbound publisher 可能由多个 worker 同时处理同一 pending outbox record。 |
 | 幂等键来自请求、事件、job 参数还是数据库唯一约束? | Command 幂等键来自 `CommandMetadata` 归一化后的 `GovernanceOperationIdempotencyKey`;Inbound Event 幂等键来自 `GovernanceInboundEventEnvelope.dedup_key`;Job 幂等键来自 `GovernanceJobMetadata.idempotency_key`。数据库唯一键只保护 business uniqueness 或 storage uniqueness,不能替代 stored result replay。Outbox per-record publish 使用 `GovernanceOutboxRef + GovernanceVersion`,不使用 public idempotency key。 |
-| 重复请求应该返回既有结果、跳过、覆盖还是报错? | same operation + same key + same digest + completed 时必须读取 stored command result / consumer receipt / job report 并返回既有 surface。same key + different digest 必须返回 `IdempotencyConflict`。same key still reserved / in-flight 必须返回 retryable unavailable / delayed,不得并发执行第二次 mutation。Query 重复读取只返回当前 authorized read surface,不写幂等记录。 |
+| 重复请求应该返回既有结果、跳过、覆盖还是报错? | same operation + same key + same digest + completed 时必须读取 stored accepted command result / stored command rejection / consumer receipt / job report 并返回既有 surface。same key + different digest 必须返回 `IdempotencyConflict`。same key still reserved / in-flight 必须返回 retryable unavailable / delayed,不得并发执行第二次 mutation。Query 重复读取只返回当前 authorized read surface,不写幂等记录。 |
 | 并发冲突如何测试? | Step 16 必须覆盖 optimistic version conflict、business unique conflict、duplicate same digest replay、same key different digest conflict、in-flight reservation、stored result missing、commit unknown retry、event redelivery、dual outbox publisher、projection stale vs rebuild、reference refresh race、handoff/export retry 和 job partial rerun。 |
 
 ## 6. 设计原则
@@ -69,7 +69,7 @@
 | operation namespace | 幂等唯一键为 `operation_name + idempotency_key`,不同 operation 可以复用同一 raw key 字符串,不得互相判 duplicate。 |
 | stable digest | `GovernanceRequestDigest` 只覆盖会改变业务结果的稳定输入,用于区分 same request 与 key reuse conflict。 |
 | volatile metadata exclusion | digest 不包含 request id、requested_at、trace id、job run id、transport header、delivery attempt、retry counter、随机 id 或当前时间。 |
-| stored replay | duplicate same digest 必须读取 `StoredGovernanceResultRepository.get_command_result/get_consumer_receipt/get_job_report`,不得从 current truth / current projection / pending outbox 重新计算。 |
+| stored replay | duplicate same digest 必须读取 `StoredGovernanceResultRepository.get_command_result/get_command_rejection/get_consumer_receipt/get_job_report`,不得从 current truth / current projection / pending outbox 重新计算。 |
 | in-flight no second writer | 同 operation/key 处于 reserved 或 already-in-progress 时,第二个调用不得进入 domain transition / resolver / publisher / job body。 |
 | optimistic update | 所有 mutable truth、projection/reference/outbox/handoff marker 更新必须使用正式 `Versioned<T>` 读取到的 `GovernanceVersion`。 |
 | append-only side effects | trace、history、audit record、outbox append 是 accepted transaction 的 append-only side effect,不得通过覆盖旧 record 实现并发保护。 |
@@ -82,7 +82,7 @@
 | 检查项 | 结论 | 依据 |
 |---|---|---|
 | idempotency reserve surface | 通过 | Step 7 `GovernanceIdempotencyRepository.reserve(...)` 返回 `Reserved` / `Duplicate(result_ref)` / `Conflict` |
-| stored result replay surface | 通过 | Step 7 `StoredGovernanceResultRepository.get_command_result/get_consumer_receipt/get_job_report` |
+| stored result replay surface | 通过 | Step 7 `StoredGovernanceResultRepository.get_command_result/get_command_rejection/get_consumer_receipt/get_job_report` |
 | result save before complete | 通过 | Step 9 / Step 11 要求 same UoW 内先保存 stored result,再 `complete` idempotency |
 | in-flight reservation | 通过 | Step 12 `IdempotencyError::AlreadyInProgress` 映射为 delayed / temporarily unavailable |
 | command truth version | 通过 | Step 7 truth repositories 均提供 `get_*_with_version` 和 `save(... expected_version ...)` |
@@ -136,7 +136,7 @@
 
 | 入口类型 | operation source | raw key source | normalized key | duplicate result source |
 |---|---|---|---|---|
-| Command | Step 8 `Operation name` | `CommandMetadata` idempotency key | `GovernanceOperationIdempotencyKey` | `StoredGovernanceResultRepository.get_command_result(result_ref)` |
+| Command | Step 8 `Operation name` | `CommandMetadata` idempotency key | `GovernanceOperationIdempotencyKey` | `StoredGovernanceResultRepository.get_command_result(result_ref)` or `get_command_rejection(result_ref)` by stored kind |
 | Inbound Event Consumer | `GovernanceInboundConsumerName` | `GovernanceInboundEventEnvelope.dedup_key` | `GovernanceOperationIdempotencyKey` | `StoredGovernanceResultRepository.get_consumer_receipt(result_ref)` |
 | Operations Job | `GovernanceOperationsJobKind` / `GovernanceOperationName` | `GovernanceJobMetadata.idempotency_key` | `GovernanceOperationIdempotencyKey` | `StoredGovernanceResultRepository.get_job_report(result_ref)` |
 | Query | query operation name only for observability | none | none | none;read current authorized surface |
@@ -176,8 +176,8 @@ Digest v1 must use deterministic field ordering and stable enum variant names. `
 | `ResolvePolicyConflict` | `CommandMetadata` key | actor scope、`conflict_ref`、`resolution_intent` including gate/decision/reason、expected version when present | stored `PolicyConflictCommandResult` |
 | `AssessControlApplicability` | `CommandMetadata` key | actor scope、`context_ref`、`control_snapshot` ref/state/digest fields、`assessment_intent` | stored `ControlCommandResult` |
 | `RecordControlReview` | `CommandMetadata` key | actor scope、`review_ref`、`applicability_ref`、`review_intent` including reviewer/evidence/reason/decision/next ref、expected version when present | stored `ControlReviewCommandResult` |
-| `SubmitAIIAConclusion` | `CommandMetadata` key | actor scope、`context_ref`、`artifact_ref`、`submission_intent` | stored `ComplianceConclusionCommandResult` |
-| `SubmitSoAConclusion` | `CommandMetadata` key | actor scope、`context_ref`、`artifact_ref`、`control_coverage_ref`、`submission_intent` | stored `ComplianceConclusionCommandResult` |
+| `SubmitAIIAConclusion` | `CommandMetadata` key | actor scope、`context_ref`、`artifact_ref`、`submission_intent` | stored accepted `ComplianceConclusionCommandResult` or stored rejected `GovernanceProtocolRejection` |
+| `SubmitSoAConclusion` | `CommandMetadata` key | actor scope、`context_ref`、`artifact_ref`、`control_coverage_ref`、`submission_intent` | stored accepted `ComplianceConclusionCommandResult` or stored rejected `GovernanceProtocolRejection` |
 | `ApproveComplianceConclusion` | `CommandMetadata` key | actor scope、`conclusion_ref`、`approval_intent` including decision/reason、expected version when present | stored `ComplianceConclusionCommandResult` |
 | `RaiseNonconformity` | `CommandMetadata` key | actor scope、`context_ref`、`severity`、`source_ref`、`owner_ref` | stored `NonconformityCommandResult` |
 | `ConfirmNonconformityCause` | `CommandMetadata` key | actor scope、`nonconformity_ref`、`cause_ref`、expected version when present | stored `NonconformityCommandResult` |
@@ -220,7 +220,7 @@ Job duplicate replay must not enter the job body. It must not scan outbox, rebui
 | Existing state / reserve outcome | Incoming digest | Service 行为 | 对外结果 |
 |---|---|---|---|
 | no existing record | any valid digest | `reserve` -> `Reserved`;继续正常 flow | success、normal rejection 或 retryable failure |
-| existing completed same operation/key | same digest | `reserve` -> `Duplicate(result_ref)`;rollback current UoW;read stored surface by operation kind | replay stored command result / consumer receipt / job report |
+| existing completed same operation/key | same digest | `reserve` -> `Duplicate(result_ref)`;rollback current UoW;read stored surface by operation kind and result kind | replay stored accepted command result / stored command rejection / consumer receipt / job report |
 | existing completed same operation/key | different digest | `reserve` -> `Conflict` or mapped `IdempotencyConflict`;no domain/job body | conflict;caller must use original request or new key |
 | existing reserved / in-flight same operation/key | same digest | `reserve` returns `IdempotencyError::AlreadyInProgress` or mapped unavailable;no mutation | retry later / delayed |
 | existing reserved / in-flight same operation/key | different digest | no mutation;record conflict if repository returned idempotency ref and UoW permits | `IdempotencyConflict` |
@@ -234,7 +234,8 @@ Job duplicate replay must not enter the job body. It must not scan outbox, rebui
 
 | 场景 | 重入来源 | 保护方式 | 恢复方式 |
 |---|---|---|---|
-| Command handler timeout after accepted commit | client retry with same key | completed idempotency points to stored command result | replay stored result;do not append new trace/outbox |
+| Command handler timeout after accepted commit | client retry with same key | completed idempotency points to stored command result | replay stored accepted result;do not append new trace/outbox |
+| Command handler timeout after save-before rejected commit | client retry with same key | completed idempotency points to stored command rejection | replay stored rejected outcome;do not rerun resolver/policy and do not write truth/trace/outbox/stale |
 | Command retry while first execution in-flight | parallel client retry | `AlreadyInProgress` / reserved same key | return temporarily unavailable;caller retries same key later |
 | Command same key with changed body | client bug / replay drift | digest mismatch | `IdempotencyConflict`;no truth write |
 | Command UoW commit status unknown | connection drop / store unknown | retry same key;reserve outcome and stored result decide | duplicate -> replay;in-flight -> unavailable;no blind domain rerun |
@@ -266,7 +267,7 @@ Input: operation_name, idempotency_key, original stable GovernanceRequestDigest
 2. Call GovernanceIdempotencyRepository.reserve(operation_name, key, digest, uow).
 3. If reserve returns Duplicate(result_ref):
      rollback current UoW;
-     load stored command result / consumer receipt / job report by operation kind;
+     load stored accepted command result / command rejection / consumer receipt / job report by operation kind and stored kind;
      return replay if present and correct kind.
 4. If reserve returns Conflict:
      return IdempotencyConflict;do not mutate.
@@ -329,7 +330,7 @@ P0 的正式能力是只读审计 + 拒绝盲重试。自动修复 `Reserved` un
 
 | 测试切口 | 覆盖点 | 建议测试类型 |
 |---|---|---|
-| `TC-GVN-IDEM-001` | command same key same digest returns stored command result;no new truth/trace/outbox/stale | application service |
+| `TC-GVN-IDEM-001` | command same key same digest returns stored accepted command result or stored command rejection;no new truth/trace/outbox/stale | application service |
 | `TC-GVN-IDEM-002` | command same key different digest returns `IdempotencyConflict`;no domain call | application service |
 | `TC-GVN-IDEM-003` | in-flight same key maps to temporarily unavailable;no second mutation | idempotency fake |
 | `TC-GVN-IDEM-004` | digest excludes request id、trace id、requested_at、job run id | contract unit |
@@ -391,7 +392,7 @@ Digest 只包含稳定业务输入:operation name、route-bound refs、trusted a
 
 | 情况 | 结果 |
 |---|---|
-| same operation + same key + same digest + completed | 读取 stored command result / consumer receipt / job report 并 replay;不重跑 mutation/job/publisher |
+| same operation + same key + same digest + completed | 读取 stored accepted command result / command rejection / consumer receipt / job report 并 replay;不重跑 mutation/job/publisher |
 | same operation + same key + same digest + in-flight | 返回 retryable unavailable / delayed;不执行第二个 writer |
 | same operation + same key + different digest | `IdempotencyConflict`;不写 business truth、snapshot、outbox 或 marker |
 | completed idempotency missing stored result | `DuplicateResultMissing` / consistency defect;不得从 current truth 重建 result |

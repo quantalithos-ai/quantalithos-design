@@ -284,6 +284,8 @@
 | `GovernanceProjectionRepository.resolve_projection_target(view_ref)` | 将 public derived view ref 解析为 typed target | read-only;must use `projection_dependency_index` / view metadata,不得字符串猜测 | `Option<GovernanceProjectionTargetRef>` | repository failure |
 | `find_dashboard_view_ref_by_scope(scope_ref)` | 按 scope 查 existing dashboard view ref | read-only;must use view metadata / projection index;missing 表示当前无已建 dashboard projection | `Option<DerivedGovernanceViewRef>` | repository failure |
 | `find_policy_effective_view_ref_by_scope(scope_ref)` | 按 scope 查 existing policy effective view ref | read-only;不得生成新 view identity | `Option<PolicyEffectiveViewRef>` | repository failure |
+| `find_decision_summary_view_ref_by_decision(decision_ref)` | 按 decision 查 existing decision summary view ref | read-only;must use projection lookup index;missing 表示当前无已建 decision summary projection | `Option<DecisionSummaryViewRef>` | repository failure |
+| `find_decision_summary_view_ref_by_gate(gate_ref)` | 按 gate 查 existing current decision summary view ref | read-only;must use projection lookup index;不得扫描 projection store 或从 gate id 拼 view ref | `Option<DecisionSummaryViewRef>` | repository failure |
 | `find_control_coverage_view_ref_by_context(context_ref)` | 按 context 查 existing control coverage view ref | read-only;不得扫描 truth 临时聚合 view | `Option<ControlCoverageViewRef>` | repository failure |
 | `find_nonconformity_status_view_ref_by_nonconformity(nonconformity_ref)` | 按 nonconformity 查 existing status view ref | read-only;不得从 nonconformity id 拼接 view ref | `Option<NonconformityStatusViewRef>` | repository failure |
 | `GovernanceProjectionRepository.get_state_with_version(view_ref)` | 读取 projection freshness state 和 version | read-only;replace/failed/unavailable update 使用返回 version | `Option<Versioned<DerivedGovernanceViewState>>` | repository failure |
@@ -300,7 +302,7 @@
 | `GovernanceUnitOfWork.assign_truth_change_cursor()` | 为 accepted command 分配 committed truth boundary cursor | all changed truth already saved/staged in same UoW;called once per accepted command before trace/outbox/stale/result | `GovernanceTruthCursor` | cursor allocation / transaction state failure |
 | `save_state(state, expected_version, uow)` | 保存 view state only | `None` create;`Some(version)` update | `DerivedGovernanceViewRef` | version conflict |
 | `replace_dashboard_view(view, state, expected_version, uow)` | 替换 dashboard view + state | rebuild UoW;state version from `get_state_with_version` or `None`;must update dependency index | `DerivedGovernanceViewRef` | version conflict |
-| `replace_decision_summary_view(view, state, expected_version, uow)` | 替换 decision summary view + state | rebuild UoW;must update dependency index | `DecisionSummaryViewRef` | version conflict |
+| `replace_decision_summary_view(view, state, expected_version, uow)` | 替换 decision summary view + state | rebuild UoW;must update dependency index and lookup rows `(decision-summary-by-decision, decision_ref)` / `(decision-summary-by-gate, gate_ref)` from view body | `DecisionSummaryViewRef` | version conflict |
 | `replace_policy_effective_view(view, state, expected_version, uow)` | 替换 policy effective view + state | rebuild UoW;must update dependency index | `PolicyEffectiveViewRef` | version conflict |
 | `replace_control_coverage_view(view, state, expected_version, uow)` | 替换 control coverage view + state | rebuild UoW;must update dependency index | `ControlCoverageViewRef` | version conflict |
 | `replace_nonconformity_status_view(view, state, expected_version, uow)` | 替换 nonconformity status view + state | rebuild UoW;must update dependency index | `NonconformityStatusViewRef` | version conflict |
@@ -734,8 +736,8 @@ Query path may call repository reads that return `Versioned<T>`,but it must not 
 | `dependency_ref` | typed ref encoded as `GovernanceProjectionDependencyRef` | source truth/snapshot/view target | body-free typed identity only |
 | `derived_view_ref` | `DerivedGovernanceViewRef` | projection target | public view identity from Step 8 |
 | `projection_kind` | `GovernanceProjectionKind` | resolved target | used for stable list and replace branch |
-| `lookup_kind` | `GovernanceProjectionLookupKind` | projection replace assembler | finite enum for query lookup keys: dashboard-by-scope, policy-effective-by-scope, control-coverage-by-context, nonconformity-status-by-nonconformity |
-| `lookup_ref` | typed ref encoded as `GovernanceProjectionLookupRef` | source query identity | scope/context/nonconformity typed identity only;must match view body target fields |
+| `lookup_kind` | `GovernanceProjectionLookupKind` | projection replace assembler | finite enum for query lookup keys: dashboard-by-scope, policy-effective-by-scope, decision-summary-by-decision, decision-summary-by-gate, control-coverage-by-context, nonconformity-status-by-nonconformity |
+| `lookup_ref` | typed ref encoded as `GovernanceProjectionLookupRef` | source query identity | scope/context/decision/gate/nonconformity typed identity only;must match view body target fields |
 | `source_cursor` | `GovernanceTruthCursor` | rebuild source snapshot | not a version |
 
 | Function | Uses index how |
@@ -743,6 +745,8 @@ Query path may call repository reads that return `Versioned<T>`,but it must not 
 | `resolve_projection_target(view_ref)` | reads view metadata / dependency rows to map public view to typed target |
 | `find_dashboard_view_ref_by_scope(scope_ref)` | reads query lookup row `(dashboard-by-scope, scope_ref)` and returns an existing dashboard view ref |
 | `find_policy_effective_view_ref_by_scope(scope_ref)` | reads query lookup row `(policy-effective-by-scope, scope_ref)` and returns an existing policy view ref |
+| `find_decision_summary_view_ref_by_decision(decision_ref)` | reads query lookup row `(decision-summary-by-decision, decision_ref)` and returns an existing decision summary view ref |
+| `find_decision_summary_view_ref_by_gate(gate_ref)` | reads query lookup row `(decision-summary-by-gate, gate_ref)` and returns an existing current decision summary view ref |
 | `find_control_coverage_view_ref_by_context(context_ref)` | reads query lookup row `(control-coverage-by-context, context_ref)` and returns an existing coverage view ref |
 | `find_nonconformity_status_view_ref_by_nonconformity(nonconformity_ref)` | reads query lookup row `(nonconformity-status-by-nonconformity, nonconformity_ref)` and returns an existing status view ref |
 | `list_views_affected_by_truth_change(change, page)` | maps truth change subject/ref/scope to existing view refs |

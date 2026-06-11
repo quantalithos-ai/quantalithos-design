@@ -1701,22 +1701,26 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 ```text
 [QueryService]
   | validate exactly one of gate_ref / decision_ref
-  | if gate_ref -> gate_v = gate_repo.get_with_version(gate_ref); decision_v = decision_repo.find_current_by_gate(gate_ref)
-  | if decision_ref -> decision_v = decision_repo.get_with_version(decision_ref); gate_v = gate_repo.get_with_version(decision.gate_ref)
+  | if gate_ref -> gate_v = gate_repo.get_with_version(gate_ref); decision_v = decision_repo.find_current_by_gate(gate_ref); view_ref = projection_repo.find_decision_summary_view_ref_by_gate(gate_ref)
+  | if decision_ref -> decision_v = decision_repo.get_with_version(decision_ref); gate_v = gate_repo.get_with_version(decision.gate_ref); view_ref = projection_repo.find_decision_summary_view_ref_by_decision(decision_ref)
+  | if view_ref missing -> return missing projection degraded surface
+  | summary_view = projection_repo.get_decision_summary_view(view_ref)
+  | if summary_view missing -> return missing projection degraded surface
   | resolution = decision_ref ? read_visibility_resolver.resolve_decision_read(decision_ref) : read_visibility_resolver.resolve_gate_read(gate_ref)
   | if decision_v present -> decision_resolution = read_visibility_resolver.resolve_decision_read(decision_v.to_ref())
   | visibility = decision_v present ? decision_resolution.policy_for_actor(actor).evaluate_can_read_decision(decision_v.to_ref(), decision_resolution.read_subject_ref, actor_snapshot) : resolution.policy_for_actor(actor).evaluate_read_subject(resolution.read_subject_ref, actor_snapshot)
-  | if visible -> assemble or load DecisionSummaryView
+  | if visible -> return loaded DecisionSummaryView
   | attach freshness from projection state when projection summary is used
 ```
 
 | 审查项 | 结论 | 缺口 / 修正 |
 |---|---|---|
 | DTO / view | 通过 | Step 8 enforces gate-or-decision lookup shape |
-| port | 通过 | gate/decision reads and projection summary reads exist |
+| port | 通过 | gate/decision reads、decision summary lookup reads and projection summary reads exist |
 | write safety | 通过 | query does not repair stale summary |
 | visibility | 通过 | decision denied returns marker body none |
 | scope/read subject 来源 | 通过 | gate_ref 分支走 `resolve_gate_read`;decision 或 current decision item 走 `resolve_decision_read`;不得从 gate/decision id 推导 |
+| stable view ref 来源 | 通过 | gate_ref 分支必须调用 `find_decision_summary_view_ref_by_gate(gate_ref)`;decision_ref 分支必须调用 `find_decision_summary_view_ref_by_decision(decision_ref)`;missing lookup/view 返回 formal missing projection degraded surface;不得拼接 `DecisionSummaryViewRef`、扫描 projection store、创建 view 或触发 rebuild |
 
 #### 14.5 `GetApprovalResponsibilityFlow`
 

@@ -161,6 +161,11 @@ jobs runner
 | `HandoffError::Permanent` | handoff/export port | package/export cannot be accepted | no until target/config fixed | failed marker;manual |
 | `RuntimeBuildError::InvalidConfig` | infra runtime | config refs invalid or required adapter missing | no until config fixed | runtime failed/rejected job/worker delayed |
 
+Resolver port 对 refresh job 有两个不同层级:
+
+- `ReferenceRefreshResolution<T>` 表示 resolver 已完成调用且给出可持久化的 body-free business outcome。`Unavailable` / `Invalid` / `Unresolved` 必须由 `RefreshExternalContextSnapshotsFlow` 调用 `ReferenceResolutionState.mark_unavailable(...)` / `mark_invalid(...)` / `mark_unresolved(...)` 后按当前 `expected_version` 保存。
+- `ApplicationError` 表示 resolver call 本身没有形成可持久化 business outcome,例如 adapter wiring 缺失、runtime/store 不可用、contract bug、serialization defect 或调用超时无法确定。refresh flow 只能把它记录为 job failed/dependency item,不得从 error variant、message、adapter code、fake private map 或 ref 字符串推断 reference state transition。
+
 ### 8.4 Protocol / worker / job surface
 
 | Surface | 所属模块 | 触发条件 | 是否可重试 | 对外映射 |

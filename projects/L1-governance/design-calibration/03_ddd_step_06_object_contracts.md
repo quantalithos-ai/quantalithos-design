@@ -2715,6 +2715,7 @@ pub struct ReferenceResolutionState {
 | `pub fn mark_resolved(&mut self, version: ExternalSourceVersionRef, checked_at: ReferenceCheckedAt) -> Result<(), ContractError>` | 标记解析成功 | source version、检查时间 | `Result<(), ContractError>` | 设置 `Resolved`,清空 failure reason |
 | `pub fn mark_unresolved(&mut self, reason: ReferenceResolutionFailureReason, checked_at: ReferenceCheckedAt) -> Result<(), ContractError>` | 标记暂未解析 | failure reason、检查时间 | `Result<(), ContractError>` | 设置 `Unresolved`,保留或清空 source version 由 Step 11 persistence 口径闭合 |
 | `pub fn mark_stale(&mut self, reason: ReferenceStaleReason, checked_at: ReferenceCheckedAt) -> Result<(), ContractError>` | 标记来源版本过期 | stale reason、检查时间 | `Result<(), ContractError>` | 设置 `Stale`,不改外部 truth |
+| `pub fn mark_unavailable(&mut self, reason: ReferenceResolutionFailureReason, checked_at: ReferenceCheckedAt) -> Result<(), ContractError>` | 标记来源暂不可用 | resolver unavailable reason、检查时间 | `Result<(), ContractError>` | 设置 `Unavailable`,写入 failure reason;保留或清空 source version 由 Step 11 persistence 口径闭合 |
 | `pub fn mark_invalid(&mut self, reason: ReferenceInvalidReason, checked_at: ReferenceCheckedAt) -> Result<(), ContractError>` | 标记引用无效 | invalid reason、检查时间 | `Result<(), ContractError>` | 设置 `Invalid`,不删除引用 |
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
@@ -4252,6 +4253,7 @@ pub struct DerivedGovernanceViewState {
 | `pub fn start_rebuild(&mut self, cursor: GovernanceTruthCursor) -> Result<(), DomainError>` | 标记 rebuild 开始 | target source cursor | `Result<(), DomainError>` | 允许 `Stale` / `Failed` / `Unavailable -> Rebuilding`;更新 `source_cursor` |
 | `pub fn mark_fresh(&mut self, cursor: GovernanceTruthCursor) -> Result<(), DomainError>` | 标记 rebuild 成功并追上 cursor | rebuilt source cursor | `Result<(), DomainError>` | 允许 `Rebuilding -> Fresh`;更新 `source_cursor`;清空 `last_failure_ref` |
 | `pub fn mark_failed(&mut self, failure_ref: DerivedViewFailureRef) -> Result<(), DomainError>` | 记录维护失败 | persisted failure ref 或 job report item ref | `Result<(), DomainError>` | 允许 `Stale` / `Rebuilding -> Failed`;写入 `last_failure_ref` |
+| `pub fn mark_unavailable(&mut self, failure_ref: DerivedViewFailureRef) -> Result<(), DomainError>` | 标记 view 暂不可服务 | persisted failure ref 或 job report item ref | `Result<(), DomainError>` | 允许 `Fresh` / `Stale` / `Rebuilding` / `Failed -> Unavailable`;写入 `last_failure_ref`;保留 `source_cursor`;repository 不得绕过 domain method 私自改 state |
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
@@ -4266,6 +4268,7 @@ pub struct DerivedGovernanceViewState {
 | query no-write | Query 只能读取本对象并返回 freshness / degraded marker,不得调用 `mark_stale`、`start_rebuild` 或 `mark_fresh` 修复状态 |
 | rebuild 不修复 truth | `mark_fresh(...)` 只说明 projection 已追上 cursor,不表示 truth 被修复或重新批准 |
 | first materialization 不进入 Rebuilding | existing state missing 时,`RebuildGovernanceProjectionsFlow` 通过 `for_view(...)` 创建 `Fresh` state,并与首次构建出的 view body 同 UoW replace;该分支不是 `Fresh -> Rebuilding -> Fresh` 迁移 |
+| unavailable 必须通过 domain method | source truth missing / projection storage unavailable 若要落 `Unavailable`,必须调用 `mark_unavailable(failure_ref)`;repository 只能保存已转换 state,不得提供私有 unavailable shortcut |
 | HLD factory 补入 cursor | HLD 写 `for_view(view_ref)`,但对象必填 `source_cursor`;为满足字段来源闭环,正式落码 factory 必须接收 `GovernanceTruthCursor` |
 | HLD failure reason 映射为 ref | HLD 写 `mark_failed(DerivedViewFailureReason)`,但对象字段是 `last_failure_ref`;正式落码用已持久化 `DerivedViewFailureRef`,failure reason 由 failure marker / job report 承载 |
 

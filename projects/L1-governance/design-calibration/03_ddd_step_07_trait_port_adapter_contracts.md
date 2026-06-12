@@ -1610,6 +1610,41 @@ pub trait StoredGovernanceResultRepository {
 
 所有 resolver 只能返回 body-free ref、safe summary、source version、digest、snapshot 或 resolution state。不得返回 process/work/artifact/method/runtime/conversation/observability 正文。
 
+Refresh job 调用的 resolver 必须返回可判别的 body-free outcome,而不是让 application service 从 `ApplicationError`、错误字符串或 fake 约定推断 reference state。`ApplicationError` 只表示 resolver call 本身无法完成、adapter wiring/store/runtime 失败或 contract bug;业务上可保存的 unresolved / unavailable / invalid 结果必须进入 `ReferenceRefreshResolution<T>`。
+
+```rust
+/// Body-free resolver outcome used by RefreshExternalContextSnapshotsFlow.
+pub enum ReferenceRefreshResolution<T> {
+    /// Resolver produced a refreshed typed sidecar/snapshot and a resolved reference state.
+    Resolved {
+        state: ReferenceResolutionState,
+        body: T,
+    },
+    /// External source is temporarily unavailable; refresh flow must persist
+    /// `ReferenceResolutionState::mark_unavailable(...)` with current expected_version.
+    Unavailable {
+        reason: ReferenceResolutionFailureReason,
+        checked_at: ReferenceCheckedAt,
+    },
+    /// External reference is invalid or payload violates body-free/schema contract; refresh flow
+    /// must persist `ReferenceResolutionState::mark_invalid(...)` with current expected_version.
+    Invalid {
+        reason: ReferenceInvalidReason,
+        checked_at: ReferenceCheckedAt,
+    },
+    /// External reference currently cannot be resolved but is not known invalid; refresh flow
+    /// must persist `ReferenceResolutionState::mark_unresolved(...)` with current expected_version.
+    Unresolved {
+        reason: ReferenceResolutionFailureReason,
+        checked_at: ReferenceCheckedAt,
+    },
+}
+
+pub struct ArtifactReferenceResolution {
+    pub artifact_ref: ArtifactRef,
+}
+```
+
 ```rust
 /// Resolves external Governance references into body-free summaries and snapshots.
 pub trait ExternalGovernanceSourceResolverPort {
@@ -1626,42 +1661,42 @@ pub trait ExternalGovernanceSourceResolverPort {
     async fn resolve_actor_capability(
         &self,
         actor_ref: ActorRef,
-    ) -> Result<ActorCapabilitySnapshot, ApplicationError>;
+    ) -> Result<ReferenceRefreshResolution<ActorCapabilitySnapshot>, ApplicationError>;
 
     async fn resolve_method_policy(
         &self,
         policy_ref: MethodPolicyRef,
-    ) -> Result<MethodPolicySnapshot, ApplicationError>;
+    ) -> Result<ReferenceRefreshResolution<MethodPolicySnapshot>, ApplicationError>;
 
     async fn resolve_method_control(
         &self,
         control_ref: MethodControlRef,
-    ) -> Result<MethodControlSnapshot, ApplicationError>;
+    ) -> Result<ReferenceRefreshResolution<MethodControlSnapshot>, ApplicationError>;
 
     async fn resolve_evidence_summary(
         &self,
         evidence_ref: EvidenceSummaryRef,
-    ) -> Result<ReferenceResolutionState, ApplicationError>;
+    ) -> Result<ReferenceRefreshResolution<EvidenceSummaryRef>, ApplicationError>;
 
     async fn resolve_artifact_ref(
         &self,
         artifact_ref: ArtifactRef,
-    ) -> Result<ReferenceResolutionState, ApplicationError>;
+    ) -> Result<ReferenceRefreshResolution<ArtifactReferenceResolution>, ApplicationError>;
 
     async fn resolve_process_context(
         &self,
         context_ref: ProcessGovernanceContextRef,
-    ) -> Result<ReferenceResolutionState, ApplicationError>;
+    ) -> Result<ReferenceRefreshResolution<ProcessGovernanceContextRef>, ApplicationError>;
 
     async fn resolve_work_context(
         &self,
         context_ref: WorkGovernanceContextRef,
-    ) -> Result<ReferenceResolutionState, ApplicationError>;
+    ) -> Result<ReferenceRefreshResolution<WorkGovernanceContextRef>, ApplicationError>;
 
     async fn resolve_runtime_signal(
         &self,
         signal_ref: RuntimeSignalRef,
-    ) -> Result<ReferenceResolutionState, ApplicationError>;
+    ) -> Result<ReferenceRefreshResolution<RuntimeSignalRef>, ApplicationError>;
 
     async fn resolve_scope_subject_relation(
         &self,
@@ -1673,24 +1708,28 @@ pub trait ExternalGovernanceSourceResolverPort {
 
 | 函数 | 闭合点 |
 |---|---|
-| `resolve_artifact_ref(artifact_ref)` | 返回 body-free `ReferenceResolutionState`;用于 `SubmitAIIAConclusionFlow` / `SubmitSoAConclusionFlow` 在 draft 创建前判定 artifact ref 是否 resolved;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 必须 save 前 rejected,不得创建 AIIA / SoA truth,不得返回 artifact body |
+| `resolve_artifact_ref(artifact_ref)` | 返回 body-free `ReferenceRefreshResolution<ArtifactReferenceResolution>`;用于 `SubmitAIIAConclusionFlow` / `SubmitSoAConclusionFlow` 在 draft 创建前判定 artifact ref 是否 resolved,也用于 refresh job 分类保存 reference state;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 必须 save 前 rejected 或在 refresh 中保存对应 failed state,不得创建 AIIA / SoA truth,不得返回 artifact body |
 | `resolve_scope_subject_relation(subject_ref, scope_ref)` | 返回 body-free `GovernanceScopeSubjectRelation`;用于 `PolicyScopePolicy` 在 `ActivatePolicyEffectiveFactFlow` / `UpdateSharedRuleSetFlow` save 前判定 subject/scope mismatch;不得解析 ref 字符串、不得扫描 adapter 私有状态、不得返回 scope body |
 
 Refresh dispatch binding:
 
 | `GovernanceReferenceRefreshTarget` | resolver call | typed save on success |
 |---|---|---|
-| `ActorCapability { actor_ref }` | `resolve_actor_capability(actor_ref)` | `save_actor_capability_snapshot(snapshot, expected_version, uow)` |
-| `MethodPolicy { policy_ref }` | `resolve_method_policy(policy_ref)` | `save_method_policy_snapshot(snapshot, expected_version, uow)` |
-| `MethodControl { control_ref }` | `resolve_method_control(control_ref)` | `save_method_control_snapshot(snapshot, expected_version, uow)` |
-| `EvidenceSummary { evidence_ref }` | `resolve_evidence_summary(evidence_ref)` | `save_evidence_summary_ref(reference_ref, evidence_ref, expected_version, uow)` |
-| `Artifact { artifact_ref }` | `resolve_artifact_ref(artifact_ref)` | `save_reference_state(...)` only |
-| `ProcessContext { process_ref, activity_ref, waiting_gate_ref }` | construct `ProcessGovernanceContextRef` with current state,then `resolve_process_context(context_ref)` | construct refreshed `ProcessGovernanceContextRef` with new state,then `save_process_context_ref(context_ref, expected_version, uow)` |
-| `WorkContext { project_ref, work_ref, iteration_ref }` | construct `WorkGovernanceContextRef` with current state,then `resolve_work_context(context_ref)` | construct refreshed `WorkGovernanceContextRef` with new state,then `save_work_context_ref(context_ref, expected_version, uow)` |
-| `RuntimeSignal { signal_kind, external_ref, captured_at }` | construct `RuntimeSignalRef` with current state,then `resolve_runtime_signal(signal_ref)` | construct refreshed `RuntimeSignalRef` with new state,then `save_runtime_signal_ref(signal_ref, expected_version, uow)` |
+| `ActorCapability { actor_ref }` | `resolve_actor_capability(actor_ref)` | on `Resolved { body: snapshot, state }`: `save_actor_capability_snapshot(snapshot, expected_version, uow)` + `save_reference_state(state, expected_version, uow)`;on `Unavailable` / `Invalid` / `Unresolved`: mutate loaded state with matching `mark_*` helper and save only reference state |
+| `MethodPolicy { policy_ref }` | `resolve_method_policy(policy_ref)` | same outcome rule;resolved body saved by `save_method_policy_snapshot(...)` |
+| `MethodControl { control_ref }` | `resolve_method_control(control_ref)` | same outcome rule;resolved body saved by `save_method_control_snapshot(...)` |
+| `EvidenceSummary { evidence_ref }` | `resolve_evidence_summary(evidence_ref)` | same outcome rule;resolved body saved by `save_evidence_summary_ref(reference_ref, evidence_ref, expected_version, uow)` |
+| `Artifact { artifact_ref }` | `resolve_artifact_ref(artifact_ref)` | save reference state only;no artifact body or typed artifact sidecar |
+| `ProcessContext { process_ref, activity_ref, waiting_gate_ref }` | construct `ProcessGovernanceContextRef` with current state,then `resolve_process_context(context_ref)` | same outcome rule;resolved body saved by `save_process_context_ref(context_ref, expected_version, uow)` |
+| `WorkContext { project_ref, work_ref, iteration_ref }` | construct `WorkGovernanceContextRef` with current state,then `resolve_work_context(context_ref)` | same outcome rule;resolved body saved by `save_work_context_ref(context_ref, expected_version, uow)` |
+| `RuntimeSignal { signal_kind, external_ref, captured_at }` | construct `RuntimeSignalRef` with current state,then `resolve_runtime_signal(signal_ref)` | same outcome rule;resolved body saved by `save_runtime_signal_ref(signal_ref, expected_version, uow)` |
 | `MarkerOnly { family }` | no resolver call | failed / skipped reference item in job report;no typed sidecar save |
 
 `RefreshExternalContextSnapshotsFlow` must dispatch only from `ReferenceResolutionState.refresh_target`. Service, fake runtime and durable adapter must not parse `ExternalGovernanceReferenceRef`, source family strings or typed ref string prefixes to select a resolver.
+
+`RefreshExternalContextSnapshotsFlow` must also classify resolver outcomes only from `ReferenceRefreshResolution<T>`. It must not inspect `ApplicationError` variants, error messages, adapter-specific codes, fake private maps or source ref strings to decide between `mark_unavailable(...)`, `mark_invalid(...)` and `mark_unresolved(...)`.
+
+For `Resolved { state, body }`, `state.reference_ref` and `state.refresh_target` must equal the loaded `state_v.item.reference_ref` and `state_v.item.refresh_target`. Mismatch is `ApplicationError::ConsistencyDefect` and must not save the typed sidecar.
 
 #### 11.2 Publisher port
 

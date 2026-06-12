@@ -2417,6 +2417,7 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
 |---|---|
 | projection target missing | mark item failed in report;do not invent typed view ref |
 | source truth missing | mark view state failed or unavailable per Step 10/13;do not create placeholder truth |
+| source truth missing / source storage unavailable with formal failure marker | existing-state branch calls `target_state.mark_unavailable(failure_ref)` when classified unavailable;otherwise `target_state.mark_failed(failure_ref)`;missing-state branch records failed item only unless a state already exists;do not create placeholder truth or unavailable state without a view state row |
 | existing state missing | first materialization only:create `DerivedGovernanceViewState::for_view(view_ref, snapshot.source_cursor)` with `expected_version = None`;do not call `start_rebuild(...)` or `mark_fresh(...)`;replace first view body and `Fresh` state atomically |
 | existing state present | use `state_v.version` as expected version;call `start_rebuild(snapshot.source_cursor)` before builder |
 | view replace success | existing-state branch calls `mark_fresh(snapshot.source_cursor)` before replace;missing-state branch is already `Fresh`;include view ref in report |
@@ -2440,21 +2441,32 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
   | for each state_v:
   |   reference_ref = state_v.item.reference_ref
   |   refresh_target = state_v.item.refresh_target
-  |   resolver call selected by match refresh_target
-  |   on success:
-  |     new_state = resolved ReferenceResolutionState
-  |     save body-free snapshot/ref required by refresh_target with Some(state_v.version)
-  |     reference_repo.save_reference_state(new_state, Some(state_v.version), tx)
-  |     affected = projection_repo.list_views_affected_by_references({reference_ref}, page)
-  |     reference_cursor = tx.assign_reference_change_cursor()
-  |     projection_repo.mark_stale(affected, reference_cursor, tx)
-  |     assembly.record_references({reference_ref}, empty)
+  |   outcome = resolver call selected by match refresh_target
+  |   match outcome:
+  |     Resolved { state: new_state, body }:
+  |       save body-free snapshot/ref required by refresh_target with Some(state_v.version)
+  |       reference_repo.save_reference_state(new_state, Some(state_v.version), tx)
+  |       affected = projection_repo.list_views_affected_by_references({reference_ref}, page)
+  |       reference_cursor = tx.assign_reference_change_cursor()
+  |       projection_repo.mark_stale(affected, reference_cursor, tx)
+  |       assembly.record_references({reference_ref}, empty)
+  |     Unavailable { reason, checked_at }:
+  |       failed_state = state_v.item.mark_unavailable(reason, checked_at)
+  |       reference_repo.save_reference_state(failed_state, Some(state_v.version), tx)
+  |       assembly.record_references(empty, {reference_ref})
+  |     Invalid { reason, checked_at }:
+  |       failed_state = state_v.item.mark_invalid(reason, checked_at)
+  |       reference_repo.save_reference_state(failed_state, Some(state_v.version), tx)
+  |       assembly.record_references(empty, {reference_ref})
+  |     Unresolved { reason, checked_at }:
+  |       failed_state = state_v.item.mark_unresolved(reason, checked_at)
+  |       reference_repo.save_reference_state(failed_state, Some(state_v.version), tx)
+  |       assembly.record_references(empty, {reference_ref})
   |   on MarkerOnly target:
   |     assembly.record_references(empty, {reference_ref})
-  |   on failure:
-  |     failed_state = state_v.item.mark_failed(...)
-  |     reference_repo.save_reference_state(failed_state, Some(state_v.version), tx)
-  |     assembly.record_references(empty, {reference_ref})
+  |   on ApplicationError:
+  |     record job dependency/failed item according to Step 12
+  |     do not mutate ReferenceResolutionState unless resolver returned ReferenceRefreshResolution
 ```
 
 | Scope branch | Formal expansion | Missing / invalid handling |
@@ -2474,7 +2486,8 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
 | `WorkContext { project_ref, work_ref, iteration_ref }` | construct `WorkGovernanceContextRef` with current state,then `resolve_work_context(context_ref)` | construct refreshed `WorkGovernanceContextRef` with new state;`save_work_context_ref(context_ref, Some(state_v.version), tx)` plus reference state | stale context/dashboard affected views |
 | `RuntimeSignal { signal_kind, external_ref, captured_at }` | construct `RuntimeSignalRef` with current state,then `resolve_runtime_signal(signal_ref)` | construct refreshed `RuntimeSignalRef` with new state;`save_runtime_signal_ref(signal_ref, Some(state_v.version), tx)` plus reference state | stale nonconformity/dashboard views |
 | `MarkerOnly { family }` | no resolver call | record failed/skipped reference item;no sidecar save | do not mark stale |
-| resolver failure | selected by target | update reference state failure marker with `state_v.version` | do not mark stale unless Step 13 classifies failure as stale-worthy |
+| resolver `Unavailable` / `Invalid` / `Unresolved` outcome | selected by target | update loaded `ReferenceResolutionState` by `mark_unavailable(...)` / `mark_invalid(...)` / `mark_unresolved(...)` with `state_v.version` | do not mark stale unless Step 13 classifies failure as stale-worthy |
+| resolver `ApplicationError` | selected by target | no reference state mutation;record job dependency/failed item | do not mark stale |
 
 Refresh dispatch constraints:
 
@@ -2482,6 +2495,7 @@ Refresh dispatch constraints:
 - `GovernanceScope(scope_ref)` expansion 的唯一来源是 Step 7 `GovernanceReferenceScopeLink` index。Refresh job 不扫描 actor / method / evidence / process / work / runtime sidecar stores,不读取 projection body,不从 truth snapshot refs 反推 external refs,也不在 job 内创建 scope links。
 - 若 scope index row 的 stored `refresh_target` 与 returned tracked state 的 `refresh_target` 不一致,repository 必须返回 consistency error 或将该 item 计入 failed refs;service 不得选择其中任意一个继续 resolver dispatch。
 - target 不直接内嵌 `ReferenceResolutionState`;构造 process/work/runtime resolver input 和 refreshed sidecar 时必须使用 `state_v.item.reference_ref` 对应的 current/new state。
+- resolver business classification 只能来自 Step 7 `ReferenceRefreshResolution<T>`。`RefreshExternalContextSnapshotsFlow` 不得解析 `ApplicationError`、错误字符串、adapter code、fake private map 或 ref 字符串来选择 `mark_unavailable(...)`、`mark_invalid(...)` 或 `mark_unresolved(...)`。
 - duplicate job 只读取 stored `GovernanceJobReport`,不得重新执行 target dispatch。
 
 #### 18.4 `RunGovernanceReconciliationFlow`

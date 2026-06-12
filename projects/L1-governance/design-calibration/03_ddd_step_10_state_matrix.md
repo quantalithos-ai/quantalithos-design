@@ -668,6 +668,7 @@
   Fresh -> Stale -> Rebuilding -> Fresh
   Stale -> Failed -> Rebuilding
   Rebuilding -> Failed
+  Fresh/Stale/Rebuilding/Failed -> Unavailable
   Unavailable -> Rebuilding
 ```
 
@@ -686,13 +687,14 @@
 | `Stale` / `Failed` / `Unavailable` | `Rebuilding` | `start_rebuild(cursor)` | `RebuildGovernanceProjectionsFlow` existing-state branch | job has versioned state read;target resolved by `resolve_projection_target`;source reads available enough to attempt rebuild | `freshness_state = Rebuilding`;update source cursor | continue to typed builder;do not use for missing-state first materialization | `DomainError::InvalidStateTransition` |
 | `Rebuilding` | `Fresh` | `mark_fresh(cursor)` | `RebuildGovernanceProjectionsFlow` existing-state branch | typed view body built from committed truth/snapshots after `start_rebuild(...)`;replace_*_view will be saved atomically | `freshness_state = Fresh`;update source cursor;clear failure ref | replace public view + state atomically;record rebuilt view ref in job report | `DomainError::InvalidStateTransition` |
 | `Stale` / `Rebuilding` | `Failed` | `mark_failed(failure_ref)` | rebuild item failure | failure marker/report item ref persisted;source truth missing or builder failure not classified unavailable | `freshness_state = Failed`;write last failure ref | save state with expected version;record failed item;do not create placeholder view | `DomainError::InvalidStateTransition` |
-| `Fresh` / `Stale` / `Rebuilding` / `Failed` | `Unavailable` | repository state update by maintenance policy | rebuild / query degraded path | projection source or storage unavailable and formal issue/failure ref exists | `freshness_state = Unavailable`;preserve cursor and failure context | save state;query returns unavailable/degraded;job report records failed view | `ApplicationError::InvalidStateTransition` |
+| `Fresh` / `Stale` / `Rebuilding` / `Failed` | `Unavailable` | `mark_unavailable(failure_ref)` | rebuild item unavailable path / query degraded source marker | projection source truth missing,source storage unavailable or projection storage unavailable is classified unavailable;formal `DerivedViewFailureRef` exists | `freshness_state = Unavailable`;preserve cursor;write last failure ref | save state with expected version when state row exists;query returns unavailable/degraded;job report records failed view;missing-state branch records failed item only unless a state row exists | `DomainError::InvalidStateTransition` |
 
 | 停审项 | 结论 | 缺口 / 修正 |
 |---|---|---|
 | enum 是否存在 | 通过 | `DerivedGovernanceViewFreshnessState` 已在 Step 6 定义 |
 | 状态名是否一致 | 通过 | `Fresh/Stale/Rebuilding/Failed/Unavailable` 全部一致 |
-| Step 9 待决点 | 已闭口 | rebuild success uses `Rebuilding -> Fresh`;item failure uses `Stale/Rebuilding -> Failed`;source/storage unavailable uses `Unavailable` |
+| Step 9 待决点 | 已闭口 | rebuild success uses `Rebuilding -> Fresh`;item failure uses `Stale/Rebuilding -> Failed`;source/storage unavailable uses `mark_unavailable(...) -> Unavailable` when a state row exists |
+| 触发函数是否存在 | 通过 | Step 6 `mark_stale/start_rebuild/mark_fresh/mark_failed/mark_unavailable` 全部存在 |
 | 前置条件是否闭合 | 通过 | affected views and projection targets come from Step 7,not ad hoc ids |
 | 副作用是否闭合 | 通过 | projection state does not repair truth;query no-write |
 | 测试切口 | 通过 | stale visible;failed rebuild no placeholder;unavailable degraded;fresh replacement atomic |

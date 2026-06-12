@@ -2258,7 +2258,7 @@ let record = GovernanceOutboxRecord::from_truth_change(outbox_id, &change, trace
 | 入口函数 | `GovernanceOperationsJobService.publish_governance_outbox(request, operation_context)` |
 | 依赖 port | `GovernanceOutboxRepository`, `GovernanceOutboxPublisherPort`, `StoredGovernanceResultRepository`, `GovernanceIdempotencyRepository`, `GovernanceUnitOfWorkManager` |
 | allowed mutation | outbox publication state only |
-| job report | `GovernanceJobReport` with outbox refs / counters;duplicate returns stored report |
+| job report | `GovernanceJobReport` with `scanned_outbox_refs` / `published_outbox_refs` / `failed_outbox_refs` and counters;duplicate returns stored report |
 | 测试切口 | pending success; publisher retryable failure; dead letter mapping; duplicate replay; missing payload snapshot; no current truth lookup |
 
 ```text
@@ -2273,16 +2273,18 @@ let record = GovernanceOutboxRecord::from_truth_change(outbox_id, &change, trace
   | duplicate -> rollback, stored_result_repo.get_job_report(result_ref), return replay
   | pending_page = outbox_repo.list_pending_with_payload(input.page)
   | assembly = GovernanceJobReportAssembly::start(operation_context, metadata.idempotency_key)
+  | assembly.record_outbox_scan(pending_page.outbox_refs)
   v
 [Per pending item]
   | record_v = Versioned<GovernanceOutboxPendingItem>
   | snapshot = outbox_repo.get_payload_snapshot(record_v.item.payload_snapshot_ref)
   | if snapshot missing -> outbox_repo.mark_failed(record.outbox_ref, reason, record_v.version, tx)
-  | else publish(record_v.item.record, snapshot)
-  |   success -> outbox_repo.mark_published(outbox_ref, publication_ref, record_v.version, tx)
-  |   retryable failure -> outbox_repo.mark_failed(outbox_ref, failure_reason, record_v.version, tx)
-  |   fatal failure -> outbox_repo.mark_dead_lettered(outbox_ref, dead_letter_reason, record_v.version, tx)
-  | assembly.record_outbox(...)
+  | else outcome = publisher.publish(record_v.item.record, snapshot)
+  |   Published(publication_ref) -> outbox_repo.mark_published(outbox_ref, publication_ref, record_v.version, tx)
+  |   RetryableFailed(failure_reason) -> outbox_repo.mark_failed(outbox_ref, failure_reason, record_v.version, tx)
+  |   FatalFailed(dead_letter_reason) -> outbox_repo.mark_dead_lettered(outbox_ref, dead_letter_reason, record_v.version, tx)
+  |   Published(...) -> assembly.record_outbox_published(outbox_ref)
+  |   RetryableFailed(...) / FatalFailed(...) / missing payload / optimistic conflict -> assembly.record_outbox_failed(outbox_ref)
   v
 [Complete]
   | report = assembly.finish_from_counts()
@@ -2294,18 +2296,22 @@ let record = GovernanceOutboxRecord::from_truth_change(outbox_id, &change, trace
 
 ```rust
 // GovernanceOutboxPublisherPort::publish(GovernanceOutboxRecord record, GovernanceOutboxPayloadSnapshot payload_snapshot)
-let publication_ref = publisher.publish(record.clone(), payload_snapshot).await?;
+let outcome = publisher.publish(record.clone(), payload_snapshot).await?;
 ```
 
 | 分支 | 处理口径 | Job report |
 |---|---|---|
-| no pending items | commit stored completed report with zero scanned/changed/failed | `Completed` |
-| publish success | mark `Published` with `expected_version = pending.version` | changed +1 |
-| retryable failure | mark `Failed` with `expected_version = pending.version`;truth unchanged | failed +1;partial if other success |
-| fatal failure | mark `DeadLettered` with `expected_version = pending.version` | failed +1 |
-| missing payload snapshot | mark `Failed` or `DeadLettered` per Step 13 retry policy;never rebuild from truth | failed +1 |
-| duplicate job | read stored `GovernanceJobReport`;do not list pending or publish | replayed report |
-| optimistic conflict | item skipped or job partial per Step 13;do not publish after conflict | failed/skipped counter |
+| no pending items | commit stored completed report with zero scanned/changed/failed and empty outbox ref sets | `Completed` |
+| `OutboxPublisherOutcome::Published(publication_ref)` | mark `Published` with `expected_version = pending.version` | `published_outbox_refs += outbox_ref`;changed +1 |
+| `OutboxPublisherOutcome::RetryableFailed(failure_reason)` | mark `Failed` with `expected_version = pending.version`;truth unchanged | `failed_outbox_refs += outbox_ref`;failed +1;partial if other success |
+| `OutboxPublisherOutcome::FatalFailed(dead_letter_reason)` | mark `DeadLettered` with `expected_version = pending.version` | `failed_outbox_refs += outbox_ref`;failed +1 |
+| missing payload snapshot | mark `Failed` or `DeadLettered` per Step 13 retry policy;never rebuild from truth | `failed_outbox_refs += outbox_ref`;failed +1 |
+| duplicate job | read stored `GovernanceJobReport`;do not list pending or publish | replayed report,including scanned/published/failed outbox refs |
+| optimistic conflict | item skipped or job partial per Step 13;do not publish after conflict | `failed_outbox_refs += outbox_ref`;failed/skipped counter |
+
+`GovernanceOutboxPublisherLoopEntry` must update `scanned_outbox_refs`, `published_outbox_refs`, and `failed_outbox_refs` only from the `GovernanceJobReport` returned by `GovernanceOperationsJobService.publish_governance_outbox(...)` or by stored duplicate replay. Worker loop code must not read `GovernanceOutboxRepository` or publisher adapter state to reconstruct per-item outcomes.
+
+Publisher failure classification is not inferred by this flow. `GovernanceOutboxPublisherPort` must return `OutboxPublisherOutcome`;service/fake/worker code must not parse `OutboxFailureReason` strings or adapter exceptions to choose retryable vs dead-letter.
 
 #### 17.5 Outbound publish stop-review
 

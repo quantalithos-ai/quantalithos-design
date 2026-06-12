@@ -1652,14 +1652,16 @@ pub trait GovernanceOutboxPublisherPort {
         &self,
         record: GovernanceOutboxRecord,
         payload_snapshot: GovernanceOutboxPayloadSnapshot,
-    ) -> Result<OutboxPublicationRef, OutboxFailureReason>;
+    ) -> Result<OutboxPublisherOutcome, ApplicationError>;
 }
 ```
 
 | 闭合点 | 说明 |
 |---|---|
 | stored snapshot | publisher 接收 `GovernanceOutboxPayloadSnapshot`,不得回查 current truth 造 payload |
-| failure reason | adapter failure 进入 `OutboxFailureReason`,不得回滚 accepted truth |
+| outcome mapping | `OutboxPublisherOutcome::Published(publication_ref)` 必须进入 `mark_published`;`RetryableFailed(failure_reason)` 必须进入 `mark_failed`;`FatalFailed(dead_letter_reason)` 必须进入 `mark_dead_lettered` |
+| adapter error | transport / serialization / topic binding 等 adapter error 必须在 publisher adapter 内映射成 `OutboxPublisherOutcome` 或 `ApplicationError`;若返回 `ApplicationError`,flow 不得自行猜 retryable/dead-letter,只能按 Step 12 job-level failure 记录 |
+| forbidden mapping | service、worker loop、fake runtime 不得从 `OutboxFailureReason` 字符串、exception type、HTTP status 或 topic name 推断 fatal / retryable |
 | topic / schema | topic map、schema version 和 unsupported handling 由 Step 8 / Step 14 / Step 13 继续闭合 |
 
 #### 11.3 Handoff / archive / external GRC ports

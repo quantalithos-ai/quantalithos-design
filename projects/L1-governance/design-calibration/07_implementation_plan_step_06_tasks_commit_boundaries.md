@@ -622,7 +622,7 @@
 | BATCH-06-04 | consumer services and fake adapters | `03` Step 9 | 9 consumer services、resolver fake、dead-letter/quarantine | 500 行以上;按 consumer family 拆批 | consumer tests | commit-06-b |
 | BATCH-06-05 | outbound event DTO + outbox record snapshot | `03` Step 6/8/11 | 12 outbound events、event kind、payload snapshot、outbox record | 500 行以上;按 event family 拆批 | contract-domain-fast | commit-06-c |
 | BATCH-06-06 | payload builders + accepted flow outbox migration | `03` Step 9 | builders、service accepted paths append outbox | 500 行以上;按 PH-02~PH-04 accepted flow 分批 | service regression | commit-06-c |
-| BATCH-06-07 | publisher loop + retry/failed | `03` Step 7/9/11/13 | publisher port/fake、worker loop、mark_published/failed | 300~500 行 | outbox publisher tests | commit-06-d |
+| BATCH-06-07 | publisher loop + retry/failed + PublishOutbox minimal job replay surface | `03` Step 6/7/8/9/11/13 | publisher port/fake、worker loop、mark_published/failed/dead-letter、`PublishGovernanceOutbox` 所需最小 job metadata/request/response/report/stored replay surface | 300~500 行 | outbox publisher tests | commit-06-d |
 
 #### 提交边界
 
@@ -631,7 +631,7 @@
 | commit-06-a | inbound event shared DTO、9 event DTO、fixtures contract tests 通过后 | inbound event contracts、consumer receipt/rejected DTO、fixtures | consumer services、outbound events、publisher | contract tests inbound slice;`cargo check`;`git diff --check` |
 | commit-06-b | reference snapshot/receipt/stale ports and consumer services tests 通过后 | local snapshots、receipt store、projection stale ports、9 consumer services、fake resolvers | outbound events、outbox publisher、operations jobs | consumer tests;projection stale targeted;`cargo check`;`git diff --check` |
 | commit-06-c | outbound event DTO、outbox record snapshot、payload builders、accepted flow outbox migration tests 通过后 | 12 outbound events、outbox record/payload snapshot、payload builders、accepted flow append outbox | publisher loop、operations jobs、release evidence | contract-domain-fast outbound slice;service regression;`git diff --check` |
-| commit-06-d | publisher loop、retry/failed state、topic map tests 通过后 | publisher port/fake、outbox publish service、worker loop、topic map verification | public job DTO、operations jobs、release report | outbox publisher tests;topic map check;`cargo check`;`git diff --check` |
+| commit-06-d | publisher loop、retry/failed/dead-letter state、topic map 和 publish duplicate replay tests 通过后 | publisher port/fake、outbox publish service、worker loop、topic map verification、`PublishGovernanceOutbox` 最小 job request/response/report/stored replay surface,包含 scanned/published/failed outbox refs | 其它 operations job DTO/runners、release report | outbox publisher tests;topic map check;publish duplicate replay;`cargo check`;`git diff --check` |
 
 #### Commit boundary 子功能分组
 
@@ -640,7 +640,7 @@
 | commit-06-a | inbound event contracts + receipt DTO | Consumer service 需要稳定 public event and receipt surface | BATCH-06-01;BATCH-06-02 | contract tests | services/outbound |
 | commit-06-b | snapshot/receipt/stale ports + consumer services | accepted consumer path 必须同时保存 receipt/snapshot 并 mark stale | BATCH-06-03;BATCH-06-04 | consumer tests | outbound/publisher/job |
 | commit-06-c | outbound DTO + outbox record + payload builders | accepted command outbox write 需要 payload snapshot 和 event kind 同时闭合 | BATCH-06-05;BATCH-06-06 | outbound contract;service regression | publisher/job |
-| commit-06-d | publisher port + loop + publication state | publish result 必须和 retry/failed/version/topic map 同时验证 | BATCH-06-07 | outbox publisher tests | operations job public surface |
+| commit-06-d | publisher port + loop + publication state + PublishOutbox duplicate replay | publish result 必须和 retry/failed/dead-letter/version/topic map/stored report replay 同时验证;worker loop success/failed refs 必须来自 stored/application job report | BATCH-06-07 | outbox publisher tests;publish duplicate replay | 其它 operations job public surface |
 
 #### PH-06 开工前设计闭环复核
 
@@ -653,7 +653,8 @@
 | outbox source identity 闭环 | outbox record 有 event_kind、truth_ref、core_trace_id、visibility_marker、payload_snapshot、publication_state/version | 开工前确认 | 回写 outbox record |
 | optimistic version 来源闭环 | reference state、receipt、outbox publication marker 的 expected_version 来源明确 | 开工前确认 | 补 versioned read/list |
 | idempotency 闭环 | consumer duplicate replay、outbox publication retry/duplicate 行为明确 | 开工前确认 | 补 receipt/result surface |
-| phase boundary | publisher loop 不引入 public operations job DTO/report | 通过 | 若需要 job surface,移至 PH-07 |
+| phase boundary | publisher loop 只前移 `PublishGovernanceOutbox` 所需最小 job shared schema/result surface,不引入其它 operations job DTO/report | 通过 | 若需要 rebuild/refresh/reconciliation/handoff/export job surface,移至 PH-07 |
+| worker publish loop report 明细闭环 | `GovernanceJobReport` 携带 scanned/published/failed outbox refs,worker loop 不读 repository 反推 success/failed refs | 通过 | 补 job report surface 或延后可执行 runner |
 
 #### PH-06 Commit boundary 经验复核
 
@@ -688,7 +689,7 @@
 
 | 任务编号 | 编写顺序 | 实施动作 | 输入 | 输出 | 完成判定 |
 |---|---:|---|---|---|---|
-| IMPL-07-01 | 1 | 编写 job shared schema、metadata、receipt/report/error、stored job report result surface | `03` job protocol/idempotency | `contracts::jobs`;application job result store | job contract tests |
+| IMPL-07-01 | 1 | 扩展 06-d 已前移的 PublishOutbox 最小 job surface,补齐其它 operations job metadata、receipt/report/error、stored job report result surface | `03` job protocol/idempotency | `contracts::jobs`;application job result store | job contract tests |
 | IMPL-07-02 | 2 | 编写 PublishOutbox/RebuildProjections/RefreshSnapshots/RunReconciliation job DTO、runner service | `03` job flows | job services and runners | operations-replay-core 子集 |
 | IMPL-07-03 | 3 | 编写 TraceHandoff/ArchiveHandoff/ExternalGrcExport job DTO、handoff/export ports/fakes | `03` handoff/export flows;`04` adapters | handoff/export services and fake adapters | partial failure tests |
 | IMPL-07-04 | 4 | 编写 jobs crate bin/runner、duplicate replay、artifact/report output | `03` jobs layout;`05` suite | jobs entry and reports | job entry tests |
@@ -698,7 +699,7 @@
 
 | 批次编号 | 目标 | 输入 | 输出 | 预计规模 | 验证门禁 | 提交关系 |
 |---|---|---|---|---|---|---|
-| BATCH-07-01 | job shared schema/result surface | `03` Step 8/13 | JobMetadata、JobRunReceipt、JobError、GovernanceJobReport、stored job report | 300~500 行 | job contract tests | commit-07-a |
+| BATCH-07-01 | remaining job shared schema/result surface | `03` Step 8/13 | 除 `PublishGovernanceOutbox` 最小 surface 外的 JobMetadata 扩展、JobRunReceipt、JobError、GovernanceJobReport 扩展、stored job report variants | 300~500 行 | job contract tests | commit-07-a |
 | BATCH-07-02 | publish/rebuild/refresh/reconcile jobs | `03` Step 9 jobs | job DTO、application job services、runners | 500 行以上;按 job type 拆批 | operations-replay-core subset | commit-07-b |
 | BATCH-07-03 | trace/archive handoff jobs | `03` handoff flow | handoff DTO、ports/fakes、partial failure | 300~500 行 | handoff tests | commit-07-c |
 | BATCH-07-04 | external GRC export job | `03` external GRC flow;`04` adapter | export DTO、port/fake、redacted payload/export report | 300~500 行 | export tests;redaction targeted | commit-07-c |
@@ -708,7 +709,7 @@
 
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
-| commit-07-a | job shared schema、stored report surface、duplicate replay contract tests 通过后 | job metadata/receipt/error/report DTO、stored job report repository/idempotency surface | concrete job runners、handoff/export adapters | job contract tests;`cargo check`;`git diff --check` |
+| commit-07-a | remaining job shared schema、stored report surface、duplicate replay contract tests 通过后 | 06-d 未覆盖的 job metadata/receipt/error/report DTO、stored job report repository/idempotency surface 扩展 | concrete job runners、handoff/export adapters、PublishOutbox publisher loop | job contract tests;`cargo check`;`git diff --check` |
 | commit-07-b | publish/rebuild/refresh/reconcile job runners tests 通过后 | publish outbox job、projection rebuild、snapshot refresh、reconciliation runners and reports | handoff/archive/export jobs、release evidence | operations-replay-core subset;job duplicate tests;`git diff --check` |
 | commit-07-c | trace/archive handoff and external GRC export tests 通过后 | handoff/export DTO、ports/fakes、partial failure report、redaction targeted tests | release report generation、final acceptance handoff | handoff/export tests;redaction-boundary targeted;`git diff --check` |
 | commit-07-d | jobs crate entry and report artifact tests 通过后 | jobs crate bins, runner wiring, artifact/report output for operations jobs | final EV index/VETO checklist/release summary | entry-worker-job;operations-replay-core;`git diff --check` |

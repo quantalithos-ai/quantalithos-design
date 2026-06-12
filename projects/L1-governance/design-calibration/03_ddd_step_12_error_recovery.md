@@ -254,6 +254,15 @@ Unsupported version invariant: when `GovernanceEventSchemaVersion` is unsupporte
 | pending list read fails | worker/job delayed or failed report | none | retry later |
 | pending item version conflict on marker update | item skipped/failed with conflict | no overwrite | reload next scan |
 | payload snapshot missing | `OutboxPublicationState::Failed` or `DeadLettered` by Step 13 policy | publication marker only | manual repair;do not rebuild payload |
+
+Publisher adapter failures must enter the outbox flow as `OutboxPublisherOutcome`.
+
+| Publisher outcome | Required recovery mapping | Forbidden behavior |
+|---|---|---|
+| `Published(publication_ref)` | `mark_published(outbox_ref, publication_ref, expected_version, uow)` | infer success from HTTP status without publication ref |
+| `RetryableFailed(failure_reason)` | `mark_failed(outbox_ref, failure_reason, expected_version, uow)` | dead-letter by parsing failure reason text |
+| `FatalFailed(dead_letter_reason)` | `mark_dead_lettered(outbox_ref, dead_letter_reason, expected_version, uow)` | retry permanent / payload-invalid / unsupported-topic failures |
+| publisher returns `ApplicationError` | record job item failure according to job error surface;do not choose retry/dead-letter in service | service/fake invents `OutboxDeadLetterReason` from exception string |
 | payload schema unsupported by publisher | `DeadLettered` | publication marker only | upgrade schema/topic map or operator recovery |
 | publisher temporary failure | `Failed` retryable marker | publication marker only | retry by policy |
 | publisher permanent failure | `DeadLettered` or terminal `Failed` by Step 13 policy | publication marker only | manual/config repair |

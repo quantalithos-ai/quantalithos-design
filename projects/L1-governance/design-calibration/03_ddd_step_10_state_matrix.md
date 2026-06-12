@@ -866,8 +866,8 @@ Step 10 正式选择:所有 `GovernanceHandoffMarker.trace_refs` 必须非空,�
 
 | From | To | 触发函数 | Step 9 flow | 前置条件 | 状态副作用 | Flow 副作用 | 非法时错误 |
 |---|---|---|---|---|---|---|---|
-| assembly | `Completed` | `GovernanceJobReportAssembly::finish_from_counts(...)` | operations job shared template | scanned count valid;failed refs empty;all required marker/report refs saved | report state completed;write refs/counters | save stored job report;complete idempotency;commit | `ApplicationError::InvalidStateTransition` |
-| assembly | `PartiallyCompleted` | `finish_from_counts(...)` | operations job shared template | at least one item changed/ref saved and at least one failed ref/item | report state partially completed;write success and failed refs | save stored job report;complete idempotency;commit | `ApplicationError::InvalidStateTransition` |
+| assembly | `Completed` | `GovernanceJobReportAssembly::finish_from_counts(...)` | operations job shared template | scanned count valid;failed refs empty;all required marker/report refs saved;for outbox publish, `published_outbox_refs` carries every successful item | report state completed;write refs/counters | save stored job report;complete idempotency;commit | `ApplicationError::InvalidStateTransition` |
+| assembly | `PartiallyCompleted` | `finish_from_counts(...)` | operations job shared template | at least one item changed/ref saved and at least one failed ref/item;for outbox publish, success/failure split is present in `published_outbox_refs` / `failed_outbox_refs` | report state partially completed;write success and failed refs | save stored job report;complete idempotency;commit | `ApplicationError::InvalidStateTransition` |
 | assembly | `Failed` | `finish_from_counts(...)` / rejected-to-report path | no successful item or fatal accepted job failure;failure refs/issues present | report state failed;write failed refs/report refs as applicable | save stored job report if accepted;or rejected job result before mutation | `ApplicationError::InvalidStateTransition` |
 
 | 停审项 | 结论 | 缺口 / 修正 |
@@ -875,7 +875,7 @@ Step 10 正式选择:所有 `GovernanceHandoffMarker.trace_refs` 必须非空,�
 | enum 是否存在 | 通过 | `GovernanceJobReportState` 已在 Step 6 定义 |
 | 状态名是否一致 | 通过 | `Completed/PartiallyCompleted/Failed` 全部一致 |
 | 触发函数是否存在 | 通过 | Step 6 job report assembly and Step 9 job template |
-| 前置条件是否闭合 | 通过 | counts, marker refs, report refs and failed refs are carried by assembly |
+| 前置条件是否闭合 | 通过 | counts, marker refs, report refs, outbox scanned/published/failed refs and failed refs are carried by assembly |
 | 副作用是否闭合 | 通过 | report is stored result surface;duplicate returns stored report |
 | 测试切口 | 通过 | partial counts;failed refs type;duplicate replay does not rerun job |
 

@@ -2218,7 +2218,7 @@ pub struct PrepareExternalGrcExportJobInput {
 
 | Job | Public request type | Application target | Report refs/counters |
 |---|---|---|---|
-| `PublishGovernanceOutbox` | `GovernanceJobRequest<PublishGovernanceOutboxJobInput>` | outbox repository `list_pending_with_payload`, publisher port, mark published/failed | outbox refs, scanned/changed/failed counts |
+| `PublishGovernanceOutbox` | `GovernanceJobRequest<PublishGovernanceOutboxJobInput>` | outbox repository `list_pending_with_payload`, publisher port, mark published/failed | `scanned_outbox_refs`, `published_outbox_refs`, `failed_outbox_refs`, scanned/changed/failed counts |
 | `RebuildGovernanceProjections` | `GovernanceJobRequest<RebuildGovernanceProjectionsJobInput>` | projection replace view/state | view refs, report refs |
 | `RefreshExternalContextSnapshots` | `GovernanceJobRequest<RefreshExternalContextSnapshotsJobInput>` | reference repository `list_reference_states` + resolver + save snapshot/state | refreshed/failed reference refs |
 | `RunGovernanceReconciliation` | `GovernanceJobRequest<RunGovernanceReconciliationJobInput>` | reconciliation report builder/repository | report refs, finding refs via report |

@@ -218,7 +218,7 @@ Step 15 observability and audit
 
 | 测试切口 | 对应契约 | 验证内容 | 建议测试类型 |
 |---|---|---|---|
-| `PublishGovernanceOutbox_job` | `PublishGovernanceOutboxFlow` | pending batch from `list_pending_with_payload`;publish success;retryable failed marker;dead-letter;version conflict single-winner;duplicate report replay;truth unchanged | job runner |
+| `PublishGovernanceOutbox_job` | `PublishGovernanceOutboxFlow` | pending batch from `list_pending_with_payload`;publish success;retryable failed marker;dead-letter;version conflict single-winner;report carries scanned/published/failed outbox refs;worker loop copies refs only from application report;duplicate report replay;truth unchanged | job runner |
 | `RebuildGovernanceProjections_job` | `RebuildGovernanceProjectionsFlow` | rebuild selected projections from `GovernanceTruthSnapshot`;replace view/state/dependency index;partial failure report;duplicate report replay;no truth repair | job runner |
 | `RefreshExternalContextSnapshots_job` | `RefreshExternalContextSnapshotsFlow` | `ExplicitRefs` / `UnhealthyReferences` / `GovernanceScope` expansion through tracked reference states;resolver success/failure;versioned save;affected views stale;duplicate replay | job runner |
 | `RunGovernanceReconciliation_job` | `RunGovernanceReconciliationFlow` | clean report;finding report;failed report;report saved/readable;no inline repair of truth/projection/outbox | job runner |

@@ -699,7 +699,7 @@
 
 | 批次编号 | 目标 | 输入 | 输出 | 预计规模 | 验证门禁 | 提交关系 |
 |---|---|---|---|---|---|---|
-| BATCH-07-01 | remaining job shared schema/result surface | `03` Step 8/13 | 除 `PublishGovernanceOutbox` 最小 surface 外的 JobMetadata 扩展、JobRunReceipt、JobError、GovernanceJobReport 扩展、stored job report variants | 300~500 行 | job contract tests | commit-07-a |
+| BATCH-07-01 | remaining job shared schema/result surface | `03` Step 8/13 | 除 `PublishGovernanceOutbox` 最小 surface 外的 JobMetadata 扩展、JobRunReceipt、`JobError`(唯一 jobs crate error 名)、GovernanceJobReport 扩展、stored job report variants | 300~500 行 | job contract tests | commit-07-a |
 | BATCH-07-02 | publish/rebuild/refresh/reconcile jobs | `03` Step 9 jobs | job DTO、application job services、runners | 500 行以上;按 job type 拆批 | operations-replay-core subset | commit-07-b |
 | BATCH-07-03 | trace/archive handoff jobs | `03` handoff flow | handoff DTO、ports/fakes、partial failure | 300~500 行 | handoff tests | commit-07-c |
 | BATCH-07-04 | external GRC export job | `03` external GRC flow;`04` adapter | export DTO、port/fake、redacted payload/export report | 300~500 行 | export tests;redaction targeted | commit-07-c |
@@ -709,7 +709,7 @@
 
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
-| commit-07-a | remaining job shared schema、stored report surface、duplicate replay contract tests 通过后 | 06-d 未覆盖的 job metadata/receipt/error/report DTO、stored job report repository/idempotency surface 扩展 | concrete job runners、handoff/export adapters、PublishOutbox publisher loop | job contract tests;`cargo check`;`git diff --check` |
+| commit-07-a | remaining job shared schema、stored report surface、duplicate replay contract tests 通过后 | 06-d 未覆盖的 job metadata/receipt/`JobError`/report DTO、stored job report repository/idempotency surface 扩展 | concrete job runners、handoff/export adapters、PublishOutbox publisher loop | job contract tests;`cargo check`;`git diff --check` |
 | commit-07-b | publish/rebuild/refresh/reconcile job runners tests 通过后 | publish outbox job、projection rebuild、snapshot refresh、reconciliation runners and reports | handoff/archive/export jobs、release evidence | operations-replay-core subset;job duplicate tests;`git diff --check` |
 | commit-07-c | trace/archive handoff and external GRC export tests 通过后 | handoff/export DTO、ports/fakes、partial failure report、redaction targeted tests | release report generation、final acceptance handoff | handoff/export tests;redaction-boundary targeted;`git diff --check` |
 | commit-07-d | jobs crate entry and report artifact tests 通过后 | jobs crate bins, runner wiring, artifact/report output for operations jobs | final EV index/VETO checklist/release summary | entry-worker-job;operations-replay-core;`git diff --check` |

@@ -7416,6 +7416,68 @@ pub enum GovernanceJobRunDisposition {
 | `GovernanceOperationsJobKind` | operations job 分类 | 7 个 HLD job 固定;不得新增隐式 repair job |
 | `GovernanceJobEntryState` | job entry lifecycle | scheduler / runner 本地状态;不表达 domain truth |
 | `GovernanceJobRunDisposition` | job run disposition | duplicate replay 与 rejected 都不得重跑 job body |
+| `JobError` | jobs-local redacted error type | 唯一正式 jobs crate 错误类型;不得再引入 `GovernanceJobError` 同义名 |
+
+##### `JobError`
+
+`JobError` 是 `governance-jobs` crate 的唯一正式错误类型,落点为 `crates/jobs/src/errors.rs`。它只用于 jobs entry / runner / registry 本地对象与 jobs crate 边界,不替代 `DomainError`、`ApplicationError`、`GovernanceProtocolRejection` 或 `GovernanceJobRunDisposition`。所有 variant 必须 body-free,只能携带 job kind、stored result ref、redacted issue ref 或状态/disposition marker,不得保存 job input body、application error body、adapter response、stack trace、config body、archive package、GRC export body 或 secret。
+
+```rust
+/// Jobs crate error for governance operations job entry, runner, registry, and replay boundary.
+pub enum JobError {
+    /// Jobs-local state or disposition transition is not allowed by Step 10.
+    InvalidStateTransition {
+        current_entry_state: Option<GovernanceJobEntryState>,
+        current_disposition: Option<GovernanceJobRunDisposition>,
+        issue_ref: Option<GovernanceJobValidationIssueRef>,
+    },
+
+    /// Job metadata, scope, page request, idempotency key, actor, or schema marker is invalid before application dispatch.
+    InvalidRequest {
+        issue_ref: GovernanceJobValidationIssueRef,
+    },
+
+    /// The requested job kind is disabled or not registered in this runtime.
+    DisabledJob {
+        job_kind: GovernanceOperationsJobKind,
+        issue_ref: GovernanceJobValidationIssueRef,
+    },
+
+    /// Duplicate replay requires a stored job report, but the stored result is missing or wrong kind.
+    StoredReportUnavailable {
+        result_ref: Option<GovernanceApplicationResultRef>,
+        issue_ref: GovernanceJobValidationIssueRef,
+    },
+
+    /// Application service returned a redacted failure surface to the jobs boundary.
+    Application {
+        issue_ref: GovernanceJobValidationIssueRef,
+    },
+
+    /// Design or storage consistency was violated at the jobs boundary.
+    Contract {
+        issue_ref: GovernanceJobValidationIssueRef,
+    },
+}
+```
+
+| Variant | 触发条件 | 是否可重试 | 对外映射 / 处理 |
+|---|---|---|---|
+| `InvalidStateTransition` | `mark_running`、`mark_delayed`、`mark_failed`、run result factory 或 registry helper 违反 Step 10 job 状态矩阵 | 否 | jobs contract test 断言;不调用 application;不保存 stored success report |
+| `InvalidRequest` | job metadata 缺 run id、idempotency key、actor、scope/page/schema marker 不合法 | 否 | `GovernanceJobRunDisposition::Rejected`;不运行 job body |
+| `DisabledJob` | config/registry 明确禁用 job kind 或 job kind 未注册 | 否,除非配置变更后重新触发 | `GovernanceJobRunDisposition::Rejected`;不进入 application service |
+| `StoredReportUnavailable` | duplicate same key/digest 命中 completed idempotency,但 stored job report missing / wrong kind | 否,人工修复 result store | job dependency/consistency failure;不得重新扫描、publish、handoff 或 export |
+| `Application` | application job service 返回 `ApplicationError` 或 failed/partial report 需要映射到 jobs error boundary | 取决于 redacted issue 分类,默认不由 `JobError` 自行重试 | 返回 failed / partial job response 或 runner failure surface;不暴露 application internals |
+| `Contract` | jobs boundary 发现 impossible state,例如 completed result 无 report、duplicate 无 result ref、report 尝试表达 truth repair | 否,设计/数据修复 | failed job surface + observability alert;不得补造 report |
+
+| Helper / mapping | 输入 | 输出 | 规则 |
+|---|---|---|---|
+| `invalid_state_transition(...)` | optional entry state、optional disposition、optional issue ref | `JobError::InvalidStateTransition` | Step 10 job matrix 非法转换唯一错误 variant |
+| `invalid_request(issue_ref)` | redacted issue | `JobError::InvalidRequest` | issue ref 必填;不保存 raw metadata/body |
+| `disabled(job_kind, issue_ref)` | job kind、redacted issue | `JobError::DisabledJob` | disabled job 不进入 application |
+| `stored_report_unavailable(result_ref, issue_ref)` | optional stored result ref、issue | `JobError::StoredReportUnavailable` | duplicate replay missing report 不得重跑 job |
+| `from_application(issue_ref)` | redacted issue generated at jobs boundary | `JobError::Application` | 不直接暴露 `ApplicationError` 结构 |
+| `contract(issue_ref)` | redacted issue | `JobError::Contract` | consistency defect;需要观测告警 |
 
 ##### `GovernanceOperationsJobEntry`
 

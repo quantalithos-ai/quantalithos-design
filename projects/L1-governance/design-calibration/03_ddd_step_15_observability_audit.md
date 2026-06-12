@@ -260,6 +260,8 @@
 | `governance.projection` | projection stale/rebuild item 开始 | `view_kind`, `view_ref`, `source_cursor` | freshness state saved / failure report |
 | `governance.handoff` | handoff/export job 调用 port | `handoff_kind`, `target_ref`, `trace_ref_count` | marker saved / receipt / failure |
 
+`JobError` 是 jobs crate 唯一正式错误名。job span / log 中只允许记录 variant kind、job kind、run id、redacted issue ref、stored result ref 和 retryability marker;不得记录 job input body、raw application error、adapter response、stack trace、archive package、GRC export body 或 secret。Step 15 不使用 `GovernanceJobError` 同义名。
+
 ### 12.1 Trace context 规则
 
 | 规则 | 正式要求 |

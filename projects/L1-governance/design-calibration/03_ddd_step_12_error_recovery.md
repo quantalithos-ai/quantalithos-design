@@ -90,7 +90,7 @@ worker handler
   -> GovernanceWorkerDisposition + GovernanceInboundEventReceipt
 
 jobs runner
-  -> GovernanceJobRunDisposition / GovernanceJobError / GovernanceJobReport
+  -> GovernanceJobRunDisposition / JobError / GovernanceJobReport
 ```
 
 | Layer | May see | Must not expose directly |
@@ -184,6 +184,26 @@ jobs runner
 | `GovernanceJobRunDisposition::Failed` | jobs | accepted job failed all or fatal dependency failure | retry/manual by failure class | failed result/report |
 | `GovernanceJobRunDisposition::DuplicateReplayed` | jobs | duplicate job returned stored report | no retry | replayed success/partial/failed report |
 | `GovernanceJobRunDisposition::Rejected` | jobs | metadata/input invalid before mutation | no | rejected |
+
+### 8.5 Job errors
+
+`JobError` 是 jobs crate 唯一正式错误类型,落点为 `crates/jobs/src/errors.rs`,并由 Step 6 `JobError` enum 定义 variant。不得另行使用 `GovernanceJobError`、`OperationsJobError` 或按 job kind 发明新的 jobs-local error enum。
+
+| 错误类型 | 所属模块 | 触发条件 | 是否可重试 | 对外映射 |
+|---|---|---|---|---|
+| `JobError::InvalidStateTransition` | `jobs` | `GovernanceOperationsJobEntry`、`GovernanceOperationsJobRunResult` 或 `GovernanceJobRunnerRegistryState` 违反 Step 10 job 状态 / disposition 矩阵 | 否 | contract failure;no application call;no stored success report |
+| `JobError::InvalidRequest` | `jobs` | job metadata、scope、page request、schema marker、actor、run id 或 idempotency key 缺失 / 不合法 | 否 | `GovernanceJobRunDisposition::Rejected`;runner does not dispatch application job |
+| `JobError::DisabledJob` | `jobs` | requested job kind disabled by config or not registered in registry | 否,除非配置变更后重新触发 | `GovernanceJobRunDisposition::Rejected`;no idempotency mutation unless Step 13 says |
+| `JobError::StoredReportUnavailable` | `jobs` | duplicate same key/digest requires stored job report, but stored result is missing, wrong kind, or unreadable | 否,人工修复 result store | failed/degraded operations surface;must not rerun job body |
+| `JobError::Application` | `jobs` | application job service returned redacted application failure to jobs boundary | depends on issue class;JobError itself does not retry | failed / partial job response with redacted issue refs |
+| `JobError::Contract` | `jobs` | jobs boundary detects design/storage consistency defect, forbidden body, impossible report shape, or truth-repair attempt | 否 | failed job surface + observability alert;manual repair |
+
+Job error mapping rules:
+
+- `JobError::InvalidStateTransition` is the only jobs-local error variant referenced by Step 10 illegal job transitions.
+- `JobError::StoredReportUnavailable` must never trigger scan/rebuild/publish/handoff/export rerun for duplicate replay; it maps to consistency failure.
+- `JobError::Application` is a redacted jobs-boundary wrapper, not a public exposure of `ApplicationError` internals.
+- `JobError::Contract` is for design/storage defects and forbidden material; it is not retryable by scheduler backoff.
 
 ## 9. 内部错误映射表
 

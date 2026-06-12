@@ -2677,7 +2677,7 @@ Archive handoff does not call `deliver(...)` in Step 7;it only prepares an archi
 |---|---|
 | 协议 | `GovernanceJobRequest<PrepareExternalGrcExportJobInput>` |
 | 入口函数 | `GovernanceOperationsJobService.prepare_external_grc_export(request, operation_context)` |
-| 依赖 port | `ExternalGrcExportPort`, `GovernanceHandoffMarkerRepository`, `GovernanceTruthSnapshotRepository` when service reloads latest snapshot, `GovernanceAdapterRegistryPort`, stored result/idempotency/id generator |
+| 依赖 port | `ExternalGrcExportPort`, `GovernanceHandoffMarkerRepository`, `GovernanceTruthSnapshotRepository` when service reloads latest snapshot, `GovernanceHandoffMarkerSubjectMapper`, `GovernanceAdapterRegistryPort`, stored result/idempotency/id generator |
 | allowed mutation | export/handoff marker and stored job report only |
 | job report | export marker refs;failed target refs;optional report refs if export adapter returns report refs in later Step |
 | 测试切口 | snapshot body-free validation; target disabled; prepare export success; deliver export success/failure; duplicate replay; no external GRC truth write |
@@ -2689,10 +2689,11 @@ Archive handoff does not call `deliver(...)` in Step 7;it only prepares an archi
   | if service requires latest snapshot:
   |   latest = truth_snapshot_repo.load_scope_snapshot(input.truth_snapshot.scope_ref, page)
   |   compare cursor or use input snapshot according to Step 13 freshness policy
-  | package_ref = external_grc_export_port.prepare_export(target_ref, truth_snapshot)
+  | export_subject_ref = GovernanceHandoffMarkerSubjectMapper.external_grc_export_marker_subject(truth_snapshot.scope_ref, target_ref)
   | marker_trace = GovernanceTraceRecord::from_marker(new_trace_id, export_subject_ref, export_trace_kind, core_trace_id, Some(truth_snapshot.source_cursor))
   | trace_repo.append_trace(marker_trace, uow)
   | trace_refs = GovernanceTraceRecordRefSet([marker_trace.to_ref()])
+  | package_ref = external_grc_export_port.prepare_export(target_ref, truth_snapshot)
   | on prepare success:
   |   marker = GovernanceHandoffMarker::prepared(new_marker_ref, trace_refs, target_ref, package_ref)
   |   receipt = external_grc_export_port.deliver_export(target_ref, package_ref)
@@ -2709,6 +2710,7 @@ Archive handoff does not call `deliver(...)` in Step 7;it only prepares an archi
 |---|---|
 | `GovernanceTruthSnapshot` in input | must be body-free;contains only scope, cursor and ref sets |
 | optional latest reload | may use `GovernanceTruthSnapshotRepository.load_scope_snapshot` if Step 13 config requires freshness check |
+| marker trace subject | must come from `GovernanceHandoffMarkerSubjectMapper.external_grc_export_marker_subject(truth_snapshot.scope_ref,target_ref)`;service/fake/durable must not construct `export_subject_ref` directly |
 | package/receipt | adapter-owned body;Governance stores only `HandoffPackageRef` and `HandoffReceiptRef` |
 | target failure | save failed marker and failed target ref;do not create external GRC truth |
 

@@ -187,6 +187,7 @@ pub trait GovernanceUnitOfWorkManager {
 | `ExternalContextRefreshScope` | reference refresh repository scope helper | application-local helper;Step 8 若暴露 public job request 必须定义对应 DTO;不得由实现全表猜测或临时拼 source filter |
 | `GovernanceTruthChangeSubjectMapper` | accepted truth subject helper | 从 typed truth ref 映射同源的 trace / audit / outbox subject refs;command service 不拼 `ExternalSourceRef` 字符串 |
 | `GovernanceReferenceMarkerSubjectMapper` | reference marker trace subject helper | 从 `ExternalGovernanceReferenceRef` 映射 consumer/reference-only marker trace subject;consumer service / fake / durable 不拼 `ExternalSourceRef` 字符串 |
+| `GovernanceHandoffMarkerSubjectMapper` | handoff/export marker trace subject helper | 从 handoff/export typed marker inputs 映射 job marker trace subject;handoff/export job service / fake / durable 不拼 `ExternalSourceRef` 字符串 |
 | `GovernanceUnitOfWork` | transaction write boundary | truth、trace、audit、outbox、projection stale、result 必须同事务提交;`assign_truth_change_cursor()` 是 command accepted path 的唯一 truth cursor 来源;`assign_reference_change_cursor()` 是 consumer/reference-refresh reference-only stale marker 的唯一 cursor 来源 |
 
 | UoW cursor rule | 正式口径 |
@@ -282,6 +283,34 @@ pub trait GovernanceReferenceMarkerSubjectMapper {
 | reference marker ref | canonical marker trace subject key |
 |---|---|
 | `ExternalGovernanceReferenceRef(ref)` | `governance:reference-marker:<ref>` |
+
+#### 7.3 Handoff / export marker trace subject helper
+
+Handoff / archive / external GRC export job path 只写 `GovernanceHandoffMarker`、optional marker trace、job report 和 stored job report,不创建 `GovernanceTruthChange` 或 outbox payload。凡 Step 9 handoff/export flow 要求 `GovernanceTraceRecord::from_marker(...)` 的 job marker path,必须先通过本 helper 取得正式 marker trace subject,再创建 marker trace。Application job service、repository adapter、jobs runner 和 fake runtime 不得根据 job kind、target string、scope string、package ref、trace id、idempotency key 或 hard-coded string 自行拼接 `GovernanceTraceSubjectRef`。
+
+```rust
+/// Maps body-free handoff/export marker inputs to trace subjects for job marker traces.
+pub trait GovernanceHandoffMarkerSubjectMapper {
+    fn external_grc_export_marker_subject(
+        &self,
+        scope_ref: GovernanceScopeRef,
+        target_ref: TraceHandoffTargetRef,
+    ) -> GovernanceTraceSubjectRef;
+}
+```
+
+| helper rule | 正式口径 |
+|---|---|
+| input source | `PrepareExternalGrcExportFlow` 必须传入 `input.truth_snapshot.scope_ref` 和 `input.target_ref`;不得从 external GRC document、package ref、adapter config 或 job name 推导 subject |
+| canonical key | helper 内部使用 `governance:external-grc-export-marker:<scope_ref.scope_ref>:<target_ref.0>` 形成 canonical `ExternalSourceRef`;`<scope_ref.scope_ref>` 和 `<target_ref.0>` 均作为完整 opaque value 的剩余整体处理,业务逻辑不得解析其中分隔符 |
+| output | 返回 `GovernanceTraceSubjectRef`;该 helper 不返回 audit/outbox subject,因为 handoff/export marker job 不创建 `GovernanceTruthChange`、不创建 outbox payload,也不更新 audit trail |
+| trace relation | `GovernanceTraceRecord::from_marker(new_trace_id, mapper.external_grc_export_marker_subject(snapshot.scope_ref, target_ref), export_trace_kind, core_trace_id, Some(snapshot.source_cursor))` |
+| fake / durable parity | fake runtime 和 durable adapter 必须按同一 canonical key 生成 subject refs,测试可直接断言具体 key |
+| forbidden | 不得在 service / adapter 中解析 target/scope 字符串、拼 route path、使用 package ref、receipt ref、job run id、idempotency key、trace id 或 hard-coded string 代替 subject |
+
+| handoff/export marker input | canonical marker trace subject key |
+|---|---|
+| `PrepareExternalGrcExport(scope_ref, target_ref)` | `governance:external-grc-export-marker:<scope_ref.scope_ref>:<target_ref.0>` |
 
 ### 8. Application 基础 port 契约
 
@@ -1856,6 +1885,7 @@ pub trait GovernanceAdapterRegistryPort {
 | GVN-S6-OPEN-008 affected views | `GovernanceProjectionRepository.list_views_affected_by_*` 正式闭合 | Step 9 定义调用时机 |
 | GVN-S6-OPEN-009 stored result | `StoredGovernanceResultRepository` 覆盖 command / consumer / job replay | Step 8/13 定义 DTO/result variants |
 | GVN-S6-OPEN-010 truth snapshot / handoff marker | `GovernanceTruthSnapshotRepository` 和 `GovernanceHandoffMarkerRepository` 正式闭合 job 读取面与 marker 保存面 | Step 9 rebuild / handoff / export flow |
+| GVN-S6-OPEN-012 marker trace subject | consumer reference marker 已由 `GovernanceReferenceMarkerSubjectMapper` 闭合;external GRC export marker 已由 `GovernanceHandoffMarkerSubjectMapper.external_grc_export_marker_subject(scope_ref,target_ref)` 闭合 | Step 9/10/16 固化 flow ordering 和测试切口;其他 job / handoff marker 若要求 trace 必须继续补正式 mapper |
 
 ### 14. 模块内停审记录
 

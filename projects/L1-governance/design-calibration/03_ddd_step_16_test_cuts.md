@@ -274,7 +274,7 @@ Step 15 observability and audit
 | `reference_scope_list_uses_tracked_state` | Step 7 / 11 reference scope index | refresh scope 只列 explicit `GovernanceReferenceScopeLink` index rows joined to tracked `ReferenceResolutionState` with matching `refresh_target`;不扫描 sibling body;不从 reference string / fake private map 选择 resolver;stale index row/mismatched target 进入 failed/consistency branch | reference fake |
 | `reference_refresh_preserves_last_good_snapshot` | Step 12 / 13 reference failure | unavailable/digest mismatch/body rejected 不删除 last successful snapshot | reference fake |
 | `handoff_marker_trace_refs_non_empty` | Step 9 / 11 handoff marker | trace/archive/external GRC marker 保存前必须有非空 trace refs | job runner |
-| `external_grc_export_marker_trace_first` | Step 9 / 11 external GRC | export marker 创建前先追加 marker trace;empty trace refs rejected | job runner |
+| `external_grc_export_marker_trace_first` | Step 7 / 9 / 11 external GRC | export marker 创建前先通过 `GovernanceHandoffMarkerSubjectMapper.external_grc_export_marker_subject(snapshot.scope_ref,target_ref)` 追加 marker trace;canonical key 为 `governance:external-grc-export-marker:<scope_ref.scope_ref>:<target_ref.0>`;empty trace refs rejected | job runner |
 | `query_no_write_side_effects` | Step 9 query no-write | Query 不 begin write UoW、不调用 resolver、不修 projection/reference/audit | query service |
 | `maintenance_job_no_truth_repair` | Step 9 job discipline | rebuild/refresh/reconciliation/handoff/export 不修改 core Governance truth | job runner |
 | `rollback_failure_surfaces_manual_intervention` | Step 12 rollback failure | rollback failure 返回 temporary unavailable / diagnostic,不做隐藏补偿写 | service + fake UoW |

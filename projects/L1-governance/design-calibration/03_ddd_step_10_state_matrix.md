@@ -828,6 +828,7 @@ Step 10 正式选择:所有 `GovernanceHandoffMarker.trace_refs` 必须非空,�
 ```text
 [PrepareExternalGrcExportFlow trace closure]
   validate body-free truth snapshot
+  export_subject_ref = GovernanceHandoffMarkerSubjectMapper.external_grc_export_marker_subject(snapshot.scope_ref, target_ref)
   marker_trace = GovernanceTraceRecord::from_marker(new_trace_id, export_subject_ref, export_trace_kind, core_trace_id, Some(snapshot.source_cursor))
   trace_repo.append_trace(marker_trace, tx)
   trace_refs = GovernanceTraceRecordRefSet([marker_trace.to_ref()])
@@ -837,7 +838,7 @@ Step 10 正式选择:所有 `GovernanceHandoffMarker.trace_refs` 必须非空,�
 | 规则 | 说明 |
 |---|---|
 | empty trace refs | 禁止。任何 `GovernanceHandoffMarker::prepared/failed` 收到 empty `trace_refs` 必须返回 `ContractError::InvalidStateTransition` 或 validation error。 |
-| export trace subject | 使用 Step 6 `GovernanceTraceRecord::from_marker(...)` 支持的 formal marker subject;不得把 external GRC document body 伪装成 trace subject。 |
+| export trace subject | 使用 Step 7 `GovernanceHandoffMarkerSubjectMapper.external_grc_export_marker_subject(snapshot.scope_ref,target_ref)` 生成 formal marker subject;canonical key 为 `governance:external-grc-export-marker:<scope_ref.scope_ref>:<target_ref.0>`;不得把 external GRC document body、package ref、adapter config 或 job name 伪装成 trace subject。 |
 | failure marker | 即使 export prepare 失败,也必须先创建 marker trace,再保存 failed marker。 |
 | job report | report 记录 handoff marker ref;target failure 仍映射为 `ExternalGovernanceReferenceRef(target_ref.0)`。 |
 | Step 9 open item | 本节已闭口:external GRC export marker 不允许 empty `trace_refs`。 |

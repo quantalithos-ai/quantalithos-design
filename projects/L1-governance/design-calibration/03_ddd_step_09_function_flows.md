@@ -248,7 +248,7 @@ let uow = unit_of_work.begin().await?;
 [Consumer service]
   | tx = begin()
   | reservation = reserve(consumer_name, dedup_key, digest, tx)
-  | duplicate -> rollback tx, load stored consumer receipt, return replay
+  | duplicate -> rollback tx, load stored consumer receipt envelope, return envelope.receipt replay
   v
 [Reference / snapshot update]
   | validate payload body-free boundary
@@ -256,7 +256,7 @@ let uow = unit_of_work.begin().await?;
   | affected = list_views_affected_by_references(...)
   | mark_stale(affected, cursor, tx)
   | append GovernanceTraceRecord::from_marker(...) when accepted marker requires trace
-  | save stored consumer receipt
+  | construct GovernanceConsumerReceiptEnvelope and save_consumer_receipt(envelope, tx)
   | complete idempotency
   | commit tx
 ```
@@ -264,7 +264,7 @@ let uow = unit_of_work.begin().await?;
 | 分支 | 处理口径 |
 |---|---|
 | `Accepted` | 写 reference/snapshot/stale/receipt;不写 core truth |
-| `Duplicate` | 返回 stored receipt;不重放 mutation |
+| `Duplicate` | 返回 stored `GovernanceConsumerReceiptEnvelope.receipt`;不重放 mutation |
 | `Delayed` | 不写 core truth;issue / retry 细节留 Step 12/13 |
 | `Rejected` | 不写 snapshot/stale;返回 redacted issue refs |
 | `UnsupportedVersion` | 不解析 payload、不写 snapshot、不 mark stale |
@@ -2077,7 +2077,7 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 |---|---|---|
 | envelope validation | `GovernanceInboundEventEnvelope<T>` | source family、source event、source ref、version、dedup、trace 必填 |
 | supported version | `GovernanceEventSchemaVersion("v1")` | unsupported version 不解析 payload、不写 snapshot、不 mark stale |
-| idempotency | `GovernanceIdempotencyRepository.reserve(...)` | duplicate 返回 `StoredGovernanceResultRepository.get_consumer_receipt(...)` |
+| idempotency | `GovernanceIdempotencyRepository.reserve(...)` | duplicate 返回 `StoredGovernanceResultRepository.get_consumer_receipt(...).receipt` |
 | reference update | `ReferenceSnapshotRepository.save_*` / `save_reference_state(...)` | 只保存 body-free snapshot/ref/state |
 | stale marker | `GovernanceProjectionRepository.list_views_affected_by_references(...)` | affected views 不临时拼接 |
 | receipt | `GovernanceInboundEventReceipt` + stored result | accepted/duplicate/delayed/rejected/unsupported 均有 public receipt |
@@ -2085,20 +2085,23 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 ```text
 [Worker entry]
   | validate envelope
+  | entry.to_operation_context(operation_name, worker_actor)
   | if event_version != v1 -> return UnsupportedVersion receipt
   v
 [GovernanceConsumerService]
   | tx begin + idempotency reserve
-  | duplicate -> rollback, load stored consumer receipt, return replay
+  | duplicate -> rollback, load stored consumer receipt envelope, return envelope.receipt as replay
   | validate body-free payload
   | save snapshot/ref/reference state
   | affected = projection_repo.list_views_affected_by_references(reference_refs, page)
   | projection_repo.mark_stale(affected, current_cursor, uow)
   | optional GovernanceTraceRecord::from_marker(...)
-  | save stored consumer receipt
+  | save stored consumer receipt envelope via StoredGovernanceResultRepository.save_consumer_receipt(...)
   | complete idempotency
   | tx commit
 ```
+
+Consumer accepted / delayed / rejected / unsupported 分支只要进入 idempotency path 并产生 public `GovernanceInboundEventReceipt`,就必须先构造 `GovernanceConsumerReceiptEnvelope { result_ref, operation_name, surface_ref, receipt }`,再调用 `save_consumer_receipt(envelope, uow)`。`result_ref` 来自 application result id generator,`surface_ref` 来自 result store 的 serialized receipt surface,`receipt.result_ref` 必须与 envelope `result_ref` 一致。duplicate replay 返回 stored `receipt`,允许由 worker/API 层 overlay duplicate disposition 仅当 Step 8/12 明确;不得重新解析 event payload、重写 snapshot、重新 mark stale 或重新生成 trace。
 
 #### 16.2 Consumer flow table
 
@@ -2141,7 +2144,7 @@ reference_repo.save_actor_capability_snapshot(snapshot, expected_version, uow).a
 | core truth 是否会被 consumer 写入 | 通过 | 只写 reference/snapshot/stale/receipt/trace marker |
 | version 来源 | 通过 | reference update uses `get_reference_state_with_version` 或 new upsert `None` 语义;具体 persistence retry 留 Step 11/13 |
 | affected views | 通过 | only `list_views_affected_by_references(...)` |
-| duplicate replay | 通过 | stored consumer receipt,不重跑 mutation |
+| duplicate replay | 通过 | stored consumer receipt envelope,不重跑 mutation |
 | unsupported version | 通过 | 不解析 payload、不写 snapshot、不 mark stale |
 
 ---

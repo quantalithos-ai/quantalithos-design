@@ -1398,7 +1398,7 @@ pub struct GovernanceCommandRejectionEnvelope {
     pub rejection: GovernanceProtocolRejection,
 }
 
-/// Stored consumer receipt placeholder closed by Step 8.
+/// Minimal stored consumer receipt summary; full replay uses GovernanceConsumerReceiptEnvelope.
 pub struct GovernanceConsumerReceipt {
     /// Stored result reference.
     pub result_ref: GovernanceApplicationResultRef,
@@ -1409,6 +1409,18 @@ pub struct GovernanceConsumerReceipt {
     /// Optional trace record for accepted receipt paths.
     pub trace_record_ref: Option<GovernanceTraceRecordRef>,
 }
+
+/// Stored consumer receipt envelope used by duplicate replay.
+pub struct GovernanceConsumerReceiptEnvelope {
+    /// Stored result reference.
+    pub result_ref: GovernanceApplicationResultRef,
+    /// Consumer operation name.
+    pub operation_name: GovernanceOperationName,
+    /// Surface ref for the serialized inbound event receipt.
+    pub surface_ref: GovernanceStoredResultSurfaceRef,
+    /// Public inbound event receipt surface.
+    pub receipt: GovernanceInboundEventReceipt,
+}
 ```
 
 | 类型 | 作用 | 约束 / 来源 |
@@ -1417,7 +1429,8 @@ pub struct GovernanceConsumerReceipt {
 | `GovernanceIdempotencyReservation` | reserve 结果 | `Duplicate` 必须携带 stored result ref;不得要求 caller 重跑 operation |
 | `GovernanceCommandResultEnvelope` | command accepted duplicate replay placeholder | 完整 command result variants 由 Step 8 闭合;本 Step 只固定 stored lookup surface |
 | `GovernanceCommandRejectionEnvelope` | command rejected duplicate replay placeholder | 保存 `GovernanceProtocolRejection` 和 surface ref;用于 save-before rejected command duplicate replay;不得包含 command body、artifact body、adapter response 或 stack trace |
-| `GovernanceConsumerReceipt` | consumer duplicate replay placeholder | unsupported / accepted / delayed / rejected receipt body 由 Step 8/12 闭合;本 Step 固定 stored receipt lookup |
+| `GovernanceConsumerReceipt` | consumer receipt minimal summary | 仅保留 result/source/disposition/trace 快速索引面;不得作为 duplicate replay 的完整 stored surface |
+| `GovernanceConsumerReceiptEnvelope` | consumer duplicate replay envelope | 保存完整 public `GovernanceInboundEventReceipt` surface 和 serialized surface ref;duplicate replay 必须返回该 stored receipt,不得重跑 consumer mutation 或临时重建 receipt |
 
 ```rust
 /// Reserves and completes command, consumer, and job idempotency records.
@@ -1468,10 +1481,16 @@ pub trait StoredGovernanceResultRepository {
         result_ref: GovernanceApplicationResultRef,
     ) -> Result<Option<GovernanceCommandRejectionEnvelope>, ApplicationError>;
 
+    async fn save_consumer_receipt(
+        &self,
+        envelope: GovernanceConsumerReceiptEnvelope,
+        uow: &dyn GovernanceUnitOfWork,
+    ) -> Result<GovernanceApplicationResultRef, ApplicationError>;
+
     async fn get_consumer_receipt(
         &self,
         result_ref: GovernanceApplicationResultRef,
-    ) -> Result<Option<GovernanceConsumerReceipt>, ApplicationError>;
+    ) -> Result<Option<GovernanceConsumerReceiptEnvelope>, ApplicationError>;
 
     async fn get_job_report(
         &self,
@@ -1485,6 +1504,8 @@ pub trait StoredGovernanceResultRepository {
 | `reserve` | duplicate / conflict 判断不重跑 mutation |
 | `save(StoredGovernanceOperationResult)` | accepted command result、rejected command result、consumer receipt、job report 都必须在 same UoW 内先保存 stored surface,再 complete idempotency |
 | `get_command_rejection(result_ref)` | duplicate same digest 且 stored kind 为 `CommandRejection` 时返回保存的 `GovernanceProtocolRejection`;不得重新调用 resolver、domain policy 或 repository |
+| `save_consumer_receipt(envelope, uow)` | accepted / delayed / rejected / unsupported consumer path 在 same UoW 内保存完整 public `GovernanceInboundEventReceipt` replay surface;内部必须同时保存或关联 `StoredGovernanceOperationResult { result_kind: ConsumerReceipt }`;不得只保存 placeholder |
+| `get_consumer_receipt(result_ref)` | duplicate same digest 且 stored kind 为 `ConsumerReceipt` 时返回保存的完整 `GovernanceConsumerReceiptEnvelope`;missing / wrong kind 是一致性错误,不得重跑 consumer |
 | `complete` | idempotency record 指向 stored result |
 | `get_job_report` | operations job duplicate replay 返回既有 report |
 

@@ -56,10 +56,10 @@
 
 | 问题 | 回答 |
 |---|---|
-| 哪些处理流可能并发修改同一资源? | 所有 23 个 Command 写路径都可能并发修改 Governance-owned mutable truth。9 个 Inbound Event Consumer 可能并发修改 reference state、snapshot、stale marker 和 stored receipt。7 个 Operations Job 可能并发修改 outbox publication state、projection state/body、reference state、reconciliation report、handoff/export marker 和 stored job report。Query 只读,不得参与写并发。 |
+| 哪些处理流可能并发修改同一资源? | 所有 23 个 Command 写路径都可能并发修改 Governance-owned mutable truth。9 个 Inbound Event Consumer 可能并发修改 reference state、snapshot、stale marker 和 stored consumer receipt envelope。7 个 Operations Job 可能并发修改 outbox publication state、projection state/body、reference state、reconciliation report、handoff/export marker 和 stored job report。Query 只读,不得参与写并发。 |
 | 哪些接口、事件或 job 可能被重复调用? | 所有 Command 可能因客户端超时 / retry 重复。所有 Inbound Event 可能因 event bus redelivery / upstream ack 丢失重复。所有 Operations Job 可能因 scheduler rerun、worker crash、operator retry 重复。Outbound publisher 可能由多个 worker 同时处理同一 pending outbox record。 |
-| 幂等键来自请求、事件、job 参数还是数据库唯一约束? | Command 幂等键来自 `CommandMetadata` 归一化后的 `GovernanceOperationIdempotencyKey`;Inbound Event 幂等键来自 `GovernanceInboundEventEnvelope.dedup_key`;Job 幂等键来自 `GovernanceJobMetadata.idempotency_key`。数据库唯一键只保护 business uniqueness 或 storage uniqueness,不能替代 stored result replay。Outbox per-record publish 使用 `GovernanceOutboxRef + GovernanceVersion`,不使用 public idempotency key。 |
-| 重复请求应该返回既有结果、跳过、覆盖还是报错? | same operation + same key + same digest + completed 时必须读取 stored accepted command result / stored command rejection / consumer receipt / job report 并返回既有 surface。same key + different digest 必须返回 `IdempotencyConflict`。same key still reserved / in-flight 必须返回 retryable unavailable / delayed,不得并发执行第二次 mutation。Query 重复读取只返回当前 authorized read surface,不写幂等记录。 |
+| 幂等键来自请求、事件、job 参数还是数据库唯一约束? | Command 幂等键来自 `CommandMetadata` 归一化后的 `GovernanceOperationIdempotencyKey`;Inbound Event 幂等键来自 `GovernanceInboundEventEnvelope.dedup_key`,并且只能通过 `GovernanceOperationContext::from_inbound_event(...)` 归一化;Job 幂等键来自 `GovernanceJobMetadata.idempotency_key`。数据库唯一键只保护 business uniqueness 或 storage uniqueness,不能替代 stored result replay。Outbox per-record publish 使用 `GovernanceOutboxRef + GovernanceVersion`,不使用 public idempotency key。 |
+| 重复请求应该返回既有结果、跳过、覆盖还是报错? | same operation + same key + same digest + completed 时必须读取 stored accepted command result / stored command rejection / consumer receipt envelope / job report 并返回既有 surface。same key + different digest 必须返回 `IdempotencyConflict`。same key still reserved / in-flight 必须返回 retryable unavailable / delayed,不得并发执行第二次 mutation。Query 重复读取只返回当前 authorized read surface,不写幂等记录。 |
 | 并发冲突如何测试? | Step 16 必须覆盖 optimistic version conflict、business unique conflict、duplicate same digest replay、same key different digest conflict、in-flight reservation、stored result missing、commit unknown retry、event redelivery、dual outbox publisher、projection stale vs rebuild、reference refresh race、handoff/export retry 和 job partial rerun。 |
 
 ## 6. 设计原则
@@ -137,7 +137,7 @@
 | 入口类型 | operation source | raw key source | normalized key | duplicate result source |
 |---|---|---|---|---|
 | Command | Step 8 `Operation name` | `CommandMetadata` idempotency key | `GovernanceOperationIdempotencyKey` | `StoredGovernanceResultRepository.get_command_result(result_ref)` or `get_command_rejection(result_ref)` by stored kind |
-| Inbound Event Consumer | `GovernanceInboundConsumerName` | `GovernanceInboundEventEnvelope.dedup_key` | `GovernanceOperationIdempotencyKey` | `StoredGovernanceResultRepository.get_consumer_receipt(result_ref)` |
+| Inbound Event Consumer | `GovernanceInboundConsumerName` | `GovernanceInboundEventEnvelope.dedup_key` normalized by `GovernanceOperationContext::from_inbound_event(...)` | `GovernanceOperationIdempotencyKey` | `StoredGovernanceResultRepository.get_consumer_receipt(result_ref).receipt` |
 | Operations Job | `GovernanceOperationsJobKind` / `GovernanceOperationName` | `GovernanceJobMetadata.idempotency_key` | `GovernanceOperationIdempotencyKey` | `StoredGovernanceResultRepository.get_job_report(result_ref)` |
 | Query | query operation name only for observability | none | none | none;read current authorized surface |
 | Outbox per-record publish | outbox record identity | `GovernanceOutboxRef` + pending item `GovernanceVersion` | not idempotency store | outbox state/version check |
@@ -189,15 +189,15 @@ Digest v1 must use deterministic field ordering and stable enum variant names. `
 
 | Consumer | 幂等键 | Digest stable input | 重复请求处理 |
 |---|---|---|---|
-| `ConsumeIdentityActorCapabilityChanged` | `GovernanceInboundEventEnvelope.dedup_key` | source family、source event ref、source ref、schema version、source version ref、actor snapshot ref/state/digest fields | stored `GovernanceInboundEventReceipt`;不重写 snapshot |
-| `ConsumeProcessGovernanceContextChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、process context ref/state fields | stored receipt;不重写 process context snapshot |
-| `ConsumeWorkGovernanceContextChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、work context ref/state fields | stored receipt;不重写 work context snapshot |
-| `ConsumeArtifactEvidenceChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、evidence summary ref / artifact ref digest fields | stored receipt;不重写 evidence summary |
-| `ConsumeMethodPolicyDefinitionChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、method policy snapshot ref/scope/state/digest fields | stored receipt;不重写 policy snapshot |
-| `ConsumeMethodControlDefinitionChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、method control snapshot ref/state/digest fields | stored receipt;不重写 control snapshot |
-| `ConsumeRuntimeSignalRecorded` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、runtime signal ref/state fields | stored receipt;不创建 core truth |
-| `ConsumeConversationContextChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、conversation context ref/state digest fields | stored receipt;不保存 transcript body |
-| `ConsumeObservabilityAlertRaised` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、alert/runtime signal body-free refs and state markers | stored receipt;不保存 alert body / stack trace |
+| `ConsumeIdentityActorCapabilityChanged` | `GovernanceInboundEventEnvelope.dedup_key` | source family、source event ref、source ref、schema version、source version ref、actor snapshot ref/state/digest fields | stored `GovernanceConsumerReceiptEnvelope.receipt`;不重写 snapshot |
+| `ConsumeProcessGovernanceContextChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、process context ref/state fields | stored `GovernanceConsumerReceiptEnvelope.receipt`;不重写 process context snapshot |
+| `ConsumeWorkGovernanceContextChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、work context ref/state fields | stored `GovernanceConsumerReceiptEnvelope.receipt`;不重写 work context snapshot |
+| `ConsumeArtifactEvidenceChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、evidence summary ref / artifact ref digest fields | stored `GovernanceConsumerReceiptEnvelope.receipt`;不重写 evidence summary |
+| `ConsumeMethodPolicyDefinitionChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、method policy snapshot ref/scope/state/digest fields | stored `GovernanceConsumerReceiptEnvelope.receipt`;不重写 policy snapshot |
+| `ConsumeMethodControlDefinitionChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、method control snapshot ref/state/digest fields | stored `GovernanceConsumerReceiptEnvelope.receipt`;不重写 control snapshot |
+| `ConsumeRuntimeSignalRecorded` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、runtime signal ref/state fields | stored `GovernanceConsumerReceiptEnvelope.receipt`;不创建 core truth |
+| `ConsumeConversationContextChanged` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、conversation context ref/state digest fields | stored `GovernanceConsumerReceiptEnvelope.receipt`;不保存 transcript body |
+| `ConsumeObservabilityAlertRaised` | envelope dedup key | source family、source event ref、source ref、schema version、source version ref、alert/runtime signal body-free refs and state markers | stored `GovernanceConsumerReceiptEnvelope.receipt`;不保存 alert body / stack trace |
 
 Unsupported schema version must return `UnsupportedVersion` receipt without parsing payload and without reserving a digest that depends on payload body. If the envelope has no source event ref or dedup key, the worker rejects before snapshot / stale marker writes.
 
@@ -220,7 +220,7 @@ Job duplicate replay must not enter the job body. It must not scan outbox, rebui
 | Existing state / reserve outcome | Incoming digest | Service 行为 | 对外结果 |
 |---|---|---|---|
 | no existing record | any valid digest | `reserve` -> `Reserved`;继续正常 flow | success、normal rejection 或 retryable failure |
-| existing completed same operation/key | same digest | `reserve` -> `Duplicate(result_ref)`;rollback current UoW;read stored surface by operation kind and result kind | replay stored accepted command result / stored command rejection / consumer receipt / job report |
+| existing completed same operation/key | same digest | `reserve` -> `Duplicate(result_ref)`;rollback current UoW;read stored surface by operation kind and result kind | replay stored accepted command result / stored command rejection / consumer receipt envelope receipt / job report |
 | existing completed same operation/key | different digest | `reserve` -> `Conflict` or mapped `IdempotencyConflict`;no domain/job body | conflict;caller must use original request or new key |
 | existing reserved / in-flight same operation/key | same digest | `reserve` returns `IdempotencyError::AlreadyInProgress` or mapped unavailable;no mutation | retry later / delayed |
 | existing reserved / in-flight same operation/key | different digest | no mutation;record conflict if repository returned idempotency ref and UoW permits | `IdempotencyConflict` |
@@ -241,7 +241,7 @@ Job duplicate replay must not enter the job body. It must not scan outbox, rebui
 | Command UoW commit status unknown | connection drop / store unknown | retry same key;reserve outcome and stored result decide | duplicate -> replay;in-flight -> unavailable;no blind domain rerun |
 | Stored result save fails before idempotency complete | repository failure | same UoW rollback | retry same key after rollback;no completed record without result |
 | Idempotency complete fails after result save within UoW | repository failure | same UoW rollback or commit unknown handling | retry same key;inspect reserve outcome;manual if unknown |
-| Inbound event redelivery | event bus at-least-once | dedup key + digest + stored receipt | duplicate receipt replay;no snapshot/stale rewrite |
+| Inbound event redelivery | event bus at-least-once | dedup key + digest + stored consumer receipt envelope | duplicate receipt replay;no snapshot/stale rewrite |
 | Inbound event same dedup key different payload | upstream defect | digest conflict | rejected/dead-letter;no snapshot overwrite |
 | Unsupported event version redelivered | unsupported schema | version checked before payload parse | return unsupported receipt;no mutation |
 | Publish job worker crash after partial item handling | worker crash / scheduler rerun with new key | per item outbox version + publication state | new job scans remaining pending/failed retryable records;old key returns old report |
@@ -267,7 +267,7 @@ Input: operation_name, idempotency_key, original stable GovernanceRequestDigest
 2. Call GovernanceIdempotencyRepository.reserve(operation_name, key, digest, uow).
 3. If reserve returns Duplicate(result_ref):
      rollback current UoW;
-     load stored accepted command result / command rejection / consumer receipt / job report by operation kind and stored kind;
+     load stored accepted command result / command rejection / consumer receipt envelope / job report by operation kind and stored kind;
      return replay if present and correct kind.
 4. If reserve returns Conflict:
      return IdempotencyConflict;do not mutate.
@@ -339,7 +339,7 @@ P0 的正式能力是只读审计 + 拒绝盲重试。自动修复 `Reserved` un
 | `TC-GVN-COMMIT-UNKNOWN-001` | retry after commit unknown uses same key and reserve/result replay before mutation | service + fake UoW |
 | `TC-GVN-CONC-TRUTH-001` | stale `GovernanceVersion` on mutable truth returns version conflict | repository fake |
 | `TC-GVN-CONC-TRUTH-002` | active unique key conflict does not overwrite existing truth | repository fake |
-| `TC-GVN-EVENT-DEDUP-001` | event redelivery same digest returns stored receipt;no snapshot/stale rewrite | consumer service |
+| `TC-GVN-EVENT-DEDUP-001` | event redelivery same digest returns stored `GovernanceConsumerReceiptEnvelope.receipt`;no snapshot/stale rewrite | consumer service |
 | `TC-GVN-EVENT-DEDUP-002` | event same dedup key different digest rejected/dead-lettered | consumer service |
 | `TC-GVN-EVENT-UNSUPPORTED-001` | unsupported version does not parse payload and does not mark stale | worker contract |
 | `TC-GVN-OUTBOX-CONC-001` | dual publisher only one versioned publication marker succeeds | outbox fake + job service |
@@ -384,7 +384,7 @@ Governance 写路径使用三层保护:
 2. `GovernanceRequestDigest` 区分 same request duplicate 与 same key different payload conflict。
 3. Repository `Versioned<T>` / `GovernanceVersion`、formal unique key 和 cursor monotonicity 防止并发覆盖 mutable truth、projection、reference、outbox 和 handoff marker。
 
-Command 幂等键来自 `CommandMetadata` 归一化后的 `GovernanceOperationIdempotencyKey`。Inbound Event 幂等键来自 `GovernanceInboundEventEnvelope.dedup_key`。Operations Job 幂等键来自 `GovernanceJobMetadata.idempotency_key`。Query 不写幂等记录。Outbound per-record publish 不使用 application idempotency store,而是用 `GovernanceOutboxRef + GovernanceVersion` 控制 publication state。
+Command 幂等键来自 `CommandMetadata` 归一化后的 `GovernanceOperationIdempotencyKey`。Inbound Event 幂等键来自 `GovernanceInboundEventEnvelope.dedup_key`,并且只能通过 `GovernanceOperationContext::from_inbound_event(...)` 归一化为 application idempotency key。Operations Job 幂等键来自 `GovernanceJobMetadata.idempotency_key`。Query 不写幂等记录。Outbound per-record publish 不使用 application idempotency store,而是用 `GovernanceOutboxRef + GovernanceVersion` 控制 publication state。
 
 Digest 只包含稳定业务输入:operation name、route-bound refs、trusted actor effective scope、command DTO fields、event source refs / schema version / payload digest、job input scope / page / target refs 和 expected version when semantically required。Digest 不得包含 idempotency key、request id、requested_at、trace id、job run id、transport header、delivery attempt、retry counter、随机 id、当前时间或外部正文。
 
@@ -392,7 +392,7 @@ Digest 只包含稳定业务输入:operation name、route-bound refs、trusted a
 
 | 情况 | 结果 |
 |---|---|
-| same operation + same key + same digest + completed | 读取 stored accepted command result / command rejection / consumer receipt / job report 并 replay;不重跑 mutation/job/publisher |
+| same operation + same key + same digest + completed | 读取 stored accepted command result / command rejection / consumer receipt envelope / job report 并 replay;consumer 返回 envelope.receipt;不重跑 mutation/job/publisher |
 | same operation + same key + same digest + in-flight | 返回 retryable unavailable / delayed;不执行第二个 writer |
 | same operation + same key + different digest | `IdempotencyConflict`;不写 business truth、snapshot、outbox 或 marker |
 | completed idempotency missing stored result | `DuplicateResultMissing` / consistency defect;不得从 current truth 重建 result |

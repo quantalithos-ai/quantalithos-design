@@ -391,10 +391,11 @@ Actor capability snapshot read 语义:
 | `GovernanceIdempotencyRepository.complete(idempotency_ref, result_ref, uow)` | 将 reservation 完成到 stored result | same UoW as stored result save;must not complete before result exists | `()` | version/state conflict |
 | `GovernanceIdempotencyRepository.mark_conflict(idempotency_ref, reason, uow)` | 记录 key digest conflict | conflict UoW;must not run domain mutation | `()` | repository failure |
 | `StoredGovernanceResultRepository.save(result, uow)` | 保存 command result / command rejection / consumer receipt / job report | same UoW before idempotency complete;immutable after save | `GovernanceApplicationResultRef` | duplicate result id |
+| `StoredGovernanceResultRepository.save_consumer_receipt(envelope, uow)` | 保存完整 public inbound consumer receipt replay surface | same UoW before idempotency complete;内部必须关联 `StoredGovernanceOperationResult.result_kind = ConsumerReceipt`;immutable after save | `GovernanceApplicationResultRef` | duplicate consumer receipt replay |
 | `StoredGovernanceResultRepository.get(result_ref)` | 读取 stored operation result | read-only;duplicate replay path | `Option<StoredGovernanceOperationResult>` | repository failure |
 | `get_command_result(result_ref)` | 读取 command result envelope | read-only;must validate result kind | `Option<GovernanceCommandResultEnvelope>` | wrong kind / repository failure |
 | `get_command_rejection(result_ref)` | 读取 command rejection envelope | read-only;must validate result kind | `Option<GovernanceCommandRejectionEnvelope>` | wrong kind / repository failure |
-| `get_consumer_receipt(result_ref)` | 读取 consumer receipt | read-only;must validate result kind | `Option<GovernanceConsumerReceipt>` | wrong kind / repository failure |
+| `get_consumer_receipt(result_ref)` | 读取完整 consumer receipt envelope | read-only;must validate result kind and return stored public receipt | `Option<GovernanceConsumerReceiptEnvelope>` | missing / wrong kind / repository failure |
 | `get_job_report(result_ref)` | 读取 job report | read-only;must validate result kind | `Option<GovernanceJobReport>` | wrong kind / repository failure |
 
 | idempotency rule | 正式口径 |
@@ -442,8 +443,8 @@ Actor capability snapshot read 语义:
 | Command validation rejected before reserve | API/application validation before `begin()` or before reserve | no write transaction | invalid DTO,missing metadata,unsupported public route | no repository write;rejected response assembled by handler/service |
 | Query read-only path | query service after request validation | no write commit | visibility denied,missing truth,repository failure | no write UoW;read truth/projection/reference/trace/report only;return body/not-visible/degraded/unavailable marker |
 | Inbound consumer unsupported version | worker envelope version gate before payload parse | no write commit unless Step 13 dead-letter receipt says so | schema version unsupported | do not parse payload;do not save snapshot;do not mark stale;return unsupported receipt/dead-letter marker by Step 13 |
-| Inbound consumer accepted path | consumer application service after envelope validation | stored consumer receipt saved and idempotency completed | idempotency conflict,body forbidden violation,resolver/snapshot validation failure,repository failure,affected-view lookup failure | reserve event idempotency,save reference state/snapshot or marker,mark affected views stale,append marker trace only when formal flow requires,save stored consumer receipt,complete idempotency |
-| Inbound consumer duplicate | reserve returns `Duplicate` | no business commit | stored receipt missing/wrong kind | rollback current UoW,read stored consumer receipt,return replay |
+| Inbound consumer accepted path | consumer application service after envelope validation and `GovernanceInboundConsumerEntry::to_operation_context(...)` | stored consumer receipt envelope saved and idempotency completed | idempotency conflict,body forbidden violation,resolver/snapshot validation failure,repository failure,affected-view lookup failure | reserve event idempotency,save reference state/snapshot or marker,mark affected views stale,append marker trace only when formal flow requires,construct `GovernanceConsumerReceiptEnvelope`,save via `save_consumer_receipt`,complete idempotency |
+| Inbound consumer duplicate | reserve returns `Duplicate` | no business commit | stored receipt missing/wrong kind | rollback current UoW,read stored consumer receipt envelope,return stored public receipt replay |
 | Outbox append helper | inside command accepted UoW after truth change and trace exist | command accepted UoW commit | payload builder failure,record/snapshot mismatch,repository append failure | create payload snapshot ref,build serialized payload,append outbox record and snapshot atomically |
 | Publish outbox item | publisher service per pending item after pending list read and external publish attempt result | after `mark_published` / `mark_failed` / `mark_dead_lettered` | version conflict,marker repository failure | use pending item version,update publication state only;no truth/projection/reference update |
 | Publish outbox duplicate job | job service reserve returns duplicate | no publish scan | stored job report missing/wrong kind | rollback current UoW,read stored job report,return replay |
@@ -535,7 +536,7 @@ validate envelope metadata and schema version
 unsupported version -> return unsupported/dead-letter receipt without parsing payload
 begin GovernanceUnitOfWork
 reserve idempotency(inbound_event_kind, event_idempotency_key, digest)
-  Duplicate -> rollback, read stored consumer receipt, return replay
+  Duplicate -> rollback, read stored consumer receipt envelope, return envelope.receipt replay
   Conflict  -> mark conflict if required, no snapshot mutation
 parse typed payload after version accepted
 validate body-free payload boundary
@@ -556,7 +557,7 @@ commit
 | projection | stale marker for existing public views | rebuilding view body inline |
 | trace | marker trace only when Step 9 requires | fake accepted truth trace |
 | outbox | only if Step 9 explicitly defines consumer outbound event | implicit event for every snapshot |
-| result | stored consumer receipt | rebuilding receipt on duplicate |
+| result | stored `GovernanceConsumerReceiptEnvelope` containing complete public `GovernanceInboundEventReceipt` | rebuilding receipt on duplicate |
 
 ### 8.15 Publisher transaction ordering
 

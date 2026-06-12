@@ -6007,6 +6007,7 @@ pub struct GovernanceOperationContext {
 |---|---|---|---|---|
 | `pub fn from_command(operation_name: GovernanceOperationName, actor: ActorContext, metadata: CommandMetadata, core_trace_id: TraceId, idempotency_key: GovernanceOperationIdempotencyKey) -> Result<Self, ApplicationError>` | 构造 command operation context | operation、actor、command metadata、core trace id、key | `Result<GovernanceOperationContext, ApplicationError>` | command service 入站校验后;`core_trace_id` 必须等于 `metadata.request.trace_id` |
 | `pub fn from_query(operation_name: GovernanceOperationName, actor: ActorContext, metadata: QueryMetadata, core_trace_id: TraceId) -> Result<Self, ApplicationError>` | 构造 query operation context | operation、actor、query metadata、core trace id | `Result<GovernanceOperationContext, ApplicationError>` | authorized query service;`core_trace_id` 必须等于 `metadata.request.trace_id` |
+| `pub fn from_inbound_event(operation_name: GovernanceOperationName, actor: ActorContext, source_event_ref: GovernanceSourceEventRef, dedup_key: GovernanceEventDedupKey, core_trace_id: TraceId) -> Result<Self, ApplicationError>` | 构造 inbound event operation context | operation、worker/system actor、source event ref、event dedup key、core trace id | `Result<GovernanceOperationContext, ApplicationError>` | inbound consumer service;`channel` 必须为 `InboundEvent`;`idempotency_key` 必须由 `dedup_key` 归一化得到;`command_metadata`、`query_metadata`、`job_run_id` 必须为 `None`;`source_event_ref` 只参与 key/digest 和诊断,不作为 stored result id |
 | `pub fn from_job(operation_name: GovernanceOperationName, actor: ActorContext, run_id: GovernanceJobRunId, core_trace_id: TraceId, idempotency_key: GovernanceOperationIdempotencyKey) -> Result<Self, ApplicationError>` | 构造 job operation context | operation、operator/system actor、run id、core trace id、key | `Result<GovernanceOperationContext, ApplicationError>` | operations job runner |
 
 ##### `GovernanceIdempotencyRecord`
@@ -7165,7 +7166,7 @@ pub struct GovernanceInboundConsumerEntry {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn to_operation_context(&self, operation_name: GovernanceOperationName, actor: ActorContext) -> Result<GovernanceOperationContext, WorkerError>` | 构造 inbound event application context | operation name、system/worker actor | `Result<GovernanceOperationContext, WorkerError>` | channel 为 `InboundEvent`;不调用 service |
+| `pub fn to_operation_context(&self, operation_name: GovernanceOperationName, actor: ActorContext) -> Result<GovernanceOperationContext, WorkerError>` | 构造 inbound event application context | operation name、system/worker actor | `Result<GovernanceOperationContext, WorkerError>` | 必须调用 `GovernanceOperationContext::from_inbound_event(operation_name, actor, self.source_event_ref, self.dedup_key, self.core_trace_id)`;channel 为 `InboundEvent`;不调用 service;不得自行拼 idempotency key |
 | `pub fn assert_envelope_complete(&self) -> Result<(), WorkerError>` | 校验 event envelope 必填面 | 无 | `Result<(), WorkerError>` | 缺 source event / source ref / schema / dedup / trace 时 rejected |
 | `pub fn unsupported_version(&mut self, issue_ref: GovernanceWorkerValidationIssueRef) -> Result<GovernanceWorkerItemResult, WorkerError>` | 构造 unsupported version disposition | redacted issue ref | `Result<GovernanceWorkerItemResult, WorkerError>` | 不调用 application;不写 snapshot |
 

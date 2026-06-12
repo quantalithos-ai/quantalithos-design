@@ -144,11 +144,11 @@
 ```text
 [API handler]
   | validate GovernanceCommandRequest<T>
-  | build GovernanceOperationName + GovernanceRequestDigest
+  | build GovernanceOperationContext + GovernanceRequestDigest
   v
 [Application service]
   | tx = GovernanceUnitOfWorkManager.begin()
-  | reservation = GovernanceIdempotencyRepository.reserve(operation, key, digest, tx)
+  | reservation = GovernanceIdempotencyRepository.reserve(context, digest, tx)
   | if Duplicate -> rollback tx, load StoredGovernanceResultRepository.get_command_result(result_ref) or get_command_rejection(result_ref) by stored kind, return replay
   | if Conflict -> mark_conflict, commit tx, return protocol rejection
   v
@@ -247,14 +247,16 @@ let uow = unit_of_work.begin().await?;
   v
 [Consumer service]
   | tx = begin()
-  | reservation = reserve(consumer_name, dedup_key, digest, tx)
+  | context = GovernanceOperationContext::from_inbound_event(...)
+  | reservation = reserve(context, digest, tx)
   | duplicate -> rollback tx, load stored consumer receipt envelope, return envelope.receipt replay
   v
 [Reference / snapshot update]
   | validate payload body-free boundary
   | save_*_snapshot or save_reference_state(...)
   | affected = list_views_affected_by_references(...)
-  | mark_stale(affected, cursor, tx)
+  | reference_cursor = tx.assign_reference_change_cursor()
+  | mark_stale(affected, reference_cursor, tx)
   | append GovernanceTraceRecord::from_marker(...) when accepted marker requires trace
   | construct GovernanceConsumerReceiptEnvelope and save_consumer_receipt(envelope, tx)
   | complete idempotency
@@ -281,7 +283,8 @@ let uow = unit_of_work.begin().await?;
   v
 [Job service]
   | tx = begin()
-  | reservation = reserve(job_kind, idempotency_key, digest, tx)
+  | context = GovernanceOperationContext::from_job(...)
+  | reservation = reserve(context, digest, tx)
   | duplicate -> rollback tx, load StoredGovernanceResultRepository.get_job_report(result_ref), return replay
   v
 [Job body]
@@ -2094,12 +2097,15 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | validate body-free payload
   | save snapshot/ref/reference state
   | affected = projection_repo.list_views_affected_by_references(reference_refs, page)
-  | projection_repo.mark_stale(affected, current_cursor, uow)
-  | optional GovernanceTraceRecord::from_marker(...)
+  | reference_cursor = uow.assign_reference_change_cursor()
+  | projection_repo.mark_stale(affected, reference_cursor, uow)
+  | optional GovernanceTraceRecord::from_marker(..., Some(reference_cursor))
   | save stored consumer receipt envelope via StoredGovernanceResultRepository.save_consumer_receipt(...)
   | complete idempotency
   | tx commit
 ```
+
+`reference_cursor` 是 consumer accepted path 的正式 stale marker source cursor:它只能来自同一 UoW 的 `GovernanceUnitOfWork.assign_reference_change_cursor()`,且调用时必须在 reference state / typed snapshot save 已 stage 之后、`mark_stale(...)` 和 optional marker trace 之前。它不创建 `GovernanceTruthChange`,不表示 core Governance truth accepted,不得由 source version、snapshot version、event dedup key、idempotency digest、timestamp、page cursor、trace id、id generator 或 hard-coded string 替代。若 flow 未成功写入 reference/snapshot,不得分配 reference cursor 或 mark stale。
 
 Consumer accepted / delayed / rejected / unsupported 分支只要进入 idempotency path 并产生 public `GovernanceInboundEventReceipt`,就必须先构造 `GovernanceConsumerReceiptEnvelope { result_ref, operation_name, surface_ref, receipt }`,再调用 `save_consumer_receipt(envelope, uow)`。`result_ref` 来自 application result id generator,`surface_ref` 来自 result store 的 serialized receipt surface,`receipt.result_ref` 必须与 envelope `result_ref` 一致。duplicate replay 返回 stored `receipt`,允许由 worker/API 层 overlay duplicate disposition 仅当 Step 8/12 明确;不得重新解析 event payload、重写 snapshot、重新 mark stale 或重新生成 trace。
 
@@ -2244,7 +2250,8 @@ let record = GovernanceOutboxRecord::from_truth_change(outbox_id, &change, trace
   v
 [GovernanceOperationsJobService]
   | tx = begin()
-  | reservation = idempotency_repo.reserve(operation, metadata.idempotency_key, request_digest, tx)
+  | context = GovernanceOperationContext::from_job(...)
+  | reservation = idempotency_repo.reserve(context, request_digest, tx)
   | duplicate -> rollback, stored_result_repo.get_job_report(result_ref), return replay
   | pending_page = outbox_repo.list_pending_with_payload(input.page)
   | assembly = GovernanceJobReportAssembly::start(operation_context, metadata.idempotency_key)
@@ -2313,7 +2320,8 @@ let publication_ref = publisher.publish(record.clone(), payload_snapshot).await?
 ```text
 [Operations job service]
   | tx begin
-  | reserve(job_kind, idempotency_key, digest, tx)
+  | context = GovernanceOperationContext::from_job(...)
+  | reserve(context, digest, tx)
   | duplicate -> rollback, stored_result_repo.get_job_report(result_ref), return replay
   | assembly = GovernanceJobReportAssembly::start(operation_context, idempotency_key)
   | run maintenance body using only Step 7 job ports
@@ -2399,7 +2407,8 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
   |     reference_repo.save_reference_state(new_state, Some(state_v.version), tx)
   |     save body-free snapshot/ref if resolver returned a typed snapshot
   |     affected = projection_repo.list_views_affected_by_references({reference_ref}, page)
-  |     projection_repo.mark_stale(affected, current_cursor, tx)
+  |     reference_cursor = tx.assign_reference_change_cursor()
+  |     projection_repo.mark_stale(affected, reference_cursor, tx)
   |     assembly.record_references({reference_ref}, empty)
   |   on failure:
   |     failed_state = state_v.item.mark_failed(...)

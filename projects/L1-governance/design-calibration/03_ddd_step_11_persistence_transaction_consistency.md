@@ -300,6 +300,7 @@
 | `list_views_affected_by_references(reference_refs, page)` | consumer/refresh success 后定位 affected views | read-only;input/output stable unique order | `Page<DerivedGovernanceViewRef>` | repository failure |
 | `mark_stale(view_refs, source_cursor, uow)` | 标记 views stale | command/consumer/refresh UoW;idempotent when incoming cursor <= stored cursor | `()` | repository failure |
 | `GovernanceUnitOfWork.assign_truth_change_cursor()` | 为 accepted command 分配 committed truth boundary cursor | all changed truth already saved/staged in same UoW;called once per accepted command before trace/outbox/stale/result | `GovernanceTruthCursor` | cursor allocation / transaction state failure |
+| `GovernanceUnitOfWork.assign_reference_change_cursor()` | 为 consumer/reference-refresh 的 reference-only accepted marker 分配 committed reference cursor | reference state and typed snapshot/ref already saved/staged in same UoW;called once before projection stale and optional marker trace | `GovernanceTruthCursor` | cursor allocation / transaction state failure |
 | `save_state(state, expected_version, uow)` | 保存 view state only | `None` create;`Some(version)` update | `DerivedGovernanceViewRef` | version conflict |
 | `replace_dashboard_view(view, state, expected_version, uow)` | 替换 dashboard view + state | rebuild UoW;state version from `get_state_with_version` or `None`;must update dependency index | `DerivedGovernanceViewRef` | version conflict |
 | `replace_decision_summary_view(view, state, expected_version, uow)` | 替换 decision summary view + state | rebuild UoW;must update dependency index and lookup rows `(decision-summary-by-decision, decision_ref)` / `(decision-summary-by-gate, gate_ref)` from view body | `DecisionSummaryViewRef` | version conflict |
@@ -387,7 +388,7 @@ Actor capability snapshot read 语义:
 
 | 函数签名 | 作用 | 锁 / 事务要求 | 返回 | 错误 |
 |---|---|---|---|---|
-| `GovernanceIdempotencyRepository.reserve(operation_name, key, digest, uow)` | reserve command / consumer / job operation | first write in operation UoW;unique `(operation,key)`;same digest duplicate returns result ref if completed | `GovernanceIdempotencyReservation` | repository failure |
+| `GovernanceIdempotencyRepository.reserve(context, digest, uow)` | reserve command / consumer / job operation | first write in operation UoW;copies `channel` / `operation_name` / `idempotency_key` from `GovernanceOperationContext`;unique `(channel, operation, key)`;same digest duplicate returns result ref if completed | `GovernanceIdempotencyReservation` | repository failure |
 | `GovernanceIdempotencyRepository.complete(idempotency_ref, result_ref, uow)` | 将 reservation 完成到 stored result | same UoW as stored result save;must not complete before result exists | `()` | version/state conflict |
 | `GovernanceIdempotencyRepository.mark_conflict(idempotency_ref, reason, uow)` | 记录 key digest conflict | conflict UoW;must not run domain mutation | `()` | repository failure |
 | `StoredGovernanceResultRepository.save(result, uow)` | 保存 command result / command rejection / consumer receipt / job report | same UoW before idempotency complete;immutable after save | `GovernanceApplicationResultRef` | duplicate result id |
@@ -412,7 +413,7 @@ Actor capability snapshot read 语义:
 |---|---|---|---|
 | `GovernanceVersion` | optimistic lock token for one persisted mutable object | `get_*_with_version`, `list_*` returning `Versioned<T>`, `list_pending_with_payload` for outbox | page cursor, truth cursor, timestamp, event sequence, hard-coded `1` |
 | `GovernanceRepositoryCursor` | pagination position inside repository list | repository page response | optimistic lock, truth change cursor |
-| `GovernanceTruthCursor` | committed truth/projection source ordering cursor | command accepted path: `GovernanceUnitOfWork.assign_truth_change_cursor()` after truth save in same UoW;read/job path: truth snapshot scan, trace cursor, projection rebuild result | optimistic lock, repository page cursor, timestamp, id generator, idempotency digest |
+| `GovernanceTruthCursor` | committed truth/reference/projection source ordering cursor | command accepted path: `GovernanceUnitOfWork.assign_truth_change_cursor()` after truth save in same UoW;consumer/reference-refresh path: `GovernanceUnitOfWork.assign_reference_change_cursor()` after reference state / snapshot save in same UoW;read/job report path: truth snapshot scan, trace cursor, projection rebuild result or formal job input cursor | optimistic lock, repository page cursor, source/snapshot version, timestamp, id generator, trace id, event dedup key, idempotency digest |
 | `GovernanceOutboxPayloadSnapshotRef` | immutable payload snapshot identity | id generator/store during accepted transaction | event id, outbox id unless explicitly same by schema |
 | `GovernanceApplicationResultRef` | stored replay result identity | id generator/result store save | idempotency key, trace id |
 | `GovernanceTraceRecordRef` | trace record identity | id generator + trace append | handoff marker id, audit trail id |
@@ -465,7 +466,7 @@ Actor capability snapshot read 语义:
 ```text
 validate public request and operation metadata
 begin GovernanceUnitOfWork
-reserve idempotency(operation, key, digest)
+reserve idempotency(context, digest)
   Duplicate -> rollback, read stored command result or command rejection by result kind, return replay
   Conflict  -> mark conflict if required, commit or rollback per Step 13, return conflict
 load required truth with get_*_with_version / list_* returning Versioned<T>
@@ -509,7 +510,7 @@ commit GovernanceUnitOfWork
 ```text
 validate public request and operation metadata
 begin GovernanceUnitOfWork
-reserve idempotency(operation, key, digest)
+reserve idempotency(context, digest)
   Duplicate -> rollback, read stored command result or command rejection by result kind, return replay
   Conflict  -> mark conflict if required, commit or rollback per Step 13, return conflict
 load only the refs/snapshots needed for precheck
@@ -543,12 +544,15 @@ validate body-free payload boundary
 load tracked reference state with get_reference_state_with_version or list_reference_states item
 save ReferenceResolutionState and typed snapshot/ref with expected_version
 list affected views by references
-mark_stale(affected_views, cursor)
+reference_cursor = uow.assign_reference_change_cursor()
+mark_stale(affected_views, reference_cursor)
 append marker trace only if the flow formally requires trace
 save StoredGovernanceOperationResult::ConsumerReceipt(...)
 complete idempotency
 commit
 ```
+
+`reference_cursor` 只来自同一 UoW 的 `assign_reference_change_cursor()`。调用前置条件是本次 consumer / refresh 已经把 reference state 与 typed snapshot/ref save/stage 到事务中;调用后同一个 cursor 传给 `mark_stale(...)` 和 optional marker trace。rollback 后该 cursor 不可见。不得用 source version、snapshot version、reference optimistic version、event dedup key、idempotency digest、page cursor、timestamp、trace id、id generator 或 hard-coded string 代替。
 
 | Consumer write | Allowed | Forbidden |
 |---|---|---|

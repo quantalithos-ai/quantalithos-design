@@ -264,7 +264,7 @@ Retry / audit sequence:
 Input: operation_name, idempotency_key, original stable GovernanceRequestDigest
 
 1. Retry with the same operation_name + idempotency_key + stable digest.
-2. Call GovernanceIdempotencyRepository.reserve(operation_name, key, digest, uow).
+2. Rebuild the original `GovernanceOperationContext` from the same command / inbound event / job metadata, then call `GovernanceIdempotencyRepository.reserve(context, digest, uow)`.
 3. If reserve returns Duplicate(result_ref):
      rollback current UoW;
      load stored accepted command result / command rejection / consumer receipt envelope / job report by operation kind and stored kind;
@@ -380,7 +380,7 @@ P0 的正式能力是只读审计 + 拒绝盲重试。自动修复 `Reserved` un
 
 Governance 写路径使用三层保护:
 
-1. `GovernanceIdempotencyRepository.reserve(operation_name, idempotency_key, request_digest, uow)` 对 command、inbound event consumer 和 operations job 做 atomic reserve。
+1. `GovernanceIdempotencyRepository.reserve(context, request_digest, uow)` 对 command、inbound event consumer 和 operations job 做 atomic reserve;repository 必须从 `GovernanceOperationContext` 复制 `channel`、`operation_name` 和 `idempotency_key`,不得由 caller 另行传入或硬编码。
 2. `GovernanceRequestDigest` 区分 same request duplicate 与 same key different payload conflict。
 3. Repository `Versioned<T>` / `GovernanceVersion`、formal unique key 和 cursor monotonicity 防止并发覆盖 mutable truth、projection、reference、outbox 和 handoff marker。
 

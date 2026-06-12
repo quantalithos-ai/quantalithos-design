@@ -159,6 +159,9 @@ pub trait GovernanceUnitOfWork {
 
     /// Assigns the accepted truth boundary cursor after truth writes are staged in this UoW.
     fn assign_truth_change_cursor(&self) -> Result<GovernanceTruthCursor, ApplicationError>;
+
+    /// Assigns a committed reference marker cursor after reference/snapshot writes are staged in this UoW.
+    fn assign_reference_change_cursor(&self) -> Result<GovernanceTruthCursor, ApplicationError>;
 }
 
 /// Creates and commits Governance write transactions.
@@ -183,7 +186,7 @@ pub trait GovernanceUnitOfWorkManager {
 | `ComplianceConclusionVersionedRef` | AIIA / SoA union list helper | query / projection / approval flow 可先列 ref+version,再按 branch 读取具体 object;不得把 AIIA 和 SoA 合并为一个 domain object |
 | `ExternalContextRefreshScope` | reference refresh repository scope helper | application-local helper;Step 8 若暴露 public job request 必须定义对应 DTO;不得由实现全表猜测或临时拼 source filter |
 | `GovernanceTruthChangeSubjectMapper` | accepted truth subject helper | 从 typed truth ref 映射同源的 trace / audit / outbox subject refs;command service 不拼 `ExternalSourceRef` 字符串 |
-| `GovernanceUnitOfWork` | transaction write boundary | truth、trace、audit、outbox、projection stale、result 必须同事务提交;`assign_truth_change_cursor()` 是 command accepted path 的唯一 truth cursor 来源 |
+| `GovernanceUnitOfWork` | transaction write boundary | truth、trace、audit、outbox、projection stale、result 必须同事务提交;`assign_truth_change_cursor()` 是 command accepted path 的唯一 truth cursor 来源;`assign_reference_change_cursor()` 是 consumer/reference-refresh reference-only stale marker 的唯一 cursor 来源 |
 
 | UoW cursor rule | 正式口径 |
 |---|---|
@@ -192,6 +195,15 @@ pub trait GovernanceUnitOfWorkManager {
 | multiplicity | 每个 accepted command transaction 调用一次并复用返回值;同一 command 的多个 `GovernanceTruthChange` 使用同一个 boundary cursor |
 | fake / durable parity | in-memory fake 必须提供单调、稳定、可断言的等价 cursor;durable adapter 可由 store / transaction sequence 分配,但不得由 service 拼接 |
 | forbidden source | 不得用 `GovernanceRepositoryCursor`、`GovernanceVersion`、timestamp、id generator、trace id、idempotency digest 或 hard-coded string 代替 |
+
+| UoW reference cursor rule | 正式口径 |
+|---|---|
+| call timing | inbound consumer / reference refresh 必须先把 `ReferenceResolutionState` 和对应 typed snapshot/ref save/stage 到同一 UoW,再调用 `assign_reference_change_cursor()` |
+| visibility | 分配的 cursor 只在 UoW commit 后成为 committed reference marker cursor;rollback 不得泄露 cursor |
+| multiplicity | 每个 reference-only consumer/refresh transaction 调用一次并复用返回值;同一 transaction 的 affected projection stale marker 和 optional marker trace 使用同一个 cursor |
+| fake / durable parity | in-memory fake 必须提供单调、稳定、可断言的等价 cursor;durable adapter 可由 store / transaction sequence 分配,但不得由 service 拼接 |
+| forbidden source | 不得用 source version、snapshot version、event dedup key、idempotency digest、page cursor、timestamp、trace id、id generator 或 hard-coded string 代替 |
+| not a truth change | reference cursor 不创建 `GovernanceTruthChange`,不生成 outbox payload,不表示 core Governance truth accepted |
 
 #### 7.1 Accepted truth change subject helper
 
@@ -1437,8 +1449,7 @@ pub struct GovernanceConsumerReceiptEnvelope {
 pub trait GovernanceIdempotencyRepository {
     async fn reserve(
         &self,
-        operation_name: GovernanceOperationName,
-        idempotency_key: GovernanceOperationIdempotencyKey,
+        context: &GovernanceOperationContext,
         request_digest: GovernanceRequestDigest,
         uow: &dyn GovernanceUnitOfWork,
     ) -> Result<GovernanceIdempotencyReservation, ApplicationError>;

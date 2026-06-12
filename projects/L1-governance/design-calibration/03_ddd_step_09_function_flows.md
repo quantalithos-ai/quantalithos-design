@@ -2095,11 +2095,22 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
   | tx begin + idempotency reserve
   | duplicate -> rollback, load stored consumer receipt envelope, return envelope.receipt as replay
   | validate body-free payload
-  | save snapshot/ref/reference state
+  | reference_ref = typed snapshot/ref snapshot_state.reference_ref or envelope source_ref
+  | runtime/observability special rule:
+  |   - RuntimeSignalRecorded uses payload.runtime_signal_ref.signal_state.reference_ref and it MUST equal envelope.source_ref
+  |   - payload.source_ref is only a pending Governance source marker, not a reference bundle key
+  |   - ObservabilityAlertRaised uses envelope.source_ref; optional runtime_signal_ref is saved only when signal_state.reference_ref equals envelope.source_ref
+  | current_state_v = reference_repo.get_reference_state_with_version(reference_ref)
+  | expected_version = current_state_v.version when found, or None only when this flow explicitly creates a new tracked reference
+  | save typed snapshot/ref with expected_version
+  | save reference state with the same expected_version
   | affected = projection_repo.list_views_affected_by_references(reference_refs, page)
   | reference_cursor = uow.assign_reference_change_cursor()
   | projection_repo.mark_stale(affected, reference_cursor, uow)
-  | optional GovernanceTraceRecord::from_marker(..., Some(reference_cursor))
+  | if flow table trace marker = yes:
+  |   marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)
+  |   marker_trace = GovernanceTraceRecord::from_marker(new_trace_id, marker_subject_ref, trace_kind, core_trace_id, Some(reference_cursor))
+  |   trace_repo.append(marker_trace, uow)
   | save stored consumer receipt envelope via StoredGovernanceResultRepository.save_consumer_receipt(...)
   | complete idempotency
   | tx commit
@@ -2107,7 +2118,13 @@ let result = VerificationResult::from_evidence(verification_id, &record, evidenc
 
 `reference_cursor` 是 consumer accepted path 的正式 stale marker source cursor:它只能来自同一 UoW 的 `GovernanceUnitOfWork.assign_reference_change_cursor()`,且调用时必须在 reference state / typed snapshot save 已 stage 之后、`mark_stale(...)` 和 optional marker trace 之前。它不创建 `GovernanceTruthChange`,不表示 core Governance truth accepted,不得由 source version、snapshot version、event dedup key、idempotency digest、timestamp、page cursor、trace id、id generator 或 hard-coded string 替代。若 flow 未成功写入 reference/snapshot,不得分配 reference cursor 或 mark stale。
 
+Consumer accepted path 的 marker trace subject 只能来自 `GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`。`reference_ref` 必须是本 flow 已正式导出的 `ExternalGovernanceReferenceRef`,例如 typed snapshot/ref `snapshot_state.reference_ref` 或 inbound envelope `source_ref`。该 mapper 的 canonical key 为 `governance:reference-marker:<external_reference_ref.0>`;fake runtime 与 durable adapter 必须使用同一规则。Consumer service 不得从 event topic、payload type、external ref 字符串、dedup key、trace id、reference cursor 或 hard-coded string 拼 `GovernanceTraceSubjectRef`。
+
 Consumer accepted / delayed / rejected / unsupported 分支只要进入 idempotency path 并产生 public `GovernanceInboundEventReceipt`,就必须先构造 `GovernanceConsumerReceiptEnvelope { result_ref, operation_name, surface_ref, receipt }`,再调用 `save_consumer_receipt(envelope, uow)`。`result_ref` 来自 application result id generator,`surface_ref` 来自 result store 的 serialized receipt surface,`receipt.result_ref` 必须与 envelope `result_ref` 一致。duplicate replay 返回 stored `receipt`,允许由 worker/API 层 overlay duplicate disposition 仅当 Step 8/12 明确;不得重新解析 event payload、重写 snapshot、重新 mark stale 或重新生成 trace。
+
+consumer/reference accepted path 的 typed snapshot/ref save 与 `ReferenceResolutionState` save 使用同一个 reference bundle version。`expected_version` 必须来自同一 `ExternalGovernanceReferenceRef` 的 `ReferenceSnapshotRepository.get_reference_state_with_version(reference_ref)` 或 refresh/list path 的 `Versioned<ReferenceResolutionState>.version`。只有 flow 明确允许创建新的 tracked reference 时,typed snapshot/ref save 与 `save_reference_state` 才能同时使用 `None`,并且必须在同一 UoW 内一起 stage。不得用 source version、snapshot version、event version、dedup key、idempotency digest、timestamp、trace id、page cursor、snapshot ref 字符串或 fake private map 作为 typed snapshot/ref 的 `expected_version`。
+
+`GovernanceSourceRef` 与 `ExternalGovernanceReferenceRef` 不可互换。若 payload 里同时出现 `payload.source_ref: GovernanceSourceRef` 和 envelope / typed sidecar 的 `ExternalGovernanceReferenceRef`,只有后者能作为 reference bundle key、expected_version 来源、marker trace subject 来源和 affected-view reference。`payload.source_ref` 只能进入 pending input / pending nonconformity marker 或 source link,不得保存 `ReferenceResolutionState`,不得调用 `get_reference_state_with_version(...)`,也不得与 typed sidecar 共用 expected_version。若 flow 需要同时更新两个不同 `ExternalGovernanceReferenceRef` bundle,必须先回 Step 7/9/11 增加显式 dual-bundle 规则;当前 consumer flow 不允许隐式双-bundle 更新。
 
 #### 16.2 Consumer flow table
 
@@ -2119,9 +2136,9 @@ Consumer accepted / delayed / rejected / unsupported 分支只要进入 idempote
 | `ConsumeArtifactEvidenceChangedFlow` | `ArtifactEvidenceChangedPayload` | `save_evidence_summary_ref` + reference state | envelope source ref/version | compliance/control affected views | yes |
 | `ConsumeMethodPolicyDefinitionChangedFlow` | `MethodPolicyDefinitionChangedPayload` | `save_method_policy_snapshot` | `payload.policy_snapshot.snapshot_state` | policy affected views | yes |
 | `ConsumeMethodControlDefinitionChangedFlow` | `MethodControlDefinitionChangedPayload` | `save_method_control_snapshot` | `payload.control_snapshot.snapshot_state` | control coverage affected views | yes |
-| `ConsumeRuntimeSignalRecordedFlow` | `RuntimeSignalRecordedPayload` | `save_runtime_signal_ref` + optional source reference state | `payload.runtime_signal_ref.signal_state` | context/dashboard affected views | yes |
+| `ConsumeRuntimeSignalRecordedFlow` | `RuntimeSignalRecordedPayload` | `save_runtime_signal_ref` + reference state for same runtime signal bundle + optional pending input marker | `payload.runtime_signal_ref.signal_state.reference_ref`;must equal envelope `source_ref`;`payload.source_ref` is marker-only | context/dashboard affected views | yes |
 | `ConsumeConversationContextChangedFlow` | `ConversationContextChangedPayload` | `save_reference_state` for source ref | envelope source ref/version | trace/decision affected views | yes |
-| `ConsumeObservabilityAlertRaisedFlow` | `ObservabilityAlertRaisedPayload` | `save_reference_state` + optional `save_runtime_signal_ref` | payload runtime signal or envelope source | nonconformity/dashboard affected views | yes |
+| `ConsumeObservabilityAlertRaisedFlow` | `ObservabilityAlertRaisedPayload` | `save_reference_state` for envelope source + optional `save_runtime_signal_ref` on same bundle | envelope `source_ref`;optional runtime signal must have matching `signal_state.reference_ref`;`payload.source_ref` is marker-only | nonconformity/dashboard affected views | yes |
 
 #### 16.3 Per-consumer function sketches
 
@@ -2132,15 +2149,15 @@ reference_repo.save_actor_capability_snapshot(snapshot, expected_version, uow).a
 
 | Flow | Function-level sequence | Rejected / delayed conditions |
 |---|---|---|
-| `ConsumeIdentityActorCapabilityChangedFlow` | reserve dedup; read current reference state version; save actor snapshot; save reference state; stale affected views; store receipt | unsupported schema; actor snapshot contains body; unresolved actor ref may delayed |
-| `ConsumeProcessGovernanceContextChangedFlow` | reserve dedup; save process context ref; save reference state; stale affected views; trace marker; receipt | process payload body present; source unavailable |
-| `ConsumeWorkGovernanceContextChangedFlow` | reserve dedup; save work context ref; save reference state; stale affected views; trace marker; receipt | work body present; invalid project/work refs |
-| `ConsumeArtifactEvidenceChangedFlow` | reserve dedup; save evidence summary ref; save reference state from envelope; stale compliance/control views; receipt | evidence/artifact body present; missing evidence ref |
-| `ConsumeMethodPolicyDefinitionChangedFlow` | reserve dedup; save method policy snapshot; save reference state; stale policy views; receipt | AIPolicyDef body present; unsupported method version |
-| `ConsumeMethodControlDefinitionChangedFlow` | reserve dedup; save method control snapshot; save reference state; stale control views; receipt | control definition body present; invalid control snapshot |
-| `ConsumeRuntimeSignalRecordedFlow` | reserve dedup; save runtime signal ref; save optional source reference state; stale context/dashboard views; receipt | runtime log body present; missing signal state |
-| `ConsumeConversationContextChangedFlow` | reserve dedup; save source reference state; stale trace/decision views; receipt | message transcript present; source ref missing |
-| `ConsumeObservabilityAlertRaisedFlow` | reserve dedup; save source reference state; optional runtime signal ref; stale nonconformity/dashboard views; receipt | alert body/stack trace present; invalid severity marker |
+| `ConsumeIdentityActorCapabilityChangedFlow` | reserve dedup; derive `reference_ref = payload.actor_snapshot.snapshot_state.reference_ref`; read current reference state version; save actor snapshot with same expected_version; save reference state with same expected_version; stale affected views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | unsupported schema; actor snapshot contains body; unresolved actor ref may delayed |
+| `ConsumeProcessGovernanceContextChangedFlow` | reserve dedup; derive `reference_ref = payload.process_context_ref.snapshot_state.reference_ref`; read current reference state version; save process context ref with same expected_version; save reference state with same expected_version; stale affected views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | process payload body present; source unavailable |
+| `ConsumeWorkGovernanceContextChangedFlow` | reserve dedup; derive `reference_ref = payload.work_context_ref.snapshot_state.reference_ref`; read current reference state version; save work context ref with same expected_version; save reference state with same expected_version; stale affected views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | work body present; invalid project/work refs |
+| `ConsumeArtifactEvidenceChangedFlow` | reserve dedup; derive `reference_ref = envelope.source_ref` / evidence summary reference state; read current reference state version; save evidence summary ref with same expected_version; save reference state from envelope with same expected_version; stale compliance/control views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | evidence/artifact body present; missing evidence ref |
+| `ConsumeMethodPolicyDefinitionChangedFlow` | reserve dedup; derive `reference_ref = payload.policy_snapshot.snapshot_state.reference_ref`; read current reference state version; save method policy snapshot with same expected_version; save reference state with same expected_version; stale policy views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | AIPolicyDef body present; unsupported method version |
+| `ConsumeMethodControlDefinitionChangedFlow` | reserve dedup; derive `reference_ref = payload.control_snapshot.snapshot_state.reference_ref`; read current reference state version; save method control snapshot with same expected_version; save reference state with same expected_version; stale control views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | control definition body present; invalid control snapshot |
+| `ConsumeRuntimeSignalRecordedFlow` | reserve dedup; derive `reference_ref = payload.runtime_signal_ref.signal_state.reference_ref`; assert `reference_ref == envelope.source_ref`; read current reference state version for `reference_ref` or use `None` only when creating this tracked reference; save runtime signal ref with same expected_version; save reference state for the same `reference_ref` with same expected_version; optional `payload.source_ref` may create only pending input/source marker and must not save reference state; stale context/dashboard views; map `reference_ref` through `GovernanceReferenceMarkerSubjectMapper` and append marker trace; receipt | runtime log body present; missing signal state; runtime signal reference mismatch with envelope source; attempting to save `payload.source_ref` as reference state |
+| `ConsumeConversationContextChangedFlow` | reserve dedup; derive `reference_ref = envelope.source_ref`; save source reference state; stale trace/decision views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | message transcript present; source ref missing |
+| `ConsumeObservabilityAlertRaisedFlow` | reserve dedup; derive `reference_ref = envelope.source_ref`; if `payload.runtime_signal_ref` exists, assert `payload.runtime_signal_ref.signal_state.reference_ref == reference_ref`; read current reference state version for `reference_ref` or use `None` only when creating this tracked reference; save reference state for `reference_ref` with expected_version; save optional runtime signal ref with same expected_version only when the reference matches; optional `payload.source_ref` may create only pending nonconformity/source marker and must not save reference state; stale nonconformity/dashboard views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | alert body/stack trace present; invalid severity marker; runtime signal reference mismatch with envelope source; attempting to save `payload.source_ref` as reference state |
 
 #### 16.4 Consumer stop-review
 
@@ -2148,8 +2165,9 @@ reference_repo.save_actor_capability_snapshot(snapshot, expected_version, uow).a
 |---|---|---|
 | 9 个 inbound consumer 是否覆盖 | 通过 | Step 8 §10.6 全部列入 flow table |
 | core truth 是否会被 consumer 写入 | 通过 | 只写 reference/snapshot/stale/receipt/trace marker |
-| version 来源 | 通过 | reference update uses `get_reference_state_with_version` 或 new upsert `None` 语义;具体 persistence retry 留 Step 11/13 |
+| version 来源 | 通过 | typed snapshot/ref 与 reference state 共享同一 reference bundle version;`expected_version` 来自同一 `reference_ref` 的 `get_reference_state_with_version` / `list_reference_states` returned version,或明确 new tracked reference 同 UoW create 时使用 `None` |
 | affected views | 通过 | only `list_views_affected_by_references(...)` |
+| marker trace subject | 通过 | reference-only accepted marker trace subject 必须来自 `GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`;fake/durable 同 canonical key |
 | duplicate replay | 通过 | stored consumer receipt envelope,不重跑 mutation |
 | unsupported version | 通过 | 不解析 payload、不写 snapshot、不 mark stale |
 

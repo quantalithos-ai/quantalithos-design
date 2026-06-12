@@ -186,6 +186,7 @@ pub trait GovernanceUnitOfWorkManager {
 | `ComplianceConclusionVersionedRef` | AIIA / SoA union list helper | query / projection / approval flow 可先列 ref+version,再按 branch 读取具体 object;不得把 AIIA 和 SoA 合并为一个 domain object |
 | `ExternalContextRefreshScope` | reference refresh repository scope helper | application-local helper;Step 8 若暴露 public job request 必须定义对应 DTO;不得由实现全表猜测或临时拼 source filter |
 | `GovernanceTruthChangeSubjectMapper` | accepted truth subject helper | 从 typed truth ref 映射同源的 trace / audit / outbox subject refs;command service 不拼 `ExternalSourceRef` 字符串 |
+| `GovernanceReferenceMarkerSubjectMapper` | reference marker trace subject helper | 从 `ExternalGovernanceReferenceRef` 映射 consumer/reference-only marker trace subject;consumer service / fake / durable 不拼 `ExternalSourceRef` 字符串 |
 | `GovernanceUnitOfWork` | transaction write boundary | truth、trace、audit、outbox、projection stale、result 必须同事务提交;`assign_truth_change_cursor()` 是 command accepted path 的唯一 truth cursor 来源;`assign_reference_change_cursor()` 是 consumer/reference-refresh reference-only stale marker 的唯一 cursor 来源 |
 
 | UoW cursor rule | 正式口径 |
@@ -257,6 +258,30 @@ pub trait GovernanceTruthChangeSubjectMapper {
 | `ComplianceConclusionRef::AIIA(conclusion_ref)` | `governance:compliance-conclusion:aiia:<aiia_conclusion_id>` |
 | `ComplianceConclusionRef::SoA(conclusion_ref)` | `governance:compliance-conclusion:soa:<soa_conclusion_id>` |
 | `NonconformityRef { nonconformity_id }` | `governance:nonconformity:<nonconformity_id>` |
+
+#### 7.2 Consumer/reference marker trace subject helper
+
+Consumer / reference-refresh path 只写 `ReferenceResolutionState`、typed snapshot/ref、projection stale marker、stored receipt 和可选 marker trace,不创建 `GovernanceTruthChange` 或 outbox payload。凡 Step 9 flow table 标记 `trace marker = yes` 的 reference-only accepted path,必须先通过本 helper 取得正式 marker trace subject,再调用 `GovernanceTraceRecord::from_marker(...)`。Application service、repository adapter、worker 和 fake runtime 不得根据 event topic、payload type、external ref 字符串、dedup key、trace id 或 cursor 自行拼接 `GovernanceTraceSubjectRef`。
+
+```rust
+/// Maps body-free Governance reference markers to trace subjects for consumer/reference-only marker traces.
+pub trait GovernanceReferenceMarkerSubjectMapper {
+    fn reference_marker_subject(&self, reference_ref: ExternalGovernanceReferenceRef) -> GovernanceTraceSubjectRef;
+}
+```
+
+| helper rule | 正式口径 |
+|---|---|
+| input source | 只能接收 flow 已正式导出的 `ExternalGovernanceReferenceRef`,例如 typed snapshot/ref `snapshot_state.reference_ref` 或 inbound envelope `source_ref` |
+| canonical key | helper 内部使用 `governance:reference-marker:<external_reference_ref.0>` 形成 canonical `ExternalSourceRef`;`<external_reference_ref.0>` 是 `ExternalSourceRef` 的完整 opaque value,即使包含分隔符也作为剩余整体处理,业务逻辑不得解析 |
+| output | 返回 `GovernanceTraceSubjectRef`;该 helper 不返回 audit/outbox subject,因为 reference-only consumer marker 不创建 `GovernanceTruthChange`、不创建 outbox payload,也不更新 audit trail |
+| trace relation | `GovernanceTraceRecord::from_marker(new_trace_id, mapper.reference_marker_subject(reference_ref), trace_kind, core_trace_id, Some(reference_cursor))` |
+| fake / durable parity | fake runtime 和 durable adapter 必须按同一 canonical key 生成 subject refs,测试可直接断言具体 key |
+| forbidden | 不得在 service / adapter 中解析 external ref 字符串、拼 route path、使用 payload type、event topic、source version、reference cursor、dedup key、idempotency digest、trace id 或 hard-coded string 代替 subject |
+
+| reference marker ref | canonical marker trace subject key |
+|---|---|
+| `ExternalGovernanceReferenceRef(ref)` | `governance:reference-marker:<ref>` |
 
 ### 8. Application 基础 port 契约
 
@@ -1247,6 +1272,32 @@ pub trait ReferenceSnapshotRepository {
 | `list_reference_states(scope, page)` | `RefreshExternalContextSnapshots` 不做全表猜测 |
 | `get_actor_capability_snapshot(actor_ref)` | query visibility、approval view 和 responsibility command 读取本地 body-free actor capability snapshot;缺失返回 `None` 并按 flow 映射为 degraded / rejected,不得调用 identity resolver 刷新 |
 | `save_*_snapshot` | consumer / refresh 只保存 body-free snapshot/ref |
+
+Reference snapshot / ref sidecar version rule:
+
+- `ReferenceSnapshotRepository` 对同一个 `ExternalGovernanceReferenceRef` 下的 `ReferenceResolutionState` 与 typed snapshot/ref sidecar 使用同一个 reference bundle version。
+- consumer / refresh flow 更新 typed snapshot/ref 时,`save_actor_capability_snapshot`、`save_method_policy_snapshot`、`save_method_control_snapshot`、`save_evidence_summary_ref`、`save_process_context_ref`、`save_work_context_ref`、`save_runtime_signal_ref` 的 `expected_version` 必须来自同一 flow 中 `get_reference_state_with_version(reference_ref)` 或 `list_reference_states(...).items[*].version`。
+- 当 flow 明确允许创建一个新的 tracked reference state 时,`save_reference_state(..., None, uow)` 与对应 typed snapshot/ref `save_* (..., None, uow)` 必须在同一个 UoW 内一起 stage;否则 missing tracked reference state 必须映射为 delayed / rejected / failed item,不得私自 upsert。
+- 当前 Step 7 不提供 `get_method_policy_snapshot_with_version(...)` 等 typed sidecar versioned read;实现不得发明 typed snapshot 私有 version,也不得使用 snapshot ref 字符串、source version、event version、timestamp、dedup key 或 fake private map 作为 `expected_version`。
+- fake 与 durable adapter 必须用同一 reference bundle version 规则做 optimistic check;typed sidecar save 与 `save_reference_state` 对同一 `reference_ref` 的 version 冲突必须表现为同一类 repository version conflict。
+- `GovernanceSourceRef` 不是 `ExternalGovernanceReferenceRef`,不能作为 reference bundle key、expected_version 来源、marker trace subject 来源或 affected-view reference。Runtime / observability payload 中的 `payload.source_ref: GovernanceSourceRef` 只可作为 pending input / pending nonconformity source marker。若 typed sidecar 使用 `signal_state.reference_ref`,它必须与 inbound envelope `source_ref: ExternalGovernanceReferenceRef` 对齐;当前 Step 7 不提供 `GovernanceSourceRef -> ExternalGovernanceReferenceRef` 转换或 dual-bundle save helper。
+
+| typed save | `reference_ref` 来源 | `expected_version` 来源 |
+|---|---|---|
+| `save_actor_capability_snapshot(snapshot, expected_version, uow)` | `snapshot.snapshot_state.reference_ref` | `get_reference_state_with_version(snapshot.snapshot_state.reference_ref).version` 或 matching list item version |
+| `save_method_policy_snapshot(snapshot, expected_version, uow)` | `snapshot.snapshot_state.reference_ref` | `get_reference_state_with_version(snapshot.snapshot_state.reference_ref).version` 或 matching list item version |
+| `save_method_control_snapshot(snapshot, expected_version, uow)` | `snapshot.snapshot_state.reference_ref` | `get_reference_state_with_version(snapshot.snapshot_state.reference_ref).version` 或 matching list item version |
+| `save_evidence_summary_ref(summary_ref, expected_version, uow)` | inbound envelope `source_ref` / `ReferenceResolutionState.reference_ref` for that evidence summary | current reference state version for the envelope source ref |
+| `save_process_context_ref(context_ref, expected_version, uow)` | `context_ref.snapshot_state.reference_ref` | `get_reference_state_with_version(context_ref.snapshot_state.reference_ref).version` 或 matching list item version |
+| `save_work_context_ref(context_ref, expected_version, uow)` | `context_ref.snapshot_state.reference_ref` | `get_reference_state_with_version(context_ref.snapshot_state.reference_ref).version` 或 matching list item version |
+| `save_runtime_signal_ref(signal_ref, expected_version, uow)` | `signal_ref.signal_state.reference_ref` | `get_reference_state_with_version(signal_ref.signal_state.reference_ref).version` 或 matching list item version |
+
+Runtime / observability consumer special rules:
+
+| Consumer path | reference bundle key | `expected_version` 来源 | 禁止事项 |
+|---|---|---|---|
+| `ConsumeRuntimeSignalRecordedFlow` | `payload.runtime_signal_ref.signal_state.reference_ref`, and it must equal inbound envelope `source_ref` | `get_reference_state_with_version(payload.runtime_signal_ref.signal_state.reference_ref).version`, or `None` only when this same tracked reference is created in the UoW | 不得把 optional `payload.source_ref: GovernanceSourceRef` 保存为 `ReferenceResolutionState`;不得用它读取 version |
+| `ConsumeObservabilityAlertRaisedFlow` | inbound envelope `source_ref`;optional `payload.runtime_signal_ref.signal_state.reference_ref` must equal it before saving runtime signal sidecar | `get_reference_state_with_version(envelope.source_ref).version`, or `None` only when this same tracked reference is created in the UoW | 不得把 `payload.source_ref: GovernanceSourceRef` 保存为 `ReferenceResolutionState`;不得在同一 flow 隐式更新第二个 reference bundle |
 
 | `ExternalContextRefreshScope` branch | repository list rule | 禁止事项 |
 |---|---|---|

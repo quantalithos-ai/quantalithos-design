@@ -1631,7 +1631,7 @@ pub struct OutboxPublicationRef(pub ExternalSourceRef);
 |---|---|---|---|
 | `GovernanceTraceId` / `GovernanceTraceRecordRef` | trace record identity / ref | command / consumer / job success path 由 application id generator 提供 | 不等同 observability log id |
 | `GovernanceTraceRecordRefSet` | audit trail 中关联 trace refs | ordered unique;去重依据 `GovernanceTraceId` | 不保存 trace body |
-| `GovernanceTraceSubjectRef` | 被追溯对象 | accepted truth path 来源于 Step 7 `GovernanceTruthChangeSubjectMapper` 生成的 canonical subject key;consumer / job marker 使用正式 marker subject | 不保存外部正文;不得拼 `ExternalSourceRef` 字符串 |
+| `GovernanceTraceSubjectRef` | 被追溯对象 | accepted truth path 来源于 Step 7 `GovernanceTruthChangeSubjectMapper` 生成的 canonical subject key;consumer reference marker 来源于 Step 7 `GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`;其他 job / handoff marker 必须有对应正式 mapper 后才可写 trace | 不保存外部正文;不得拼 `ExternalSourceRef` 字符串 |
 | `GovernanceAuditTrailId` / `GovernanceAuditTrailRef` | audit trail identity / ref | start audit trail flow 或 repository load | 不替代 observability ledger |
 | `GovernanceAuditSubjectRef` | audit 对象 | accepted truth path 与 trace / outbox 使用同一个 canonical subject key,由 Step 7 `GovernanceTruthChangeSubjectMapper` 返回 | 不表达当前业务状态;不得由 audit repository 另行推导 |
 | `GovernanceOutboxId` / `GovernanceOutboxRef` | outbox record identity / ref | outbox enqueue 由 application id generator 提供 | 不等同 outbound event id |
@@ -1642,6 +1642,7 @@ pub struct OutboxPublicationRef(pub ExternalSourceRef);
 |---|---|
 | trace / audit 不保存外部正文 | artifact、conversation、runtime、observability、archive body 都只通过 ref / handoff 表达 |
 | accepted subject key 同源 | command accepted path 的 trace subject、audit subject 和 outbox subject 必须包装同一个 canonical `ExternalSourceRef`;context/input/gate/decision 等 flow 不得各自生成不同 subject |
+| reference marker trace subject 有正式 helper | consumer/reference-only path 若 Step 9 要求 `GovernanceTraceRecord::from_marker(...)`,subject 必须来自 `GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`,其 canonical key 为 `governance:reference-marker:<external_reference_ref.0>`;`<external_reference_ref.0>` 是 `ExternalSourceRef` 的完整 opaque value,不得被业务逻辑解析 |
 | outbox 不决定 truth | 只传播已成立 truth 或正式维护状态 |
 | publication ref 不是 source version | 只表示发布动作结果,不替代 event schema version |
 
@@ -4203,7 +4204,7 @@ pub struct GovernanceTraceRecord {
 | 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
 | `trace_id` | `GovernanceTraceId` | trace record identity | application id generator 生成;domain 不自行生成 |
-| `subject_ref` | `GovernanceTraceSubjectRef` | 被追溯对象 | accepted truth path 从 Step 7 mapper 返回的 `trace_subject_ref` 取得,且必须与 `GovernanceTruthChange.subject_ref` 包装同一个 canonical key;consumer marker / job / handoff 使用正式 marker subject;不保存正文 |
+| `subject_ref` | `GovernanceTraceSubjectRef` | 被追溯对象 | accepted truth path 从 Step 7 mapper 返回的 `trace_subject_ref` 取得,且必须与 `GovernanceTruthChange.subject_ref` 包装同一个 canonical key;consumer reference marker 从 Step 7 `GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)` 取得;job / handoff marker 只有存在对应正式 mapper 时才可写 trace;不保存正文 |
 | `trace_kind` | `GovernanceTraceKind` | 追溯类别 | 非空 newtype;由 factory input 或 flow 常量提供;不驱动业务状态 |
 | `core_trace_id` | `TraceId` | L0-core distributed trace 关联 | 来自 `CommandMetadata.request.trace_id`、`QueryMetadata.request.trace_id`、event envelope traceparent 或 job metadata;不得本仓重新定义额外 trace context wrapper |
 | `source_cursor` | `Option<GovernanceTruthCursor>` | accepted change 后的 cursor | truth change path 必须为 `Some(change.source_cursor)`;consumer / job marker 若无 truth cursor 可为 `None` |
@@ -4217,7 +4218,7 @@ pub struct GovernanceTraceRecord {
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
 | `pub fn from_truth_change(trace_id: GovernanceTraceId, change: &GovernanceTruthChange, trace_subject_ref: GovernanceTraceSubjectRef, trace_kind: GovernanceTraceKind, core_trace_id: TraceId) -> Result<Self, DomainError>` | 从已成立 truth change 构造 trace | application generated id、accepted truth change、same-key trace subject、trace kind、core trace id | `Result<GovernanceTraceRecord, DomainError>` | command accepted path;`trace_subject_ref` 必须来自同一 Step 7 mapper result,并与 `change.subject_ref` 包装同一个 canonical key;`source_cursor = Some(change.source_cursor)` |
-| `pub fn from_marker(trace_id: GovernanceTraceId, subject_ref: GovernanceTraceSubjectRef, trace_kind: GovernanceTraceKind, core_trace_id: TraceId, source_cursor: Option<GovernanceTruthCursor>) -> Result<Self, DomainError>` | 从 consumer / job marker 构造 trace | generated id、formal marker subject、kind、core trace id、optional cursor | `Result<GovernanceTraceRecord, DomainError>` | consumer accepted marker、rebuild / refresh / reconciliation job marker |
+| `pub fn from_marker(trace_id: GovernanceTraceId, subject_ref: GovernanceTraceSubjectRef, trace_kind: GovernanceTraceKind, core_trace_id: TraceId, source_cursor: Option<GovernanceTruthCursor>) -> Result<Self, DomainError>` | 从 consumer / job marker 构造 trace | generated id、formal marker subject、kind、core trace id、optional cursor | `Result<GovernanceTraceRecord, DomainError>` | consumer accepted reference marker、rebuild / refresh / reconciliation job marker;consumer reference marker subject 必须来自 Step 7 `GovernanceReferenceMarkerSubjectMapper` |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
@@ -7737,7 +7738,7 @@ pub struct GovernanceJobRunnerRegistryState {
 | GVN-S6-OPEN-009 | stored result surface 必须正式闭合 command result、consumer receipt、job report 的 save/get/missing behavior | Step 7 / Step 8 / Step 13 | `GovernanceIdempotencyRecord`、`StoredGovernanceOperationResult`、job run result | duplicate replay 找不到 result,只能重跑 mutation/job scan |
 | GVN-S6-OPEN-010 | visibility denied、degraded、unavailable、unsupported version、dead-letter、retry 的 error/recovery 映射必须正式闭合 | Step 12 / Step 13 / Step 16 | markers、entry dispositions、outbox/job states | error 只能是普通异常,无法构造 NotVisible/degraded/dead-letter surface |
 | GVN-S6-OPEN-011 | config binding 必须定义 config refs 与 adapter slots 的来源、校验和 redaction,但不得把 raw config/secret 写进 object | Step 14 | infra config refs、availability marker、builder state | infra object 保存 secret / URL / topic / cron / retry 数字 |
-| GVN-S6-OPEN-012 | observability/audit 必须定义 trace subject、audit source、history kind、handoff target、redacted issue refs 的正式映射 | Step 15 | trace/audit/history/handoff object | consumer marker 或 job report 无 trace subject / audit source |
+| GVN-S6-OPEN-012 | observability/audit 必须定义 trace subject、audit source、history kind、handoff target、redacted issue refs 的正式映射 | Step 15 | trace/audit/history/handoff object;consumer reference marker trace 已由 Step 7 `GovernanceReferenceMarkerSubjectMapper` 闭合 | job report / handoff marker 无 trace subject / audit source |
 | GVN-S6-OPEN-013 | test cut 必须覆盖 object factory、state transition、field closure、no-external-body、idempotency duplicate、projection stale、outbox publish、visibility denied | Step 16 | Step 6 object and state closure | 实现只测 happy path,无法发现设计闭口缺失 |
 
 #### 19.3 不应在 Step 6 继续展开的事项

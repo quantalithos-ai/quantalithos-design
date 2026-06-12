@@ -1558,9 +1558,9 @@ pub struct GovernanceInboundEventReceipt {
 | `ConsumeArtifactEvidenceChanged` | `ArtifactEvidenceChangedPayload` | `EvidenceSummaryRef`、`ReferenceResolutionState` | affected compliance views |
 | `ConsumeMethodPolicyDefinitionChanged` | `MethodPolicyDefinitionChangedPayload` | `MethodPolicySnapshot`、`ReferenceResolutionState` | affected policy views |
 | `ConsumeMethodControlDefinitionChanged` | `MethodControlDefinitionChangedPayload` | `MethodControlSnapshot`、`ReferenceResolutionState` | affected control coverage views |
-| `ConsumeRuntimeSignalRecorded` | `RuntimeSignalRecordedPayload` | `RuntimeSignalRef`、`ReferenceResolutionState`、optional pending input marker | affected context / dashboard views |
+| `ConsumeRuntimeSignalRecorded` | `RuntimeSignalRecordedPayload` | `RuntimeSignalRef`、`ReferenceResolutionState` for `runtime_signal_ref.signal_state.reference_ref`、optional pending input marker | affected context / dashboard views |
 | `ConsumeConversationContextChanged` | `ConversationContextChangedPayload` | `GovernanceSourceRef` reference state / trace stale marker | affected trace / decision views |
-| `ConsumeObservabilityAlertRaised` | `ObservabilityAlertRaisedPayload` | `RuntimeSignalRef` or `GovernanceSourceRef` reference state / pending nonconformity marker | affected nonconformity / dashboard views |
+| `ConsumeObservabilityAlertRaised` | `ObservabilityAlertRaisedPayload` | `ReferenceResolutionState` for envelope source ref, optional `RuntimeSignalRef` when aligned to same reference bundle, pending nonconformity marker | affected nonconformity / dashboard views |
 
 #### 10.4 8.3-a stop-review
 
@@ -1616,7 +1616,7 @@ pub struct MethodControlDefinitionChangedPayload {
 pub struct RuntimeSignalRecordedPayload {
     /// Runtime signal ref.
     pub runtime_signal_ref: RuntimeSignalRef,
-    /// Optional source ref to create a pending Governance input marker.
+    /// Optional Governance source ref used only to create a pending Governance input marker.
     pub source_ref: Option<GovernanceSourceRef>,
 }
 
@@ -1630,7 +1630,7 @@ pub struct ConversationContextChangedPayload {
 
 /// Observability alert or audit summary payload.
 pub struct ObservabilityAlertRaisedPayload {
-    /// Source ref for the alert or audit summary.
+    /// Governance source ref used only as pending nonconformity marker/source link.
     pub source_ref: GovernanceSourceRef,
     /// Optional runtime signal ref when the alert maps to runtime signal.
     pub runtime_signal_ref: Option<RuntimeSignalRef>,
@@ -1647,9 +1647,9 @@ pub struct ObservabilityAlertRaisedPayload {
 | `ArtifactEvidenceChangedPayload` | artifact/evidence safe summary | `save_evidence_summary_ref` + reference state | 不保存 evidence / artifact body |
 | `MethodPolicyDefinitionChangedPayload` | method-library policy safe summary, including body-free `policy_snapshot.scope_ref` | `save_method_policy_snapshot` + reference state | 不保存 AIPolicyDef body;不得从 summary body 或字符串临时推导 scope |
 | `MethodControlDefinitionChangedPayload` | method-library control safe summary | `save_method_control_snapshot` + reference state | 不保存 ControlDefinition / standard body |
-| `RuntimeSignalRecordedPayload` | runtime/capability event summary | `save_runtime_signal_ref` + optional pending input marker | 不保存 execution log |
+| `RuntimeSignalRecordedPayload` | runtime/capability event summary;`runtime_signal_ref.signal_state.reference_ref` must equal envelope `source_ref` | `save_runtime_signal_ref` + `ReferenceResolutionState` for the same runtime signal reference bundle + optional pending input marker | 不保存 execution log;`payload.source_ref` 不保存 reference state,不提供 expected_version |
 | `ConversationContextChangedPayload` | conversation event summary | source reference state / trace stale marker | 不保存 message body |
-| `ObservabilityAlertRaisedPayload` | observability alert safe summary | source/reference state + optional runtime signal / pending nonconformity marker | 不保存 alert body / stack trace |
+| `ObservabilityAlertRaisedPayload` | observability alert safe summary;when `runtime_signal_ref` is present, its `signal_state.reference_ref` must equal envelope `source_ref` | `ReferenceResolutionState` for envelope source ref + optional `save_runtime_signal_ref` on the same bundle + pending nonconformity marker | 不保存 alert body / stack trace;`payload.source_ref` 不保存 reference state,不提供 expected_version |
 
 #### 10.6 Inbound event envelope specializations
 
@@ -1675,9 +1675,9 @@ pub struct ObservabilityAlertRaisedPayload {
 | Artifact evidence | upsert evidence ref | envelope `source_ref` + source version | compliance / control views |
 | Method policy definition | upsert method policy snapshot | `policy_snapshot.snapshot_state` and `policy_snapshot.scope_ref` | policy effective views |
 | Method control definition | upsert method control snapshot | `control_snapshot.snapshot_state` | control coverage views |
-| Runtime signal recorded | upsert runtime signal ref | `runtime_signal_ref.signal_state` | context / dashboard views |
+| Runtime signal recorded | upsert runtime signal ref + reference state for the same bundle | `runtime_signal_ref.signal_state.reference_ref`;must equal envelope `source_ref`;optional `payload.source_ref` is pending input marker only | context / dashboard views |
 | Conversation context changed | save source reference state | envelope `source_ref` + optional read subject | trace / decision views |
-| Observability alert raised | save source/reference state + optional runtime signal | payload runtime signal or envelope source ref | nonconformity / dashboard views |
+| Observability alert raised | save envelope reference state + optional runtime signal on the same bundle | envelope `source_ref`;if payload has `runtime_signal_ref`, its `signal_state.reference_ref` must equal envelope `source_ref`;payload `source_ref` is pending nonconformity marker only | nonconformity / dashboard views |
 
 #### 10.8 8.3-b stop-review
 

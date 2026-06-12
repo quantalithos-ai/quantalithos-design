@@ -328,13 +328,22 @@
 | `ReferenceSnapshotRepository.list_reference_states(scope, page)` | 按 refresh scope 列 tracked refs | read-only;stable page;returns `Versioned<T>` for per-item update | `Page<Versioned<ReferenceResolutionState>>` | repository failure |
 | `ReferenceSnapshotRepository.save_reference_state(state, expected_version, uow)` | 保存 reference resolution state | `None` create only when flow explicitly tracks new ref;`Some(version)` update existing | `ExternalGovernanceReferenceRef` | version conflict |
 | `ReferenceSnapshotRepository.get_actor_capability_snapshot(actor_ref)` | 按 actor ref 读取本地 body-free actor capability snapshot | read-only;query visibility / approval view / responsibility command 使用;不得触发 external resolver 或 identity refresh | `Option<ActorCapabilitySnapshot>` | repository failure |
-| `save_actor_capability_snapshot(snapshot, expected_version, uow)` | 保存 actor capability body-free snapshot | `None` create;`Some(version)` update;same UoW as reference state save when from consumer/refresh | `ActorCapabilitySnapshotRef` | version conflict |
-| `save_method_policy_snapshot(snapshot, expected_version, uow)` | 保存 method policy snapshot | same UoW as reference state;must persist `policy_ref` / `policy_version_ref` / `scope_ref` / `summary_ref` / `snapshot_state`;no method body | `MethodPolicySnapshotRef` | version conflict |
-| `save_method_control_snapshot(snapshot, expected_version, uow)` | 保存 method control snapshot | same UoW as reference state;no control body | `MethodControlSnapshotRef` | version conflict |
-| `save_evidence_summary_ref(summary_ref, expected_version, uow)` | 保存 evidence summary marker | same UoW as reference state;no artifact/evidence body | `EvidenceSummaryRef` | version conflict |
-| `save_process_context_ref(context_ref, expected_version, uow)` | 保存 process context marker | same UoW as reference state;no process truth body | `ProcessGovernanceContextRef` | version conflict |
-| `save_work_context_ref(context_ref, expected_version, uow)` | 保存 work context marker | same UoW as reference state;no work truth body | `WorkGovernanceContextRef` | version conflict |
-| `save_runtime_signal_ref(signal_ref, expected_version, uow)` | 保存 runtime signal marker | same UoW as reference state;no runtime log body | `RuntimeSignalRef` | version conflict |
+| `save_actor_capability_snapshot(snapshot, expected_version, uow)` | 保存 actor capability body-free snapshot | `expected_version` is the same reference bundle version as `snapshot.snapshot_state.reference_ref`;same UoW as reference state save when from consumer/refresh | `ActorCapabilitySnapshotRef` | version conflict |
+| `save_method_policy_snapshot(snapshot, expected_version, uow)` | 保存 method policy snapshot | `expected_version` is the same reference bundle version as `snapshot.snapshot_state.reference_ref`;must persist `policy_ref` / `policy_version_ref` / `scope_ref` / `summary_ref` / `snapshot_state`;no method body | `MethodPolicySnapshotRef` | version conflict |
+| `save_method_control_snapshot(snapshot, expected_version, uow)` | 保存 method control snapshot | `expected_version` is the same reference bundle version as `snapshot.snapshot_state.reference_ref`;same UoW as reference state;no control body | `MethodControlSnapshotRef` | version conflict |
+| `save_evidence_summary_ref(summary_ref, expected_version, uow)` | 保存 evidence summary marker | `expected_version` is the same reference bundle version as the envelope/source `ReferenceResolutionState.reference_ref`;same UoW as reference state;no artifact/evidence body | `EvidenceSummaryRef` | version conflict |
+| `save_process_context_ref(context_ref, expected_version, uow)` | 保存 process context marker | `expected_version` is the same reference bundle version as `context_ref.snapshot_state.reference_ref`;same UoW as reference state;no process truth body | `ProcessGovernanceContextRef` | version conflict |
+| `save_work_context_ref(context_ref, expected_version, uow)` | 保存 work context marker | `expected_version` is the same reference bundle version as `context_ref.snapshot_state.reference_ref`;same UoW as reference state;no work truth body | `WorkGovernanceContextRef` | version conflict |
+| `save_runtime_signal_ref(signal_ref, expected_version, uow)` | 保存 runtime signal marker | `expected_version` is the same reference bundle version as `signal_ref.signal_state.reference_ref`;same UoW as reference state;no runtime log body | `RuntimeSignalRef` | version conflict |
+
+Reference bundle version semantics:
+
+- `ReferenceResolutionState` and all typed snapshot/ref sidecars for the same `ExternalGovernanceReferenceRef` share one optimistic reference bundle version.
+- Consumer / refresh success paths must read `Versioned<ReferenceResolutionState>` first through `get_reference_state_with_version(reference_ref)` or `list_reference_states(...).items[*]`, then pass that `version` to both the typed snapshot/ref `save_*` and `save_reference_state(...)` in the same UoW.
+- `expected_version = None` is allowed only when the flow explicitly creates a new tracked reference state and its typed snapshot/ref sidecar in the same UoW. If the reference is untracked and the flow does not declare create semantics, the item is delayed / rejected / failed, not silently upserted.
+- durable storage may implement this as one row, two tables with a shared version column, or an aggregate bundle, but the externally visible repository behavior must be identical. in-memory fake must enforce the same version conflict behavior.
+- typed sidecar saves do not have independent private versions in this design. If a future boundary requires independent typed sidecar update without reference state update, Step 7 / Step 11 must first add a typed `get_*_with_version(...)` read surface.
+- source version、snapshot version、event schema version、dedup key、idempotency digest、timestamp、trace id、page cursor、snapshot ref string and fake private map are not valid `expected_version` sources.
 
 | `ExternalContextRefreshScope` branch | list rule | update rule |
 |---|---|---|
@@ -546,7 +555,9 @@ save ReferenceResolutionState and typed snapshot/ref with expected_version
 list affected views by references
 reference_cursor = uow.assign_reference_change_cursor()
 mark_stale(affected_views, reference_cursor)
-append marker trace only if the flow formally requires trace
+if the flow formally requires marker trace:
+  marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)
+  append GovernanceTraceRecord::from_marker(new_trace_id, marker_subject_ref, trace_kind, core_trace_id, Some(reference_cursor))
 save StoredGovernanceOperationResult::ConsumerReceipt(...)
 complete idempotency
 commit
@@ -554,12 +565,20 @@ commit
 
 `reference_cursor` 只来自同一 UoW 的 `assign_reference_change_cursor()`。调用前置条件是本次 consumer / refresh 已经把 reference state 与 typed snapshot/ref save/stage 到事务中;调用后同一个 cursor 传给 `mark_stale(...)` 和 optional marker trace。rollback 后该 cursor 不可见。不得用 source version、snapshot version、reference optimistic version、event dedup key、idempotency digest、page cursor、timestamp、trace id、id generator 或 hard-coded string 代替。
 
+当 consumer/reference-only flow 正式要求 marker trace 时,`marker_subject_ref` 必须来自 Step 7 `GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`。`reference_ref` 是同一 flow 已保存 / stage 的 `ExternalGovernanceReferenceRef`,并且 canonical key 固定为 `governance:reference-marker:<external_reference_ref.0>`。Trace append 必须与 reference state、typed snapshot/ref、projection stale marker、stored receipt 和 idempotency complete 处在同一 UoW。Service、repository、fake 或 durable adapter 不得从 event topic、payload type、source version、reference cursor、trace id、dedup key、idempotency digest 或 hard-coded string 拼 subject。
+
+Runtime / observability consumer persistence rule:
+
+- `RuntimeSignalRecorded` 的 reference bundle key 只能是 `payload.runtime_signal_ref.signal_state.reference_ref`,且必须等于 inbound envelope `source_ref`。`save_runtime_signal_ref(...)` 与 `save_reference_state(...)` 使用这一个 bundle 的同一个 `expected_version`。optional `payload.source_ref: GovernanceSourceRef` 只可作为 pending input/source marker,不得保存 `ReferenceResolutionState`,不得读取 version,不得作为 marker trace subject。
+- `ObservabilityAlertRaised` 的 reference bundle key 只能是 inbound envelope `source_ref`。若 payload 带 `runtime_signal_ref`,只有当 `runtime_signal_ref.signal_state.reference_ref == envelope.source_ref` 时才可在同一 UoW 内保存 runtime signal sidecar,并复用同一个 expected_version。payload `source_ref: GovernanceSourceRef` 只可作为 pending nonconformity/source marker,不得保存 reference state。
+- 当前持久化契约不允许 runtime / observability consumer 在同一 flow 中隐式更新两个不同 `ExternalGovernanceReferenceRef` bundles。若未来需要双-bundle 更新,必须先在 Step 7/9/11 定义第二个 bundle 的 versioned read、transaction ordering、affected-view expansion、marker trace subject 和 conflict mapping。
+
 | Consumer write | Allowed | Forbidden |
 |---|---|---|
 | reference state | resolved/stale/unavailable/invalid marker with version | creating sibling truth body |
 | snapshot/ref | body-free actor/method/evidence/process/work/runtime summary or ref | saving policy/control/evidence/process/work/raw body |
 | projection | stale marker for existing public views | rebuilding view body inline |
-| trace | marker trace only when Step 9 requires | fake accepted truth trace |
+| trace | marker trace only when Step 9 requires and subject comes from `GovernanceReferenceMarkerSubjectMapper` | fake accepted truth trace or service-built subject string |
 | outbox | only if Step 9 explicitly defines consumer outbound event | implicit event for every snapshot |
 | result | stored `GovernanceConsumerReceiptEnvelope` containing complete public `GovernanceInboundEventReceipt` | rebuilding receipt on duplicate |
 

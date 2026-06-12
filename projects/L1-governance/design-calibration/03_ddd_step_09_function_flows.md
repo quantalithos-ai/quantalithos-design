@@ -2379,15 +2379,23 @@ Publisher failure classification is not inferred by this flow. `GovernanceOutbox
   | for each requested derived_view_ref:
   |   target = projection_repo.resolve_projection_target(derived_view_ref)
   |   state_v = projection_repo.get_state_with_version(derived_view_ref)
-  |   target_state = state_v.item or DerivedGovernanceViewState::for_view(derived_view_ref, snapshot.source_cursor)
-  |   target_state.start_rebuild(snapshot.source_cursor)
+  |   if state_v exists:
+  |     target_state = state_v.item
+  |     expected_state_version = Some(state_v.version)
+  |     target_state.start_rebuild(snapshot.source_cursor)
+  |     requires_mark_fresh = true
+  |   else:
+  |     target_state = DerivedGovernanceViewState::for_view(derived_view_ref, snapshot.source_cursor)
+  |     expected_state_version = None
+  |     requires_mark_fresh = false
   |   build typed view:
   |     Dashboard -> GovernanceDashboardView::from_truth(...)
   |     DecisionSummary -> load decision and gate, DecisionSummaryView::from_decision(...)
   |     PolicyEffective -> load active conflicts/shared rules, PolicyEffectiveView::from_policy_truth(...)
   |     ControlCoverage -> load context snapshot and coverage inputs, ControlCoverageView::from_control_truth(...)
   |     NonconformityStatus -> load nonconformity, NonconformityStatusView::from_nonconformity(...)
-  |   target_state.mark_fresh(snapshot.source_cursor)
+  |   if requires_mark_fresh:
+  |     target_state.mark_fresh(snapshot.source_cursor)
   |   projection_repo.replace_*_view(view, target_state, expected_state_version, tx)
   |   assembly.record_views(view_ref, changed_count +1)
 ```
@@ -2409,9 +2417,9 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
 |---|---|
 | projection target missing | mark item failed in report;do not invent typed view ref |
 | source truth missing | mark view state failed or unavailable per Step 10/13;do not create placeholder truth |
-| existing state missing | create `DerivedGovernanceViewState::for_view(view_ref, snapshot.source_cursor)` with `expected_version = None` |
-| existing state present | use `state_v.version` as expected version |
-| view replace success | mark state fresh and include view ref in report |
+| existing state missing | first materialization only:create `DerivedGovernanceViewState::for_view(view_ref, snapshot.source_cursor)` with `expected_version = None`;do not call `start_rebuild(...)` or `mark_fresh(...)`;replace first view body and `Fresh` state atomically |
+| existing state present | use `state_v.version` as expected version;call `start_rebuild(snapshot.source_cursor)` before builder |
+| view replace success | existing-state branch calls `mark_fresh(snapshot.source_cursor)` before replace;missing-state branch is already `Fresh`;include view ref in report |
 | duplicate job | return stored job report;do not recompute snapshot or rebuild |
 
 #### 18.3 `RefreshExternalContextSnapshotsFlow`

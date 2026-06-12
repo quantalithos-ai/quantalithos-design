@@ -318,7 +318,7 @@
 | query index lookup | projection-backed query 必须先通过正式 `find_*_view_ref_by_*` 读取 existing view ref;missing 只能返回 degraded/missing projection surface,不得创建或拼接 view ref |
 | stale identity | affected view refs 只能来自 repository list,不得拼接 |
 | replace atomicity | view body、view state、dependency index 必须在同一 UoW 替换 |
-| missing state | rebuild 可用 `expected_version = None` 创建 new state;query 不创建 |
+| missing state | rebuild first materialization 可用 `expected_version = None` 创建 new `Fresh` state and first view body in the same UoW;query 不创建;该分支不得调用 `start_rebuild(...)` / `mark_fresh(...)` |
 | failed rebuild | failure path 只保存 `Failed` / `Unavailable` state 或 job report,不改 source truth |
 
 ### 8.7 Reference snapshot repository 语义

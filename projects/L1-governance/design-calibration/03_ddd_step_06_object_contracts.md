@@ -2377,7 +2377,7 @@ pub enum DerivedGovernanceViewFreshnessState {
 |---|---|---|---|---|
 | `Fresh` | `The view has caught up with its source cursor.` | 视图已追上来源 cursor | `DerivedGovernanceViewState::for_view(...)`、`mark_fresh` | `Stale` |
 | `Stale` | `The view is behind Governance truth or a local snapshot.` | 视图落后于 truth 或 snapshot | `mark_stale` from `Fresh`、core truth / snapshot changed | `Rebuilding`、`Failed` |
-| `Rebuilding` | `The view is currently being rebuilt.` | 视图重建中 | `start_rebuild` from `Stale` / `Failed` | `Fresh`、`Failed` |
+| `Rebuilding` | `The view is currently being rebuilt.` | 视图重建中 | `start_rebuild` from `Stale` / `Failed` / `Unavailable` | `Fresh`、`Failed` |
 | `Failed` | `The last view maintenance attempt failed.` | 视图维护失败 | `mark_failed` from `Stale` / `Rebuilding` | `Rebuilding` |
 | `Unavailable` | `The view is not available for serving.` | 视图不可用 | projection source / storage unavailable path | `Rebuilding` after maintenance retry starts |
 
@@ -4255,7 +4255,7 @@ pub struct DerivedGovernanceViewState {
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn for_view(view_ref: DerivedGovernanceViewRef, source_cursor: GovernanceTruthCursor) -> Result<Self, DomainError>` | 为派生视图建立 freshness state | stable view ref、当前 source cursor | `Result<DerivedGovernanceViewState, DomainError>` | projection repository 首次注册 view state;初始 state 为 `Fresh`,failure ref 为空 |
+| `pub fn for_view(view_ref: DerivedGovernanceViewRef, source_cursor: GovernanceTruthCursor) -> Result<Self, DomainError>` | 为派生视图建立 freshness state | stable view ref、当前 source cursor | `Result<DerivedGovernanceViewState, DomainError>` | projection repository 首次注册 / first materialization view state;初始 state 为 `Fresh`,failure ref 为空;`RebuildGovernanceProjectionsFlow` 的 missing-state 分支不得随后调用 `start_rebuild(...)` 或 `mark_fresh(...)` |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
@@ -4265,6 +4265,7 @@ pub struct DerivedGovernanceViewState {
 | 失败原因不内联 | `last_failure_ref` 指向 failure marker / job report item;错误详情、adapter log、stack trace 不进入本对象 |
 | query no-write | Query 只能读取本对象并返回 freshness / degraded marker,不得调用 `mark_stale`、`start_rebuild` 或 `mark_fresh` 修复状态 |
 | rebuild 不修复 truth | `mark_fresh(...)` 只说明 projection 已追上 cursor,不表示 truth 被修复或重新批准 |
+| first materialization 不进入 Rebuilding | existing state missing 时,`RebuildGovernanceProjectionsFlow` 通过 `for_view(...)` 创建 `Fresh` state,并与首次构建出的 view body 同 UoW replace;该分支不是 `Fresh -> Rebuilding -> Fresh` 迁移 |
 | HLD factory 补入 cursor | HLD 写 `for_view(view_ref)`,但对象必填 `source_cursor`;为满足字段来源闭环,正式落码 factory 必须接收 `GovernanceTruthCursor` |
 | HLD failure reason 映射为 ref | HLD 写 `mark_failed(DerivedViewFailureReason)`,但对象字段是 `last_failure_ref`;正式落码用已持久化 `DerivedViewFailureRef`,failure reason 由 failure marker / job report 承载 |
 

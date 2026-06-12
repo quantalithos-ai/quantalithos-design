@@ -207,7 +207,7 @@ Unsupported schema version must return `UnsupportedVersion` receipt without pars
 |---|---|---|---|
 | `PublishGovernanceOutbox` | `GovernanceJobMetadata.idempotency_key` | actor scope、job kind、`PublishGovernanceOutboxJobInput.page` and publish config refs that affect item selection | stored `GovernanceJobReport`,including scanned/published/failed outbox refs;不重新 list pending、不重新 publish |
 | `RebuildGovernanceProjections` | job metadata key | actor scope、scope ref、projection set、page/from cursor fields | stored `GovernanceJobReport`,including rebuilt / inspected `view_refs`;不重新 rebuild |
-| `RefreshExternalContextSnapshots` | job metadata key | actor scope、refresh scope, explicit refs / unhealthy / governance scope, page | stored `GovernanceJobReport`,including refreshed / failed reference refs;不重新 resolve |
+| `RefreshExternalContextSnapshots` | job metadata key | actor scope、refresh scope, explicit refs / unhealthy / governance scope, page;fresh run binds per-item resolver dispatch to the `refresh_target` returned by listed reference states | stored `GovernanceJobReport`,including refreshed / failed reference refs;不重新 resolve |
 | `RunGovernanceReconciliation` | job metadata key | actor scope、`GovernanceReconciliationInput`, inspected view/outbox/reference/report refs, cursor/scope fields | stored `GovernanceJobReport`,including generated `report_refs` and inspected `view_refs`;不重新 produce report |
 | `PrepareGovernanceTraceHandoff` | job metadata key | actor scope、trace refs、target ref | stored `GovernanceJobReport`;不重新 deliver handoff |
 | `PrepareGovernanceArchiveHandoff` | job metadata key | actor scope、trace refs、report refs、target ref | stored `GovernanceJobReport`;不重新 deliver archive |
@@ -314,6 +314,7 @@ P0 的正式能力是只读审计 + 拒绝盲重试。自动修复 `Reserved` un
 |---|---|
 | scope expansion | `ReferenceSnapshotRepository.list_reference_states(refresh_scope, page)` 或 Step 7 等价正式读取面 |
 | version source | each item uses `Versioned<ReferenceResolutionState>.version` |
+| resolver dispatch | each item uses `ReferenceResolutionState.refresh_target`;service/fake must not parse `reference_ref` or source family strings |
 | save rule | refresh success/failure uses expected version;conflict becomes item-level failure/delayed |
 | body boundary | resolver returns only refs/summaries/source version/digest/snapshot state;forbidden body rejects item |
 | duplicate job | stored job report replay;does not resolve refs again |

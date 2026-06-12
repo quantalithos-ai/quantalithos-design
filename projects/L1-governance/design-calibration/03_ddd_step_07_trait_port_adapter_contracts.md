@@ -1269,13 +1269,14 @@ pub trait ReferenceSnapshotRepository {
 | 函数 | 闭合点 |
 |---|---|
 | `get_reference_state_with_version` | refresh success/failure 的 expected_version 来源 |
-| `list_reference_states(scope, page)` | `RefreshExternalContextSnapshots` 不做全表猜测 |
+| `list_reference_states(scope, page)` | `RefreshExternalContextSnapshots` 不做全表猜测;returned `ReferenceResolutionState` 必须包含 `refresh_target`,用于 resolver dispatch |
 | `get_actor_capability_snapshot(actor_ref)` | query visibility、approval view 和 responsibility command 读取本地 body-free actor capability snapshot;缺失返回 `None` 并按 flow 映射为 degraded / rejected,不得调用 identity resolver 刷新 |
 | `save_*_snapshot` | consumer / refresh 只保存 body-free snapshot/ref |
 
 Reference snapshot / ref sidecar version rule:
 
 - `ReferenceSnapshotRepository` 对同一个 `ExternalGovernanceReferenceRef` 下的 `ReferenceResolutionState` 与 typed snapshot/ref sidecar 使用同一个 reference bundle version。
+- `ReferenceResolutionState.refresh_target` 是 tracked reference bundle 的正式 dispatch metadata,必须由 durable / fake repository 随 reference state 持久化、分页返回和 versioned update;不得由 service 从 `reference_ref` 字符串、source family 字符串或 private map 反推。
 - consumer / refresh flow 更新 typed snapshot/ref 时,`save_actor_capability_snapshot`、`save_method_policy_snapshot`、`save_method_control_snapshot`、`save_evidence_summary_ref`、`save_process_context_ref`、`save_work_context_ref`、`save_runtime_signal_ref` 的 `expected_version` 必须来自同一 flow 中 `get_reference_state_with_version(reference_ref)` 或 `list_reference_states(...).items[*].version`。
 - 当 flow 明确允许创建一个新的 tracked reference state 时,`save_reference_state(..., None, uow)` 与对应 typed snapshot/ref `save_* (..., None, uow)` 必须在同一个 UoW 内一起 stage;否则 missing tracked reference state 必须映射为 delayed / rejected / failed item,不得私自 upsert。
 - 当前 Step 7 不提供 `get_method_policy_snapshot_with_version(...)` 等 typed sidecar versioned read;实现不得发明 typed snapshot 私有 version,也不得使用 snapshot ref 字符串、source version、event version、timestamp、dedup key 或 fake private map 作为 `expected_version`。
@@ -1301,9 +1302,9 @@ Runtime / observability consumer special rules:
 
 | `ExternalContextRefreshScope` branch | repository list rule | 禁止事项 |
 |---|---|---|
-| `ExplicitRefs(refs)` | 只返回已存在的 tracked reference states;缺失 ref 由 Step 9 refresh flow 进入 failed refs 或 rejected item | 不得为缺失 ref 隐式创建 state |
-| `UnhealthyReferences` | 返回 `ReferenceResolutionState.is_unhealthy() == true` 的 tracked refs,按 `reference_ref` 稳定分页 | 不得把 repository cursor 当 freshness / version |
-| `GovernanceScope(scope_ref)` | 从 Governance scope reference index 枚举关联 refs,再返回 versioned state | 不得扫描 sibling body 或按字符串拼接 scope identity |
+| `ExplicitRefs(refs)` | 只返回已存在且包含 `refresh_target` 的 tracked reference states;缺失 ref 由 Step 9 refresh flow 进入 failed refs 或 rejected item | 不得为缺失 ref 隐式创建 state;不得靠 ref string 猜 resolver |
+| `UnhealthyReferences` | 返回 `ReferenceResolutionState.is_unhealthy() == true` 且包含 `refresh_target` 的 tracked refs,按 `reference_ref` 稳定分页 | 不得把 repository cursor 当 freshness / version |
+| `GovernanceScope(scope_ref)` | 从 Governance scope reference index 枚举关联 refs,再返回带 `refresh_target` 的 versioned state | 不得扫描 sibling body 或按字符串拼接 scope identity |
 
 #### 10.4 Outbox repository and payload snapshot lookup
 
@@ -1642,6 +1643,22 @@ pub trait ExternalGovernanceSourceResolverPort {
 |---|---|
 | `resolve_artifact_ref(artifact_ref)` | 返回 body-free `ReferenceResolutionState`;用于 `SubmitAIIAConclusionFlow` / `SubmitSoAConclusionFlow` 在 draft 创建前判定 artifact ref 是否 resolved;`Unresolved` / `Stale` / `Unavailable` / `Invalid` / digest mismatch outcome 必须 save 前 rejected,不得创建 AIIA / SoA truth,不得返回 artifact body |
 | `resolve_scope_subject_relation(subject_ref, scope_ref)` | 返回 body-free `GovernanceScopeSubjectRelation`;用于 `PolicyScopePolicy` 在 `ActivatePolicyEffectiveFactFlow` / `UpdateSharedRuleSetFlow` save 前判定 subject/scope mismatch;不得解析 ref 字符串、不得扫描 adapter 私有状态、不得返回 scope body |
+
+Refresh dispatch binding:
+
+| `GovernanceReferenceRefreshTarget` | resolver call | typed save on success |
+|---|---|---|
+| `ActorCapability { actor_ref }` | `resolve_actor_capability(actor_ref)` | `save_actor_capability_snapshot(snapshot, expected_version, uow)` |
+| `MethodPolicy { policy_ref }` | `resolve_method_policy(policy_ref)` | `save_method_policy_snapshot(snapshot, expected_version, uow)` |
+| `MethodControl { control_ref }` | `resolve_method_control(control_ref)` | `save_method_control_snapshot(snapshot, expected_version, uow)` |
+| `EvidenceSummary { evidence_ref }` | `resolve_evidence_summary(evidence_ref)` | `save_evidence_summary_ref(reference_ref, evidence_ref, expected_version, uow)` |
+| `Artifact { artifact_ref }` | `resolve_artifact_ref(artifact_ref)` | `save_reference_state(...)` only |
+| `ProcessContext { process_ref, activity_ref, waiting_gate_ref }` | construct `ProcessGovernanceContextRef` with current state,then `resolve_process_context(context_ref)` | construct refreshed `ProcessGovernanceContextRef` with new state,then `save_process_context_ref(context_ref, expected_version, uow)` |
+| `WorkContext { project_ref, work_ref, iteration_ref }` | construct `WorkGovernanceContextRef` with current state,then `resolve_work_context(context_ref)` | construct refreshed `WorkGovernanceContextRef` with new state,then `save_work_context_ref(context_ref, expected_version, uow)` |
+| `RuntimeSignal { signal_kind, external_ref, captured_at }` | construct `RuntimeSignalRef` with current state,then `resolve_runtime_signal(signal_ref)` | construct refreshed `RuntimeSignalRef` with new state,then `save_runtime_signal_ref(signal_ref, expected_version, uow)` |
+| `MarkerOnly { family }` | no resolver call | failed / skipped reference item in job report;no typed sidecar save |
+
+`RefreshExternalContextSnapshotsFlow` must dispatch only from `ReferenceResolutionState.refresh_target`. Service, fake runtime and durable adapter must not parse `ExternalGovernanceReferenceRef`, source family strings or typed ref string prefixes to select a resolver.
 
 #### 11.2 Publisher port
 

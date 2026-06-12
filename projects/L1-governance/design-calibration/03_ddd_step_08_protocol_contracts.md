@@ -2220,7 +2220,7 @@ pub struct PrepareExternalGrcExportJobInput {
 |---|---|---|---|
 | `PublishGovernanceOutbox` | `GovernanceJobRequest<PublishGovernanceOutboxJobInput>` | outbox repository `list_pending_with_payload`, publisher port, mark published/failed | `scanned_outbox_refs`, `published_outbox_refs`, `failed_outbox_refs`, scanned/changed/failed counts |
 | `RebuildGovernanceProjections` | `GovernanceJobRequest<RebuildGovernanceProjectionsJobInput>` | projection replace view/state | `view_refs`, `report_refs`, scanned/changed/failed counts |
-| `RefreshExternalContextSnapshots` | `GovernanceJobRequest<RefreshExternalContextSnapshotsJobInput>` | reference repository `list_reference_states` + resolver + save snapshot/state | `refreshed_reference_refs`, `failed_reference_refs`, scanned/changed/failed counts |
+| `RefreshExternalContextSnapshots` | `GovernanceJobRequest<RefreshExternalContextSnapshotsJobInput>` | reference repository `list_reference_states` returns `ReferenceResolutionState.refresh_target`;application dispatches resolver by that target and saves snapshot/state | `refreshed_reference_refs`, `failed_reference_refs`, scanned/changed/failed counts |
 | `RunGovernanceReconciliation` | `GovernanceJobRequest<RunGovernanceReconciliationJobInput>` | reconciliation report builder/repository | `report_refs`, inspected `view_refs`, finding refs via report |
 | `PrepareGovernanceTraceHandoff` | `GovernanceJobRequest<PrepareGovernanceTraceHandoffJobInput>` | trace handoff port + marker save | handoff marker refs, failed refs |
 | `PrepareGovernanceArchiveHandoff` | `GovernanceJobRequest<PrepareGovernanceArchiveHandoffJobInput>` | archive handoff port + marker save | handoff marker refs, report refs |
@@ -2232,7 +2232,7 @@ pub struct PrepareExternalGrcExportJobInput {
 |---|---|---|---|
 | `PublishGovernanceOutboxJobInput` | `page` | `GovernanceOutboxRepository.list_pending_with_payload` | page missing or limit invalid |
 | `RebuildGovernanceProjectionsJobInput` | scope, projection set, page | `GovernanceTruthSnapshot` + projection replace methods | projection set empty unless explicitly allowed in Step 9 |
-| `RefreshExternalContextSnapshotsJobInput` | refresh scope, page | `ExternalContextRefreshScope` application helper | explicit refs empty or unsupported scope |
+| `RefreshExternalContextSnapshotsJobInput` | refresh scope, page | `ExternalContextRefreshScope` application helper;tracked states provide `GovernanceReferenceRefreshTarget` | explicit refs empty or unsupported scope;tracked state missing refresh target |
 | `RunGovernanceReconciliationJobInput` | reconciliation input | `GovernanceReconciliationInput` / report factory | input view/outbox refs inconsistent with scope |
 | `PrepareGovernanceTraceHandoffJobInput` | trace refs, target | handoff port prepare/deliver | trace refs empty or target disabled |
 | `PrepareGovernanceArchiveHandoffJobInput` | trace refs, report refs, target | archive handoff port | both trace/report refs empty or target disabled |

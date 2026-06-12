@@ -2425,15 +2425,18 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
   | states = reference_repo.list_reference_states(scope, input.page)
   | for each state_v:
   |   reference_ref = state_v.item.reference_ref
-  |   resolver call selected by reference kind / source family
+  |   refresh_target = state_v.item.refresh_target
+  |   resolver call selected by match refresh_target
   |   on success:
   |     new_state = resolved ReferenceResolutionState
+  |     save body-free snapshot/ref required by refresh_target with Some(state_v.version)
   |     reference_repo.save_reference_state(new_state, Some(state_v.version), tx)
-  |     save body-free snapshot/ref if resolver returned a typed snapshot
   |     affected = projection_repo.list_views_affected_by_references({reference_ref}, page)
   |     reference_cursor = tx.assign_reference_change_cursor()
   |     projection_repo.mark_stale(affected, reference_cursor, tx)
   |     assembly.record_references({reference_ref}, empty)
+  |   on MarkerOnly target:
+  |     assembly.record_references(empty, {reference_ref})
   |   on failure:
   |     failed_state = state_v.item.mark_failed(...)
   |     reference_repo.save_reference_state(failed_state, Some(state_v.version), tx)
@@ -2442,19 +2445,28 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
 
 | Scope branch | Formal expansion | Missing / invalid handling |
 |---|---|---|
-| `ExplicitRefs(refs)` | `ReferenceSnapshotRepository.list_reference_states(ExplicitRefs(refs), page)` returns tracked states only | untracked refs enter failed refs;job must not create implicit states |
-| `UnhealthyReferences` | repository returns tracked states where `is_unhealthy() == true` | empty page returns completed zero-change report |
-| `GovernanceScope(scope_ref)` | repository expands scope reference index to tracked states | missing scope index returns failed/degraded job report,not full-table scan |
+| `ExplicitRefs(refs)` | `ReferenceSnapshotRepository.list_reference_states(ExplicitRefs(refs), page)` returns tracked states with `refresh_target` only | untracked refs enter failed refs;job must not create implicit states or infer target from ref string |
+| `UnhealthyReferences` | repository returns tracked states where `is_unhealthy() == true`,including `refresh_target` | empty page returns completed zero-change report |
+| `GovernanceScope(scope_ref)` | repository expands scope reference index to tracked states with `refresh_target` | missing scope index returns failed/degraded job report,not full-table scan |
 
-| Resolver result | Save behavior | Projection behavior |
-|---|---|---|
-| actor capability snapshot | `save_actor_capability_snapshot(..., Some(version or None), tx)` plus reference state | stale actor/capability affected views |
-| method policy snapshot | `save_method_policy_snapshot(...)` plus reference state | stale policy effective views |
-| method control snapshot | `save_method_control_snapshot(...)` plus reference state | stale control coverage views |
-| evidence summary ref | `save_evidence_summary_ref(...)` plus reference state | stale compliance/control/nonconformity views |
-| process/work context ref | `save_process_context_ref` / `save_work_context_ref` plus reference state | stale context/dashboard affected views |
-| runtime signal ref | `save_runtime_signal_ref(...)` plus reference state | stale nonconformity/dashboard views |
-| resolver failure | update reference state failure marker with `state_v.version` | do not mark stale unless Step 13 classifies failure as stale-worthy |
+| `GovernanceReferenceRefreshTarget` | Resolver call | Save behavior | Projection behavior |
+|---|---|---|---|
+| `ActorCapability { actor_ref }` | `resolve_actor_capability(actor_ref)` | `save_actor_capability_snapshot(snapshot, Some(state_v.version), tx)` plus reference state | stale actor/capability affected views |
+| `MethodPolicy { policy_ref }` | `resolve_method_policy(policy_ref)` | `save_method_policy_snapshot(snapshot, Some(state_v.version), tx)` plus reference state | stale policy effective views |
+| `MethodControl { control_ref }` | `resolve_method_control(control_ref)` | `save_method_control_snapshot(snapshot, Some(state_v.version), tx)` plus reference state | stale control coverage views |
+| `EvidenceSummary { evidence_ref }` | `resolve_evidence_summary(evidence_ref)` | `save_evidence_summary_ref(reference_ref, evidence_ref, Some(state_v.version), tx)` plus reference state | stale compliance/control/nonconformity views |
+| `Artifact { artifact_ref }` | `resolve_artifact_ref(artifact_ref)` | save reference state only;no artifact body or typed artifact sidecar | stale compliance/control/nonconformity views |
+| `ProcessContext { process_ref, activity_ref, waiting_gate_ref }` | construct `ProcessGovernanceContextRef` with current state,then `resolve_process_context(context_ref)` | construct refreshed `ProcessGovernanceContextRef` with new state;`save_process_context_ref(context_ref, Some(state_v.version), tx)` plus reference state | stale context/dashboard affected views |
+| `WorkContext { project_ref, work_ref, iteration_ref }` | construct `WorkGovernanceContextRef` with current state,then `resolve_work_context(context_ref)` | construct refreshed `WorkGovernanceContextRef` with new state;`save_work_context_ref(context_ref, Some(state_v.version), tx)` plus reference state | stale context/dashboard affected views |
+| `RuntimeSignal { signal_kind, external_ref, captured_at }` | construct `RuntimeSignalRef` with current state,then `resolve_runtime_signal(signal_ref)` | construct refreshed `RuntimeSignalRef` with new state;`save_runtime_signal_ref(signal_ref, Some(state_v.version), tx)` plus reference state | stale nonconformity/dashboard views |
+| `MarkerOnly { family }` | no resolver call | record failed/skipped reference item;no sidecar save | do not mark stale |
+| resolver failure | selected by target | update reference state failure marker with `state_v.version` | do not mark stale unless Step 13 classifies failure as stale-worthy |
+
+Refresh dispatch constraints:
+
+- `RefreshExternalContextSnapshotsFlow` 必须从 `state_v.item.refresh_target` 选择 resolver 与 sidecar save;不得解析 `ExternalGovernanceReferenceRef.0`、`ExternalSourceRef`、source family string 或 fake private map。
+- target 不直接内嵌 `ReferenceResolutionState`;构造 process/work/runtime resolver input 和 refreshed sidecar 时必须使用 `state_v.item.reference_ref` 对应的 current/new state。
+- duplicate job 只读取 stored `GovernanceJobReport`,不得重新执行 target dispatch。
 
 #### 18.4 `RunGovernanceReconciliationFlow`
 

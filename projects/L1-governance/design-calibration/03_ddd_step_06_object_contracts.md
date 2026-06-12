@@ -2623,6 +2623,62 @@ pub struct ReferenceInvalidReason(pub String);
 
 本节闭合前面 shared refs、policy guard 和 projection factory 已引用的 helper type。它们位于 `contracts::refs` 或 `contracts::reports` 的 shared surface,可被 domain policy、query view、job report 和 reconciliation flow 使用,但不得包含完整 domain object body。
 
+##### `GovernanceReferenceRefreshTarget`
+
+```rust
+/// Body-free typed target used by RefreshExternalContextSnapshots to dispatch resolvers.
+pub enum GovernanceReferenceRefreshTarget {
+    /// Refresh an identity actor capability snapshot.
+    ActorCapability { actor_ref: ActorRef },
+    /// Refresh a method policy snapshot.
+    MethodPolicy { policy_ref: MethodPolicyRef },
+    /// Refresh a method control snapshot.
+    MethodControl { control_ref: MethodControlRef },
+    /// Refresh an evidence summary under the tracked reference bundle.
+    EvidenceSummary { evidence_ref: EvidenceSummaryRef },
+    /// Refresh an artifact reference state.
+    Artifact { artifact_ref: ArtifactRef },
+    /// Refresh process governance context marker.
+    ProcessContext {
+        process_ref: ProcessInstanceRef,
+        activity_ref: Option<ActivityRef>,
+        waiting_gate_ref: Option<WaitingGateRef>,
+    },
+    /// Refresh work governance context marker.
+    WorkContext {
+        project_ref: ProjectRef,
+        work_ref: Option<FormalWorkRef>,
+        iteration_ref: Option<IterationRef>,
+    },
+    /// Refresh runtime signal marker.
+    RuntimeSignal {
+        signal_kind: RuntimeSignalKind,
+        external_ref: ExternalSourceRef,
+        captured_at: RuntimeSignalCapturedAt,
+    },
+    /// Reference is tracked for marker/degraded surface only and cannot be resolver-refreshed.
+    MarkerOnly { family: GovernanceSourceResolverFamily },
+}
+```
+
+| Variant | Resolver dispatch | Save target | 约束 / 来源 |
+|---|---|---|---|
+| `ActorCapability` | `ExternalGovernanceSourceResolverPort.resolve_actor_capability(actor_ref)` | `save_actor_capability_snapshot(...)` + `save_reference_state(...)` | 来源于 identity consumer / tracked reference registry;不得从 `reference_ref.0` 解析 actor |
+| `MethodPolicy` | `resolve_method_policy(policy_ref)` | `save_method_policy_snapshot(...)` + `save_reference_state(...)` | 来源于 method policy consumer / tracked registry |
+| `MethodControl` | `resolve_method_control(control_ref)` | `save_method_control_snapshot(...)` + `save_reference_state(...)` | 来源于 method control consumer / tracked registry |
+| `EvidenceSummary` | `resolve_evidence_summary(evidence_ref)` | `save_evidence_summary_ref(reference_ref, evidence_ref, ...)` + `save_reference_state(...)` | `reference_ref` 仍来自 enclosing `ReferenceResolutionState.reference_ref`;`EvidenceSummaryRef.external_ref` 不作为 bundle key |
+| `Artifact` | `resolve_artifact_ref(artifact_ref)` | `save_reference_state(...)` only unless a future boundary defines typed artifact sidecar save | 用于 artifact-only degraded / compliance precheck reference state |
+| `ProcessContext` | construct temporary `ProcessGovernanceContextRef` from target fields + current state,then `resolve_process_context(context_ref)` | construct refreshed `ProcessGovernanceContextRef` from target fields + new state,then save with `save_reference_state(...)` | target 不内嵌 `ReferenceResolutionState`,避免递归 schema |
+| `WorkContext` | construct temporary `WorkGovernanceContextRef` from target fields + current state,then `resolve_work_context(context_ref)` | construct refreshed `WorkGovernanceContextRef` from target fields + new state,then save with `save_reference_state(...)` | target 不内嵌 `ReferenceResolutionState`,避免递归 schema |
+| `RuntimeSignal` | construct temporary `RuntimeSignalRef` from target fields + current state,then `resolve_runtime_signal(signal_ref)` | construct refreshed `RuntimeSignalRef` from target fields + new state,then save with `save_reference_state(...)` | target 不内嵌 `ReferenceResolutionState`,避免递归 schema |
+| `MarkerOnly` | no resolver dispatch | failure / skipped item in refresh report unless flow explicitly treats marker as inspected | conversation、observability 或 future family 尚无 typed resolver target 时使用;不得让 refresh job 猜测 |
+
+| 不变量 / 禁止事项 | 说明 |
+|---|---|
+| target 是 refresh dispatch truth | `RefreshExternalContextSnapshots` 必须从 `ReferenceResolutionState.refresh_target` 选择 resolver;不得解析 `ExternalGovernanceReferenceRef` 字符串或使用 fake 私有 map |
+| target 与 reference bundle 一致 | target 不直接内嵌 `ReferenceResolutionState`;refresh flow 临时构造 resolver input 时必须使用 enclosing `ReferenceResolutionState` 作为 current state,保存 refreshed sidecar 时必须使用同一 `reference_ref` 的 new state |
+| 不保存外部正文 | target 只携带 typed ref / safe summary ref;不携带 actor profile、method body、process/work body、artifact body 或 runtime log |
+
 ##### `ReferenceResolutionState`
 
 ```rust
@@ -2630,6 +2686,8 @@ pub struct ReferenceInvalidReason(pub String);
 pub struct ReferenceResolutionState {
     /// External reference tracked by the resolver.
     pub reference_ref: ExternalGovernanceReferenceRef,
+    /// Typed body-free target used to select the refresh resolver.
+    pub refresh_target: GovernanceReferenceRefreshTarget,
     /// Current local resolution status.
     pub resolution_state: ReferenceResolutionKind,
     /// Source-side version reached by the latest successful resolution.
@@ -2644,6 +2702,7 @@ pub struct ReferenceResolutionState {
 | 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
 | `reference_ref` | `ExternalGovernanceReferenceRef` | 被解析引用 | 来源于 source ref、snapshot ref 或 refresh input;不保存外部正文 |
+| `refresh_target` | `GovernanceReferenceRefreshTarget` | refresh job 的 resolver dispatch 与 typed save 目标 | 来源于 consumer / resolver registration / tracked reference repository;必须随 state 持久化和分页返回;不得由实现解析 `reference_ref` |
 | `resolution_state` | `ReferenceResolutionKind` | 当前解析状态 | 只能使用 §10.14 定义的状态 |
 | `source_version_ref` | `Option<ExternalSourceVersionRef>` | 成功解析到的来源版本 | `Resolved` 必须有值;其他状态可保留上次版本或为空 |
 | `checked_at` | `ReferenceCheckedAt` | 最近检查时间 | 来源于 ClockPort / consumer metadata;不替代 source version |
@@ -2660,13 +2719,14 @@ pub struct ReferenceResolutionState {
 
 | 工厂函数签名 | 作用 | 参数说明 | 返回 | 使用场景 |
 |---|---|---|---|---|
-| `pub fn for_reference(reference_ref: ExternalGovernanceReferenceRef, checked_at: ReferenceCheckedAt) -> Result<Self, ContractError>` | 为外部引用建立解析状态 | reference、初次检查时间 | `Result<ReferenceResolutionState, ContractError>` | consumer pending state、refresh job input |
+| `pub fn for_reference(reference_ref: ExternalGovernanceReferenceRef, refresh_target: GovernanceReferenceRefreshTarget, checked_at: ReferenceCheckedAt) -> Result<Self, ContractError>` | 为外部引用建立解析状态 | reference、typed refresh target、初次检查时间 | `Result<ReferenceResolutionState, ContractError>` | consumer pending state、refresh job input |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
 | 不拥有外部 truth | 只表达 Governance 本地解析状态 |
 | 不保存外部正文 | 不保存 process、work、artifact、method、runtime、observability、archive 或 external GRC body |
 | unhealthy 必须可见 | query / job / reconciliation 不得把 unresolved / stale / unavailable 当成 resolved |
+| refresh dispatch 不可缺省 | 任何会进入 `list_reference_states(...)` 的 tracked state 都必须有 `refresh_target`;未知 family 使用 `MarkerOnly`,并由 refresh flow 记录 failed/skipped,不得猜 resolver |
 
 ##### truth summary helper sets
 

@@ -324,9 +324,9 @@
 
 | 函数签名 | 作用 | 锁 / 事务要求 | 返回 | 错误 |
 |---|---|---|---|---|
-| `ReferenceSnapshotRepository.get_reference_state_with_version(reference_ref)` | 读取 tracked reference state 和 version | read-only;refresh success/failure update 必须使用返回 version | `Option<Versioned<ReferenceResolutionState>>` | repository failure |
-| `ReferenceSnapshotRepository.list_reference_states(scope, page)` | 按 refresh scope 列 tracked refs | read-only;stable page;returns `Versioned<T>` for per-item update | `Page<Versioned<ReferenceResolutionState>>` | repository failure |
-| `ReferenceSnapshotRepository.save_reference_state(state, expected_version, uow)` | 保存 reference resolution state | `None` create only when flow explicitly tracks new ref;`Some(version)` update existing | `ExternalGovernanceReferenceRef` | version conflict |
+| `ReferenceSnapshotRepository.get_reference_state_with_version(reference_ref)` | 读取 tracked reference state 和 version | read-only;refresh success/failure update 必须使用返回 version;returned state includes `refresh_target` | `Option<Versioned<ReferenceResolutionState>>` | repository failure |
+| `ReferenceSnapshotRepository.list_reference_states(scope, page)` | 按 refresh scope 列 tracked refs | read-only;stable page;returns `Versioned<T>` with `refresh_target` for per-item resolver dispatch/update | `Page<Versioned<ReferenceResolutionState>>` | repository failure |
+| `ReferenceSnapshotRepository.save_reference_state(state, expected_version, uow)` | 保存 reference resolution state | `None` create only when flow explicitly tracks new ref;`Some(version)` update existing;must persist `refresh_target` with the state | `ExternalGovernanceReferenceRef` | version conflict |
 | `ReferenceSnapshotRepository.get_actor_capability_snapshot(actor_ref)` | 按 actor ref 读取本地 body-free actor capability snapshot | read-only;query visibility / approval view / responsibility command 使用;不得触发 external resolver 或 identity refresh | `Option<ActorCapabilitySnapshot>` | repository failure |
 | `save_actor_capability_snapshot(snapshot, expected_version, uow)` | 保存 actor capability body-free snapshot | `expected_version` is the same reference bundle version as `snapshot.snapshot_state.reference_ref`;same UoW as reference state save when from consumer/refresh | `ActorCapabilitySnapshotRef` | version conflict |
 | `save_method_policy_snapshot(snapshot, expected_version, uow)` | 保存 method policy snapshot | `expected_version` is the same reference bundle version as `snapshot.snapshot_state.reference_ref`;must persist `policy_ref` / `policy_version_ref` / `scope_ref` / `summary_ref` / `snapshot_state`;no method body | `MethodPolicySnapshotRef` | version conflict |
@@ -339,6 +339,7 @@
 Reference bundle version semantics:
 
 - `ReferenceResolutionState` and all typed snapshot/ref sidecars for the same `ExternalGovernanceReferenceRef` share one optimistic reference bundle version.
+- `ReferenceResolutionState.refresh_target` is part of the persisted reference bundle state. Durable storage and in-memory fake must return it from both `get_reference_state_with_version(...)` and `list_reference_states(...)`;refresh service must not reconstruct it from `ExternalGovernanceReferenceRef`, source-family strings or private lookup maps.
 - Consumer / refresh success paths must read `Versioned<ReferenceResolutionState>` first through `get_reference_state_with_version(reference_ref)` or `list_reference_states(...).items[*]`, then pass that `version` to both the typed snapshot/ref `save_*` and `save_reference_state(...)` in the same UoW.
 - `expected_version = None` is allowed only when the flow explicitly creates a new tracked reference state and its typed snapshot/ref sidecar in the same UoW. If the reference is untracked and the flow does not declare create semantics, the item is delayed / rejected / failed, not silently upserted.
 - durable storage may implement this as one row, two tables with a shared version column, or an aggregate bundle, but the externally visible repository behavior must be identical. in-memory fake must enforce the same version conflict behavior.
@@ -347,9 +348,9 @@ Reference bundle version semantics:
 
 | `ExternalContextRefreshScope` branch | list rule | update rule |
 |---|---|---|
-| `ExplicitRefs(refs)` | 返回已存在 tracked refs;缺失 ref 由 job report 记录 failed/rejected item | existing state uses returned version;不得隐式创建 unknown state |
-| `UnhealthyReferences` | 返回 `Unresolved/Stale/Unavailable/Invalid` 或 Step 10 定义的不健康 state | per-item update with returned version |
-| `GovernanceScope(scope_ref)` | 通过 scope reference index 枚举关联 refs,再返回 tracked states | scope index 只能来自 Governance truth/snapshot metadata,不得扫描 sibling body |
+| `ExplicitRefs(refs)` | 返回已存在 tracked refs and their `refresh_target`;缺失 ref 由 job report 记录 failed/rejected item | existing state uses returned version;不得隐式创建 unknown state |
+| `UnhealthyReferences` | 返回 `Unresolved/Stale/Unavailable/Invalid` 或 Step 10 定义的不健康 state,including `refresh_target` | per-item update with returned version |
+| `GovernanceScope(scope_ref)` | 通过 scope reference index 枚举关联 refs,再返回 tracked states with `refresh_target` | scope index 只能来自 Governance truth/snapshot metadata,不得扫描 sibling body |
 
 Actor capability snapshot read 语义:
 

@@ -219,9 +219,9 @@ Step 15 observability and audit
 | 测试切口 | 对应契约 | 验证内容 | 建议测试类型 |
 |---|---|---|---|
 | `PublishGovernanceOutbox_job` | `PublishGovernanceOutboxFlow` | pending batch from `list_pending_with_payload`;publish success;retryable failed marker;dead-letter;version conflict single-winner;report carries scanned/published/failed outbox refs;worker loop copies refs only from application report;duplicate report replay;truth unchanged | job runner |
-| `RebuildGovernanceProjections_job` | `RebuildGovernanceProjectionsFlow` | rebuild selected projections from `GovernanceTruthSnapshot`;replace view/state/dependency index;partial failure report;duplicate report replay;no truth repair | job runner |
-| `RefreshExternalContextSnapshots_job` | `RefreshExternalContextSnapshotsFlow` | `ExplicitRefs` / `UnhealthyReferences` / `GovernanceScope` expansion through tracked reference states;resolver success/failure;versioned save;affected views stale;duplicate replay | job runner |
-| `RunGovernanceReconciliation_job` | `RunGovernanceReconciliationFlow` | clean report;finding report;failed report;report saved/readable;no inline repair of truth/projection/outbox | job runner |
+| `RebuildGovernanceProjections_job` | `RebuildGovernanceProjectionsFlow` | rebuild selected projections from `GovernanceTruthSnapshot`;replace view/state/dependency index;partial failure report carries rebuilt / inspected `view_refs`;duplicate report replay returns same `view_refs`;no truth repair | job runner |
+| `RefreshExternalContextSnapshots_job` | `RefreshExternalContextSnapshotsFlow` | `ExplicitRefs` / `UnhealthyReferences` / `GovernanceScope` expansion through tracked reference states;resolver success/failure;versioned save;affected views stale;report carries `refreshed_reference_refs` / `failed_reference_refs`;duplicate replay returns same item refs | job runner |
+| `RunGovernanceReconciliation_job` | `RunGovernanceReconciliationFlow` | clean report;finding report;failed report;stored report carries generated `report_refs` and inspected `view_refs`;duplicate replay returns same item refs;no inline repair of truth/projection/outbox | job runner |
 | `PrepareGovernanceTraceHandoff_job` | `PrepareGovernanceTraceHandoffFlow` | non-empty trace refs;target disabled rejected;prepared/delivered/failed marker;package/receipt refs only;duplicate replay | job runner |
 | `PrepareGovernanceArchiveHandoff_job` | `PrepareGovernanceArchiveHandoffFlow` | trace/report refs validation;archive target disabled;prepared/failed marker;no archive package body;partial report | job runner |
 | `PrepareExternalGrcExport_job` | `PrepareExternalGrcExportFlow` | truth snapshot validation;external GRC disabled;marker trace created first;non-empty trace refs;package/receipt/failure refs only;no external document body | job runner |
@@ -262,7 +262,7 @@ Step 15 observability and audit
 | `command_same_key_different_digest_conflict` | Step 13 idempotency conflict | 返回 conflict surface;不进入 domain transition;不写 accepted audit | application |
 | `operation_namespace_isolation` | Step 13 operation namespace | 同 raw key 在不同 command / event / job operation 下不互相 duplicate | idempotency fake |
 | `duplicate_result_missing_no_recompute` | Step 11 / 12 / 13 stored result | completed idempotency 指向 missing / wrong result kind 时返回 consistency error;不得从 current truth 重算 | application |
-| `job_duplicate_same_key_replays_report` | Step 8 / 13 job duplicate | duplicate job 读取 stored job report;不重新 scan/publish/rebuild/handoff/export | jobs |
+| `job_duplicate_same_key_replays_report` | Step 8 / 13 job duplicate | duplicate job 读取完整 stored job report;outbox refs、view_refs、refreshed/failed reference refs、report refs、handoff marker refs 与首跑一致;不重新 scan/publish/rebuild/refresh/reconcile/handoff/export | jobs |
 | `consumer_duplicate_replays_receipt` | Step 8 / 13 consumer duplicate | duplicate inbound event 读取 stored receipt/result;不重写 snapshot/stale marker | worker |
 | `commit_unknown_same_key_recovery` | Step 12 / 13 commit unknown | retry same key 先读 idempotency/result store,不盲写第二次 truth | service + fake UoW |
 | `stored_result_saved_before_idempotency_complete` | Step 11 ordering | result save 失败 rollback;idempotency complete 不可见 | repository fake |

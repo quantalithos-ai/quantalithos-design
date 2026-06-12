@@ -206,9 +206,9 @@ Unsupported schema version must return `UnsupportedVersion` receipt without pars
 | Job | 幂等键 | Digest stable input | 重复请求处理 |
 |---|---|---|---|
 | `PublishGovernanceOutbox` | `GovernanceJobMetadata.idempotency_key` | actor scope、job kind、`PublishGovernanceOutboxJobInput.page` and publish config refs that affect item selection | stored `GovernanceJobReport`,including scanned/published/failed outbox refs;不重新 list pending、不重新 publish |
-| `RebuildGovernanceProjections` | job metadata key | actor scope、scope ref、projection set、page/from cursor fields | stored `GovernanceJobReport`;不重新 rebuild |
-| `RefreshExternalContextSnapshots` | job metadata key | actor scope、refresh scope, explicit refs / unhealthy / governance scope, page | stored `GovernanceJobReport`;不重新 resolve |
-| `RunGovernanceReconciliation` | job metadata key | actor scope、`GovernanceReconciliationInput`, inspected view/outbox/reference/report refs, cursor/scope fields | stored `GovernanceJobReport`;不重新 produce report |
+| `RebuildGovernanceProjections` | job metadata key | actor scope、scope ref、projection set、page/from cursor fields | stored `GovernanceJobReport`,including rebuilt / inspected `view_refs`;不重新 rebuild |
+| `RefreshExternalContextSnapshots` | job metadata key | actor scope、refresh scope, explicit refs / unhealthy / governance scope, page | stored `GovernanceJobReport`,including refreshed / failed reference refs;不重新 resolve |
+| `RunGovernanceReconciliation` | job metadata key | actor scope、`GovernanceReconciliationInput`, inspected view/outbox/reference/report refs, cursor/scope fields | stored `GovernanceJobReport`,including generated `report_refs` and inspected `view_refs`;不重新 produce report |
 | `PrepareGovernanceTraceHandoff` | job metadata key | actor scope、trace refs、target ref | stored `GovernanceJobReport`;不重新 deliver handoff |
 | `PrepareGovernanceArchiveHandoff` | job metadata key | actor scope、trace refs、report refs、target ref | stored `GovernanceJobReport`;不重新 deliver archive |
 | `PrepareExternalGrcExport` | job metadata key | actor scope、truth snapshot ref/digest fields、target ref | stored `GovernanceJobReport`;不重新 export |

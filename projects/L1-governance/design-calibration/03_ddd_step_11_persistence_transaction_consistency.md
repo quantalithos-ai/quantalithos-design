@@ -406,7 +406,7 @@ Actor capability snapshot read 语义:
 | `get_command_result(result_ref)` | 读取 command result envelope | read-only;must validate result kind | `Option<GovernanceCommandResultEnvelope>` | wrong kind / repository failure |
 | `get_command_rejection(result_ref)` | 读取 command rejection envelope | read-only;must validate result kind | `Option<GovernanceCommandRejectionEnvelope>` | wrong kind / repository failure |
 | `get_consumer_receipt(result_ref)` | 读取完整 consumer receipt envelope | read-only;must validate result kind and return stored public receipt | `Option<GovernanceConsumerReceiptEnvelope>` | missing / wrong kind / repository failure |
-| `get_job_report(result_ref)` | 读取 job report | read-only;must validate result kind | `Option<GovernanceJobReport>` | wrong kind / repository failure |
+| `get_job_report(result_ref)` | 读取完整 stored job report | read-only;must validate result kind;must return the stored public report including outbox refs, view refs, refreshed / failed reference refs, report refs and handoff marker refs | `Option<GovernanceJobReport>` | wrong kind / repository failure |
 
 | idempotency rule | 正式口径 |
 |---|---|
@@ -414,7 +414,7 @@ Actor capability snapshot read 语义:
 | duplicate same digest | rollback current UoW if needed,read stored result by stored kind,return replay |
 | conflict different digest | mark conflict or return conflict per Step 13;do not run mutation |
 | missing stored result | completed idempotency without stored result is consistency defect;Step 12 maps to internal consistency error |
-| job duplicate | duplicate job returns stored `GovernanceJobReport`;does not rescan page,republish outbox,refresh refs or prepare handoff |
+| job duplicate | duplicate job returns stored `GovernanceJobReport`;does not rescan page,republish outbox,rebuild views,refresh refs,rerun reconciliation or prepare handoff;item refs must come from the stored report |
 
 ### 8.11 Version / cursor / identity rules
 
@@ -646,7 +646,7 @@ for external GRC export:
 call adapter prepare/export/deliver outside or inside marker staging as Step 14 binding permits
 create GovernanceHandoffMarker::prepared / delivered / failed
 save marker with expected_version None or loaded version
-save stored GovernanceJobReport
+save stored GovernanceJobReport,including outbox refs, view refs, refreshed / failed reference refs, report refs and handoff marker refs
 complete idempotency
 commit
 ```

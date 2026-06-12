@@ -2464,7 +2464,7 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
 | 入口函数 | `GovernanceOperationsJobService.run_governance_reconciliation(request, operation_context)` |
 | 依赖 port | `GovernanceTruthSnapshotRepository`, `GovernanceProjectionRepository`, `GovernanceOutboxRepository`, `GovernanceReconciliationReportRepository`, stored result/idempotency |
 | allowed mutation | save reconciliation report and stored job report only |
-| job report | generated reconciliation report ref;failed refs/counters when report generation fails |
+| job report | generated reconciliation report ref plus inspected `view_refs`;failed refs/counters when report generation fails |
 | 测试切口 | no findings generated; stale view finding; outbox lag finding; failed report persisted; query latest by scope; duplicate replay |
 
 ```text
@@ -2482,6 +2482,8 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
   | report_ref = reconciliation_report_repo.save(report, tx)
   | assembly.record_report(report_ref as GovernanceReportRef)
   | assembly.record_views(input.view_refs, changed_count 0)
+  | report = assembly.finish_from_counts()
+  | stored_result_repo.save(JobReport(report), tx)
 ```
 
 | Finding source | Required formal read | Finding rule |

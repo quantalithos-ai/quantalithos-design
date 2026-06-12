@@ -2894,10 +2894,14 @@ pub struct GovernanceJobReport {
     pub published_outbox_refs: GovernanceOutboxRefSet,
     /// Outbox records that failed or were dead-lettered by PublishGovernanceOutbox.
     pub failed_outbox_refs: GovernanceOutboxRefSet,
+    /// Derived views rebuilt, marked stale, or inspected by maintenance jobs.
+    pub view_refs: DerivedGovernanceViewRefSet,
     /// Governance reports produced by the job.
     pub report_refs: GovernanceReportRefSet,
     /// Handoff markers produced by the job.
     pub handoff_marker_refs: GovernanceHandoffMarkerRefSet,
+    /// External references successfully refreshed or inspected.
+    pub refreshed_reference_refs: ExternalGovernanceReferenceRefSet,
     /// Failed external references, when the job processes references.
     pub failed_reference_refs: ExternalGovernanceReferenceRefSet,
 }
@@ -2911,8 +2915,10 @@ pub struct GovernanceJobReport {
 | `scanned_outbox_refs` | `GovernanceOutboxRefSet` | PublishGovernanceOutbox 本轮扫描到的 outbox refs | 只来自 application outbox publish service 的 pending page;worker 不得读 repo 反推 |
 | `published_outbox_refs` | `GovernanceOutboxRefSet` | PublishGovernanceOutbox 本轮成功发布 refs | 只来自 application service 对 `OutboxPublisherOutcome::Published` 的记录;不保存 payload body |
 | `failed_outbox_refs` | `GovernanceOutboxRefSet` | PublishGovernanceOutbox 本轮失败 / dead-letter refs | 只来自 application service mark failed / dead-letter branch;携带 ref,不保存 adapter failure body |
+| `view_refs` | `DerivedGovernanceViewRefSet` | projection rebuild / reconciliation inspection / stale marker 涉及的 view refs | 来源于 application projection / reconciliation service 的正式 view refs;不得由 worker、runner 或 duplicate replay 重新扫描 / 拼接 |
 | `report_refs` | `GovernanceReportRefSet` | 对账 / rebuild / export report 引用 | ordered unique;不保存 report body |
 | `handoff_marker_refs` | `GovernanceHandoffMarkerRefSet` | handoff / export marker 集合 | ordered unique |
+| `refreshed_reference_refs` | `ExternalGovernanceReferenceRefSet` | refresh job 成功刷新或 inspect 的 external reference refs | 来源于 application refresh service / resolver success branch;不保存外部正文 |
 | `failed_reference_refs` | `ExternalGovernanceReferenceRefSet` | refresh / handoff / export 失败引用 | ordered unique;不得保存外部正文 |
 
 | 不变量 / 禁止事项 | 说明 |
@@ -2921,6 +2927,7 @@ pub struct GovernanceJobReport {
 | duplicate replay 需要 stored report | Step 13 必须定义 stored job report surface 或明确替代 replay 口径 |
 | failed refs 必须 body-free | 失败项只保存 ref / marker / reason,不得保存外部材料正文 |
 | publish loop 明细来自 application | `GovernanceOutboxPublisherLoopEntry.scanned_outbox_refs` / `published_outbox_refs` / `failed_outbox_refs` 必须从 application 返回的 `GovernanceJobReport` 复制,worker 不得绕过 application 读取 repository 或从聚合 counters 反推 |
+| maintenance refs 必须进入 public report | `GovernanceJobReportAssembly.view_refs` 和 `refreshed_reference_refs` 必须由 `finish(...)` 写入 `GovernanceJobReport`;stored job duplicate replay 不得重跑 rebuild/refresh/reconcile 或从 repository 反推这些 refs |
 
 #### 10.18 public query / view helper and remaining report helper
 

@@ -2123,7 +2123,7 @@ pub struct GovernanceJobResponse {
 | `actor` | system/operator actor context | no login/auth body stored |
 | `core_trace_id` | scheduler / caller metadata | copied to report and handoff marker |
 | `result_ref` | stored result repository | duplicate replay uses existing result ref |
-| `report` | job report assembly or stored result load | duplicate must not rerun job body |
+| `report` | job report assembly or stored result load | duplicate must not rerun job body;stored report must include job item refs such as outbox refs, rebuilt/inspected view refs, refreshed refs, failed refs, report refs and handoff marker refs |
 
 #### 12.2 Job duplicate replay contract
 
@@ -2219,9 +2219,9 @@ pub struct PrepareExternalGrcExportJobInput {
 | Job | Public request type | Application target | Report refs/counters |
 |---|---|---|---|
 | `PublishGovernanceOutbox` | `GovernanceJobRequest<PublishGovernanceOutboxJobInput>` | outbox repository `list_pending_with_payload`, publisher port, mark published/failed | `scanned_outbox_refs`, `published_outbox_refs`, `failed_outbox_refs`, scanned/changed/failed counts |
-| `RebuildGovernanceProjections` | `GovernanceJobRequest<RebuildGovernanceProjectionsJobInput>` | projection replace view/state | view refs, report refs |
-| `RefreshExternalContextSnapshots` | `GovernanceJobRequest<RefreshExternalContextSnapshotsJobInput>` | reference repository `list_reference_states` + resolver + save snapshot/state | refreshed/failed reference refs |
-| `RunGovernanceReconciliation` | `GovernanceJobRequest<RunGovernanceReconciliationJobInput>` | reconciliation report builder/repository | report refs, finding refs via report |
+| `RebuildGovernanceProjections` | `GovernanceJobRequest<RebuildGovernanceProjectionsJobInput>` | projection replace view/state | `view_refs`, `report_refs`, scanned/changed/failed counts |
+| `RefreshExternalContextSnapshots` | `GovernanceJobRequest<RefreshExternalContextSnapshotsJobInput>` | reference repository `list_reference_states` + resolver + save snapshot/state | `refreshed_reference_refs`, `failed_reference_refs`, scanned/changed/failed counts |
+| `RunGovernanceReconciliation` | `GovernanceJobRequest<RunGovernanceReconciliationJobInput>` | reconciliation report builder/repository | `report_refs`, inspected `view_refs`, finding refs via report |
 | `PrepareGovernanceTraceHandoff` | `GovernanceJobRequest<PrepareGovernanceTraceHandoffJobInput>` | trace handoff port + marker save | handoff marker refs, failed refs |
 | `PrepareGovernanceArchiveHandoff` | `GovernanceJobRequest<PrepareGovernanceArchiveHandoffJobInput>` | archive handoff port + marker save | handoff marker refs, report refs |
 | `PrepareExternalGrcExport` | `GovernanceJobRequest<PrepareExternalGrcExportJobInput>` | external GRC export port + marker save | handoff/export marker refs, report refs |

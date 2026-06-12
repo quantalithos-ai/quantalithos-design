@@ -271,7 +271,7 @@ Step 15 observability and audit
 | `outbox_publisher_parallel_single_winner` | Step 13 publish concurrency | 两个 publisher 对同 outbox 只有一个 mark succeeds;另一方 version conflict / partial report | worker / repository |
 | `projection_dependency_index_is_only_source` | Step 11 projection index | affected views 只能来自 `list_views_affected_by_*`;projection-backed query view refs 只能来自 `find_*_view_ref_by_*`;禁止 ad hoc view ref | application + repository |
 | `projection_rebuild_race_preserves_newer_cursor` | Step 13 projection race | older cursor 不覆盖 newer fresh state;failed marker 不清除 newer state | projection fake |
-| `reference_scope_list_uses_tracked_state` | Step 11 reference scope index | refresh scope 只列 tracked `ReferenceResolutionState` with `refresh_target`;不扫描 sibling body;不从 reference string / fake private map 选择 resolver | reference fake |
+| `reference_scope_list_uses_tracked_state` | Step 7 / 11 reference scope index | refresh scope 只列 explicit `GovernanceReferenceScopeLink` index rows joined to tracked `ReferenceResolutionState` with matching `refresh_target`;不扫描 sibling body;不从 reference string / fake private map 选择 resolver;stale index row/mismatched target 进入 failed/consistency branch | reference fake |
 | `reference_refresh_preserves_last_good_snapshot` | Step 12 / 13 reference failure | unavailable/digest mismatch/body rejected 不删除 last successful snapshot | reference fake |
 | `handoff_marker_trace_refs_non_empty` | Step 9 / 11 handoff marker | trace/archive/external GRC marker 保存前必须有非空 trace refs | job runner |
 | `external_grc_export_marker_trace_first` | Step 9 / 11 external GRC | export marker 创建前先追加 marker trace;empty trace refs rejected | job runner |

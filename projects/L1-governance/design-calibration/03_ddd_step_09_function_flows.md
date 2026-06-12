@@ -2159,6 +2159,12 @@ reference_repo.save_actor_capability_snapshot(snapshot, expected_version, uow).a
 | `ConsumeConversationContextChangedFlow` | reserve dedup; derive `reference_ref = envelope.source_ref`; save source reference state; stale trace/decision views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | message transcript present; source ref missing |
 | `ConsumeObservabilityAlertRaisedFlow` | reserve dedup; derive `reference_ref = envelope.source_ref`; if `payload.runtime_signal_ref` exists, assert `payload.runtime_signal_ref.signal_state.reference_ref == reference_ref`; read current reference state version for `reference_ref` or use `None` only when creating this tracked reference; save reference state for `reference_ref` with expected_version; save optional runtime signal ref with same expected_version only when the reference matches; optional `payload.source_ref` may create only pending nonconformity/source marker and must not save reference state; stale nonconformity/dashboard views; `marker_subject_ref = GovernanceReferenceMarkerSubjectMapper.reference_marker_subject(reference_ref)`; append marker trace; receipt | alert body/stack trace present; invalid severity marker; runtime signal reference mismatch with envelope source; attempting to save `payload.source_ref` as reference state |
 
+Consumer scope index rule:
+
+- Inbound consumer accepted paths do not derive `GovernanceScopeRef` from the external reference, event topic, payload source ref or typed ref string.
+- A consumer may call `ReferenceSnapshotRepository.upsert_reference_scope_link(...)` only when the inbound payload or a formally loaded Governance truth already supplies the exact `GovernanceScopeRef`. If no scope is formally available, the consumer only saves tracked state / typed sidecar / stale marker / receipt;the reference remains refreshable by `ExplicitRefs` and `UnhealthyReferences`,but is not returned by `GovernanceScope(scope_ref)`.
+- Runtime / observability paths keep `payload.source_ref: GovernanceSourceRef` as marker-only input;it cannot create a scope link unless another formal scope source is present in the same flow.
+
 #### 16.4 Consumer stop-review
 
 | 审查项 | 结论 | 缺口 / 修正 |
@@ -2447,7 +2453,7 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
 |---|---|---|
 | `ExplicitRefs(refs)` | `ReferenceSnapshotRepository.list_reference_states(ExplicitRefs(refs), page)` returns tracked states with `refresh_target` only | untracked refs enter failed refs;job must not create implicit states or infer target from ref string |
 | `UnhealthyReferences` | repository returns tracked states where `is_unhealthy() == true`,including `refresh_target` | empty page returns completed zero-change report |
-| `GovernanceScope(scope_ref)` | repository expands scope reference index to tracked states with `refresh_target` | missing scope index returns failed/degraded job report,not full-table scan |
+| `GovernanceScope(scope_ref)` | repository expands `governance_reference_scope_index` rows for the scope,then joins only existing tracked `ReferenceResolutionState` rows with matching `refresh_target` | valid empty page returns completed zero-change;missing index storage or consistency failure returns degraded/failed report;stale index row pointing to missing state is a failed item;never full-table scan |
 
 | `GovernanceReferenceRefreshTarget` | Resolver call | Save behavior | Projection behavior |
 |---|---|---|---|
@@ -2465,6 +2471,8 @@ let target = projection_repo.resolve_projection_target(view_ref).await?;
 Refresh dispatch constraints:
 
 - `RefreshExternalContextSnapshotsFlow` 必须从 `state_v.item.refresh_target` 选择 resolver 与 sidecar save;不得解析 `ExternalGovernanceReferenceRef.0`、`ExternalSourceRef`、source family string 或 fake private map。
+- `GovernanceScope(scope_ref)` expansion 的唯一来源是 Step 7 `GovernanceReferenceScopeLink` index。Refresh job 不扫描 actor / method / evidence / process / work / runtime sidecar stores,不读取 projection body,不从 truth snapshot refs 反推 external refs,也不在 job 内创建 scope links。
+- 若 scope index row 的 stored `refresh_target` 与 returned tracked state 的 `refresh_target` 不一致,repository 必须返回 consistency error 或将该 item 计入 failed refs;service 不得选择其中任意一个继续 resolver dispatch。
 - target 不直接内嵌 `ReferenceResolutionState`;构造 process/work/runtime resolver input 和 refreshed sidecar 时必须使用 `state_v.item.reference_ref` 对应的 current/new state。
 - duplicate job 只读取 stored `GovernanceJobReport`,不得重新执行 target dispatch。
 

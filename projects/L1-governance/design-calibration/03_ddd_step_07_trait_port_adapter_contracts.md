@@ -1251,6 +1251,20 @@ pub trait ReferenceSnapshotRepository {
         uow: &dyn GovernanceUnitOfWork,
     ) -> Result<ExternalGovernanceReferenceRef, ApplicationError>;
 
+    async fn upsert_reference_scope_link(
+        &self,
+        link: GovernanceReferenceScopeLink,
+        uow: &dyn GovernanceUnitOfWork,
+    ) -> Result<(), ApplicationError>;
+
+    async fn remove_reference_scope_link(
+        &self,
+        scope_ref: GovernanceScopeRef,
+        reference_ref: ExternalGovernanceReferenceRef,
+        link_source_ref: GovernanceReferenceScopeLinkSourceRef,
+        uow: &dyn GovernanceUnitOfWork,
+    ) -> Result<(), ApplicationError>;
+
     async fn get_actor_capability_snapshot(
         &self,
         actor_ref: ActorRef,
@@ -1270,6 +1284,8 @@ pub trait ReferenceSnapshotRepository {
 |---|---|
 | `get_reference_state_with_version` | refresh success/failure 的 expected_version 来源 |
 | `list_reference_states(scope, page)` | `RefreshExternalContextSnapshots` 不做全表猜测;returned `ReferenceResolutionState` 必须包含 `refresh_target`,用于 resolver dispatch |
+| `upsert_reference_scope_link(link, uow)` | 在已有正式 scope 来源的 accepted command / consumer flow 中维护 scope reference index;link 必须指向已 committed 或同 UoW staged 的 `ReferenceResolutionState.reference_ref` 并复制其 `refresh_target` |
+| `remove_reference_scope_link(scope_ref, reference_ref, link_source_ref, uow)` | 当 producing truth/snapshot 被 superseded/retired/invalidated/closed 或关系不再适用时删除对应 index 行;不得按 scope 批量猜删 |
 | `get_actor_capability_snapshot(actor_ref)` | query visibility、approval view 和 responsibility command 读取本地 body-free actor capability snapshot;缺失返回 `None` 并按 flow 映射为 degraded / rejected,不得调用 identity resolver 刷新 |
 | `save_*_snapshot` | consumer / refresh 只保存 body-free snapshot/ref |
 
@@ -1277,6 +1293,9 @@ Reference snapshot / ref sidecar version rule:
 
 - `ReferenceSnapshotRepository` 对同一个 `ExternalGovernanceReferenceRef` 下的 `ReferenceResolutionState` 与 typed snapshot/ref sidecar 使用同一个 reference bundle version。
 - `ReferenceResolutionState.refresh_target` 是 tracked reference bundle 的正式 dispatch metadata,必须由 durable / fake repository 随 reference state 持久化、分页返回和 versioned update;不得由 service 从 `reference_ref` 字符串、source family 字符串或 private map 反推。
+- `GovernanceReferenceScopeLink` 是 `GovernanceScope(scope_ref)` refresh expansion 的唯一 scope index 写入载体。Service 只能在当前 flow 已有正式 `GovernanceScopeRef` 时调用 `upsert_reference_scope_link(...)`;repository 不得从 sidecar body、projection body、typed ref 字符串或 fake private map 推导 scope。
+- `upsert_reference_scope_link(...)` 不创建 tracked reference state。若 `link.reference_ref` 没有 committed `ReferenceResolutionState` 且同一 UoW 也未先 stage `save_reference_state(...)`,或 link 的 `refresh_target` 与 tracked state 不一致,必须返回 repository consistency / validation error,不得隐式 upsert。
+- `remove_reference_scope_link(...)` 只删除 `(scope_ref, reference_ref, link_source_ref)` 对应行。truth supersede / retire / invalidate / close、snapshot replacement 和 relation removal 必须由对应 application flow 明确调用;repository 不得扫描 sibling stores 反推删除。
 - consumer / refresh flow 更新 typed snapshot/ref 时,`save_actor_capability_snapshot`、`save_method_policy_snapshot`、`save_method_control_snapshot`、`save_evidence_summary_ref`、`save_process_context_ref`、`save_work_context_ref`、`save_runtime_signal_ref` 的 `expected_version` 必须来自同一 flow 中 `get_reference_state_with_version(reference_ref)` 或 `list_reference_states(...).items[*].version`。
 - 当 flow 明确允许创建一个新的 tracked reference state 时,`save_reference_state(..., None, uow)` 与对应 typed snapshot/ref `save_* (..., None, uow)` 必须在同一个 UoW 内一起 stage;否则 missing tracked reference state 必须映射为 delayed / rejected / failed item,不得私自 upsert。
 - 当前 Step 7 不提供 `get_method_policy_snapshot_with_version(...)` 等 typed sidecar versioned read;实现不得发明 typed snapshot 私有 version,也不得使用 snapshot ref 字符串、source version、event version、timestamp、dedup key 或 fake private map 作为 `expected_version`。
@@ -1305,6 +1324,19 @@ Runtime / observability consumer special rules:
 | `ExplicitRefs(refs)` | 只返回已存在且包含 `refresh_target` 的 tracked reference states;缺失 ref 由 Step 9 refresh flow 进入 failed refs 或 rejected item | 不得为缺失 ref 隐式创建 state;不得靠 ref string 猜 resolver |
 | `UnhealthyReferences` | 返回 `ReferenceResolutionState.is_unhealthy() == true` 且包含 `refresh_target` 的 tracked refs,按 `reference_ref` 稳定分页 | 不得把 repository cursor 当 freshness / version |
 | `GovernanceScope(scope_ref)` | 从 Governance scope reference index 枚举关联 refs,再返回带 `refresh_target` 的 versioned state | 不得扫描 sibling body 或按字符串拼接 scope identity |
+
+Scope reference index write rules:
+
+| link source | 正式 scope 来源 | link 写入规则 |
+|---|---|---|
+| method policy snapshot | `MethodPolicySnapshot.scope_ref` 或 accepted `PolicyEffectiveFact.scope_ref` | policy definition consumer 可 link snapshot 声明的 scope;activate / suspend / supersede / retire policy fact path 必须 upsert/remove `policy_snapshot_ref.snapshot_state.reference_ref` under accepted fact scope |
+| method control snapshot | loaded `GovernanceContext` / truth snapshot scope used by `ControlApplicability` | `AssessControlApplicability` accepted path links `control_snapshot_ref.snapshot_state.reference_ref` to the context scope;supersede/removal removes the same `link_source_ref` |
+| evidence summary | accepted decision / control review / compliance conclusion / corrective action / verification truth scope | flow that stores an `EvidenceSummaryRef` as basis/review/completion/verification evidence may link only when it already has the governing scope;`EvidenceSummaryRef.external_ref` is not the bundle key |
+| actor capability snapshot | accepted responsibility / review / nonconformity ownership scope | flow assigning or using an actor capability may link `snapshot_state.reference_ref` only when actor snapshot is loaded and governing scope is known |
+| process/work/runtime marker | loaded context / corrective / nonconformity / explicit job scope | link only when the accepted flow has both the marker `reference_ref` and a formal scope;consumer-only updates without scope do not create scope index rows |
+| marker-only source | explicit job scope or accepted truth source scope | link only when Step 9 flow explicitly records a body-free source relation under a scope;otherwise marker-only refs refresh only by explicit/unhealthy branches |
+
+`link_source_ref` must identify the producing body-free metadata,for example a truth ref canonical key, snapshot ref, job input scope marker or projection dependency source. It is not parsed by repository code;it only scopes replacement/removal of the exact row.
 
 #### 10.4 Outbox repository and payload snapshot lookup
 

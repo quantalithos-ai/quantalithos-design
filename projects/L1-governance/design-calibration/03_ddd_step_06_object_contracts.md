@@ -2728,6 +2728,40 @@ pub struct ReferenceResolutionState {
 | unhealthy 必须可见 | query / job / reconciliation 不得把 unresolved / stale / unavailable 当成 resolved |
 | refresh dispatch 不可缺省 | 任何会进入 `list_reference_states(...)` 的 tracked state 都必须有 `refresh_target`;未知 family 使用 `MarkerOnly`,并由 refresh flow 记录 failed/skipped,不得猜 resolver |
 
+##### `GovernanceReferenceScopeLink`
+
+```rust
+/// Body-free index row that links a tracked external reference bundle to a Governance scope.
+pub struct GovernanceReferenceScopeLink {
+    /// Governance scope that may refresh this reference.
+    pub scope_ref: GovernanceScopeRef,
+    /// Tracked reference bundle listed for that scope.
+    pub reference_ref: ExternalGovernanceReferenceRef,
+    /// Typed refresh target copied from the tracked reference state at link time.
+    pub refresh_target: GovernanceReferenceRefreshTarget,
+    /// Body-free source that justified the scope link.
+    pub link_source_ref: GovernanceReferenceScopeLinkSourceRef,
+}
+
+/// Identifies the body-free Governance truth/snapshot metadata that produced a reference scope link.
+pub struct GovernanceReferenceScopeLinkSourceRef(pub ExternalSourceRef);
+```
+
+| 字段 | 类型 | 作用 | 约束 / 来源 |
+|---|---|---|---|
+| `scope_ref` | `GovernanceScopeRef` | `ExternalContextRefreshScope::GovernanceScope(scope_ref)` 的枚举 key | 必须来自 command request、loaded truth、truth snapshot、resolver summary 或 explicit job scope;不得从 `reference_ref` / typed ref string 解析 |
+| `reference_ref` | `ExternalGovernanceReferenceRef` | 被 scope refresh 枚举的 tracked reference bundle | 必须等于 `ReferenceResolutionState.reference_ref`;不得使用 `GovernanceSourceRef`、`EvidenceSummaryRef.external_ref` 或 snapshot ref 字符串代替 |
+| `refresh_target` | `GovernanceReferenceRefreshTarget` | scope index read 可校验的 dispatch metadata | 必须复制同一 tracked `ReferenceResolutionState.refresh_target`;link 不可自造或覆盖 target |
+| `link_source_ref` | `GovernanceReferenceScopeLinkSourceRef` | 解释该 link 来自哪个 body-free governance truth / snapshot / command relation | 来源于 accepted truth ref、snapshot ref、view dependency source 或 explicit flow source marker;不保存 body |
+
+| 不变量 / 禁止事项 | 说明 |
+|---|---|
+| link 不是 truth | 只服务 `list_reference_states(GovernanceScope)`;不得被 domain policy 当作 subject/scope relation、visibility relation 或 evidence truth |
+| repository 不推导 scope | `ReferenceSnapshotRepository` 只保存 service 明确传入的 link;不得扫描 sibling body、projection body、snapshot body,也不得按 ref 字符串猜 scope |
+| 无 scope 来源则不建 link | consumer / refresh flow 若只知道 `ExternalGovernanceReferenceRef` 而没有正式 `GovernanceScopeRef`,只能更新 tracked state/sidecar,该 ref 仍可被 `ExplicitRefs` / `UnhealthyReferences` 刷新,不得进入 `GovernanceScope(scope_ref)` expansion |
+| target 必须一致 | 保存 link 时若当前 tracked state 的 `refresh_target` 与 link 的 `refresh_target` 不一致,必须拒绝或按 repository consistency error 处理;不得让 scope index 成为第二套 dispatch source |
+| fake / durable parity | fake runtime 必须有显式 `scope_ref -> reference_ref` 索引槽位;durable adapter 必须提供等价 unique key 和删除/替换语义;二者都不得用 private map 或 string prefix 替代 |
+
 ##### truth summary helper sets
 
 ```rust

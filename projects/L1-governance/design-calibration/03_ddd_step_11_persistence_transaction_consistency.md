@@ -150,7 +150,8 @@
 | `nonconformity_status_views` | nonconformity status projection | PK `nonconformity_status_view_ref`;unique `nonconformity_ref` | `context_ref`,`owner_ref`,`status_state`,`source_cursor` | replaced with state version |
 | `governance_search_facts` | search projection rows | PK `search_fact_ref`;unique `(fact_kind, fact_subject_ref)` | `context_ref`,`scope_ref`,`fact_kind`,`source_cursor` | replaced with state version |
 | `projection_dependency_index` | affected view lookup | unique `(dependency_kind, dependency_ref, derived_view_ref)` | `dependency_kind`,`dependency_ref`,`derived_view_ref` | rebuilt with projection;no standalone version |
-| `reference_resolution_states` | tracked external ref state | PK `reference_state_ref`;unique `reference_ref` | `resolution_kind`,`source_version_ref`,`checked_at`,`scope_ref` | `governance_version` |
+| `reference_resolution_states` | tracked external ref state | PK `reference_state_ref`;unique `reference_ref` | `resolution_kind`,`source_version_ref`,`checked_at`,`refresh_target_kind` | `governance_version` |
+| `governance_reference_scope_index` | scope -> tracked external ref index for refresh jobs | unique `(scope_ref, reference_ref, link_source_ref)` | `scope_ref`,`reference_ref`,`refresh_target_kind`,`link_source_ref` | no standalone version;updated in same UoW as producing truth/snapshot relation |
 | `actor_capability_snapshots` | identity capability snapshot | PK `snapshot_ref`;unique `actor_ref` current | `actor_ref`,`reference_ref`,`source_version_ref` | `governance_version` |
 | `method_policy_snapshots` | method policy summary snapshot | PK `snapshot_ref`;unique `(method_policy_ref, policy_version_ref)` | `method_policy_ref`,`reference_ref`,`source_version_ref` | `governance_version` |
 | `method_control_snapshots` | method control summary snapshot | PK `snapshot_ref`;unique `(method_control_ref, control_version_ref)` | `method_control_ref`,`reference_ref`,`source_version_ref` | `governance_version` |
@@ -327,6 +328,8 @@
 | `ReferenceSnapshotRepository.get_reference_state_with_version(reference_ref)` | 读取 tracked reference state 和 version | read-only;refresh success/failure update 必须使用返回 version;returned state includes `refresh_target` | `Option<Versioned<ReferenceResolutionState>>` | repository failure |
 | `ReferenceSnapshotRepository.list_reference_states(scope, page)` | 按 refresh scope 列 tracked refs | read-only;stable page;returns `Versioned<T>` with `refresh_target` for per-item resolver dispatch/update | `Page<Versioned<ReferenceResolutionState>>` | repository failure |
 | `ReferenceSnapshotRepository.save_reference_state(state, expected_version, uow)` | 保存 reference resolution state | `None` create only when flow explicitly tracks new ref;`Some(version)` update existing;must persist `refresh_target` with the state | `ExternalGovernanceReferenceRef` | version conflict |
+| `ReferenceSnapshotRepository.upsert_reference_scope_link(link, uow)` | 保存 scope reference index 行 | write-only within UoW;requires committed or same-UoW staged tracked `reference_ref`;link target must match tracked state target;unique `(scope_ref, reference_ref, link_source_ref)` replace | `()` | missing reference, target mismatch, repository failure |
+| `ReferenceSnapshotRepository.remove_reference_scope_link(scope_ref, reference_ref, link_source_ref, uow)` | 删除单条 scope reference index 行 | same UoW as producing relation removal / supersede / retire;idempotent missing delete allowed only if Step 12 maps it as consistency-safe | `()` | repository failure |
 | `ReferenceSnapshotRepository.get_actor_capability_snapshot(actor_ref)` | 按 actor ref 读取本地 body-free actor capability snapshot | read-only;query visibility / approval view / responsibility command 使用;不得触发 external resolver 或 identity refresh | `Option<ActorCapabilitySnapshot>` | repository failure |
 | `save_actor_capability_snapshot(snapshot, expected_version, uow)` | 保存 actor capability body-free snapshot | `expected_version` is the same reference bundle version as `snapshot.snapshot_state.reference_ref`;same UoW as reference state save when from consumer/refresh | `ActorCapabilitySnapshotRef` | version conflict |
 | `save_method_policy_snapshot(snapshot, expected_version, uow)` | 保存 method policy snapshot | `expected_version` is the same reference bundle version as `snapshot.snapshot_state.reference_ref`;must persist `policy_ref` / `policy_version_ref` / `scope_ref` / `summary_ref` / `snapshot_state`;no method body | `MethodPolicySnapshotRef` | version conflict |
@@ -340,6 +343,9 @@ Reference bundle version semantics:
 
 - `ReferenceResolutionState` and all typed snapshot/ref sidecars for the same `ExternalGovernanceReferenceRef` share one optimistic reference bundle version.
 - `ReferenceResolutionState.refresh_target` is part of the persisted reference bundle state. Durable storage and in-memory fake must return it from both `get_reference_state_with_version(...)` and `list_reference_states(...)`;refresh service must not reconstruct it from `ExternalGovernanceReferenceRef`, source-family strings or private lookup maps.
+- `governance_reference_scope_index` is the only source for `list_reference_states(ExternalContextRefreshScope::GovernanceScope(scope_ref), page)`. Durable storage and in-memory fake must maintain an explicit index keyed by `scope_ref`;they must not scan typed sidecar stores, projection rows, truth bodies or private maps.
+- A scope index row may be written only by a flow that already has a formal `GovernanceScopeRef` and a committed or same-UoW staged `ReferenceResolutionState.reference_ref`. `upsert_reference_scope_link(...)` must run in the same UoW as the truth/snapshot relation that justifies the link. If no formal scope is available,the reference remains unlinked for `GovernanceScope` refresh.
+- Scope index rows do not own reference state versions. Updating `ReferenceResolutionState` or typed sidecars still uses the reference bundle version;creating/removing a link does not allow sidecar save without the normal versioned state read.
 - Consumer / refresh success paths must read `Versioned<ReferenceResolutionState>` first through `get_reference_state_with_version(reference_ref)` or `list_reference_states(...).items[*]`, then pass that `version` to both the typed snapshot/ref `save_*` and `save_reference_state(...)` in the same UoW.
 - `expected_version = None` is allowed only when the flow explicitly creates a new tracked reference state and its typed snapshot/ref sidecar in the same UoW. If the reference is untracked and the flow does not declare create semantics, the item is delayed / rejected / failed, not silently upserted.
 - durable storage may implement this as one row, two tables with a shared version column, or an aggregate bundle, but the externally visible repository behavior must be identical. in-memory fake must enforce the same version conflict behavior.
@@ -350,7 +356,7 @@ Reference bundle version semantics:
 |---|---|---|
 | `ExplicitRefs(refs)` | 返回已存在 tracked refs and their `refresh_target`;缺失 ref 由 job report 记录 failed/rejected item | existing state uses returned version;不得隐式创建 unknown state |
 | `UnhealthyReferences` | 返回 `Unresolved/Stale/Unavailable/Invalid` 或 Step 10 定义的不健康 state,including `refresh_target` | per-item update with returned version |
-| `GovernanceScope(scope_ref)` | 通过 scope reference index 枚举关联 refs,再返回 tracked states with `refresh_target` | scope index 只能来自 Governance truth/snapshot metadata,不得扫描 sibling body |
+| `GovernanceScope(scope_ref)` | 通过 `governance_reference_scope_index` 枚举关联 refs,再返回 tracked states with `refresh_target`;stable page order by `(scope_ref, reference_ref, link_source_ref)` | scope index 只能来自 explicit link rows;不得扫描 sibling body、projection body 或 ref 字符串 |
 
 Actor capability snapshot read 语义:
 
@@ -788,19 +794,37 @@ No flow may derive a `DerivedGovernanceViewRef` by concatenating project/context
 |---|---|---|
 | `ExplicitRefs(refs)` | input refs intersect tracked `reference_resolution_states` | existing `Versioned<ReferenceResolutionState>` only |
 | `UnhealthyReferences` | `reference_resolution_states.resolution_kind` unhealthy index | existing unhealthy tracked states |
-| `GovernanceScope(scope_ref)` | Governance-owned truth/snapshot metadata that links scope to external refs | existing tracked states under scope |
+| `GovernanceScope(scope_ref)` | `governance_reference_scope_index` rows written by explicit application flow calls | existing tracked states under scope with matching `refresh_target` |
 
-| Reference type | Scope link examples | Snapshot store |
+Logical row:
+
+| Field | Type | Rule |
 |---|---|---|
-| actor capability | responsibility actor / context owner / nonconformity owner | `actor_capability_snapshots` |
-| method policy | policy effective fact | `method_policy_snapshots` |
-| method control | control applicability | `method_control_snapshots` |
-| evidence summary | decision basis,control review,verification result | `evidence_summary_refs` |
-| process context | governed subject / process context marker | `process_governance_context_refs` |
-| work context | governed subject / corrective work ref / work governance marker | `work_governance_context_refs` |
-| runtime signal | runtime signal marker used by nonconformity/control evidence | `runtime_signal_refs` |
+| `scope_ref` | `GovernanceScopeRef` | Exact scope supplied by command request,loaded truth,truth snapshot,resolver summary or job input;not parsed from reference strings |
+| `reference_ref` | `ExternalGovernanceReferenceRef` | Must exist in `reference_resolution_states` or be staged by `save_reference_state(...)` in the same UoW at upsert time |
+| `refresh_target` | `GovernanceReferenceRefreshTarget` | Copy of tracked state's target;used only for consistency check and test visibility |
+| `link_source_ref` | `GovernanceReferenceScopeLinkSourceRef` | Body-free source of the relation,such as policy fact ref,control applicability ref,decision ref,review ref,conclusion ref,nonconformity ref,corrective action ref,verification result ref,snapshot ref or explicit job scope marker |
 
-If a scope link points to a ref with no tracked `ReferenceResolutionState`, the refresh job records a failed/missing item or ignores it according to Step 12. It must not create a resolved state without resolver output.
+Write / replacement rules:
+
+| Reference family | Required scope source | Write timing | Remove / replace timing |
+|---|---|---|---|
+| actor capability | accepted responsibility/review/nonconformity owner scope or loaded context scope | after the flow has saved/loaded the actor snapshot and before commit,upsert link for `snapshot_state.reference_ref` | release/supersede/close owner relation removes exact `link_source_ref` row |
+| method policy | `MethodPolicySnapshot.scope_ref` and accepted `PolicyEffectiveFact.scope_ref` | method policy consumer may link snapshot declared scope;policy fact accepted path upserts fact source link | policy fact supersede/retire/remove deletes fact source link;new version upserts new row |
+| method control | loaded context scope for accepted `ControlApplicability` | assess control accepted path upserts `control_snapshot_ref.snapshot_state.reference_ref` under context scope | applicability supersede/remove deletes exact link |
+| evidence summary | accepted decision/control review/compliance/corrective/verification scope | flow that stores `EvidenceSummaryRef` as basis/review/completion/verification evidence upserts only when it also has tracked evidence `reference_ref` | supersede/revoke/remove of the producing truth deletes exact link |
+| process context | loaded context scope or explicit job input scope | context/input flow with formal process marker upserts marker reference | context close/invalidate or marker replacement deletes exact link |
+| work context | corrective/nonconformity/context scope or explicit job input scope | corrective action / work marker accepted path upserts marker reference | action cancel/supersede or marker replacement deletes exact link |
+| runtime signal | nonconformity/control/context scope or explicit job input scope | runtime/observability path upserts only when a formal governance scope is present;consumer-only runtime signal without scope does not link | nonconformity/control/source relation removal deletes exact link |
+| marker-only source | explicit scope from accepted truth or job input | upsert only when Step 9 flow explicitly records a scope-bound marker relation | relation removal deletes exact link |
+
+If a scope link points to a ref with no tracked `ReferenceResolutionState`, or the row target differs from tracked state target, `list_reference_states(GovernanceScope)` must return a failed/consistency item or repository error as Step 12 defines. It must not create a resolved state without resolver output.
+
+Fake implementation requirements:
+
+- `MemoryRuntimeState` must keep an explicit `scope_ref -> Vec<GovernanceReferenceScopeLink>` index or equivalent keyed structure.
+- `GovernanceScope(scope_ref)` listing must read only that index and then join tracked `reference_resolution_states`;tests must be able to seed an unrelated sidecar with matching text and prove it is not returned.
+- String prefix, substring, JSON body scan, typed sidecar scan and private resolver-family maps are forbidden.
 
 ### 8.25 Stored result persistence schema
 

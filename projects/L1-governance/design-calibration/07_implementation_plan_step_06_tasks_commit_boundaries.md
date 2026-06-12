@@ -730,7 +730,7 @@
 | public job surface 阶段闭环 | job DTO、metadata、receipt、error、report、stored result、duplicate replay 同 boundary 闭合 | 开工前确认 | 调整 boundary 或回写 Step 8/13 |
 | job policy executable summary 闭环 | refresh/retry/rebuild/reconcile/handoff/export 的 policy ref 若用于判定,必须有 executable summary 或 truth field | 开工前确认 | 补 policy summary / repository |
 | Projection stale/rebuild 闭环 | rebuild jobs 的 truth snapshot source、projection set、replace semantics 闭合 | 开工前确认 | 补 rebuild source |
-| Ref-scope 解析闭环 | refresh/reconcile/handoff/export scope 的展开 owner、分页、去重、empty branch 定义 | 开工前确认 | 补 list/resolve port |
+| Ref-scope 解析闭环 | refresh/reconcile/handoff/export scope 的展开 owner、分页、去重、empty branch 定义;reference refresh 的 `GovernanceScope(scope_ref)` 必须有 `GovernanceReferenceScopeLink` index schema、write/remove timing 和 fake/durable parity | 开工前确认 | 补 list/link port、scope index write rules |
 | artifact materialization 闭环 | job report、handoff/export artifact path、redaction、run_id、digest 有规则 | 开工前确认 | 回写 `05/06` |
 | idempotency 闭环 | duplicate job returns stored report or明确重新扫描语义 | 开工前确认 | 回写 job result surface |
 | phase boundary | jobs 不修复 business truth,只写正式 marker/report | 通过 | 越界回写 flow 或移出 |

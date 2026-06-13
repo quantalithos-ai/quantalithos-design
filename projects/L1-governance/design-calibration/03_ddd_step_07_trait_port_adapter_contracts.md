@@ -1809,6 +1809,11 @@ pub trait GovernanceArchiveHandoffPort {
     ) -> Result<HandoffPackageRef, HandoffFailureReason>;
 }
 
+// report_refs are adapter-facing body-free refs. The application flow must
+// validate typed GovernanceReconciliationReportRef inputs through the report
+// repository, then convert loaded refs to GovernanceReportRef before calling
+// this port. Adapters must not parse GovernanceReportRef back into repository keys.
+
 /// Prepares export packages for external GRC systems.
 pub trait ExternalGrcExportPort {
     async fn prepare_export(
@@ -1828,7 +1833,7 @@ pub trait ExternalGrcExportPort {
 | port | 禁止事项 |
 |---|---|
 | `GovernanceTraceHandoffPort` | 不保存 observability ledger body;只返回 package / receipt ref |
-| `GovernanceArchiveHandoffPort` | 不保存 archive package body;package body 归 archive |
+| `GovernanceArchiveHandoffPort` | 不保存 archive package body;package body 归 archive;接收的 `GovernanceReportRefSet` 只能由 application 从已加载的 `GovernanceReconciliationReportRef` 单向转换而来,adapter/fake/durable 不得反向解析或读取 report repository |
 | `ExternalGrcExportPort` | external GRC 不反写 Governance truth |
 
 #### 11.4 Adapter availability port

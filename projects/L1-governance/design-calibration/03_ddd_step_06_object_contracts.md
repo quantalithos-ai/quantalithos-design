@@ -1557,6 +1557,9 @@ pub struct GovernanceReconciliationReportRef {
     pub report_id: GovernanceReconciliationReportId,
 }
 
+/// Carries an ordered set of Governance reconciliation report refs.
+pub struct GovernanceReconciliationReportRefSet(pub Vec<GovernanceReconciliationReportRef>);
+
 /// Identifies a reconciliation finding.
 pub struct GovernanceReconciliationFindingId(pub String);
 
@@ -1573,13 +1576,19 @@ pub struct GovernanceReconciliationFindingRefSet(pub Vec<GovernanceReconciliatio
 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|
 | `GovernanceReconciliationReportRef` | query / job report 中引用对账报告 | 只由已生成或已持久化 report id 构造 |
+| `GovernanceReconciliationReportRefSet` | archive handoff / report validation 中需要通过 reconciliation report repository 读取的一组 typed report refs | ordered unique;去重依据 `GovernanceReconciliationReportId`;用于 repository read key,不得降级为 `GovernanceReportRefSet` |
 | `GovernanceReconciliationFindingRef` | 引用对账发现 | 不保存完整 finding body;body 留给 report DTO / persistence |
 | `GovernanceReconciliationFindingRefSet` | 对账报告中的发现集合 | ordered unique;空集合表示无发现 |
+
+| 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
+|---|---|---|---|---|
+| `pub fn to_governance_report_ref(&self) -> GovernanceReportRef` | 将可读取的 reconciliation report typed ref 转为 job report / archive handoff 使用的 body-free generic report ref | 已保存或已加载的 `GovernanceReconciliationReportRef`;`GovernanceReportRef` 在 handoff/job report shared helper 段定义 | `GovernanceReportRef` | 单向转换;canonical key 由 helper 内部生成,实现不得反向解析 `GovernanceReportRef` 来读取 reconciliation repository |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
 | report 不修复 truth | 对账报告只暴露问题或维护建议 |
 | finding 不成为 external GRC truth | external GRC 只能消费导出材料 |
+| typed read key 与 generic report ref 分离 | `GovernanceReconciliationReportRepository.get(...)` 只能接收 `GovernanceReconciliationReportRef`;`GovernanceReportRef` 只用于 job report / archive handoff body-free引用,不得反向解析成 repository key |
 
 ##### trace / audit / outbox refs
 
@@ -2793,7 +2802,7 @@ pub struct GovernanceReportRef(pub ExternalSourceRef);
 | `ComplianceConclusionRefSet` | AIIA / SoA 结论集合 | ordered unique;union branch + id 共同去重 |
 | `GovernanceOutboxRefSet` | reconciliation / operations report 中引用 outbox 记录集合 | ordered unique;去重依据 `GovernanceOutboxId` |
 | `DerivedGovernanceViewRefSet` | reconciliation / projection job 中引用派生视图集合 | ordered unique;去重依据 `DerivedGovernanceViewId`;空集合表示本次未检查视图 |
-| `GovernanceReportRef` | derived view policy 校验报告来源 | 只引用 report identity 或 storage ref;不保存 report body |
+| `GovernanceReportRef` | derived view policy、archive handoff adapter 和 job report 中的 body-free report 引用 | 只能由正式 report typed ref helper 生成,例如 `GovernanceReconciliationReportRef::to_governance_report_ref()`;不保存 report body;不得作为 reconciliation repository read key |
 
 ##### truth snapshot and change helpers
 
@@ -6381,7 +6390,7 @@ pub struct GovernanceJobReportAssembly {
 | `pub fn record_outbox_failed(&mut self, outbox_ref: GovernanceOutboxRef) -> Result<(), ApplicationError>` | 记录 outbox publish failure / dead-letter | failed outbox ref | `Result<(), ApplicationError>` | 累加 failed refs 和 failed_count;不保存 adapter failure body |
 | `pub fn record_views(&mut self, view_refs: DerivedGovernanceViewRefSet, changed_count: u64) -> Result<(), ApplicationError>` | 记录 projection rebuild / stale 视图 | view refs、changed count | `Result<(), ApplicationError>` | 累加 view refs;不写 projection store |
 | `pub fn record_references(&mut self, refreshed_refs: ExternalGovernanceReferenceRefSet, failed_refs: ExternalGovernanceReferenceRefSet) -> Result<(), ApplicationError>` | 记录 external reference refresh 结果 | refreshed refs、failed refs | `Result<(), ApplicationError>` | 成功/失败 refs 分开累计;不读取 external body |
-| `pub fn record_report(&mut self, report_ref: GovernanceReportRef) -> Result<(), ApplicationError>` | 记录生成的 report ref | report ref | `Result<(), ApplicationError>` | 追加到 `report_refs`;不保存 report body |
+| `pub fn record_report(&mut self, report_ref: GovernanceReportRef) -> Result<(), ApplicationError>` | 记录生成或已验证的 body-free report ref | report ref 必须来自正式 typed report ref helper,例如 `GovernanceReconciliationReportRef::to_governance_report_ref()` | `Result<(), ApplicationError>` | 追加到 `report_refs`;不保存 report body;不从 generic ref 反向读取 repository |
 | `pub fn record_handoff_marker(&mut self, marker_ref: GovernanceHandoffMarkerRef) -> Result<(), ApplicationError>` | 记录 handoff / export marker | marker ref | `Result<(), ApplicationError>` | 追加 marker ref;不调用 handoff port |
 | `pub fn finish(self, report_state: GovernanceJobReportState) -> Result<GovernanceJobReport, ApplicationError>` | 生成 public job report | final report state | `Result<GovernanceJobReport, ApplicationError>` | 只组装 `GovernanceJobReport`;不保存 stored result |
 | `pub fn finish_from_counts(self) -> Result<GovernanceJobReport, ApplicationError>` | 按 counters 推导 completed / partial / failed report | 无 | `Result<GovernanceJobReport, ApplicationError>` | `failed_count == 0 -> Completed`;`changed_count > 0 && failed_count > 0 -> PartiallyCompleted`;否则 `Failed` |

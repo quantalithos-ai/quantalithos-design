@@ -2522,7 +2522,7 @@ Refresh dispatch constraints:
   | finding_refs = build body-free GovernanceReconciliationFindingRefSet
   | report = GovernanceReconciliationReport::from_reconciliation(new_reconciliation_report_id(), input, finding_refs, surface)
   | report_ref = reconciliation_report_repo.save(report, tx)
-  | assembly.record_report(report_ref as GovernanceReportRef)
+  | assembly.record_report(report_ref.to_governance_report_ref())
   | assembly.record_views(input.view_refs, changed_count 0)
   | report = assembly.finish_from_counts()
   | stored_result_repo.save(JobReport(report), tx)
@@ -2643,18 +2643,23 @@ let marker = GovernanceHandoffMarker::prepared(marker_ref, trace_refs, target_re
 | job report | archive handoff marker refs and report refs inspected |
 | 测试切口 | trace/report refs validation; empty both rejected; archive target disabled; package prepared marker; failed marker; no archive body saved |
 
+`PrepareGovernanceArchiveHandoffJobInput.report_refs` is a `GovernanceReconciliationReportRefSet`. It is the repository-readable input set. `GovernanceArchiveHandoffPort.prepare_archive(...)` receives `GovernanceReportRefSet` only after application has loaded each reconciliation report and converted each typed ref with `GovernanceReconciliationReportRef::to_governance_report_ref()`.
+
 ```text
 [Job body]
   | validate trace_refs or report_refs non-empty
   | validate target through adapter registry
   | load traces through trace_repo.get(...)
-  | load reports through reconciliation_report_repo.get(...)
-  | package_ref = archive_handoff_port.prepare_archive(target_ref, trace_refs, report_refs)
+  | for each reconciliation_report_ref in request.report_refs:
+  |   report = reconciliation_report_repo.get(reconciliation_report_ref)
+  |   missing -> rejected job or failed item before adapter call
+  |   adapter_report_refs.add(reconciliation_report_ref.to_governance_report_ref())
+  | package_ref = archive_handoff_port.prepare_archive(target_ref, trace_refs, adapter_report_refs)
   | on success:
   |   marker = GovernanceHandoffMarker::prepared(new_marker_ref, trace_refs, target_ref, package_ref)
   |   marker_repo.save(marker, None, tx)
   |   assembly.record_handoff_marker(marker_ref)
-  |   assembly.record_report(each loaded report_ref as GovernanceReportRef)
+  |   assembly.record_report(each adapter_report_ref)
   | on failure:
   |   marker = GovernanceHandoffMarker::failed(new_marker_ref, trace_refs, target_ref, reason)
   |   marker_repo.save(marker, None, tx)
@@ -2665,7 +2670,7 @@ let marker = GovernanceHandoffMarker::prepared(marker_ref, trace_refs, target_re
 | Input | Formal validation | Failure behavior |
 |---|---|---|
 | `trace_refs` | each ref must be readable by `GovernanceTraceRepository.get` | missing trace is rejected before adapter call |
-| `report_refs` | each report must exist in `GovernanceReconciliationReportRepository.get` or report store designated by Step 11 | missing report rejected or failed item,never replaced by ad hoc report |
+| `report_refs` | input type is `GovernanceReconciliationReportRefSet`;each typed ref must exist in `GovernanceReconciliationReportRepository.get`;after load,application converts it with `to_governance_report_ref()` for archive port and job report | missing report rejected or failed item,never replaced by ad hoc report;service/fake/durable must not parse `GovernanceReportRef` back into a repository key |
 | `target_ref` | adapter registry confirms enabled archive target | disabled target produces rejected job or failed marker |
 | archive package | returned only as `HandoffPackageRef` | package body remains in archive adapter/system |
 

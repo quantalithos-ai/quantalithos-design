@@ -2201,8 +2201,8 @@ pub struct PrepareGovernanceTraceHandoffJobInput {
 pub struct PrepareGovernanceArchiveHandoffJobInput {
     /// Trace refs to include.
     pub trace_refs: GovernanceTraceRecordRefSet,
-    /// Report refs to include.
-    pub report_refs: GovernanceReportRefSet,
+    /// Reconciliation report refs to validate and include.
+    pub report_refs: GovernanceReconciliationReportRefSet,
     /// Archive target.
     pub target_ref: TraceHandoffTargetRef,
 }
@@ -2235,7 +2235,7 @@ pub struct PrepareExternalGrcExportJobInput {
 | `RefreshExternalContextSnapshotsJobInput` | refresh scope, page | `ExternalContextRefreshScope` application helper;tracked states provide `GovernanceReferenceRefreshTarget` | explicit refs empty or unsupported scope;tracked state missing refresh target |
 | `RunGovernanceReconciliationJobInput` | reconciliation input | `GovernanceReconciliationInput` / report factory | input view/outbox refs inconsistent with scope |
 | `PrepareGovernanceTraceHandoffJobInput` | trace refs, target | handoff port prepare/deliver | trace refs empty or target disabled |
-| `PrepareGovernanceArchiveHandoffJobInput` | trace refs, report refs, target | archive handoff port | both trace/report refs empty or target disabled |
+| `PrepareGovernanceArchiveHandoffJobInput` | trace refs, reconciliation report refs, target | reconciliation report repository validates each report;archive handoff port receives generic report refs converted from loaded typed refs | both trace/report refs empty,missing report,or target disabled |
 | `PrepareExternalGrcExportJobInput` | truth snapshot, target | export port prepare/deliver | snapshot empty/invalid or target disabled |
 
 #### 12.6 Job response and route mapping
@@ -2311,7 +2311,7 @@ pub struct PrepareExternalGrcExportJobInput {
 | runtime | `RuntimeSignalRef` | execution log, runtime payload body |
 | conversation | `GovernanceSourceRef`, read subject ref | message body, conversation transcript |
 | observability | `GovernanceSourceRef`, `RuntimeSignalRef`, severity ref | alert body, stack trace, log body |
-| external GRC/archive | `TraceHandoffTargetRef`, `HandoffPackageRef`, `GovernanceReportRef` | target config secret, archive package body, external GRC document body |
+| external GRC/archive | `TraceHandoffTargetRef`, `HandoffPackageRef`, `GovernanceReconciliationReportRef` as input read key,`GovernanceReportRef` as body-free adapter/job report ref | target config secret, archive package body, external GRC document body |
 
 #### 13.4 Step 8 completion checklist
 

@@ -112,7 +112,7 @@
 | `EV-GOV-REDACTION-001` | `TC-GOV-REDACTION-001~004` | `artifacts/test/<run_id>/suites/redaction-boundary/` | `reports/runs/<run_id>/redaction-check.md` | AC-GOV-025;AC-GOV-NFR-003;VF-GOV-003/007 | 缺失或 failed 则阻断 |
 | `EV-GOV-ARCH-001` | `TC-GOV-ARCH-001` | `artifacts/test/<run_id>/suites/dependency-boundary/` | `reports/runs/<run_id>/dependency-boundary.md` | AC-GOV-019;AC-GOV-NFR-005;VF-GOV-010 | 缺失或 failed 则阻断 |
 | `EV-GOV-NFR-001` | `TC-GOV-NFR-*`;config/replay representative cases | `artifacts/test/<run_id>/suites/<suite>/` | release / operations / redaction suite reports | AC-GOV-NFR-001~007 | 缺失则非功能不可裁决 |
-| `EV-GOV-REPORT-001` | all P0 suite pairing | `artifacts/test/<run_id>/suites/report-generation-audit/` | `reports/runs/<run_id>/report-audit.md` | AC-GOV-EV-*;evidence integrity VETO | 缺失或 failed 则阻断 |
+| `EV-GOV-REPORT-001` | `TC-GOV-REPORT-001~004` | `artifacts/test/<run_id>/suites/report-generation-audit/` | `reports/runs/<run_id>/report-audit.md` | AC-GOV-EV-*;evidence integrity VETO | 缺失或 failed 则阻断 |
 
 ### 8.3 Report 完整性检查表
 

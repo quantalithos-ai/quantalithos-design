@@ -105,6 +105,7 @@
 | operations job | 6.4 | 7 Job success/partial/duplicate/no truth repair | P0 | job input + store fixtures | `EV-CAND-GOV-JOB-*` | 通过 |
 | consistency / idempotency / recovery | 6.5 | same-key replay/conflict、commit unknown、stored result missing、race | P0 | fake UoW/repository fault fixtures | `EV-CAND-GOV-IDEMP-*` | 通过 |
 | config / redaction / dependency | 6.5 | strict config、profile isolation、redaction scan、dependency boundary | P0 | config/artifact fixtures | `EV-CAND-GOV-CONFIG-*` | 通过 |
+| report / evidence integrity | 6.6 | artifact/report pairing、evidence index traceability、no static evidence、orphan EV blocking | P0 | run-scoped artifact/report fixtures | `EV-CAND-GOV-REPORT-*` | 通过 |
 
 ### 8.2 测试场景表
 
@@ -271,7 +272,16 @@
 | TC-GOV-REDACTION-004 | redaction scan blocks raw secret | P0 | artifacts/reports contain injected secret/body fixture | run redaction checker | checker fails with redacted issue ref | failure output does not echo secret/body | 是 | EV-CAND-GOV-REDACTION-004 |
 | TC-GOV-ARCH-001 | no non-core sibling compile dependency | P0 | implementation dependency metadata available | run dependency boundary check | check passes only with `L0-core` compile-time upstream | process/work/artifact/etc. only via contracts/events/adapters,not package dependency | 是 | EV-CAND-GOV-ARCH-001 |
 
-### 8.9 设计契约断言矩阵
+### 8.9 Report / evidence integrity 用例矩阵
+
+| 用例 ID | 场景 | 优先级 | 前置条件 | 输入 / 操作 | 预期结果 | 断言点 | 自动化候选 | 证据候选 ID |
+|---|---|---|---|---|---|---|---|---|
+| TC-GOV-REPORT-001 | blocking suite artifact/report pairing | P0 | run root contains all P0 blocking suite raw artifacts and generated suite reports | run `report-generation-audit` pairing check | report audit passes only when every blocking suite has raw artifact and human report | no missing suite artifact;no missing report;paths are run-scoped and not `latest` | 是 | EV-CAND-GOV-REPORT-001 |
+| TC-GOV-REPORT-002 | evidence index traceability | P0 | evidence-index.json/md generated from suite artifacts and reports | validate each EV item | every P0 `EV-GOV-*` item has `TC-GOV-*`, `AC-GOV-*`, suite, artifact path, report path, digest, status and review status | `tc_refs` is non-empty and only uses formal `TC-GOV-*`;`EV-GOV-REPORT-001` maps to `TC-GOV-REPORT-001~004` | 是 | EV-CAND-GOV-REPORT-002 |
+| TC-GOV-REPORT-003 | no static evidence / no hand-written pass | P0 | isolated static pass fixture or hand-written EV fixture exists | run no-static-evidence check | check fails safely and report audit blocks release | evidence index cannot declare EV/VETO passed without raw artifact/report `generated_from` chain | 是 | EV-CAND-GOV-REPORT-003 |
+| TC-GOV-REPORT-004 | orphan EV and missing report blocking | P0 | evidence index contains orphan EV or points to missing artifact/report | run report audit | audit fails with safe missing-path summary | orphan EV, missing artifact digest, missing report path, or stale run id blocks acceptance | 是 | EV-CAND-GOV-REPORT-004 |
+
+### 8.10 设计契约断言矩阵
 
 | 测试用例 | 设计契约 | 字段 / 状态断言 | 负向条件 | 证据候选 ID |
 |---|---|---|---|---|
@@ -287,8 +297,9 @@
 | TC-GOV-CONFIG-001~008 | `04` §12 config gates | profile, strict JSON, source priority, topic completeness, runtime build state | silent fallback, fake production-like, boundary override | EV-CAND-GOV-CONFIG-* |
 | TC-GOV-REDACTION-001~004 | `03` Step 15 / `04` no-output | safe logs, low-cardinality metrics, refs-only audit | raw body/secret/full ref leak | EV-CAND-GOV-REDACTION-* |
 | TC-GOV-ARCH-001 | `01` dependency boundary / `03` module contract | only `L0-core` compile-time upstream | sibling repo package dependency | EV-CAND-GOV-ARCH-001 |
+| TC-GOV-REPORT-001~004 | `05` evidence schema / `06` evidence gate | every EV has formal TC/AC/suite/path/digest and report audit proves pairing | static EV, orphan EV, missing report, non-TC `tc_refs` | EV-CAND-GOV-REPORT-* |
 
-### 8.10 单测试切口用例停审记录
+### 8.11 单测试切口用例停审记录
 
 | 测试切口 | 审查项 | 结论 | 缺口 / 修正 |
 |---|---|---|---|
@@ -301,8 +312,9 @@
 | operations job | 7 Job 是否有 success/duplicate/partial/no truth repair | 通过 | partial report artifact 留 Step 13 |
 | consistency / recovery | duplicate、stored result missing、commit unknown、race、marker guard 是否覆盖 | 通过 | fault injection fixture 留 Step 7 |
 | config / redaction / dependency | `04` §12 gates、redaction、dependency boundary 是否覆盖 | 通过 | script names/paths 留 Step 9 |
+| report / evidence integrity | artifact/report pairing、TC traceability、no-static-evidence、orphan EV 是否覆盖 | 通过 | final evidence instance 留 Step 13 |
 
-### 8.11 跨用例断言 / phase 审计表
+### 8.12 跨用例断言 / phase 审计表
 
 | 审计项 | 结论 | 缺口 / 修正 |
 |---|---|---|
@@ -315,6 +327,7 @@
 | 是否有 query/job 反写真相用例 | 通过 | TC-GOV-QUERY-016、TC-GOV-JOB-010、TC-GOV-IDEMP-* 覆盖 |
 | 是否有 redaction / forbidden body 用例 | 通过 | TC-GOV-CMD-030、TC-GOV-CONSUMER-004、TC-GOV-REDACTION-* 覆盖 |
 | 是否有 dependency boundary 用例 | 通过 | TC-GOV-ARCH-001 覆盖 |
+| 是否有 report / evidence traceability 用例 | 通过 | TC-GOV-REPORT-001~004 覆盖 |
 | 是否有证据 ID 冲突 | 通过 | 当前为候选 ID,无正式冲突 |
 
 ## 9. 对上游设计的影响判定
@@ -334,12 +347,12 @@
 > - `design-calibration/05_test_plan_step_06_cases.md`
 >
 > 延伸阅读:
-> - 建议继续阅读上述中间产物的“用例批次表”“Contract / domain / state 用例矩阵”“Command 用例矩阵”“Query / inbound consumer 用例矩阵”“Outbound event / operations job 用例矩阵”“Consistency / idempotency / recovery 用例矩阵”和“跨用例断言 / phase 审计表”小节,了解测试场景与用例如何从覆盖矩阵落成可执行断言。
+> - 建议继续阅读上述中间产物的“用例批次表”“Contract / domain / state 用例矩阵”“Command 用例矩阵”“Query / inbound consumer 用例矩阵”“Outbound event / operations job 用例矩阵”“Consistency / idempotency / recovery 用例矩阵”“Report / evidence integrity 用例矩阵”和“跨用例断言 / phase 审计表”小节,了解测试场景与用例如何从覆盖矩阵落成可执行断言。
 
 正式 `05-测试方案.md` §6 应回填:
 
 - 测试用例按测试切口组织,不得写成无来源的大表。
-- P0 用例覆盖 contracts、domain/state、23 Command、14 Query、9 Consumer、12 Outbound Event、7 Job、一致性 / 幂等 / 恢复、配置、redaction 和 dependency boundary。
+- P0 用例覆盖 contracts、domain/state、23 Command、14 Query、9 Consumer、12 Outbound Event、7 Job、一致性 / 幂等 / 恢复、配置、redaction、dependency boundary 和 report / evidence integrity。
 - 每个用例必须有前置条件、输入 / 操作、预期结果、断言点、自动化候选和候选证据 ID。
 - 用例预期必须引用正式 state enum、protocol surface、worker/job disposition、outbox payload snapshot、stored result/report 或 config gate。
 - Query 用例必须覆盖 no-write;Job 用例必须覆盖 no truth repair;Duplicate 用例必须覆盖 stored result/receipt/report replay。
@@ -361,7 +374,7 @@
 | 条件 | 状态 | 说明 |
 |---|---|---|
 | P0 用例可执行、可断言、可留证 | 通过 | 当前 TC 均有前置、操作、预期、断言和候选证据 |
-| 每个 P0 测试切口用例已停审 | 通过 | 见 §8.10 |
-| 跨用例审计没有 unresolved 冲突 | 通过 | 见 §8.11 |
+| 每个 P0 测试切口用例已停审 | 通过 | 见 §8.11 |
+| 跨用例审计没有 unresolved 冲突 | 通过 | 见 §8.12 |
 | 未提前固定正式 evidence / artifact | 通过 | 只使用 `EV-CAND-*` |
 | 可进入 Step 7 | 通过 | 下一步设计测试数据;进入前等待用户审查 |

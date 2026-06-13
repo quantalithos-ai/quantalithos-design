@@ -195,7 +195,7 @@ P1 selected-run
 | `redaction-boundary` | no raw body/secret/full ref | TC-GOV-REDACTION-001~004;TC-GOV-CMD-030;TC-GOV-CONSUMER-004 | EV-CAND-GOV-REDACTION-* | redaction raw report | redaction-check.md | P0 blocking |
 | `dependency-boundary` | no non-core sibling compile dependency | TC-GOV-ARCH-001 | EV-CAND-GOV-ARCH-001 | dependency graph report | dependency-boundary.md | P0 blocking |
 | `release-main-smoke` | fixed governance business closure | Representative TC-GOV-CMD/QUERY/OUTBOX/JOB/CONFIG/REDACTION | EV-CAND-GOV-CORE-*;EV-CAND-GOV-TRACE-* | scenario artifact | suite md | P0 blocking |
-| `report-generation-audit` | artifact/report/evidence candidate audit | all blocking suite pairing | EV-CAND-GOV-REPORT-* | pairing raw report | report-audit.md | P0 blocking |
+| `report-generation-audit` | artifact/report/evidence candidate audit | TC-GOV-REPORT-001~004 | EV-CAND-GOV-REPORT-* | pairing raw report | report-audit.md | P0 blocking |
 | `p1-real-like-selected-run` | future real-like seam | future selected TC only | future EV-CAND-P1-* | selected-run artifact | selected-run md | non-P0 |
 
 ### 8.6 P0 手工测试与不可自动化清单

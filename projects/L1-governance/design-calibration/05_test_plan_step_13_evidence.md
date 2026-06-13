@@ -130,7 +130,7 @@
 | `EV-GOV-REDACTION-001` | redaction scan report | `redaction-boundary`;`check_redaction.sh` | `artifacts/test/<run_id>/suites/redaction-boundary/`;`reports/runs/<run_id>/redaction-check.md` | TC-GOV-REDACTION-001~004 | AC-GOV-025/028/031;VF-GOV-003/007 |
 | `EV-GOV-ARCH-001` | dependency graph report | `dependency-boundary`;`check_dependency_boundary.sh` | `artifacts/test/<run_id>/suites/dependency-boundary/`;`reports/runs/<run_id>/dependency-boundary.md` | TC-GOV-ARCH-001 | AC-GOV-019;VF-GOV-010 |
 | `EV-GOV-NFR-001` | performance/degraded/observability sample | `release-main-smoke`;`operations-replay-core`;`redaction-boundary` | `artifacts/test/<run_id>/suites/<suite>/` | TC-GOV-NFR-*;TC-GOV-CONFIG-* | AC-GOV-026~031 |
-| `EV-GOV-REPORT-001` | report integrity audit | `report-generation-audit` | `artifacts/test/<run_id>/suites/report-generation-audit/`;`reports/runs/<run_id>/report-audit.md` | all P0 suite pairing | supports all AC / VETO evidence integrity |
+| `EV-GOV-REPORT-001` | report integrity audit | `report-generation-audit` | `artifacts/test/<run_id>/suites/report-generation-audit/`;`reports/runs/<run_id>/report-audit.md` | TC-GOV-REPORT-001~004 | supports all AC / VETO evidence integrity |
 
 ### 8.3 测试切口到证据 / 验收映射表
 
@@ -144,7 +144,7 @@
 | config gates | TC-GOV-CONFIG-* | `config-redline`;release config check | `EV-GOV-CONFIG-001` | `artifacts/test/<run_id>/suites/config-redline/` | `reports/runs/<run_id>/suites/config-redline.md` | AC-GOV-026~031 |
 | redaction and body boundary | TC-GOV-REDACTION-*;TC-GOV-CMD-030;TC-GOV-CONSUMER-004 | `redaction-boundary`;release redaction check | `EV-GOV-REDACTION-001` | `artifacts/test/<run_id>/suites/redaction-boundary/` | `reports/runs/<run_id>/redaction-check.md` | VF-GOV-003/007 |
 | dependency boundary | TC-GOV-ARCH-001 | `dependency-boundary`;release dependency check | `EV-GOV-ARCH-001` | `artifacts/test/<run_id>/suites/dependency-boundary/` | `reports/runs/<run_id>/dependency-boundary.md` | AC-GOV-019;VF-GOV-010 |
-| report integrity | all P0 suite pairing | `report-generation-audit` | `EV-GOV-REPORT-001` | `artifacts/test/<run_id>/suites/report-generation-audit/` | `reports/runs/<run_id>/report-audit.md` | evidence integrity VETO |
+| report integrity | TC-GOV-REPORT-001~004 | `report-generation-audit` | `EV-GOV-REPORT-001` | `artifacts/test/<run_id>/suites/report-generation-audit/` | `reports/runs/<run_id>/report-audit.md` | evidence integrity VETO |
 | P1 selected-run | future selected TC only | `p1-real-like-selected-run` | future P1 EV | `artifacts/test/<run_id>/suites/p1-real-like-selected-run/` | `reports/runs/<run_id>/suites/p1-real-like-selected-run.md` | residual only,not P0 |
 
 ### 8.4 Artifact 目录结构

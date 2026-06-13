@@ -168,7 +168,162 @@ artifacts/test/<run_id>/
 - `meta/source-commits.json` 必须记录 design commit、implementation commit、core-contracts commit 或等价 source refs。
 - `evidence-index.json` 只能由 suite raw artifact 和 generated reports 推导。
 - `stdout.log`、`stderr.log` 必须经过 redaction scan;失败日志也不得回显 secret/body。
-- `cases/<case_id>.json` 必须至少包含 TC-GOV id、status、assertions、safe failure reason、evidence candidate / formal evidence family 和 artifact digest。
+- `cases/<case_id>.json` 必须符合 §8.4.1 raw artifact JSON schema,并回指 TC-GOV id、status、assertions、safe failure reason、evidence candidate / formal evidence family 和 artifact digest。
+
+### 8.4.1 Raw artifact JSON schema
+
+P0 raw artifact JSON 由 jobs/gate/report artifact writer 生成。字段名、枚举和 digest 规则如下,不得由具体 binary 自行发明。
+
+Shared enums:
+
+| Enum | Values | Scope |
+|---|---|---|
+| `GovernanceArtifactStatus` | `passed`,`failed`,`partial`,`skipped`,`unavailable` | suite,case,evidence item,safe artifact |
+| `GovernanceAssertionStatus` | `passed`,`failed`,`skipped`,`not_run` | case assertion item |
+| `GovernanceArtifactDigestAlgorithm` | `sha256` | every JSON artifact with `artifact_digest` |
+| `GovernanceRedactionStatus` | `clean`,`failed`,`not_applicable` | evidence index / scan-derived artifact |
+| `GovernanceReviewStatus` | `pending`,`reviewed`,`disputed` | evidence index only |
+
+Digest rule:
+
+- `artifact_digest_algorithm` is always `sha256` in P0.
+- `artifact_digest` format is `sha256:<64 lowercase hex chars>`.
+- Digest input is canonical UTF-8 JSON for the same object with `artifact_digest` omitted.
+- Canonical JSON uses lexicographically sorted object keys,arrays in stored order,no insignificant whitespace,JSON strings escaped by the JSON encoder,and no timestamps or paths outside the declared fields.
+- `stdout.log` and `stderr.log` are redacted log artifacts and do not carry embedded JSON digest;their digests may be referenced from a suite or safe artifact JSON item.
+
+`meta/context.json`:
+
+| Field | Required | Type / values | Notes |
+|---|---|---|---|
+| `schema_version` | yes | string,`governance.artifact.v1` | fixed P0 schema marker |
+| `run_id` | yes | `GovernanceJobRunId` or gate run id string | must not be `latest` |
+| `suite_refs` | yes | array of suite strings | sorted by writer |
+| `config_profile` | yes | string | selected profile |
+| `started_at` | yes | timestamp string | entry start time |
+| `tool_version` | yes | string | jobs/gate writer version or source ref |
+| `redacted_environment` | yes | object | safe keys / redacted values only |
+| `artifact_root` | yes | string | run-scoped output root |
+| `report_root` | yes | string | run-scoped report root |
+| `artifact_digest_algorithm` | yes | `sha256` | shared digest rule |
+| `artifact_digest` | yes | string | digest of this object excluding this field |
+
+`meta/source-commits.json`:
+
+| Field | Required | Type / values | Notes |
+|---|---|---|---|
+| `schema_version` | yes | `governance.artifact.v1` | fixed |
+| `run_id` | yes | string | same run id |
+| `design_source_ref` | yes | string | design commit or equivalent source ref |
+| `implementation_source_ref` | yes | string | implementation commit or equivalent source ref |
+| `core_contracts_source_ref` | yes | string | core contracts source ref |
+| `workspace_status_ref` | no | string | safe dirty-status ref,not diff body |
+| `artifact_digest_algorithm` | yes | `sha256` | shared digest rule |
+| `artifact_digest` | yes | string | digest of this object excluding this field |
+
+`meta/config-digest.json`:
+
+| Field | Required | Type / values | Notes |
+|---|---|---|---|
+| `schema_version` | yes | `governance.artifact.v1` | fixed |
+| `run_id` | yes | string | same run id |
+| `config_profile` | yes | string | selected profile |
+| `config_digest_algorithm` | yes | `sha256` | digest of redacted effective config summary |
+| `config_digest` | yes | `sha256:<hex>` | no raw secret/body |
+| `redacted_config_ref` | yes | string | safe config ref or generated ref |
+| `artifact_digest_algorithm` | yes | `sha256` | shared digest rule |
+| `artifact_digest` | yes | string | digest of this object excluding this field |
+
+`suites/<suite>/report.json`:
+
+| Field | Required | Type / values | Notes |
+|---|---|---|---|
+| `schema_version` | yes | `governance.artifact.v1` | fixed |
+| `run_id` | yes | string | same run id |
+| `suite` | yes | string | suite id |
+| `status` | yes | `GovernanceArtifactStatus` | aggregate suite status |
+| `case_refs` | yes | array of case ids | all executed/planned case files in this suite |
+| `case_digests` | yes | object map case id -> digest | each referenced case JSON digest |
+| `failure_reason_ref` | no | string | safe reason ref only |
+| `duration_ms` | yes | non-negative integer | suite duration |
+| `config_profile` | yes | string | selected profile |
+| `started_at` | yes | timestamp string | suite start |
+| `finished_at` | yes | timestamp string | suite finish |
+| `stdout_digest` | no | string | digest of redacted stdout.log if present |
+| `stderr_digest` | no | string | digest of redacted stderr.log if present |
+| `artifact_digest_algorithm` | yes | `sha256` | shared digest rule |
+| `artifact_digest` | yes | string | digest of this object excluding this field |
+
+`suites/<suite>/cases/<case_id>.json`:
+
+| Field | Required | Type / values | Notes |
+|---|---|---|---|
+| `schema_version` | yes | `governance.artifact.v1` | fixed |
+| `run_id` | yes | string | same run id |
+| `suite` | yes | string | suite id |
+| `case_id` | yes | string | case id |
+| `tc_refs` | yes | array of `TC-GOV-*` ids | at least one |
+| `status` | yes | `GovernanceArtifactStatus` | case status |
+| `assertions` | yes | array of assertion objects | see below |
+| `safe_failure_reason_ref` | no | string | safe reason ref only |
+| `evidence_candidate_refs` | yes | array of `EV-CAND-*` ids | may be empty only for non-evidence helper cases |
+| `evidence_family_refs` | yes | array of `EV-GOV-*` ids | formal evidence families covered |
+| `artifact_refs` | yes | array of safe artifact relative paths | under the same suite artifact root |
+| `artifact_digest_algorithm` | yes | `sha256` | shared digest rule |
+| `artifact_digest` | yes | string | digest of this object excluding this field |
+
+Assertion object:
+
+| Field | Required | Type / values | Notes |
+|---|---|---|---|
+| `assertion_id` | yes | string | stable within case |
+| `status` | yes | `GovernanceAssertionStatus` | assertion status |
+| `expected_ref` | yes | string | safe expected condition ref |
+| `actual_ref` | no | string | safe actual result ref,not raw body |
+| `message_ref` | no | string | safe diagnostic ref |
+| `failure_reason_ref` | no | string | safe failure reason ref |
+
+Root `evidence-index.json`:
+
+| Field | Required | Type / values | Notes |
+|---|---|---|---|
+| `schema_version` | yes | `governance.artifact.v1` | fixed |
+| `run_id` | yes | string | same run id |
+| `items` | yes | array of evidence items | derived only from raw artifacts and generated reports |
+| `artifact_digest_algorithm` | yes | `sha256` | shared digest rule |
+| `artifact_digest` | yes | string | digest of this object excluding this field |
+
+Evidence item:
+
+| Field | Required | Type / values | Notes |
+|---|---|---|---|
+| `evidence_id` | yes | `EV-GOV-*` | formal evidence family id |
+| `suite` | yes | string | source suite |
+| `status` | yes | `GovernanceArtifactStatus` | evidence status |
+| `tc_refs` | yes | array of `TC-GOV-*` | traceability |
+| `ac_refs` | yes | array of `AC-GOV-*` | acceptance traceability |
+| `veto_refs` | no | array of `VF-GOV-*` | required when VETO relevant |
+| `artifact_path` | yes | string | run-scoped raw artifact path |
+| `report_path` | yes | string | run-scoped generated report path |
+| `artifact_digest` | yes | `sha256:<hex>` | digest of source raw artifact |
+| `generated_from` | yes | array of strings | script/source artifact refs |
+| `redaction_status` | yes | `GovernanceRedactionStatus` | safe output check status |
+| `review_status` | yes | `GovernanceReviewStatus` | human/agent review status |
+
+`suites/<suite>/artifacts/<safe_artifact_name>.json`:
+
+| Field | Required | Type / values | Notes |
+|---|---|---|---|
+| `schema_version` | yes | `governance.artifact.v1` | fixed |
+| `run_id` | yes | string | same run id |
+| `suite` | yes | string | suite id |
+| `artifact_name` | yes | string | safe file stem |
+| `artifact_kind` | yes | string | writer-defined safe kind |
+| `status` | yes | `GovernanceArtifactStatus` | artifact status |
+| `safe_refs` | yes | array of strings | safe refs only |
+| `safe_summary` | no | object | redacted/body-free summary only |
+| `artifact_digest_algorithm` | yes | `sha256` | shared digest rule |
+| `artifact_digest` | yes | string | digest of this object excluding this field |
 
 ### 8.5 Reports 目录结构
 

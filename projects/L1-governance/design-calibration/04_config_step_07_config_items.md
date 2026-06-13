@@ -198,6 +198,38 @@
 | clock / id | `clockId.*` | clock / id / deterministic test | startup runtime config;test fixture config | defaults < file < env;fixture 仅 test | CI deterministic;local system/local-sequence;integration controlled | 无回写;承接 Clock/Id ports |
 | test / replay fixtures | `testFixtures.*` | environment / profile matrix | test fixture / deterministic config;job-run-start replay | test config/test env/job input | local optional;CI fixture required;operations-replay replay root required | 无回写;production-like reject fixture |
 
+### 8.3.1 Jobs entry-local 参数 schema
+
+Jobs crate binaries use the same local-only argument schema. These arguments select local config/profile, request source and artifact/report output roots;they do not define public job metadata and do not enter application DTOs.
+
+| 参数 | CLI flag | Env key | 默认 / 缺失处理 | 适用 binary | DTO 承载边界 |
+|---|---|---|---|---|---|
+| config source selector | `--config <path>` | `GOVERNANCE_CONFIG` | 缺失使用默认 config discovery;flag/env 冲突 rejected | all jobs bins | `GovernanceJobsEntryLocalArgs.config_path` |
+| profile selector | `--profile <profile>` | `GOVERNANCE_PROFILE` | 缺失使用 config/default profile;unknown profile rejected | all jobs bins | `GovernanceJobsEntryLocalArgs.profile` |
+| job request file | `--job-request <path>` | `GOVERNANCE_JOB_REQUEST` | 与 stdin source 二选一 | all jobs bins | `GovernanceJobsEntryRequestSource::File`;full `GovernanceJobRequest<T>` |
+| job request stdin | `--job-request-stdin` | `GOVERNANCE_JOB_REQUEST_STDIN=true` | 与 file source 二选一;truthy only `true` | all jobs bins | `GovernanceJobsEntryRequestSource::Stdin`;full `GovernanceJobRequest<T>` |
+| artifact output root | `--artifact-root <path>` | `GOVERNANCE_ARTIFACT_ROOT` | default `artifacts/test/<run_id>` from request metadata | all jobs bins | local output path only |
+| report output root | `--report-root <path>` | `GOVERNANCE_REPORT_ROOT` | default `reports/runs/<run_id>` from request metadata | all jobs bins | local output path only |
+| dry-run diagnostics | `--dry-run-diagnostics` | `GOVERNANCE_JOB_DRY_RUN_DIAGNOSTICS=true` | default `false`;no application mutation when true | all jobs bins | local diagnostic selector |
+
+Binary request binding:
+
+| Binary | request JSON 必须解码为 |
+|---|---|
+| `publish_governance_outbox` | `GovernanceJobRequest<PublishGovernanceOutboxJobInput>` |
+| `rebuild_governance_projections` | `GovernanceJobRequest<RebuildGovernanceProjectionsJobInput>` |
+| `refresh_governance_references` | `GovernanceJobRequest<RefreshExternalContextSnapshotsJobInput>` |
+| `run_governance_reconciliation` | `GovernanceJobRequest<RunGovernanceReconciliationJobInput>` |
+| `prepare_governance_trace_handoff` | `GovernanceJobRequest<PrepareGovernanceTraceHandoffJobInput>` |
+| `prepare_governance_archive_handoff` | `GovernanceJobRequest<PrepareGovernanceArchiveHandoffJobInput>` |
+| `prepare_external_grc_export` | `GovernanceJobRequest<PrepareExternalGrcExportJobInput>` |
+
+Entry-local 禁止项:
+
+- 不新增 `--run-id`、`--idempotency-key`、`--actor-ref`、`--trace-id`、`--scope` 或 `--target` 同义 flag;这些 protocol metadata/input 只来自 `GovernanceJobRequest<T>`。
+- Env 只承载 selector、path 或 boolean,不得承载完整 job input body。
+- `artifact_root` / `report_root` 不写入 `GovernanceJobReport`、stored job result 或 domain truth。
+
 ### 8.4 系统级聚合配置映射说明
 
 项目本地配置文件使用本 Step 的顶层模块名,例如 `runtime.profile`。若未来存在系统级聚合配置文件,可以做如下只读映射:

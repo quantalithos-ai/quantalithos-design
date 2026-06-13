@@ -172,9 +172,9 @@ P1 selected-run
 
 | 输出项 | 路径 | 来源 | 要求 |
 |---|---|---|---|
-| suite raw report | `artifacts/test/<run_id>/suites/<suite>/report.json` | gate / suite execution | 必须含 suite、case refs、status、failure reason、duration、config profile、artifact digest |
+| suite raw report | `artifacts/test/<run_id>/suites/<suite>/report.json` | gate / suite execution | 必须符合 Step 13 raw artifact JSON schema,包含 suite、case refs、status、failure reason、duration、config profile、artifact digest |
 | stdout / stderr | `artifacts/test/<run_id>/suites/<suite>/stdout.log`;`stderr.log` | gate execution | 可脱敏;不得含 raw secret/body |
-| case result files | `artifacts/test/<run_id>/suites/<suite>/cases/*.json` | automated case runner | 至少回指 TC-GOV-* 和 EV-CAND-* |
+| case result files | `artifacts/test/<run_id>/suites/<suite>/cases/*.json` | automated case runner | 必须符合 Step 13 raw artifact JSON schema,并回指 TC-GOV-* 和 EV-CAND-* |
 | redaction scan raw | `artifacts/test/<run_id>/suites/redaction-boundary/report.json` | `check_redaction.sh` | failed 时不得回显 secret/body |
 | dependency graph raw | `artifacts/test/<run_id>/suites/dependency-boundary/report.json` | `check_dependency_boundary.sh` | 必须能证明 only `L0-core` compile dependency |
 | suite human report | `reports/runs/<run_id>/suites/<suite>.md` | `generate_reports.sh` | 从 raw artifact 生成 |

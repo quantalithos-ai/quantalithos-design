@@ -190,7 +190,7 @@
 | static design boundary | 不是配置项 | truth ownership、state matrix、query no-write、outbox source、duplicate replay、external GRC no-truth | 配置中出现相关 override key => validation reject |
 | startup | runtime builder 前加载并冻结 | runtime、stores、resolver、consumer、outbox/topic、jobs defaults、handoff targets、redaction、boundary、idempotency、projection/reference defaults、clock/id | invalid => builder `Failed`,不暴露 facade |
 | job-run-start | job run 开始时冻结 | job input scope、batch、target、replay root、current run page/cursor where allowed | invalid => job rejected,不进入 application mutation |
-| entry-local | 只影响当前入口选择 | profile selector、config source selector、dry-run diagnostic selector | invalid => current entry rejected |
+| entry-local | 只影响当前入口选择 | profile selector、config source selector、job request source、artifact/report output root、dry-run diagnostic selector | invalid => current entry rejected |
 | test harness | fake runtime / fixture load 前生效 | fixture set、fixed clock、deterministic id、fake adapter seed | invalid => test fail-fast |
 | reload | P0 unsupported | 无 | presence of reload config => validation reject |
 | hot | P0 unsupported | 无 | presence of hot config => validation reject |

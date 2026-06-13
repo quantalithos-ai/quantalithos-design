@@ -261,6 +261,26 @@ Runtime builder rules:
 - `clockId.clockAdapterRef` and `clockId.idGeneratorRef` are separate adapter refs;runtime builder must inject ClockPort and IdGeneratorPort separately and must not synthesize a combined clock/id adapter ref.
 - builder cannot expose facade unless all blocking slots are enabled or intentionally disabled by a rule that does not affect core command acceptance.
 
+## 14.1 Jobs entry-local binding
+
+Jobs crate binaries read a local argument layer before they build the runtime and dispatch to application job services. This layer is not a domain truth source and must not introduce alternate job protocol metadata.
+
+| Binding | Owner | Formal source | Rule |
+|---|---|---|---|
+| config source selector | `jobs` entry / `infra/config.rs` | `--config` / `GOVERNANCE_CONFIG` | Optional;selects config file for current entry only |
+| profile selector | `jobs` entry / `infra/config.rs` | `--profile` / `GOVERNANCE_PROFILE` | Optional;selects profile for current entry only |
+| job request source | `jobs` entry | `--job-request` / `GOVERNANCE_JOB_REQUEST` or `--job-request-stdin` / `GOVERNANCE_JOB_REQUEST_STDIN` | Exactly one;contains full `GovernanceJobRequest<T>` envelope |
+| artifact output root | `jobs` entry artifact writer | `--artifact-root` / `GOVERNANCE_ARTIFACT_ROOT` | Optional;default `artifacts/test/<run_id>` where `run_id` comes from request metadata |
+| report output root | `jobs` entry report writer | `--report-root` / `GOVERNANCE_REPORT_ROOT` | Optional;default `reports/runs/<run_id>` where `run_id` comes from request metadata |
+| dry-run diagnostic selector | `jobs` entry | `--dry-run-diagnostics` / `GOVERNANCE_JOB_DRY_RUN_DIAGNOSTICS` | Optional;default false;when true,validate and emit diagnostic artifacts only |
+
+Constraints:
+
+- `run_id`, `idempotency_key`, actor, trace id and job input must be read from `GovernanceJobRequest<T>`;jobs entry-local args must not define duplicate `--run-id`, `--scope`, `--target` or `--idempotency-key` flags.
+- Each binary must validate that the decoded request generic input type matches the binary's job kind before calling the runner.
+- The artifact writer consumes `GovernanceOperationsJobRunResult` / `GovernanceJobReport` and writes the `05` raw artifact JSON schema;application services do not receive local filesystem paths.
+- Environment variables use the same validation and conflict rules as `04`: if flag and env for the same binding are both present with different values, the entry is rejected rather than silently choosing one.
+
 ## 15. 前序契约回填审计
 
 | 前序 Step | 审计结论 | 是否需要回填 |

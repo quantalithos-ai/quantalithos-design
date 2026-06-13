@@ -107,7 +107,7 @@
 | static / design-time | 架构红线、truth boundary、protocol schema、state matrix、transaction ordering | 作为 JSON / env / flag 配置 | 只能通过正式设计变更和实现提交生效 |
 | startup / cold update | profile、store、adapter、topic、redaction、boundary、retention、clock/id、feature peripheral enablement | 启动后无审计替换核心 adapter / store | 重新启动并重新 validate 后生效 |
 | job-run-start | job batch、timeout、retry、parallelism、target availability snapshot、report ref | job 运行中改变 scope / mutation semantics | 新 job run 冻结,写入 report / receipt |
-| entry-local | config source selector、profile selector、job input / run identity、dry-run diagnostic selection | 改写全局 config、truth scope、state transition、actor visibility | 只对当前入口有效 |
+| entry-local | config source selector、profile selector、job request source、artifact/report output root、dry-run diagnostic selection | 改写全局 config、truth scope、state transition、actor visibility、job metadata | 只对当前入口有效 |
 | hot runtime update | P0 无核心 hot update | store / adapter / topic / redaction / idempotency / truth invariant hot change | 需要未来新增 `03` reload contract 后才可启用 |
 
 ### 8.3 禁止配置化项表

@@ -83,7 +83,7 @@
 - [ ] core-contracts / `L0-core` source ref 或 package version 已固定。
 - [ ] P0 profile、config digest、runtime config source、fixture set / replay root 已固定。
 - [ ] `run_id` 已固定且不是 `latest`。
-- [ ] raw artifact root 为 `artifacts/test/<run_id>`,且存在 suite `report.json`、stdout/stderr、case JSON 和 artifact digest。
+- [ ] raw artifact root 为 `artifacts/test/<run_id>`,且存在符合 `05-测试方案.md` §13.3.1 schema 的 suite `report.json`、stdout/stderr、case JSON 和 artifact digest。
 - [ ] run report root 为 `reports/runs/<run_id>`,且存在 summary、gate-summary、evidence-index、suite reports、redaction-check、dependency-boundary、report-audit。
 - [ ] `reports/acceptance/handoff.md` 已生成,并记录 source refs、P0/P1/P2 边界、未覆盖说明。
 - [ ] `reports/acceptance/veto-checklist.md` 已生成,且每个 VETO 项引用真实 evidence / report / artifact。

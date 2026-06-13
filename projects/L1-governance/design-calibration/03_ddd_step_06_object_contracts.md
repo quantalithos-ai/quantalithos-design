@@ -7650,6 +7650,80 @@ pub struct GovernanceOperationsJobEntry {
 |---|---|---|---|---|
 | `pub fn from_metadata(entry_ref: GovernanceJobEntryRef, job_kind: GovernanceOperationsJobKind, operation_name: GovernanceOperationName, run_id: GovernanceJobRunId, idempotency_key: GovernanceJobIdempotencyKey, actor: ActorContext, core_trace_id: TraceId, scope_ref: Option<GovernanceScopeRef>, page_request: Option<GovernancePageRequest>) -> Result<Self, JobError>` | 从 job metadata 和 runner input 构造 entry | entry、kind、operation、run、key、actor、core trace id、optional scope/page | `Result<GovernanceOperationsJobEntry, JobError>` | jobs runner validation 后 |
 
+##### `GovernanceJobsEntryLocalArgs`
+
+```rust
+/// Local-only arguments parsed by jobs crate binaries before application dispatch.
+pub struct GovernanceJobsEntryLocalArgs {
+    /// Optional runtime config file selector for this entry only.
+    pub config_path: Option<std::path::PathBuf>,
+    /// Optional runtime profile selector for this entry only.
+    pub profile: Option<String>,
+    /// Exactly one request source containing a full GovernanceJobRequest<T>.
+    pub request_source: GovernanceJobsEntryRequestSource,
+    /// Run-scoped raw machine artifact root.
+    pub artifact_root: std::path::PathBuf,
+    /// Run-scoped human report root.
+    pub report_root: std::path::PathBuf,
+    /// Entry diagnostic mode; validates input and emits diagnostic artifacts without application mutation.
+    pub dry_run_diagnostics: bool,
+}
+
+pub enum GovernanceJobsEntryRequestSource {
+    File(std::path::PathBuf),
+    Stdin,
+}
+```
+
+| 字段 | 类型 | 作用 | 约束 / 来源 |
+|---|---|---|---|
+| `config_path` | `Option<PathBuf>` | 当前 jobs entry 使用的 config file selector | `--config` / `GOVERNANCE_CONFIG`;只影响当前 entry;不写入 domain/contracts |
+| `profile` | `Option<String>` | 当前 jobs entry profile selector | `--profile` / `GOVERNANCE_PROFILE`;缺失按 `04` profile 默认口径;不得覆盖 startup invariant |
+| `request_source` | `GovernanceJobsEntryRequestSource` | 读取完整 `GovernanceJobRequest<T>` envelope | `--job-request` / `GOVERNANCE_JOB_REQUEST` 或 `--job-request-stdin` / `GOVERNANCE_JOB_REQUEST_STDIN`;解析后 job kind 必须匹配 binary |
+| `artifact_root` | `PathBuf` | raw artifact run root | `--artifact-root` / `GOVERNANCE_ARTIFACT_ROOT`;缺失默认 `artifacts/test/<run_id>`;`run_id` 来自 request metadata |
+| `report_root` | `PathBuf` | human report run root | `--report-root` / `GOVERNANCE_REPORT_ROOT`;缺失默认 `reports/runs/<run_id>`;`run_id` 来自 request metadata |
+| `dry_run_diagnostics` | `bool` | entry-local dry-run diagnostic selector | `--dry-run-diagnostics` / `GOVERNANCE_JOB_DRY_RUN_DIAGNOSTICS`;默认 `false`;为 `true` 时不得调用 application service、repository mutation、publisher、handoff 或 export adapter |
+
+Entry-local 约束:
+
+- `GovernanceJobsEntryLocalArgs` 属于 `jobs` crate entry boundary,不是 public protocol DTO,不得进入 `governance-contracts`。
+- jobs bin 只从 `request_source` 读取完整 `GovernanceJobRequest<T>`;`run_id`、`idempotency_key`、`actor`、`trace_id` 和 job input 均来自该 envelope metadata/input,不另设同义 CLI/env 参数。
+- CLI/env 只选择本地 config/profile/request source/artifact/report root/dry-run;不得覆盖业务 truth、idempotency digest、visibility、target availability、adapter result 或 application job report。
+- `artifact_root` / `report_root` 是本地运行输出位置。application job service 只返回 `GovernanceJobReport`;artifact writer 根据 `05` raw artifact schema materialize JSON/log/report,不得把本地路径写入 domain truth。
+
+| Binary | request_source 必须解析成 |
+|---|---|
+| `publish_governance_outbox` | `GovernanceJobRequest<PublishGovernanceOutboxJobInput>` |
+| `rebuild_governance_projections` | `GovernanceJobRequest<RebuildGovernanceProjectionsJobInput>` |
+| `refresh_governance_references` | `GovernanceJobRequest<RefreshExternalContextSnapshotsJobInput>` |
+| `run_governance_reconciliation` | `GovernanceJobRequest<RunGovernanceReconciliationJobInput>` |
+| `prepare_governance_trace_handoff` | `GovernanceJobRequest<PrepareGovernanceTraceHandoffJobInput>` |
+| `prepare_governance_archive_handoff` | `GovernanceJobRequest<PrepareGovernanceArchiveHandoffJobInput>` |
+| `prepare_external_grc_export` | `GovernanceJobRequest<PrepareExternalGrcExportJobInput>` |
+
+##### Jobs raw artifact local DTO ownership
+
+Commit-07-d artifact/report output uses local DTOs owned by the `jobs` crate artifact writer,not public governance protocol contracts. Formal field schema and digest rules live in `05-测试方案.md` §13.3.1 and `design-calibration/05_test_plan_step_13_evidence.md` §8.4.1.
+
+| Local DTO / enum | Owner | Purpose | Boundary |
+|---|---|---|---|
+| `GovernanceArtifactStatus` | `jobs::artifacts` | status enum for suite,case and raw artifact JSON | values fixed by `05`;not domain state |
+| `GovernanceArtifactDigestAlgorithm` | `jobs::artifacts` | digest algorithm enum | P0 only `sha256` |
+| `GovernanceSuiteReportArtifact` | `jobs::artifacts` | `suites/<suite>/report.json` | generated from job/test result;not stored job report |
+| `GovernanceCaseResultArtifact` | `jobs::artifacts` | `suites/<suite>/cases/<case_id>.json` | generated from executed case assertions |
+| `GovernanceAssertionArtifact` | `jobs::artifacts` | assertion item embedded in case JSON | safe refs / safe summaries only |
+| `GovernanceRunContextArtifact` | `jobs::artifacts` | `meta/context.json` | local run context;redacted environment summary only |
+| `GovernanceSourceCommitsArtifact` | `jobs::artifacts` | `meta/source-commits.json` | source refs / commits only |
+| `GovernanceConfigDigestArtifact` | `jobs::artifacts` | `meta/config-digest.json` | redacted config ref and digest only |
+| `GovernanceEvidenceIndexArtifact` | `jobs::artifacts` | root `evidence-index.json` | derived from raw artifacts and generated reports |
+| `GovernanceSafeRawArtifact` | `jobs::artifacts` | `suites/<suite>/artifacts/<safe_artifact_name>.json` | optional safe machine artifact;no raw body / no secret |
+
+Raw artifact DTO constraints:
+
+- These DTOs may use local filesystem paths under `artifact_root` / `report_root`,but those paths do not enter `governance-contracts`,domain truth,application job requests or stored job reports.
+- `artifact_digest` is computed by the local artifact writer using the canonical rule in `05`;application services do not compute or verify artifact JSON digests.
+- Failed,partial,skipped and unavailable artifacts must still be written when the entry reached artifact writer stage;writer failure itself is an entry failure,not a business truth mutation.
+
 ##### `GovernanceOperationsJobRunResult`
 
 ```rust

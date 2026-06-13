@@ -98,7 +98,7 @@
 | `operator_ref` | 提交 startup config 文件或 env ref 的变更,执行 restart / rollback | 直接修改 domain truth、绕过 validator、注入 raw secret | actor、reason、change request、old/new digest、validation result |
 | `release_automation_ref` | 在已评审变更中应用 config artifact、运行 validation、记录 digest | 自动批准 high-risk / critical 变更 | release run ref、config digest、validation issue refs |
 | `authorized_job_runner_ref` | 提交 job-run-start scope、batch、target、replay root 等 run-local 输入 | 覆盖 startup invariant、修改全局 config、写 raw target credential | job run id、input digest、target digest、validation result |
-| `entry_caller_ref` | 提交 entry-local profile/config selector、dry-run diagnostic selector | 修改持久配置或绕过 startup validation | entry ref、selector digest、rejection issue |
+| `entry_caller_ref` | 提交 entry-local profile/config selector、job request source、artifact/report output root、dry-run diagnostic selector | 修改持久配置、绕过 startup validation 或覆盖 job metadata | entry ref、selector digest、request source digest、rejection issue |
 | `test_harness_ref` | 加载 fake fixture、fixed clock/id、replay fixture | 进入 production-like / staging-like runtime | test run ref、fixture digest、profile |
 | `design_change_ref` | 对 critical boundary 做正式设计变更 | 在 P0 runtime 中直接生效 | design baseline commit、review record |
 

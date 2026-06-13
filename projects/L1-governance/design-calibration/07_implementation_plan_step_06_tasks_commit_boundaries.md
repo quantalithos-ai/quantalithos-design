@@ -703,7 +703,7 @@
 | BATCH-07-02 | publish/rebuild/refresh/reconcile jobs | `03` Step 9 jobs | job DTO、application job services、runners | 500 行以上;按 job type 拆批 | operations-replay-core subset | commit-07-b |
 | BATCH-07-03 | trace/archive handoff jobs | `03` handoff flow | handoff DTO、ports/fakes、partial failure | 300~500 行 | handoff tests | commit-07-c |
 | BATCH-07-04 | external GRC export job | `03` external GRC flow;`04` adapter | export DTO、port/fake、redacted payload/export report | 300~500 行 | export tests;redaction targeted | commit-07-c |
-| BATCH-07-05 | jobs crate entry and reports | `03` layout;`05` suite | bin runners、artifact/report output | 300~500 行 | job entry tests | commit-07-d |
+| BATCH-07-05 | jobs crate entry and reports | `03` layout/jobs entry-local args;`04` jobs entry-local schema;`05` raw artifact schema | bin runners、artifact/report output | 300~500 行 | job entry tests | commit-07-d |
 
 #### 提交边界
 
@@ -712,7 +712,7 @@
 | commit-07-a | remaining job shared schema、stored report surface、duplicate replay contract tests 通过后 | 06-d 未覆盖的 job metadata/receipt/`JobError`/report DTO、stored job report repository/idempotency surface 扩展 | concrete job runners、handoff/export adapters、PublishOutbox publisher loop | job contract tests;`cargo check`;`git diff --check` |
 | commit-07-b | publish/rebuild/refresh/reconcile job runners tests 通过后 | publish outbox job、projection rebuild、snapshot refresh、reconciliation runners and reports | handoff/archive/export jobs、release evidence | operations-replay-core subset;job duplicate tests;`git diff --check` |
 | commit-07-c | trace/archive handoff and external GRC export tests 通过后 | handoff/export DTO、ports/fakes、partial failure report、redaction targeted tests | release report generation、final acceptance handoff | handoff/export tests;redaction-boundary targeted;`git diff --check` |
-| commit-07-d | jobs crate entry and report artifact tests 通过后 | jobs crate bins, runner wiring, artifact/report output for operations jobs | final EV index/VETO checklist/release summary | entry-worker-job;operations-replay-core;`git diff --check` |
+| commit-07-d | jobs crate entry and report artifact tests 通过后 | jobs crate bins, runner wiring, `GovernanceJobsEntryLocalArgs` parser, full `GovernanceJobRequest<T>` file/stdin loading, artifact/report output for operations jobs per raw artifact schema | final EV index/VETO checklist/release summary | entry-worker-job;operations-replay-core;`git diff --check` |
 
 #### Commit boundary 子功能分组
 
@@ -721,7 +721,7 @@
 | commit-07-a | job shared schema + stored report | duplicate replay of public jobs requires stable report result surface | BATCH-07-01 | job contract tests | concrete runners |
 | commit-07-b | publish/rebuild/refresh/reconcile runners | 这些 jobs 共同维护 public projection/reference/report markers and reconciliation report | BATCH-07-02 | operations-replay-core subset | handoff/export |
 | commit-07-c | handoff/archive/export ports + jobs | handoff/export 都是 external delivery seam,需统一 partial failure/redaction/report | BATCH-07-03;BATCH-07-04 | handoff/export/redaction tests | release evidence |
-| commit-07-d | jobs entry + artifact/report output | runner entry 必须把 job service result materialize 为 suite artifact/report | BATCH-07-05 | entry-worker-job | final release reports |
+| commit-07-d | jobs entry + artifact/report output | runner entry 必须用正式 entry-local schema 读取 full job request,并把 job service result materialize 为 suite artifact/report | BATCH-07-05 | entry-worker-job | final release reports |
 
 #### PH-07 开工前设计闭环复核
 
@@ -731,7 +731,8 @@
 | job policy executable summary 闭环 | refresh/retry/rebuild/reconcile/handoff/export 的 policy ref 若用于判定,必须有 executable summary 或 truth field | 开工前确认 | 补 policy summary / repository |
 | Projection stale/rebuild 闭环 | rebuild jobs 的 truth snapshot source、projection set、replace semantics 闭合 | 开工前确认 | 补 rebuild source |
 | Ref-scope 解析闭环 | refresh/reconcile/handoff/export scope 的展开 owner、分页、去重、empty branch 定义;reference refresh 的 `GovernanceScope(scope_ref)` 必须有 `GovernanceReferenceScopeLink` index schema、write/remove timing 和 fake/durable parity | 开工前确认 | 补 list/link port、scope index write rules |
-| artifact materialization 闭环 | job report、handoff/export artifact path、redaction、run_id、digest 有规则 | 开工前确认 | 回写 `05/06` |
+| artifact materialization 闭环 | job report、handoff/export artifact path、redaction、run_id、digest、raw JSON schema 有规则 | 开工前确认 | 回写 `05/06` |
+| jobs entry-local schema 闭环 | jobs bin flag/env、full request source、artifact/report root、dry-run selector、forbidden duplicate metadata flags 已在 `03/04` 闭合 | 开工前确认 | 回写 `03/04/07` |
 | idempotency 闭环 | duplicate job returns stored report or明确重新扫描语义 | 开工前确认 | 回写 job result surface |
 | phase boundary | jobs 不修复 business truth,只写正式 marker/report | 通过 | 越界回写 flow 或移出 |
 
@@ -742,7 +743,7 @@
 | commit-07-a | public job/report/idempotency | public job surface阶段闭环;idempotency;artifact materialization;phase boundary | concrete scope parsing 不适用 | `03` Step 8/13;`05` | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
 | commit-07-b | publish/rebuild/refresh/reconcile jobs | Projection stale/rebuild;Ref-scope解析;job policy executable summary;optimistic version;artifact materialization | handoff/export 不适用 | `03` Step 7/9/11;`05/06` | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
 | commit-07-c | handoff/archive/export | artifact materialization;Ref-scope解析;public target穷尽;redaction;job report failed refs | projection rebuild 不适用 | `03` Step 7/8/9;`04`;`05/06` | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
-| commit-07-d | jobs entry/report output | path baseline;artifact materialization;config binding;phase boundary | business DTO 不适用 | `03` layout;`04`;`05` suite | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
+| commit-07-d | jobs entry/report output | path baseline;artifact materialization;config binding;entry local args schema;machine artifact JSON schema;phase boundary | business DTO 不适用 | `03` layout/jobs args;`04` entry-local schema;`05` raw artifact schema | 开工前复核 | blocker 回写设计 | 设计者完成;实现者二次校验 |
 
 #### PH-07 提交粒度判断
 

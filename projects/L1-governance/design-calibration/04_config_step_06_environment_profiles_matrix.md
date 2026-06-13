@@ -109,7 +109,7 @@
 | `local-dev` | required and sufficient | optional | optional | optional selector | optional fake seed | fake / absent |
 | `ci-test` | required | required test file when suite needs overrides | CI-safe refs only | allowed for run id / selected config | required for deterministic fixture tests | fake refs only |
 | `integration-like` | required baseline | required | allowed refs and profile selector | allowed for current entry / job | optional controlled scenario file | credential / endpoint refs only |
-| `operations-replay` | required baseline | required replay config | allowed refs and run metadata | required job input / run identity | required replay artifacts / state refs | historical / fake refs only |
+| `operations-replay` | required baseline | required replay config | allowed refs and request metadata | required full job request source | required replay artifacts / state refs | historical / fake refs only |
 | `staging-like` | required baseline | required deployment config | allowed refs | limited operator entry params | no test fixture override | secret provider refs |
 | `production-like` | required baseline | deployment material | operations-controlled refs | restricted | no fixture / replay override | secret provider refs only |
 

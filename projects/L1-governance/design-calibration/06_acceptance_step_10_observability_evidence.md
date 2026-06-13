@@ -86,7 +86,7 @@
 | 验收项 ID | 证据主题 | 必须存在的证据 | 通过条件 | 失败条件 |
 |---|---|---|---|---|
 | AC-GOV-EV-001 | P0 evidence index | `reports/runs/<run_id>/evidence-index.md` | 覆盖全部 P0 `EV-GOV-*`,每项含 TC、AC、suite、artifact path、report path、digest、status、review status | 缺任一 P0 EV、orphan EV、使用 `latest`、无 artifact digest |
-| AC-GOV-EV-002 | blocking suite artifacts | `artifacts/test/<run_id>/suites/<suite>/report.json` and cases | 每个 blocking suite 有 raw report、case refs、status、failure reason、config profile、digest | suite report 缺 raw artifact、failed artifact 被删除、case refs 缺失 |
+| AC-GOV-EV-002 | blocking suite artifacts | `artifacts/test/<run_id>/suites/<suite>/report.json` and cases | 每个 blocking suite 有符合 `05` raw artifact schema 的 raw report、case refs、status、failure reason、config profile、digest | suite report 缺 raw artifact、failed artifact 被删除、case refs 缺失或 schema/digest 不合法 |
 | AC-GOV-EV-003 | human-readable run reports | `reports/runs/<run_id>/summary.md`;suite reports;`gate-summary.md` | report 从 raw artifact 生成,blocking/non-blocking 分类清楚,失败可审计 | report 手写补洞、把 failed 改 passed、缺 gate summary |
 | AC-GOV-EV-004 | redaction check | `reports/runs/<run_id>/redaction-check.md` | artifact 和 report 均 clean;negative leak fixture safe failure | raw body/secret/full ref 泄露或 scan 范围不含 report |
 | AC-GOV-EV-005 | dependency boundary check | `reports/runs/<run_id>/dependency-boundary.md` | 证明 only `L0-core` / core-contracts compile upstream | non-core sibling dependency 或 dependency graph 缺失 |

@@ -91,7 +91,7 @@
 | config file | 2 | startup runtime config、store / adapter refs、topic map、boundary、retention、job defaults、feature peripheral enablement | 覆盖 code defaults;重复 key / alias key fail-fast | 未指定则使用 defaults;指定但不可读 / 解析失败则 fail-fast |
 | environment variables | 3,最高普通来源 | profile selector、config path、有限 runtime refs、CI override、safe diagnostics selector | 覆盖 file / defaults;存在但非法 fail-fast,不得 fallback | 缺失则使用低优先级;存在但非法 fail-fast |
 | secret / credential refs | 引用值可由普通来源提供;raw material 不进入普通优先级 | credential ref、endpoint ref、handoff destination ref、external export target ref | ref 冲突按普通来源优先级;raw value 一律拒绝 | ref 格式非法 fail-fast;真实解析不可用按 profile / adapter 策略 fail-fast 或 rejected |
-| entry-local parameters | 局部,不参与全局优先级 | config source selector、profile selector、job input / run identity、dry-run diagnostic selector | 只影响当前 entry;不得覆盖全局禁止项 | 缺失必填 entry 参数则拒绝当前 entry / job |
+| entry-local parameters | 局部,不参与全局优先级 | config source selector、profile selector、job request source、artifact/report output root、dry-run diagnostic selector | 只影响当前 entry;不得覆盖全局禁止项 | 缺失必填 entry 参数则拒绝当前 entry / job |
 | test fixture / deterministic override | 仅 local / CI test harness | fake adapter output、in-memory seed、fixed clock / id sequence、fixture refs | 只在 test profile 生效;不得覆盖 production-like | fixture 缺失则 test fail-fast |
 | config center | P1/P2, P0 unsupported | future remote config source | P0 启用视为 unsupported | P0 fail-fast unsupported source |
 | admin override | P1/P2, P0 unsupported | future audited operator override | P0 启用视为 unsupported | P0 fail-fast unsupported source |

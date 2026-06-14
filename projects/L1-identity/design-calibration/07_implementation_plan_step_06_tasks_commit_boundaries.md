@@ -130,8 +130,8 @@
 |---|---|---|---|---|
 | PH-01 | commit-01-a | 建立 workspace、crate skeleton、依赖边界和空入口骨架 | BATCH-01-01~02 | compile / format / dependency boundary scan |
 | PH-02 | commit-02-a | 建立 contracts shared refs、metadata、protocol envelope 和 public surface shell | BATCH-02-01~02 | contracts unit / body-free schema scan |
-| PH-02 | commit-02-b | 建立 domain core truth、policy、guard 和 business state transition foundation | BATCH-02-03~04 | contract-domain-fast subset |
-| PH-02 | commit-02-c | 建立 domain projection/reference/outbox/handoff/replay state helpers | BATCH-02-05~06 | state transition subset / forbidden body scan |
+| PH-02 | commit-02-b | 建立 domain core truth、policy、guard 和 business state transition foundation | BATCH-02-03~04 | contract-domain-fast core domain subset;`TC-ID-DOMAIN-001~006` |
+| PH-02 | commit-02-c | 建立 domain projection/reference/outbox/handoff/replay state helpers | BATCH-02-05~06 | support state subset / forbidden body scan;`TC-ID-STATE-001~002` |
 | PH-03 | commit-03-a | 建立 application shared helpers、UoW、context、id/clock/cursor 和 mapper ports | BATCH-03-01~02 | application compile / mapper key tests |
 | PH-03 | commit-03-b | 建立 repository / resolver / publisher / handoff / read ports 和 fake runtime skeleton | BATCH-03-03~04 | infra-runtime-fake subset |
 | PH-03 | commit-03-c | 建立 idempotency、stored result、receipt/report replay 和 fake parity 基座 | BATCH-03-05~06 | replay / conflict / rollback subset |
@@ -255,17 +255,17 @@
 |---|---|---|---|---|---|---|
 | BATCH-02-01 | shared refs / markers / metadata | Step 6 refs、Step 8 shared helper | contracts refs/common | 300~500 行,按文件拆 | contracts unit | commit-02-a |
 | BATCH-02-02 | protocol / view / receipt / report shell | Step 8 inventories | contracts commands/queries/events/jobs/views | 需拆分 | body-free schema scan | commit-02-a |
-| BATCH-02-03 | member / lifecycle domain foundation | Step 6 member/lifecycle、Step 10 10.1 | domain member_identity/lifecycle | 300~500 行,按状态族拆 | contract-domain-fast subset | commit-02-b |
-| BATCH-02-04 | role / career / memory domain foundation | Step 6 role/career/memory、Step 10 10.2 | domain role/career/memory | 需拆分 | domain invariant subset | commit-02-b |
-| BATCH-02-05 | trace/audit/projection/reference/report state helpers | Step 6 trace/projection/report、Step 10 10.3~10.4 | domain trace_audit/projection | 300~500 行 | state transition subset | commit-02-c |
-| BATCH-02-06 | outbox/handoff/idempotency/job/runtime support states | Step 6 outbox/handoff/replay、Step 10 10.5~10.7 | domain outbox_handoff/support | 300~500 行 | state / forbidden transition subset | commit-02-c |
+| BATCH-02-03 | member / lifecycle domain foundation | Step 6 member/lifecycle、Step 10 10.1 | domain member_identity/lifecycle | 300~500 行,按状态族拆 | core domain subset;`TC-ID-DOMAIN-001~003` | commit-02-b |
+| BATCH-02-04 | role / career / memory domain foundation | Step 6 role/career/memory、Step 10 10.2 | domain role/career/memory | 需拆分 | core domain subset;`TC-ID-DOMAIN-004~006` | commit-02-b |
+| BATCH-02-05 | trace/audit/projection/reference/report state helpers | Step 6 trace/projection/report、Step 10 10.3~10.4 | domain trace_audit/projection | 300~500 行 | support state subset;`TC-ID-STATE-001` | commit-02-c |
+| BATCH-02-06 | outbox/handoff/idempotency/job/runtime support states | Step 6 outbox/handoff/replay、Step 10 10.5~10.7 | domain outbox_handoff/support | 300~500 行 | support state subset;`TC-ID-STATE-002`;forbidden transition subset | commit-02-c |
 
 #### 提交边界
 
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁方向 |
 |---|---|---|---|---|
 | commit-02-a | contracts shell 编译和 body-free schema checks 通过后 | refs、metadata、protocol envelopes、DTO/view/receipt/report shell | domain policy、repository trait、application service、infra fake | contracts unit、schema/serialization subset、redaction scan direction |
-| commit-02-b | core truth domain 状态和 invariant tests 通过后 | member/lifecycle/role/career/memory truth、policy、guard、domain errors | application orchestration、repository/UoW、trace/outbox write side effect implementation | contract-domain-fast domain subset |
+| commit-02-b | core truth domain 状态和 invariant tests 通过后 | member/lifecycle/role/career/memory truth、policy、guard、domain errors;`TC-ID-DOMAIN-001~006` evidence | application orchestration、repository/UoW、trace/outbox write side effect implementation;`TC-ID-STATE-001~002` | contract-domain-fast core domain subset |
 | commit-02-c | support state helpers 和 forbidden transition tests 通过后 | trace/audit/projection/reference/report/outbox/handoff/replay/job/runtime state helpers | application ports、fake runtime、operations service | state transition subset、forbidden body scan direction |
 
 #### Commit boundary 子功能分组
@@ -273,8 +273,8 @@
 | Commit boundary | 子功能分组 | 必须同提交的原因 | 涉及批次 | 验证门禁方向 | 不包含 |
 |---|---|---|---|---|---|
 | commit-02-a | public contracts shared vocabulary + protocol shell | public DTO/ref vocabulary 必须同源,否则后续 domain/application 会引用漂移名称 | BATCH-02-01~02 | contracts unit | domain / application |
-| commit-02-b | core business truth state + policy | core command write path 依赖这些 domain invariant,必须在 application service 前闭合 | BATCH-02-03~04 | contract-domain-fast subset | repository / UoW |
-| commit-02-c | support state families | query/job/outbox/handoff later surface 共用这些状态,必须先于 ports/fake/service | BATCH-02-05~06 | state subset | service flow |
+| commit-02-b | core business truth state + policy | core command write path 依赖这些 domain invariant,必须在 application service 前闭合 | BATCH-02-03~04 | `TC-ID-DOMAIN-001~006` | repository / UoW;support state cases |
+| commit-02-c | support state families | query/job/outbox/handoff later surface 共用这些状态,必须先于 ports/fake/service | BATCH-02-05~06 | `TC-ID-STATE-001~002` | service flow |
 
 #### 开工前设计闭环复核
 

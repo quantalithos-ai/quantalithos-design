@@ -129,6 +129,7 @@
 | report 必须 run-scoped | 所有 run report 使用 `reports/runs/<run_id>/...` | report 缺失或未从 artifact 推导则门禁失败 |
 | acceptance 只能是初稿 + 审查补充 | `reports/acceptance/*` 不得替代 suite artifact / run report | 未审查补充不得宣称送验完整 |
 | failed / partial artifact 必须保留 | failure reason 只能是 safe ref 或安全摘要 | 删除失败证据或改写 pass 视为 evidence integrity failure |
+| commit-scoped TC subset 优先 | GATE 总表可表达 phase 聚合覆盖,但单个 commit 可声明覆盖的 TC 只能来自本 Step 的 commit boundary 行 | 用 GATE 聚合 TC 反推单 commit 覆盖范围则门禁失败 |
 | redaction / dependency 是提前阻断门禁 | 触及 body/log/report/dependency 的 boundary 必须挂接相关 GATE | 失败进入 `VETO-ID-003/006` 或 S 级缺陷处理 |
 | no-write / no-repair 必须有证据 | query、consumer missing、job/report-only 必须有 write-audit 或 replay evidence | 失败进入 `VETO-ID-002/005` 或状态事务不通过 |
 
@@ -194,7 +195,7 @@
 |---|---|---|---|---|---|---|---|
 | commit-01-a | `GATE-01` | `dependency-boundary`;workspace compile direction | `TC-ID-ARCH-001` | `EV-ID-ARCH-001` | `reports/runs/<run_id>/dependency-boundary.md` | `AC-BOUNDARY-003`;`AC-SYNC-007`;`VETO-ID-006` | dependency report 不 clean 或 workspace 不编译则不得提交 |
 | commit-02-a | `GATE-02`;`GATE-10` | `contract-domain-fast`;`redaction-boundary` | `TC-ID-CONTRACT-001~004`;`TC-ID-REDACTION-001~003` | `EV-ID-CONTRACT-001`;`EV-ID-REDACTION-001` | `reports/runs/<run_id>/suites/contract-domain-fast.md`;`reports/runs/<run_id>/redaction-check.md` | `AC-BOUNDARY-001/002`;`AC-SYNC-008`;`VETO-ID-003` | DTO/schema/body-free 失败则不得提交 |
-| commit-02-b | `GATE-02` | `contract-domain-fast` domain/state subset | `TC-ID-DOMAIN-001~006`;`TC-ID-STATE-001~002` | `EV-ID-STATE-001` | `reports/runs/<run_id>/suites/contract-domain-fast.md` | `AC-FUNC-001/002/003/004`;`AC-STATE-001`;`VETO-ID-001/004` | invariant 或状态非法 accepted 则不得提交 |
+| commit-02-b | `GATE-02` | `contract-domain-fast` core domain subset | `TC-ID-DOMAIN-001~006` | `EV-ID-STATE-001` | `reports/runs/<run_id>/suites/contract-domain-fast.md` | `AC-FUNC-001/002/003/004`;`AC-STATE-001`;`VETO-ID-001/004` | invariant 或 core truth 状态非法 accepted 则不得提交 |
 | commit-02-c | `GATE-02`;必要时 `GATE-10` | `contract-domain-fast` support state subset | `TC-ID-STATE-001~002`;related `TC-ID-OUTBOX-*`;related `TC-ID-JOB-*` | `EV-ID-STATE-001`;`EV-ID-OUTBOX-001`;`EV-ID-JOB-001` | `reports/runs/<run_id>/suites/contract-domain-fast.md` | `AC-STATE-002/003`;`AC-BOUNDARY-007`;`AC-SYNC-008` | support state 名称或 terminal guard 漂移则不得提交 |
 | commit-03-a | `GATE-03`;必要时 `GATE-02` | `infra-runtime-fake`;`contract-domain-fast` metadata subset | `TC-ID-IDEMP-001`;`TC-ID-CONTRACT-002`;related `TC-ID-CONFIG-*` | `EV-ID-IDEMP-001`;`EV-ID-CONTRACT-001`;`EV-ID-CONFIG-001` | `reports/runs/<run_id>/suites/infra-runtime-fake.md`;`reports/runs/<run_id>/suites/contract-domain-fast.md` | `AC-IDEM-002`;`AC-CONC-001`;`AC-SYNC-001/003/005` | context/key/cursor source 漂移则不得提交 |
 | commit-03-b | `GATE-03`;`GATE-09` if config binding touched | `infra-runtime-fake`;`config-redline` | `TC-ID-IDEMP-008~011`;`TC-ID-CONFIG-001~004` | `EV-ID-IDEMP-001`;`EV-ID-CONFIG-001` | `reports/runs/<run_id>/suites/infra-runtime-fake.md`;`reports/runs/<run_id>/suites/config-redline.md` | `AC-CONC-003`;`AC-SYNC-007`;`AC-BOUNDARY-003` | fake private shortcut、disabled fake success 或 config fallback 则不得提交 |
@@ -248,7 +249,7 @@
 | 是否每个 commit boundary 有提交前 gate | 通过 | 22 个 boundary 均在 §8.6~§8.11 绑定 |
 | 是否所有 P0 suite 都被使用 | 通过 | `contract-domain-fast`、`service-flow-fast`、`config-redline`、`dependency-boundary`、`infra-runtime-fake`、`entry-worker-job`、`operations-replay-core`、`redaction-boundary`、`report-generation-audit`、`release-main-smoke` 均已绑定 |
 | 是否覆盖 `TC-ID-CONTRACT-*` | 通过 | `GATE-02`;commit-02-a |
-| 是否覆盖 `TC-ID-DOMAIN-*` / `TC-ID-STATE-*` | 通过 | `GATE-02`;commit-02-b/c |
+| 是否覆盖 `TC-ID-DOMAIN-*` / `TC-ID-STATE-*` | 通过 | `TC-ID-DOMAIN-001~006` 由 commit-02-b 覆盖;`TC-ID-STATE-001~002` 由 commit-02-c 覆盖 |
 | 是否覆盖 `TC-ID-CMD-*` | 通过 | `GATE-04`;commit-04-a/b/c |
 | 是否覆盖 `TC-ID-QUERY-*` | 通过 | `GATE-05`;commit-05-a/b/c |
 | 是否覆盖 `TC-ID-CONSUMER-*` | 通过 | `GATE-06`;commit-06-a/b |
@@ -283,8 +284,8 @@
 | PH-08 | entry/config/report/evidence/release 是否有 run-scoped report | 通过 | 无 |
 | commit-01-a | 是否有 TC/EV/AC/VETO 和 report path | 通过 | 无 |
 | commit-02-a | 是否不把 domain/service 提前放入 contracts gate | 通过 | 无 |
-| commit-02-b | 是否覆盖 state/domain invariant | 通过 | 无 |
-| commit-02-c | 是否覆盖 support state terminal guard | 通过 | 无 |
+| commit-02-b | 是否只覆盖 core truth domain invariant | 通过 | 不声明覆盖 `TC-ID-STATE-001~002` |
+| commit-02-c | 是否覆盖 support state terminal guard | 通过 | 覆盖 `TC-ID-STATE-001~002` |
 | commit-03-a | 是否覆盖 context/key/cursor/idempotency 来源 | 通过 | 无 |
 | commit-03-b | 是否覆盖 fake parity 和 config fallback 风险 | 通过 | 无 |
 | commit-03-c | 是否覆盖 stored replay no-rerun | 通过 | 无 |

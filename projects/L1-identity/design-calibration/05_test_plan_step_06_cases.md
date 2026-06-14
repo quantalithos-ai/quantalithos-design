@@ -124,6 +124,12 @@
 | TC-ID-STATE-001 | Projection / reference / report no repair | P0 | projection stale, reference unavailable, report finding fixture | read/query and run maintenance paths | query surfaces `StaleVisible` / `Degraded`;jobs write projection/reference/report only | no `GlobalMember`、lifecycle、role、career、memory truth repair | 是 | EV-CAND-ID-STATE-007 |
 | TC-ID-STATE-002 | outbox and handoff terminal guards | P0 | outbox `Published` / `Failed`;handoff `Delivered` / `Cancelled` | retry terminal record / intent | terminal retry rejected or skipped by formal selector | retry only selects `RetryableFailed`;`Published` does not mean downstream consumed | 是 | EV-CAND-ID-STATE-008 |
 
+Commit boundary 归属说明:
+
+- `TC-ID-DOMAIN-001~006` 是 core truth domain invariant / policy / business state transition 用例,归 `commit-02-b` 可声明覆盖。
+- `TC-ID-STATE-001~002` 是 projection / reference / report / outbox / handoff support state 用例,归 `commit-02-c` 可声明覆盖;`commit-02-b` 不得用 run-scoped report 声称已覆盖这两个用例。
+- `GATE-02` 可以作为 PH-02 聚合门禁列出 domain 与 support state 全量 case,但 commit-scoped evidence 必须以 `07_implementation_plan_step_07_test_acceptance_gates.md` 的 boundary TC subset 为准。
+
 ### 8.3 Command 用例矩阵
 
 | 用例 ID | 场景 | 优先级 | 前置条件 | 输入 / 操作 | 预期结果 | 断言点 | 自动化候选 | 证据候选 ID |

@@ -111,6 +111,8 @@
 | 证据入口 | 固定路径 | 版本 / 标识 | 验收用途 |
 |---|---|---|---|
 | 原始 artifact root | `artifacts/test/<run_id>/...` | `<run_id>` | 复核机器原始证据、case JSON、suite report、stdout/stderr digest |
+| source commits artifact | `artifacts/test/<run_id>/meta/source-commits.json` | `<run_id>` | 复核 design / implementation / core contracts / additional source refs |
+| config digest artifact | `artifacts/test/<run_id>/meta/config-digest.json` | `<run_id>` | 复核 config applicability、profile、digest、safe config sources 和 not-applicable reason |
 | suite artifact | `artifacts/test/<run_id>/suites/<suite>/...` | `<run_id>` + `<suite>` | 验证每个 blocking suite 的原始执行证据 |
 | 运行报告 root | `reports/runs/<run_id>/...` | `<run_id>` | 阅读测试摘要、EV 索引、suite report 和门禁结果 |
 | EV 索引 | `reports/runs/<run_id>/evidence-index.md` | `<run_id>` | 连接 EV、TC、artifact、report、AC 和 VETO |

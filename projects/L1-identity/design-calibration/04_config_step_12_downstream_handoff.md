@@ -280,7 +280,7 @@
 | ID-CONFIG-Q55 | `06-验收标准.md` 何时按新版 `03/04` 复核或重写 | 影响配置验收门禁 | 当前只给门禁输入;Step 14 汇总风险 |
 | ID-CONFIG-Q56 | `07-实施计划.md` 何时完成新版 phase / commit boundary 审计 | 影响实现 agent 开工 | 当前只给任务族和设计复核要求 |
 | ID-CONFIG-Q57 | `09-部署与运维手册.md` 是否作为本轮后续文档创建 | 影响真实环境、secret provider 和 rollback 操作 | 当前不阻塞 `04`;真实部署留 09 |
-| ID-CONFIG-Q58 | release evidence index 是否需要统一 config digest schema | 影响验收自动化 | 当前只定义 evidence 类型;若要正式 schema 需回写 `03/05/06` |
+| ID-CONFIG-Q58 | release evidence index 是否需要统一 config digest schema | 影响验收自动化 | 已由 `05` Step 13 / 正式 `05` 和 `06` 基线承接为 run-scoped `meta/config-digest.json` 测试 artifact schema;该 schema 不进入产品配置 DTO / port |
 | ID-CONFIG-Q59 | 实现是否需要 formal runtime config/error/evidence type | 影响 `03` 回写 | 当前不新增;实施发现需要时先回写 `03` |
 
 ## 11. 进入下一步条件

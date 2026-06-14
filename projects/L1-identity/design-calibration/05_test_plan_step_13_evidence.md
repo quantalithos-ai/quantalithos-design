@@ -178,6 +178,12 @@ artifacts/test/<run_id>/
 
 Raw artifact 是测试证据 schema,不是产品 DTO。实现仓的 writer 可以使用任意语言实现,但字段和值必须稳定。
 
+Schema owner:
+
+- Raw artifact JSON 的 owner 是 identity test artifact writer local schema。
+- 这些 JSON schema 不进入 public contracts、application command/query DTO、domain object 或 adapter port。
+- writer 可以用任意语言实现,但必须逐字段遵守本节 required/optional、类型、值域和 digest 规则。
+
 Shared status:
 
 | 字段域 | 允许值 |
@@ -210,6 +216,63 @@ Digest rule:
 | `report_root` | string | run-scoped report root |
 | `artifact_digest_algorithm` | `sha256` | shared digest rule |
 | `artifact_digest` | string | digest of this object excluding this field |
+
+`meta/source-commits.json` 必填字段:
+
+| Field | Type / values | Notes |
+|---|---|---|
+| `schema_version` | `identity.artifact.v1` | fixed |
+| `run_id` | string | same run id |
+| `design_source_ref` | source ref string | design repo source, format `git:<40 lowercase hex>` or `doc-digest:sha256:<64 lowercase hex>` |
+| `implementation_source_ref` | source ref string | implementation repo source, format `git:<40 lowercase hex>` or pre-commit `worktree:sha256:<64 lowercase hex>` |
+| `core_contracts_source_ref` | source ref string or `not_applicable` | core/shared contract source used by run |
+| `additional_source_refs` | array of source ref items | may be empty |
+| `generated_at` | timestamp string | artifact generation time |
+| `artifact_digest_algorithm` | `sha256` | shared digest rule |
+| `artifact_digest` | string | digest of this object excluding this field |
+
+`additional_source_refs[]` item schema:
+
+| Field | Type / values | Notes |
+|---|---|---|
+| `source_name` | string | stable safe source name |
+| `source_role` | `design`,`implementation`,`core-contracts`,`dependency`,`test-tool`,`other` | source category |
+| `source_ref` | source ref string | safe source ref, no credential or raw private path |
+| `source_digest` | optional digest string | `sha256:<64 lowercase hex chars>` when available |
+| `dirty_state` | `clean`,`dirty`,`unknown` | worktree/source cleanliness marker |
+
+`meta/config-digest.json` 必填字段:
+
+| Field | Type / values | Notes |
+|---|---|---|
+| `schema_version` | `identity.artifact.v1` | fixed |
+| `run_id` | string | same run id |
+| `config_applicability` | `applicable`,`not_applicable` | whether this run boundary used formal config material |
+| `config_profile` | string | selected profile, or `not_applicable` when not applicable |
+| `config_digest_algorithm` | `sha256` | digest algorithm for config material |
+| `config_digest` | string | digest of `config_digest_material` canonical JSON, or digest of `{}` when not applicable |
+| `config_digest_material` | object | safe canonical redacted config baseline; no raw secret/body |
+| `config_sources` | array of config source items | may be empty only when `config_applicability=not_applicable` |
+| `config_reason_ref` | optional string | required when `config_applicability=not_applicable` |
+| `redaction_status` | shared redaction status | must be `clean` or `not_applicable` for accepted evidence |
+| `generated_at` | timestamp string | artifact generation time |
+| `artifact_digest_algorithm` | `sha256` | shared digest rule |
+| `artifact_digest` | string | digest of this object excluding this field |
+
+`config_sources[]` item schema:
+
+| Field | Type / values | Notes |
+|---|---|---|
+| `source_kind` | `default`,`file`,`env`,`cli`,`generated`,`test-fixture`,`none` | config source family |
+| `source_ref` | string | safe ref or safe logical name; no raw secret, absolute private path, or credential |
+| `source_digest` | optional digest string | `sha256:<64 lowercase hex chars>` when source material is digestible |
+| `required` | boolean | whether missing source would fail this run |
+
+Commit boundary applicability:
+
+- `commit-02-b` may emit `meta/config-digest.json` with `config_applicability=not_applicable` when the contract/domain run does not use a formal runtime config surface.
+- When `config_applicability=not_applicable`, `config_profile` must be `not_applicable`, `config_sources` must be empty, `config_reason_ref` must be a safe reason ref, and `config_digest` is the sha256 digest of canonical `{}`.
+- Full release / config / entry / runtime gates must use `config_applicability=applicable`.
 
 `suites/<suite>/report.json` 必填字段:
 
@@ -248,6 +311,19 @@ Digest rule:
 | `duration_ms` | non-negative integer | case duration |
 | `artifact_digest_algorithm` | `sha256` | shared digest rule |
 | `artifact_digest` | string | digest of this object excluding this field |
+
+`assertions[]` item schema:
+
+| Field | Type / values | Notes |
+|---|---|---|
+| `assertion_id` | string | stable id unique within `case_id` |
+| `assertion_ref` | string | safe logical ref, typically `<TC-ID>:<assertion-name>` |
+| `assertion_status` | shared assertion status | `passed`,`failed`,`skipped`,`not_run` |
+| `assertion_kind` | `contract`,`domain`,`state`,`flow`,`redaction`,`dependency`,`evidence`,`config`,`other` | assertion category |
+| `safe_message` | string | human-safe summary, no raw body/secret/full sensitive ref |
+| `safe_message_ref` | string | stable safe diagnostic/ref id |
+| `safe_detail_refs` | array of strings | safe refs/digests only; may be empty |
+| `failure_reason_ref` | optional string | required when `assertion_status=failed` |
 
 `evidence-index.json` item 必填字段:
 

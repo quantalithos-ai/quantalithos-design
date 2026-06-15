@@ -24,6 +24,8 @@
 | v0.11 | 2026-06-06 | 详细设计到实现交付审计承接 | 明确 Step 17 只完成详细设计到 07 的承接,正式实现移交前仍需由 07 按 phase / commit boundary 做整体可落码闭环审计 |
 | v0.12 | 2026-06-08 | Step 6 模块内功能抽象流程 | 明确 Step 6 应按模块小循环从功能 / capability 推导对象、对象能力、字段、函数和状态,再做跨模块闭环审计 |
 | v0.13 | 2026-06-08 | Step 7~10 契约小循环闭环 | 明确 port、protocol、flow、state matrix 必须分别按模块 / 协议族 / 接口 / 状态机小循环停审,再做跨模块闭环审计 |
+| v0.14 | 2026-06-13 | Step 10 状态主语筛选流程 | 补充进入状态矩阵前必须先筛选状态主语、排除非状态机对象、按状态族分批,并禁止为统一管理新增全局状态机 |
+| v0.15 | 2026-06-14 | 继续任务恢复门禁 | 要求每次 Step 开工、继续或上下文恢复时先读取详细设计校准 flow 状态台账,再确认当前 Step、模块和下一动作 |
 
 ---
 
@@ -189,10 +191,14 @@ Step 中间产物必须遵循 `standards/document/设计文档讨论中间产物
 详细设计讨论必须遵守 `设计文档讨论中间产物规范.md` 的“通用执行纪律”：
 
 - 严格按 Step 独立执行，不得合并 Step。
+- 本 SOP 只定义详细设计的 Step 顺序和应问问题;Step 内小阶段、模块级先思考后写入、重启模式、旧材料后置差异审计和写入批次规则,统一以 `设计文档讨论中间产物规范.md` 为准。
+- Step 开工、用户只说“继续 / 同意 / 开始下一步”、上下文压缩或 agent 切换时,必须先按 `设计文档讨论中间产物规范.md` 的状态台账和上下文恢复门禁读取 `03_ddd_calibration_flow.md`,确认当前 Step、当前模块和下一动作。
 - 明确要求重写 / 重建 / 替换旧文件时，先删除旧文件，再按新文件标准创建。
 - 正式 `03-详细设计.md` 的章节必须能追溯到具体 `design-calibration/...` 中间产物。
 - 长文档先建骨架，再按 Step 或章节分批写入。
 - 单次写入以 100~300 行为宜；预计超过 300 行应拆分；预计超过 500 行必须拆分。
+- 100~300 行只约束单次写入批次,不是正式文档、Step 文件或章节最终长度上限。
+- 项目级 `/tmp` 计划只能裁剪本项目的必读文档、Step 模块和输出路径,不得重新定义本 SOP 或中间产物规范中的通用流程。
 - 对象实现契约、Trait / Port / Adapter 契约、协议契约、逐接口处理流、状态机和事务一致性等重 Step 应单独成批完成。
 
 正确示例：
@@ -1211,6 +1217,8 @@ let tx = unit_of_work.begin().await?;
 
 #### 本步输出
 
+- 状态主语筛选表
+- 状态族分组表
 - 状态集合表
 - 状态转换图
 - 状态转换矩阵
@@ -1222,19 +1230,32 @@ let tx = unit_of_work.begin().await?;
 #### 应问的问题
 
 ```text
-1. 当前仓有哪些正式状态机？
-2. 每个状态机归属于哪个模块和哪个 Step 6 状态 enum？
-3. 每个状态机的状态集合是什么？
-4. 哪些函数会触发状态转换,这些函数能否回指 Step 6 对象函数或 Step 9 flow？
-5. 每个转换的前置条件、副作用和错误是什么？
-6. 非法转换应该返回什么错误，是否写审计？
-7. 每个状态机完成后,状态名、触发函数、前置条件、非法转换和副作用是否通过停审？
-8. 所有状态机完成后,是否存在同名 / 近义状态语义冲突、触发函数缺失、测试 / 验收口径漂移或 phase reserved 状态被当前 boundary 调用？
+1. Step 6 / Step 9 中哪些对象、marker、helper 或 entry result 是候选状态主语？
+2. 哪些候选对象应排除在 Step 10 状态矩阵外,因为它们只是 ref、value object、DTO wrapper、外部 truth、cache / lock / retry counter 或无独立生命周期的 marker？
+3. 当前仓有哪些正式状态机？
+4. 每个状态机属于 business truth、source/reference、read/visibility、projection/report、outbox/handoff、idempotency/stored replay/job report 或 runtime/entry 哪一类状态族？
+5. 每个状态机归属于哪个模块和哪个 Step 6 状态 enum？
+6. 每个状态机的状态集合是什么？
+7. 哪些函数会触发状态转换,这些函数能否回指 Step 6 对象函数或 Step 9 flow？
+8. 每个转换的前置条件、副作用和错误是什么？
+9. 非法转换应该返回什么错误，是否写审计？
+10. 每个状态机完成后,状态名、触发函数、前置条件、非法转换和副作用是否通过停审？
+11. 所有状态机完成后,是否存在同名 / 近义状态语义冲突、触发函数缺失、测试 / 验收口径漂移或 phase reserved 状态被当前 boundary 调用？
 ```
 
 #### 期望产出
 
 ```md
+#### 状态主语筛选表
+
+| 候选主语 | 来源对象 / 字段 | 是否进入 Step 10 | 原因 | 状态族 |
+|---|---|---|---|---|
+
+#### 状态族分组表
+
+| 状态族 | 状态机 | 所属模块 | 主要触发来源 | 停审顺序 |
+|---|---|---|---|---|
+
 #### 状态矩阵批次表
 
 | 状态机 | 所属模块 | 状态 enum | 触发 flow / 函数 | 停审状态 |
@@ -1267,7 +1288,11 @@ let tx = unit_of_work.begin().await?;
 - 触发函数必须能回指对象函数或处理流。
 - 非法转换必须明确错误类型。
 - 状态转换图必须使用 ASCII。
+- Step 10 必须先做状态主语筛选;只有 Step 6 已定义 state enum / state value / disposition / availability / validation / dispatch / report result,且 Step 9 flow 会读取、推进、暴露或回放的状态主语,才能进入状态矩阵。
+- 纯 ref / id / marker、只承载字段的 value object、无独立生命周期的 DTO wrapper、外部仓 truth 状态、UI/cache/retry counter/SQL lock 等实现细节,不得硬写成状态机。
+- 状态主语必须先归入状态族,至少区分 business truth、source/reference、read/visibility、projection/report maintenance、outbox/handoff propagation、idempotency/stored replay/job report、runtime/adapter/entry technical states。
 - Step 10 必须按状态机逐个定义状态集合和转换矩阵,不得用一个全局状态总表混写多个对象的状态。
+- 不得为了统一管理新增 `GlobalState` / `SystemState` 等全局状态机;除非 Step 6 已将其定义为正式 truth object 且 Step 9 有明确 flow 推进。跨对象规则应通过跨状态机审计表表达。
 - 每个状态机必须回指所属模块、Step 6 状态 enum、Step 9 触发 flow / 函数和后续测试切口。
 - 状态矩阵中的前置条件字段必须能回指 truth schema、DTO 输入、repository 读取面或 policy decision;不得写无法落码的自然语言条件。
 - 状态副作用必须说明是否写 outbox、trace、audit、history、projection stale 或 sidecar truth。
@@ -1278,7 +1303,7 @@ let tx = unit_of_work.begin().await?;
 #### 进入下一步的条件
 
 ```text
-所有状态转换、非法转换和触发函数都已经足够实现者写状态校验代码；每个状态机已停审；跨状态机命名 / 触发 / 测试审计没有 unresolved 冲突。
+状态主语筛选表已排除非状态机对象；所有状态转换、非法转换和触发函数都已经足够实现者写状态校验代码；每个状态机已停审；跨状态机命名 / 触发 / 测试审计没有 unresolved 冲突。
 ```
 
 ---

@@ -21,6 +21,9 @@
 | v0.8 | 2026-05-28 | 补充通用执行纪律 | 对齐中间产物规范，补充逐 Step、删除旧文件重建、校准来源追溯和长文档分批写作纪律及正反例 |
 | v0.9 | 2026-05-28 | 补充配置影响轮廓 Step | 在异常边界之后、详细设计承接清单之前新增配置影响轮廓 Step，要求 02 只识别配置影响和禁止配置化边界 |
 | v0.10 | 2026-06-08 | 主要组成部分小循环抽象流程 | 明确 Step 5~9 应先按主要组成部分逐个收敛功能、候选对象、接口、处理流和状态,每个组成部分停审后再做跨部分闭环审计 |
+| v0.11 | 2026-06-10 | 概要 Step 内小阶段校准 | 补充无人值守流式执行时概要 Step 5~9 必须先问题回答、诊断、取舍和复杂度判断,再按主要组成部分拆分对象、接口、处理流和状态,并增加正反例 |
+| v0.12 | 2026-06-10 | 概要总流程计划 / Step 内计划 | 要求概要校准流程文件维护总流程计划、Step 5~9 维护 Step 内计划,并补充主要组成部分和对象附录场景正反例 |
+| v0.13 | 2026-06-14 | 继续任务恢复门禁 | 要求每次 Step 开工、继续或上下文恢复时先读取概要校准 flow 状态台账,再确认当前 Step、模块和下一动作 |
 
 ---
 
@@ -104,6 +107,92 @@ API / 接口骨架
 
 所有主要组成部分完成后,必须再做跨部分闭环审计,检查重复对象、接口归属、处理流跨界、状态语义、对象候选池遗漏和详细设计承接清单是否一致。
 
+### 2.6.1 无人值守概要流的 Step 内正反例
+
+即使用户要求自动完成概要设计后续 Step,Step 5~9 也不能一次性生成全仓总表。每个 Step 必须先完成问题回答、诊断、取舍和复杂度判断,再按主要组成部分拆分。
+
+正确示例:
+
+```text
+Step 6 关键对象轮廓:
+1. 先回答:每个主要组成部分需要哪些 capability?这些 capability 需要 truth、policy、view、reference、trace/outbox 哪类对象承接?
+2. 再诊断:当前材料是否把 ProjectMember 当 GlobalMember、把 RoleDefinition body 当 RoleCapabilitySummary、把 memory body 当 MemoryReference?
+3. 再取舍:采用 identity anchor / lifecycle / role capability / career / memory reference / consumption trace / maintenance / outbox 分模块;不采用一张全仓对象表。
+4. 再结构化:每个模块分别输出对象、字段骨架、函数骨架、禁止事项。
+5. 复杂度判断:对象较多时拆主控文件和对象附录。
+6. 最后正式 02 只汇总关键对象总表和延伸阅读,详细对象卡片留在 calibration。
+```
+
+错误示例:
+
+```text
+Step 6 一次性写完:
+| 对象 | 所属组成部分 | 字段 | 函数 |
+| GlobalMember | 身份锚定 | member_ref,state,created_at | new,activate,pause |
+| RoleCapabilitySummary | 角色能力 | role_ref,summary_ref,state | refresh,mark_stale |
+| MemoryReference | 记忆引用 | memory_ref,archive_ref,state | attach,migrate |
+```
+
+错误原因:
+
+- 对象字段和函数没有先回指 capability。
+- 诊断没有说明哪些字段来自上游架构边界、哪些不能进入 identity。
+- 没有判断是否需要拆附录,正式 02 会被迫承载过多对象细节。
+- 后续 03 详细设计会缺少对象存在理由和模块内停审记录。
+
+### 2.6.2 概要总流程计划 / Step 内计划正反例
+
+概要校准流程文件必须维护总流程计划;Step 5~9 的每个 Step 文件必须维护 Step 内计划。概要线的 Step 内计划要特别证明“主要组成部分 -> capability -> 对象 / 接口 / flow / 状态”的推导链。
+
+正确示例:
+
+```text
+02_hld_calibration_flow.md:
+Step 6 关键对象
+  输入: Step 4 代码主体框架、Step 5 主要组成部分边界
+  输出:
+    - 02_hld_step_06_key_objects.md
+    - 02_hld_step_06_key_objects_identity_anchor.md
+    - 02_hld_step_06_key_objects_lifecycle.md
+    - 02_hld_step_06_key_objects_role_capability.md
+  完成门禁:
+    - 每个对象都能映射到一个组成部分 capability
+    - 字段 / 函数保持骨架层级
+    - 正式 02 只做汇总,详细对象卡片留在附录
+
+02_hld_step_06_key_objects.md:
+Step 内计划:
+  [x] 读取 Step 4 / Step 5 输入
+  [x] 回答对象发现问题
+  [x] 诊断当前全局对象大表风险
+  [x] 选择组成部分附录,不采用全局对象大表
+  [x] 结构化对象组和附录归属
+  [~] 编写 role capability 附录
+  [ ] 回填正式对象摘要
+  [ ] 自检没有孤儿对象
+```
+
+错误示例:
+
+```text
+02_hld_calibration_flow.md:
+全部概要设计 Step 已完成。
+
+02_hld_step_06_key_objects.md:
+Step 内计划:
+  [x] 完成关键对象。
+正文:
+  一张表列 GlobalMember、LifecycleState、RoleCapabilitySummary、CareerRecord、
+  MemoryReference、ProjectionState、OutboxRecord 的字段和函数。
+```
+
+错误原因:
+
+- 没有证明对象来自 Step 5 的主要组成部分。
+- 没有 capability 到对象、字段、函数的映射。
+- 没有拆分附录,导致正式 02 被字段和函数细节撑厚。
+- 后续详细设计无法判断哪些对象是概要骨架、哪些已经越界进入详细 schema。
+
 ### 2.7 Step 模型统一
 
 本 SOP 沿用已在需求线、架构线验证通过的 8 字段模型：
@@ -183,10 +272,14 @@ Step 中间产物必须遵循 `standards/document/设计文档讨论中间产物
 概要设计讨论必须遵守 `设计文档讨论中间产物规范.md` 的“通用执行纪律”：
 
 - 严格按 Step 独立执行，不得合并 Step。
+- 本 SOP 只定义概要设计的 Step 顺序和应问问题;Step 内小阶段、模块级先思考后写入、重启模式、旧材料后置差异审计和写入批次规则,统一以 `设计文档讨论中间产物规范.md` 为准。
+- Step 开工、用户只说“继续 / 同意 / 开始下一步”、上下文压缩或 agent 切换时,必须先按 `设计文档讨论中间产物规范.md` 的状态台账和上下文恢复门禁读取 `02_hld_calibration_flow.md`,确认当前 Step、当前模块和下一动作。
 - 明确要求重写 / 重建 / 替换旧文件时，先删除旧文件，再按新文件标准创建。
 - 正式 `02-概要设计.md` 的章节必须能追溯到具体 `design-calibration/...` 中间产物。
 - 长文档先建骨架，再按 Step 或章节分批写入。
 - 单次写入以 100~300 行为宜；预计超过 300 行应拆分；预计超过 500 行必须拆分。
+- 100~300 行只约束单次写入批次,不是正式文档、Step 文件或章节最终长度上限。
+- 项目级 `/tmp` 计划只能裁剪本项目的必读文档、Step 模块和输出路径,不得重新定义本 SOP 或中间产物规范中的通用流程。
 - 主要组成部分、关键对象、API / 接口骨架、关键处理流、状态机等重 Step 应单独成批完成。
 
 正确示例：

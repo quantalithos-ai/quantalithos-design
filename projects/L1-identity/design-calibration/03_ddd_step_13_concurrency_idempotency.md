@@ -559,7 +559,7 @@ The reserve outcome is authoritative before domain transition. Business uniquene
 |---|---|---|---|
 | first-run accepted | save truth, cursor, trace/audit, outbox, projection stale, effect summary, stored accepted result, then complete idempotency | `CommandAccepted` + effect summary | all in same UoW before commit |
 | first-run replayable rejected | save stored rejected result, then complete rejected idempotency if Step 12/flow classifies rejection replayable | `CommandRejected` | no truth, no accepted trace/outbox/stale/effect |
-| duplicate accepted replay | load stored accepted command result/effect | existing `CommandAccepted` | no new truth/trace/audit/outbox/stale/effect |
+| duplicate accepted replay | load stored accepted command typed result and response effect | existing `CommandAccepted` | no new truth/trace/audit/outbox/stale/effect |
 | duplicate rejected replay | load stored rejected result | existing `CommandRejected` | no revalidation/domain guard rerun |
 | same key different digest | return duplicate conflict | none for incoming request | original record/result authoritative |
 | in-flight same digest | return delayed/temporary surface | none for second request | no second mutation |

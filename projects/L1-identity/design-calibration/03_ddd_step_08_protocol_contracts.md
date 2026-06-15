@@ -400,8 +400,10 @@ pub enum IdentityCommandOutcome<T> {
 }
 ```
 
+正式承载规则: `IdentityCommandEffectPublicSummary` 只出现在 `IdentityCommandResponse<T>.effect`。所有 command-specific typed result DTO 只承载业务结果字段,不得再定义 `effect` 字段或复制 effect summary。
+
 ```rust
-/// Public accepted side-effect summary for command results.
+/// Public accepted side-effect summary carried only by `IdentityCommandResponse<T>.effect`.
 pub struct IdentityCommandEffectPublicSummary {
     pub accepted_cursor_ref: IdentityTruthCursor,
     pub trace_refs: Vec<IdentityTraceRecordRef>,
@@ -416,6 +418,7 @@ pub struct IdentityCommandEffectPublicSummary {
 | `actor_ref` | API actor extractor | handler 不从 body 推导 actor;trusted source 例外只在具体 consumer/command 批次说明 |
 | `command_name` | route catalog | 必须与 `body` DTO 类型匹配 |
 | `metadata` / `digest` | entry canonicalizer | API handler 映射到 operation context;service 不读取 raw request |
+| `result` | command-specific typed result DTO | 只承载命令业务结果字段;不得重复携带 `IdentityCommandEffectPublicSummary` |
 | `result_ref` | Step 7 stored result repository | duplicate replay 返回 stored surface,不得重跑 mutation |
 | `effect.accepted_cursor_ref` | Step 7 UoW truth cursor assigner | accepted-only;rejected/entry failure 不生成 |
 | `trace_refs` / `outbox_refs` | accepted transaction append or explicit empty side-effect inventory | 只返回 refs,不返回 trace body或 event body;`outbox_refs` 仅在该 flow 有正式 canonical outbound payload 时非空 |
@@ -940,9 +943,6 @@ pub struct GlobalMemberCommandResult {
 
     /// Body-free source marker that established the member.
     pub source_ref: IdentitySourceRef,
-
-    /// Accepted command side-effect summary.
-    pub effect: IdentityCommandEffectPublicSummary,
 }
 ```
 
@@ -952,7 +952,6 @@ pub struct GlobalMemberCommandResult {
 | `anchor_state_kind` | `IdentityAnchorStateKind` | `IdentityAnchorState::established(...)` | accepted 建档必须为 `Established` |
 | `lifecycle_state_kind` | `GlobalLifecycleStateKind` | `GlobalLifecycleState::initial_available(...)` | accepted 建档初始为 `Available` |
 | `source_ref` | `IdentitySourceRef` | request | body-free;不返回 source body |
-| `effect` | `IdentityCommandEffectPublicSummary` | effect summary assembler | accepted-only;duplicate replay 返回 stored surface |
 
 #### 9.3.4 DTO -> Domain 构造闭环
 
@@ -1047,9 +1046,6 @@ pub struct GlobalLifecycleCommandResult {
 
     /// Anchor state after lifecycle terminal handling, when changed by the flow.
     pub anchor_state_kind: Option<IdentityAnchorStateKind>,
-
-    /// Accepted command side-effect summary.
-    pub effect: IdentityCommandEffectPublicSummary,
 }
 ```
 
@@ -1060,7 +1056,6 @@ pub struct GlobalLifecycleCommandResult {
 | `reason_ref` | `LifecycleReasonRef` | request | body-free reason marker |
 | `basis_ref` | `Option<GovernanceBasisRef>` | request + resolver accepted summary | 只保存 ref,不保存 governance body |
 | `anchor_state_kind` | `Option<IdentityAnchorStateKind>` | terminal anchor hold side effect,若 Step 9 flow 触发 | 非 terminal 可空;具体 terminal mapping 留 Step 10 |
-| `effect` | `IdentityCommandEffectPublicSummary` | effect summary assembler | accepted-only |
 
 #### 9.4.4 DTO -> Domain 构造闭环
 
@@ -1243,9 +1238,6 @@ pub struct RoleCapabilityCommandResult {
 
     /// Body-free safe summary marker.
     pub safe_summary_ref: Option<RoleCapabilitySafeSummaryRef>,
-
-    /// Accepted command side-effect summary.
-    pub effect: IdentityCommandEffectPublicSummary,
 }
 ```
 
@@ -1259,7 +1251,6 @@ pub struct RoleCapabilityCommandResult {
 | `role_source_ref` / `capability_source_refs` | role/capability typed refs | request / resolver mapping | 不保存 RoleDefinition / CapabilityDefinition body |
 | `evidence_refs` | `Vec<CapabilityEvidenceRef>` | request + evidence resolver | 不保存 evidence body |
 | `safe_summary_ref` | `Option<RoleCapabilitySafeSummaryRef>` | request / resolver / saved summary | marker only;最小 public schema 留 query/outbound 批次 |
-| `effect` | `IdentityCommandEffectPublicSummary` | effect summary assembler | accepted-only |
 
 #### 10.3.4 DTO -> Domain 构造闭环
 
@@ -1383,9 +1374,6 @@ pub struct CareerRecordCommandResult {
 
     /// Existing record marked as superseded by this correction, when applicable.
     pub superseded_record_ref: Option<CareerRecordRef>,
-
-    /// Accepted command side-effect summary.
-    pub effect: IdentityCommandEffectPublicSummary,
 }
 ```
 
@@ -1398,7 +1386,6 @@ pub struct CareerRecordCommandResult {
 | `source_marker_ref` | `CareerSourceMarkerRef` | request / resolver summary | duplicate source marker,不等于 idempotency key |
 | `career_summary_ref` | `Option<CareerSafeSummaryRef>` | request / resolver / saved record | safe marker only;不保存 work summary body |
 | `correction_of_ref` / `superseded_record_ref` | `Option<CareerRecordRef>` | correction flow | correction 是追加,不是 in-place update |
-| `effect` | `IdentityCommandEffectPublicSummary` | effect summary assembler | accepted-only |
 
 #### 10.4.4 DTO -> Domain 构造闭环
 
@@ -1522,9 +1509,6 @@ pub struct MemoryReferenceCommandResult {
 
     /// Body-free reason marker.
     pub reason_ref: MemoryReferenceReasonRef,
-
-    /// Accepted command side-effect summary.
-    pub effect: IdentityCommandEffectPublicSummary,
 }
 ```
 
@@ -1537,7 +1521,6 @@ pub struct MemoryReferenceCommandResult {
 | `source_ref` | `MemoryReferenceSourceRef` | request / source summary | marker only |
 | `safe_summary_ref` | `Option<MemorySafeSummaryRef>` | request / resolver / saved relation | summary body 不入 DTO |
 | `reason_ref` | `MemoryReferenceReasonRef` | request / saved relation | body-free reason marker |
-| `effect` | `IdentityCommandEffectPublicSummary` | effect summary assembler | accepted-only |
 
 #### 10.5.4 DTO -> Domain 构造闭环
 
@@ -1709,9 +1692,6 @@ pub struct TraceHandoffCommandResult {
 
     /// Safe material marker retained by the intent.
     pub safe_material_ref: TraceHandoffSafeMaterialRef,
-
-    /// Accepted command side-effect summary.
-    pub effect: IdentityCommandEffectPublicSummary,
 }
 ```
 
@@ -1724,7 +1704,6 @@ pub struct TraceHandoffCommandResult {
 | `trace_record_refs` | `Vec<IdentityTraceRecordRef>` | request + loaded trace selection | 非空;只返回 refs |
 | `audit_trail_ref` | `Option<AuditTrailRef>` | request + loaded audit trail | 不返回 audit body |
 | `safe_material_ref` | `TraceHandoffSafeMaterialRef` | request / material builder | marker only;不返回 package/body/raw log |
-| `effect` | `IdentityCommandEffectPublicSummary` | effect summary assembler | accepted-only |
 
 #### 11.3.4 DTO -> Domain 构造闭环
 
@@ -4302,7 +4281,7 @@ Stored job report surface 必须足够 replay public `IdentityJobResponse<T>` �
 
 | Protocol family | Step 6 object closure | Step 7 port closure | Step 9 flow required |
 |---|---|---|---|
-| Command | request DTO 能构造 member/lifecycle/role/career/memory/handoff domain object 或 policy input,result DTO 能承接 accepted effect | truth repositories、subject mapper、trace/audit/outbox、stored result、id generator、clock | 6 command flows with transaction order, accepted cursor, outbox/stale/effect summary and stored replay |
+| Command | request DTO 能构造 member/lifecycle/role/career/memory/handoff domain object 或 policy input,typed result DTO 只承载业务结果;accepted effect 只由 `IdentityCommandResponse<T>.effect` 承载 | truth repositories、subject mapper、trace/audit/outbox、stored result、id generator、clock | 6 command flows with transaction order, accepted cursor, outbox/stale/effect summary and stored replay |
 | Query | request/view DTO 映射到 truth/projection/reference/report/outbox/handoff read object,query surface 表达 missing/not visible/degraded/stale | read visibility repository、truth read repositories、projection lookup、reference/report/outbox/handoff repositories、page mapping | 14 query flows with visibility precheck, no-write rule, stable view lookup and degraded priority |
 | Inbound Event / Callback | payload DTO 映射到 role/career/memory source summary、reference state/sidecar、handoff callback state and receipt | external source resolver、reference repository、trace/outbox/effect where applicable、stored receipt/result | 5 consumer/callback flows with dedupe, unsupported version, delayed/quarantine/rejected/noop and callback receipt replay |
 | Outbound Event | payload DTO 映射到 accepted fact/outbox material,只承载 event-specific refs/state/marker/cursor | outbox repository、topic binding、publisher port、payload marker builder | accepted outbox append and publish flows;publisher must not reconstruct payload from current truth |
@@ -4330,7 +4309,7 @@ Stored job report surface 必须足够 replay public `IdentityJobResponse<T>` �
 
 | Replay surface | Public output | Stored source | Missing / wrong-kind rule |
 |---|---|---|---|
-| command accepted | `IdentityCommandResponse<T>` + `IdentityCommandEffectPublicSummary` | `StoredIdentityOperationResult(CommandAccepted)` + command result/effect summary marker | Step 13 定义 degraded/rejected replay error;不得重跑 command |
+| command accepted | `IdentityCommandResponse<T>` carrying `effect` | `StoredIdentityOperationResult(CommandAccepted)` + command result/effect summary marker | Step 13 定义 degraded/rejected replay error;不得重跑 command |
 | command rejected | `IdentityProtocolRejection` | `StoredIdentityOperationResult(CommandRejected)` only for replayable rejection | 普通 validation/internal error 是否存储留 Step 12/13 |
 | consumer receipt | `IdentityConsumerReceipt` | `IdentityConsumerReceiptEnvelope(result_kind = ConsumerReceipt)` + `StoredIdentityOperationResult(ConsumerReceipt)` shell | missing typed envelope 不得重放 consumer mutation |
 | handoff callback receipt | `IdentityConsumerReceipt` with callback family | `IdentityConsumerReceiptEnvelope(result_kind = HandoffCallbackReceipt)` + `StoredIdentityOperationResult(HandoffCallbackReceipt)` shell | kind mismatch 不得当普通 consumer receipt |
@@ -4443,25 +4422,25 @@ Step 8 shared protocol helper 定义 public protocol naming、metadata、digest�
 当前 8.2-a 可追加回填为:
 
 ```text
-`EstablishGlobalMemberRequest` 只承载 optional requested member ref、body-free source ref、optional anchor reason ref 和 initial lifecycle reason ref。accepted result 返回 member ref、anchor state kind、initial lifecycle state kind、source ref 和 accepted effect summary。建档 DTO 能构造 `IdentityAnchorPolicy::for_create(...)`、`GlobalMember::establish(...)` 和 `GlobalLifecycleState::initial_available(...)`;member ref 缺失时由 id generator 生成,created/changed time 来自 clock,existing anchor state 来自 member repository,accepted cursor/effect/outbox/trace 来自 application side-effect builder。
+`EstablishGlobalMemberRequest` 只承载 optional requested member ref、body-free source ref、optional anchor reason ref 和 initial lifecycle reason ref。accepted typed result 返回 member ref、anchor state kind、initial lifecycle state kind 和 source ref;accepted effect summary 只由 `IdentityCommandResponse<T>.effect` 承载。建档 DTO 能构造 `IdentityAnchorPolicy::for_create(...)`、`GlobalMember::establish(...)` 和 `GlobalLifecycleState::initial_available(...)`;member ref 缺失时由 id generator 生成,created/changed time 来自 clock,existing anchor state 来自 member repository,accepted cursor/effect/outbox/trace 来自 application side-effect builder。
 
-`UpdateGlobalLifecycleStateRequest` 承载 member ref、target lifecycle state、lifecycle reason ref、optional governance basis ref 和 optional action risk ref。accepted result 返回 member ref、lifecycle state kind、reason ref、optional basis ref、optional anchor state kind 和 accepted effect summary。高风险处置不得仅凭 `GovernanceBasisRef` presence accepted;必须通过 governance basis resolver 取得 `GovernanceBasisSummary`,并证明 basis valid for action risk。lifecycle DTO 能构造 `LifecycleTransitionPolicy::for_transition(...)`、`HighRiskLifecycleGuard::for_action(...)` 和 `GlobalLifecycleState::from_transition(...)`;terminal anchor hold 的具体 side effect 由 Step 9/10 闭口。
+`UpdateGlobalLifecycleStateRequest` 承载 member ref、target lifecycle state、lifecycle reason ref、optional governance basis ref 和 optional action risk ref。accepted typed result 返回 member ref、lifecycle state kind、reason ref、optional basis ref 和 optional anchor state kind;accepted effect summary 只由 `IdentityCommandResponse<T>.effect` 承载。高风险处置不得仅凭 `GovernanceBasisRef` presence accepted;必须通过 governance basis resolver 取得 `GovernanceBasisSummary`,并证明 basis valid for action risk。lifecycle DTO 能构造 `LifecycleTransitionPolicy::for_transition(...)`、`HighRiskLifecycleGuard::for_action(...)` 和 `GlobalLifecycleState::from_transition(...)`;terminal anchor hold 的具体 side effect 由 Step 9/10 闭口。
 ```
 
 当前 8.2-b 可追加回填为:
 
 ```text
-`MaintainRoleCapabilitySummaryRequest` 承载 member ref、optional summary ref、role/capability source refs、evidence refs、optional safe summary marker、change reason 和 material marker。accepted result 返回 summary ref、source snapshot ref、summary/source state、source/evidence refs、safe summary marker 和 accepted effect summary。DTO 能构造 `RoleCapabilitySourceSnapshot`、`RoleCapabilitySourcePolicy::for_summary_update(...)` 和 `RoleCapabilitySummary`;source/evidence validity 必须来自 Step 7 resolver summary,不得保存 RoleDefinition / CapabilityDefinition / method / evidence body,也不得用 source version 替代 optimistic version。
+`MaintainRoleCapabilitySummaryRequest` 承载 member ref、optional summary ref、role/capability source refs、evidence refs、optional safe summary marker、change reason 和 material marker。accepted typed result 返回 summary ref、source snapshot ref、summary/source state、source/evidence refs 和 safe summary marker;accepted effect summary 只由 `IdentityCommandResponse<T>.effect` 承载。DTO 能构造 `RoleCapabilitySourceSnapshot`、`RoleCapabilitySourcePolicy::for_summary_update(...)` 和 `RoleCapabilitySummary`;source/evidence validity 必须来自 Step 7 resolver summary,不得保存 RoleDefinition / CapabilityDefinition / method / evidence body,也不得用 source version 替代 optimistic version。
 
-`AppendCareerRecordRequest` 承载 member ref、optional career record ref、append/correction intent、ProjectParticipationRef、WorkSourceRef、CareerSourceMarkerRef、optional safe summary marker、append reason、optional original record ref 和 material marker。accepted result 返回 appended record ref、record state、work source markers、safe summary marker、correction refs 和 accepted effect summary。DTO 能构造 `CareerAppendPolicy` 和 `CareerRecord::append_from_work_source(...)` / `correction_for_record(...)`;duplicate source 不新增 history,correction 必须追加新 record,Project / WorkItem / ProjectMember body 不得进入 DTO、truth、trace、outbox 或 report。
+`AppendCareerRecordRequest` 承载 member ref、optional career record ref、append/correction intent、ProjectParticipationRef、WorkSourceRef、CareerSourceMarkerRef、optional safe summary marker、append reason、optional original record ref 和 material marker。accepted typed result 返回 appended record ref、record state、work source markers、safe summary marker 和 correction refs;accepted effect summary 只由 `IdentityCommandResponse<T>.effect` 承载。DTO 能构造 `CareerAppendPolicy` 和 `CareerRecord::append_from_work_source(...)` / `correction_for_record(...)`;duplicate source 不新增 history,correction 必须追加新 record,Project / WorkItem / ProjectMember body 不得进入 DTO、truth、trace、outbox 或 report。
 
-`MaintainMemoryReferenceRequest` 承载 member ref、optional memory reference ref、change intent、optional memory/archive/handoff refs、source ref、optional safe summary marker、reason 和 material marker。accepted result 返回 memory reference ref、relation state kind、memory/archive/handoff refs、source ref、safe summary marker、reason 和 accepted effect summary。DTO 能构造 `MemoryReferencePolicy`、`MemoryReference::link_for_member(...)` / `from_archive_handoff(...)` / state update;memory body、embedding、index、archive package、receipt body 和 external carrier truth 不得进入 identity。
+`MaintainMemoryReferenceRequest` 承载 member ref、optional memory reference ref、change intent、optional memory/archive/handoff refs、source ref、optional safe summary marker、reason 和 material marker。accepted typed result 返回 memory reference ref、relation state kind、memory/archive/handoff refs、source ref、safe summary marker 和 reason;accepted effect summary 只由 `IdentityCommandResponse<T>.effect` 承载。DTO 能构造 `MemoryReferencePolicy`、`MemoryReference::link_for_member(...)` / `from_archive_handoff(...)` / state update;memory body、embedding、index、archive package、receipt body 和 external carrier truth 不得进入 identity。
 ```
 
 当前 8.2-c 可追加回填为:
 
 ```text
-`PrepareTraceHandoffRequest` 承载 member ref、optional handoff intent ref、非空 trace refs、optional audit trail ref、handoff target/scope refs、safe material marker、visibility context 和 handoff reason。accepted result 返回 handoff intent ref、`PendingHandoff` state、target/scope refs、trace refs、optional audit trail ref、safe material marker 和 accepted effect summary。DTO 能构造 `HandoffPolicy::for_handoff(...)`、`HandoffState::pending(...)` 和 `TraceHandoffIntent::prepare(...)`;prepare 只创建 pending intent,不得执行 delivery,不得保存 trace body、audit raw log、archive package、receipt body、target secret 或 adapter raw response。Delivered 只能由后续 callback/job 的 formal `HandoffReceiptRef` 驱动。
+`PrepareTraceHandoffRequest` 承载 member ref、optional handoff intent ref、非空 trace refs、optional audit trail ref、handoff target/scope refs、safe material marker、visibility context 和 handoff reason。accepted typed result 返回 handoff intent ref、`PendingHandoff` state、target/scope refs、trace refs、optional audit trail ref 和 safe material marker;accepted effect summary 只由 `IdentityCommandResponse<T>.effect` 承载。DTO 能构造 `HandoffPolicy::for_handoff(...)`、`HandoffState::pending(...)` 和 `TraceHandoffIntent::prepare(...)`;prepare 只创建 pending intent,不得执行 delivery,不得保存 trace body、audit raw log、archive package、receipt body、target secret 或 adapter raw response。Delivered 只能由后续 callback/job 的 formal `HandoffReceiptRef` 驱动。
 ```
 
 当前 8.3-a 可追加回填为:

@@ -2085,6 +2085,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   | view = IdentityProjectionRepository.get_member_summary_view(view_ref)
   | view None -> return Missing or Degraded projection material;do not rebuild
   | require view.belongs_to(member_ref);else Degraded invalid material
+  | require view.matches_visibility_scope(access.scope_ref);else Degraded projection integrity surface
   | require view.assert_body_free();else Degraded / forbidden material surface per Step 12
   | policy = VisibilityPolicy::for_summary(view_access or access, view.read_material_marker)
   | surface = policy.classify_read_surface(found=true, stale=view.is_stale_or_degraded())
@@ -2098,6 +2099,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 | stable lookup missing | `Missing`,body `None`;no view ref construction,no rebuild |
 | loaded view missing | `Missing` or `Degraded` projection inconsistency;no rebuild |
 | view belongs to another member | `Degraded` invalid material;do not return another member slices |
+| view scope mismatch | `Degraded` projection integrity surface;do not infer scope from `visibility_result_ref` |
 | forbidden read material | `Degraded` / rejected read surface per Step 12;no body |
 | view stale/degraded | `StaleVisible` / `Degraded` using loaded view marker;no projection state write |
 
@@ -2108,6 +2110,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 | lookup missing | `Missing`;no constructed `MemberSummaryViewRef`,no rebuild |
 | loaded view missing after lookup | degraded/missing projection material,no repair |
 | view member mismatch | degraded invalid material |
+| view scope mismatch | degraded projection integrity surface;no scope inference from visibility result |
 | stale view | stale/degraded surface,projection unchanged |
 
 ### 16.7 `ReadIdentityTraceFlow`
@@ -2304,7 +2307,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 ```md
 ### 8.x Trace / audit / summary query flows
 
-`ReadMemberSummaryFlow` 先通过 `IdentityReadVisibilityRepository.resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 取得 visibility scope,再通过 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, scope_ref)` 查找 stable `MemberSummaryViewRef`,随后 `get_member_summary_view(view_ref)` 读取 view 并执行 `belongs_to` 与 body-free guard。lookup/view missing 只返回 `Missing` / degraded surface,stale 只通过 loaded view freshness marker 表达;query 不拼 view ref、不读取未闭合 projection-state 反向映射、不触发 rebuild。
+`ReadMemberSummaryFlow` 先通过 `IdentityReadVisibilityRepository.resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 取得 visibility scope,再通过 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, scope_ref)` 查找 stable `MemberSummaryViewRef`,随后 `get_member_summary_view(view_ref)` 读取 view 并执行 `belongs_to`、`matches_visibility_scope(access.scope_ref)` 与 body-free guard。lookup/view missing 只返回 `Missing` / degraded surface,scope mismatch 返回 degraded projection integrity surface,stale 只通过 loaded view freshness marker 表达;query 不拼 view ref、不读取未闭合 projection-state 反向映射、不从 `visibility_result_ref` 反推 scope、不触发 rebuild。
 
 `ReadIdentityTraceFlow` 使用 `IdentityTraceReadSelector` 精确映射 Step 7 trace repository:by member、by subject after cursor、by member and change kind。每个 loaded trace record 必须通过 member/subject guard 和 `resolve_trace_read(record.subject_ref, consumer_ref, visibility_context_ref)` per-item visibility。visible empty page 返回 `Empty`;全部 loaded items denied 返回 `NotVisible`;mixed denied/redacted 返回 redacted partial;missing item 或 invalid material 返回 degraded partial。query 不 append trace、不修复 index。
 
@@ -3608,7 +3611,9 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
   |   save_projection_state(... expected_version)
   |   if projection kind has a formal writer:
   |      rebuild body-free projection material
-  |      save_member_summary_view(...) for MemberSummaryView only
+  |      for each formal member summary visibility scope selected by the projection target:
+  |         build MemberSummaryView { member_ref, visibility_scope_ref, ... }
+  |         save_member_summary_view(...) for MemberSummaryView only
   |   else:
   |      issue_ref = maintenance_issue_mapper.projection_unsupported_writer_issue(projection_ref)
   |      mark_rebuild_failed(issue_ref,...)

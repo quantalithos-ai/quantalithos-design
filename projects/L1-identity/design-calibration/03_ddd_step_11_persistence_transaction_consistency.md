@@ -164,7 +164,7 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | `career_records` | append-only career facts and correction records | PK `career_record_ref`;source duplicate key by `source_marker_ref` when append policy requires | `member_ref`,`source_marker_ref`,`record_state`,`append_time`,`original_record_ref` | append create has row version;state update uses `identity_version` |
 | `career_correction_index` | original record -> correction record lookup | unique `(original_record_ref, correction_record_ref)` | `original_record_ref`,`correction_record_ref` | owned by `career_records` append |
 | `memory_references` | memory/archive/handoff relation truth | PK `memory_reference_ref`;unique active `(member_ref, memory_ref)` / `(member_ref, archive_ref)` when relation kind applies | `member_ref`,`memory_ref`,`archive_ref`,`handoff_ref`,`reference_state` | `identity_version` |
-| `member_summary_views` | body-free member summary read model | PK `member_summary_view_ref`;unique current `member_ref` | `member_ref`,`read_surface_kind`,`visibility_result_ref`,`source_cursor` | replaced under projection state version |
+| `member_summary_views` | body-free member summary read model | PK `member_summary_view_ref`;unique current `(member_ref, visibility_scope_ref)` | `member_ref`,`visibility_scope_ref`,`read_surface_kind`,`visibility_result_ref`,`source_cursor` | replaced under projection state version |
 | `identity_projection_states` | projection freshness and rebuild state | PK `projection_ref` or stable `view_ref` | `projection_kind`,`source_identity_ref`,`freshness_state`,`source_cursor`,`last_issue_ref` | `identity_version` |
 | `projection_dependency_index` | accepted truth -> affected projection lookup | unique `(dependency_kind, dependency_ref, projection_ref)` | `dependency_ref`,`projection_ref`,`projection_kind` | no standalone version;updated in same UoW as producing relation |
 | `external_reference_states` | tracked external reference bundle state | PK `reference_state_ref`;unique `reference_ref` | `owner_ref`,`reference_kind`,`resolution_state`,`source_version_ref`,`checked_at` | `identity_version` |
@@ -318,7 +318,7 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 
 | 函数 | logical store / key | version / UoW | 持久化语义 / 禁止事项 |
 |---|---|---|---|
-| `IdentityProjectionRepository.find_member_summary_view_ref` | `member_summary_views` unique `(member_ref, visibility_scope_ref)` | read-only | stable lookup;missing 由 query surface 处理;不拼 view ref |
+| `IdentityProjectionRepository.find_member_summary_view_ref` | `member_summary_views` unique `(member_ref, visibility_scope_ref)` written by `save_member_summary_view` from loaded view fields | read-only | stable lookup;missing 由 query surface 处理;不拼 view ref;不从 `visibility_result_ref` 反推 scope |
 | `IdentityProjectionRepository.get_member_summary_view` | view PK `member_summary_view_ref` | read-only | view ref 必须来自 formal lookup/request;missing 不 rebuild |
 | `IdentityProjectionRepository.get_projection_state_with_version` | `identity_projection_states` by `projection_ref` | returns projection state version | projection cursor 不当 version |
 | `IdentityProjectionRepository.find_projection_state_ref` | projection state lookup index | read-only | only returns state ref;missing 不创建 |
@@ -326,7 +326,7 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | `IdentityProjectionRepository.list_stale_projection_states` | maintenance scope + stale index | page cursor only | rebuild job selection;query 不调用 rebuild |
 | `IdentityProjectionRepository.get_projection_source_cursor` | projection source cursor store | read-only | cursor 来自 projection builder/committed scan;不等于 page cursor/version |
 | `IdentityProjectionRepository.expand_affected_projection_refs` | `projection_dependency_index` by accepted subject refs | read-only | subject refs 来自 mapper;不解析 subject string |
-| `IdentityProjectionRepository.save_member_summary_view` | `member_summary_views` PK/current index | create `None`;update loaded view/projection version;UoW write | projection builder only;不保存 forbidden body |
+| `IdentityProjectionRepository.save_member_summary_view` | `member_summary_views` PK + current `(member_ref, visibility_scope_ref)` index | create `None`;update loaded view/projection version;UoW write | projection builder only;view 必须携带 `visibility_scope_ref`;保存时同步写 lookup index;不保存 forbidden body |
 | `IdentityProjectionRepository.save_projection_state` | `identity_projection_states` PK | create `None`;update loaded state version;UoW write | 不修改 core truth |
 | `IdentityProjectionRepository.mark_projection_stale` | projection state PK | expected loaded projection version;UoW write | state carries source cursor;不使用 timestamp/idempotency key |
 | `IdentityReadVisibilityRepository.resolve_member_summary_read` | read mapping index by member/view/consumer/context | read-only | returns access summary;不从 route/member string 拼 scope |

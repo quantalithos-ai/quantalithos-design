@@ -1644,7 +1644,7 @@ pub trait IdentityProjectionRepository {
 
 | 函数 | 使用场景 | lookup / version 语义 | 禁止事项 |
 |---|---|---|---|
-| `find_member_summary_view_ref` | query by member/scope | stable index lookup;missing 返回 `None` 由 query surface 处理 | 不拼 view ref;不扫描 projection body |
+| `find_member_summary_view_ref` | query by member/scope | stable index lookup over persisted `(member_ref, visibility_scope_ref)`;missing 返回 `None` 由 query surface 处理 | 不拼 view ref;不扫描 projection body;不从 `visibility_result_ref` 反推 scope |
 | `get_member_summary_view` | query load view | view ref 必须来自 lookup/request/formal result | missing 不触发 rebuild |
 | `get_projection_state_with_version` | stale mark/rebuild update | version 是 projection state save expected_version 来源 | projection cursor 不当 version |
 | `find_projection_state_ref` | query/report lightweight lookup | 只返回 state ref | 不创建 missing state |
@@ -1652,7 +1652,7 @@ pub trait IdentityProjectionRepository {
 | `list_stale_projection_states` | rebuild job selection | stale 判定来自 `ProjectionState` | 不在 query path 调用来 rebuild |
 | `get_projection_source_cursor` | rebuild job before `mark_rebuilt(...)` | cursor 来自 projection builder / committed truth scan / projection source cursor store | 不用 page cursor、timestamp、truth cursor、job cursor 或 optimistic version 代替 |
 | `expand_affected_projection_refs` | accepted side effect mark stale | subject refs 来自 7.1 mapper | 不从 subject string 前缀推 affected views |
-| `save_member_summary_view` | projection builder/rebuild job save view | create `None`;update loaded version | 不保存 forbidden body |
+| `save_member_summary_view` | projection builder/rebuild job save view | create `None`;update loaded version;writes current `(view.member_ref, view.visibility_scope_ref) -> view.view_ref` lookup index | view 必须携带 `visibility_scope_ref`;不保存 forbidden body;不得保存无 scope 的 current view |
 | `save_projection_state` | create/update projection state | create `None`;update loaded version | 不修改 core truth |
 | `mark_projection_stale` | accepted truth side effect | expected_version 来自 loaded projection state;source cursor 已在 state 内正式给出 | 不用 timestamp/idempotency key 当 stale cursor |
 

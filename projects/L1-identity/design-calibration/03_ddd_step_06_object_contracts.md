@@ -3816,7 +3816,7 @@ pub struct IdentityReadMaterialMarker {
 
 | 对象能力 | 必需字段 | factory / 构造入口 | 成员函数 | 状态 enum / variant | 字段来源 |
 |---|---|---|---|---|---|
-| member summary identity | `view_ref`, `member_ref` | `MemberSummaryView::from_projection(...)` | `belongs_to(...)` | 不适用 | projection builder / repository lookup;member truth |
+| member summary identity | `view_ref`, `member_ref`, `visibility_scope_ref` | `MemberSummaryView::from_projection(...)` | `belongs_to(...)`, `matches_visibility_scope(...)` | 不适用 | projection builder / repository lookup;member truth;read visibility summary |
 | slice aggregation | `anchor_slice_ref`, `lifecycle_slice_ref`, role/career/memory slices | `from_projection(...)` | `has_required_slices()` | 不适用 | accepted truth safe summary refs / projection builder |
 | visibility surface | `visibility_result_ref`, `read_surface_kind` | `visible(...)` / `not_visible(...)` / `degraded(...)` | `is_visible()` | `IdentityReadSurfaceKind` | `VisibilityPolicy` output |
 | freshness marker | `source_cursor_ref`, `freshness_marker` | `from_projection(...)` / `stale(...)` | `is_stale_or_degraded()` | `Stale` / `Degraded` surface | projection state / committed truth scan;not query |
@@ -3830,6 +3830,9 @@ pub struct MemberSummaryView {
 
     /// Member represented by this summary.
     pub member_ref: GlobalMemberRef,
+
+    /// Visibility scope for which this summary view was materialized.
+    pub visibility_scope_ref: VisibilityScopeRef,
 
     /// Anchor safe summary slice.
     pub anchor_slice_ref: MemberSummarySliceRef,
@@ -3864,6 +3867,7 @@ pub struct MemberSummaryView {
 |---|---|---|---|
 | `view_ref` | `MemberSummaryViewRef` | view 身份 | 来源于正式 projection builder / lookup;不得 query 拼接 |
 | `member_ref` | `GlobalMemberRef` | summary 所属成员 | 来自 loaded member truth / projection row;必须与 slices 一致 |
+| `visibility_scope_ref` | `VisibilityScopeRef` | summary lookup scope 维度 | 来自 `IdentityReadVisibilityRepository.resolve_member_summary_read(...)` 或同等正式 read visibility summary;`save_member_summary_view(...)` 必须用它写入 `(member_ref, visibility_scope_ref)` index;不得从 `visibility_result_ref`、route、member id 或 view id 反推 |
 | `anchor_slice_ref` | `MemberSummarySliceRef` | anchor safe slice | 来自 accepted anchor fact / projection builder |
 | `lifecycle_slice_ref` | `MemberSummarySliceRef` | lifecycle safe slice | 来自 accepted lifecycle fact / projection builder;不保存 governance basis body |
 | `role_capability_slice_refs` | `Vec<MemberSummarySliceRef>` | role/capability 摘要切片 | 来自 `RoleCapabilitySummary` safe marker;不保存 method body |
@@ -3876,10 +3880,11 @@ pub struct MemberSummaryView {
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `pub fn from_projection(view_ref: MemberSummaryViewRef, member_ref: GlobalMemberRef, anchor_slice_ref: MemberSummarySliceRef, lifecycle_slice_ref: MemberSummarySliceRef, role_capability_slice_refs: Vec<MemberSummarySliceRef>, career_slice_refs: Vec<MemberSummarySliceRef>, memory_slice_refs: Vec<MemberSummarySliceRef>, visibility_result_ref: VisibilityResultRef, source_cursor_ref: Option<IdentityTruthCursor>, read_material_marker: IdentityReadMaterialMarker) -> Result<Self, IdentityDomainError>` | 从正式 projection/read assembler 输入构造 summary | 所有 slice 已经是 body-free safe refs | `MemberSummaryView` | 不读取 repository、不触发 rebuild |
-| `pub fn not_visible(view_ref: MemberSummaryViewRef, member_ref: GlobalMemberRef, visibility_result_ref: VisibilityResultRef) -> Self` | 构造 not visible surface | 不携带不可见字段 | `MemberSummaryView` | `read_surface_kind = NotVisible` |
-| `pub fn degraded(view_ref: MemberSummaryViewRef, member_ref: GlobalMemberRef, visibility_result_ref: VisibilityResultRef, source_cursor_ref: Option<IdentityTruthCursor>) -> Self` | 构造 degraded surface | 可携带 body-free cursor marker | `MemberSummaryView` | 不修复 projection |
+| `pub fn from_projection(view_ref: MemberSummaryViewRef, member_ref: GlobalMemberRef, visibility_scope_ref: VisibilityScopeRef, anchor_slice_ref: MemberSummarySliceRef, lifecycle_slice_ref: MemberSummarySliceRef, role_capability_slice_refs: Vec<MemberSummarySliceRef>, career_slice_refs: Vec<MemberSummarySliceRef>, memory_slice_refs: Vec<MemberSummarySliceRef>, visibility_result_ref: VisibilityResultRef, source_cursor_ref: Option<IdentityTruthCursor>, read_material_marker: IdentityReadMaterialMarker) -> Result<Self, IdentityDomainError>` | 从正式 projection/read assembler 输入构造 summary | 所有 slice 已经是 body-free safe refs;scope 已来自正式 read visibility summary | `MemberSummaryView` | 不读取 repository、不触发 rebuild |
+| `pub fn not_visible(view_ref: MemberSummaryViewRef, member_ref: GlobalMemberRef, visibility_scope_ref: VisibilityScopeRef, visibility_result_ref: VisibilityResultRef) -> Self` | 构造 not visible surface | scope 来自正式 read visibility summary;不携带不可见字段 | `MemberSummaryView` | `read_surface_kind = NotVisible`;仍写入可校验的 `(member_ref, visibility_scope_ref)` 维度 |
+| `pub fn degraded(view_ref: MemberSummaryViewRef, member_ref: GlobalMemberRef, visibility_scope_ref: VisibilityScopeRef, visibility_result_ref: VisibilityResultRef, source_cursor_ref: Option<IdentityTruthCursor>) -> Self` | 构造 degraded surface | scope 来自正式 read visibility summary;可携带 body-free cursor marker | `MemberSummaryView` | 不修复 projection;不得从 `visibility_result_ref` 反推 scope |
 | `pub fn belongs_to(&self, member_ref: &GlobalMemberRef) -> bool` | 判断 view 是否属于成员 | member ref 来自 query | `bool` | 只比较 typed ref |
+| `pub fn matches_visibility_scope(&self, visibility_scope_ref: &VisibilityScopeRef) -> bool` | 判断 view 是否属于 lookup scope | scope 来自 read visibility summary | `bool` | 只比较 typed ref;不解析 visibility result |
 | `pub fn has_required_slices(&self) -> bool` | 判断 anchor/lifecycle 基础 slice 是否存在 | 无 | `bool` | 不触发补建 |
 | `pub fn is_visible(&self) -> bool` | 判断 surface 是否 visible/redacted | 无 | `bool` | not visible 返回 false |
 | `pub fn is_stale_or_degraded(&self) -> bool` | 判断 freshness / degraded surface | 无 | `bool` | 不改变 projection state |
@@ -7181,7 +7186,7 @@ Step 7 承接批次不新增实现契约,只把 Step 6 的对象、字段和状�
 | DDD-S6-OPEN-018 | `MemoryReferenceSourceSummary` 的正式 resolver / event mapper / callback 来源 | `MemoryReference`, `MemoryReferencePolicy`, source state consumer, archive handoff result | Step 7 / 8 / 9 闭口;当前 Step 6 只固定 body-free summary shape |
 | DDD-S6-OPEN-019 | `MemoryReferenceState::PendingVerification` 是否持久化为 relation state,还是仅作为 pending/rejected surface | memory state matrix、source pending flow、query visibility | Step 9 / 10 / 12 闭口;当前只固定 pending/unavailable 不得 silent accepted |
 | DDD-S6-OPEN-020 | `ArchiveHandoffRef` 与 `TraceHandoffIntent` / `HandoffState` / receipt marker 的边界 | archive callback、handoff delivery、receipt body exclusion、config binding | 6.5 已固定 handoff marker 不等于 delivered receipt;callback DTO 和 config binding 留 Step 8 / 14 |
-| DDD-S6-OPEN-021 | `MemberSummaryViewRef` 的正式 projection builder / lookup 来源 | summary query、projection fake、view ref 稳定性 | 6.4 已固定不得 query 拼接;Step 7 / Step 11 闭口具体 builder / lookup surface |
+| DDD-S6-OPEN-021 | `MemberSummaryViewRef` 的正式 projection builder / lookup 来源 | summary query、projection fake、view ref 稳定性 | 已闭合:query 只能通过 Step 7 `find_member_summary_view_ref(member_ref, visibility_scope_ref)` 读取;Step 11 `member_summary_views` 按 `(member_ref, visibility_scope_ref)` current index 持久化;broader projection catalog 仍由 DDD-S6-OPEN-026 承接 |
 | DDD-S6-OPEN-022 | `IdentityTraceSubjectRef` / `IdentityAuditSubjectRef` / `IdentityOutboxSubjectRef` 是否由同一个 subject mapper 同时返回 | trace、audit、outbox、handoff canonical subject | Step 7 mapper 闭口;当前固定不得字符串拼接或强转 |
 | DDD-S6-OPEN-023 | `IdentityVisibilityAccessSummary` 的正式 resolver / prepared context 来源 | summary/trace/audit query、event/handoff visibility、redaction failure | Step 7 / Step 8 / Step 12 闭口;当前 Step 6 只固定 policy 输入 shape |
 | DDD-S6-OPEN-024 | field-level redaction matrix 与 `IdentityReadSurfaceKind` 的 public DTO 映射 | query response、trace/audit redaction、not visible/degraded surface | PH-02 public marker shell 已由 Step 8 `IdentityVisibilityMarker` / `IdentityDegradedMarker` / `IdentityRedactionMarkerRef` / `IdentityDegradedMarkerRef` 闭合;剩余 field-level omission matrix 与 per-field DTO 裁剪规则留 Step 12 |

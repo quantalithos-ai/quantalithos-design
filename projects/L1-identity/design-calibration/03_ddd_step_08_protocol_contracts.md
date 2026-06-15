@@ -2312,7 +2312,7 @@ pub struct MemoryReferenceView {
 | 场景 | 正例 | 反例 |
 |---|---|---|
 | visibility scope | 先用 `resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 取得 `scope_ref` | 从 URL、route name、member id 或 source ref 字符串拼 scope |
-| stable view lookup | 用 `find_member_summary_view_ref(member_ref, scope_ref)` 读取 `MemberSummaryViewRef` | `format!("member-summary:{member_id}")` 临时构造 view ref |
+| stable view lookup | 用 `find_member_summary_view_ref(member_ref, scope_ref)` 读取 `MemberSummaryViewRef`,loaded view 的 `visibility_scope_ref` 必须等于 access summary scope | `format!("member-summary:{member_id}")` 临时构造 view ref;用 `visibility_result_ref` 反推 scope |
 | query miss | `GetGlobalMemberAnchor` missing 返回 `Missing` surface | 查询不到 member 时调用 establish 自动建档 |
 | list page | `IdentityPublicPageRequest.cursor/limit` 映射 repository page | 把 page cursor 当 truth cursor、projection cursor 或 idempotency key |
 | not visible | `IdentityQuerySurface.disposition = NotVisible`,body/items 空 | 返回 `Empty` 或 `Missing` 来隐藏权限结果 |
@@ -2420,6 +2420,7 @@ pub struct ReadMemberSummaryRequest {
 pub struct MemberSummaryView {
     pub view_ref: MemberSummaryViewRef,
     pub member_ref: GlobalMemberRef,
+    pub visibility_scope_ref: VisibilityScopeRef,
     pub anchor_slice_ref: MemberSummarySliceRef,
     pub lifecycle_slice_ref: MemberSummarySliceRef,
     pub role_capability_slice_refs: Vec<MemberSummarySliceRef>,
@@ -2436,6 +2437,7 @@ pub struct MemberSummaryView {
 |---|---|---|
 | `view_ref` | `IdentityProjectionRepository.find_member_summary_view_ref(...)` + `get_member_summary_view(...)` | stable view ref;不得 query 拼接 |
 | `member_ref` | request + loaded `MemberSummaryView` | 必须一致;不等于 actor/account/runtime ref |
+| `visibility_scope_ref` | loaded `MemberSummaryView` + `IdentityVisibilityAccessSummary.scope_ref` | 必须一致;该字段是 `(member_ref, visibility_scope_ref)` lookup 的持久化来源;不得由 `visibility_result_ref` 反推 |
 | slice refs | loaded `MemberSummaryView` | 只含 safe summary refs;不返回 anchor/lifecycle/role/work/memory body |
 | `visibility_result_ref` / `read_surface_kind` | `VisibilityPolicy::for_summary(...)` / prepared access summary | not visible/redacted/degraded 是 query surface,不是 truth state |
 | `source_cursor_ref` | projection builder / committed truth scan | optional;不得用 page cursor、version、timestamp 代替 |
@@ -2446,7 +2448,7 @@ pub struct MemberSummaryView {
 | 输入契约 | 目标读取 / assembler | 必填字段是否齐全 | 派生字段来源 | 缺失时行为 |
 |---|---|---|---|---|
 | `IdentityQueryRequest<ReadMemberSummaryRequest>` | initial visibility seed | 齐全: member, consumer, visibility context | `resolve_member_summary_read(member_ref, None, ...)` | access summary missing -> `Degraded`,不默认 visible |
-| same | stable projection lookup | 齐全: member + scope | `IdentityVisibilityAccessSummary.scope_ref` | view ref missing -> `Missing` 或 rebuilding/degraded surface,不 rebuild |
+| same | stable projection lookup | 齐全: member + scope | `IdentityVisibilityAccessSummary.scope_ref`;scope 必须等于 loaded `MemberSummaryView.visibility_scope_ref` | view ref missing -> `Missing` 或 rebuilding/degraded surface,不 rebuild |
 | view ref | loaded summary view | 齐全: stable view ref | `get_member_summary_view(view_ref)` | view missing/stale -> `Missing` / `StaleVisible` / `Degraded` |
 | loaded view | final visibility policy | 齐全: access summary + material marker | `VisibilityPolicy::for_summary(...)` | not visible -> body `None`;redacted -> body-free fields only |
 | output | `IdentityQueryResponse<MemberSummaryView>` | 齐全: query name、surface、optional body | surface from visibility + projection freshness | no write / no repair |
@@ -2659,7 +2661,7 @@ pub struct AuditTrailEntryView {
 
 | 场景 | 正例 | 反例 |
 |---|---|---|
-| summary view ref | `find_member_summary_view_ref(member_ref, scope_ref)` 后再 `get_member_summary_view(view_ref)` | `format!("member-summary:{member_id}")` 临时拼 view ref |
+| summary view ref | `find_member_summary_view_ref(member_ref, scope_ref)` 后再 `get_member_summary_view(view_ref)`,并校验 loaded `visibility_scope_ref` | `format!("member-summary:{member_id}")` 临时拼 view ref;忽略 scope mismatch |
 | trace selector | `IdentityTraceReadSelector::BySubject { subject_ref, after_cursor_ref, ... }` 对应 Step 7 cursor 读取面 | 同时传 subject/change_kind/cursor 三个 optional 字段让 service 自行猜优先级 |
 | trace visibility | loaded trace 的 `subject_ref` 调 `resolve_trace_read(...)` | 从 route/member/source 字符串推断 visibility subject |
 | audit subject | `IdentityTruthChangeSubjectMapper.member_subjects(member_ref).audit_subject_ref` | 把 `IdentityTraceSubjectRef` 字符串切割成 audit subject |

@@ -30,7 +30,7 @@ Step 12 的目标是把 Step 6 的对象错误、Step 7 的 port failure、Step 
 - 错误对 command、query、inbound event、callback、outbox publish、handoff delivery、operations job 分别如何映射。
 - 错误是否可重试、不可重试、需要人工介入或只能作为 degraded / not-visible / delayed surface 暴露。
 - 事务失败、version conflict、unique conflict、duplicate replay、stored result missing、外部依赖不可用、forbidden body persistence attempt 应如何处理。
-- 哪些异常可以写 stored rejected result、typed receipt、job report、marker / issue / audit / trace,哪些异常必须停在 entry pre-dispatch,不得写入 application store。
+- 哪些异常可以写 stored rejected generic shell、typed command rejected envelope、typed receipt、job report、marker / issue / audit / trace,哪些异常必须停在 entry pre-dispatch,不得写入 application store。
 
 本 Step 不定义 HTTP status 数字、RPC code 数字、具体 retry/backoff 参数、broker ack/dead-letter 绑定、配置项名称、日志/指标字段、测试用例 ID 或实施 commit boundary。这些分别由 Step 13~16、配置设计和实施计划承接。
 
@@ -336,7 +336,7 @@ protocol response / worker receipt / job report
 | Application outcome only after facade | 只有 application facade 被调用并返回结果后,才可产生 command rejection、query surface、consumer receipt 或 job report |
 | Query is not command error | query not-visible / missing / degraded / stale / empty 使用 `IdentityQuerySurface`,不使用 `IdentityProtocolRejection` |
 | Accepted-only effect | command accepted 才有 `IdentityCommandEffectPublicSummary.accepted_cursor_ref`、trace/outbox/stale refs;rejected/entry failure 不生成 accepted effect |
-| Stored rejected is limited | `IdentityCommandOutcome::Rejected` 不自动意味着 stored rejected result;可 replay rejected 范围由 12.3/Step 13 固定 |
+| Stored rejected is limited | `IdentityCommandOutcome::Rejected` 不自动意味着 stored rejected generic shell 或 typed command rejected envelope;可 replay rejected 范围由 12.3/Step 13 固定 |
 | Worker receipt is application-level | `IdentityConsumerReceipt` 只在 consumer/callback application flow reached 后生成;worker entry failure 不伪造成 `Rejected` receipt |
 | Job report is application-level | `IdentityJobRunReport` / `IdentityJobReportSurface` 只由 application job service 生成;job entry failure 不保存 failed report |
 | Propagation failure is marker/report only | publisher/handoff failure 不回滚 accepted truth;只映射 outbox/handoff state、safe issue、job report/result |
@@ -349,7 +349,7 @@ Command public surface 只能是 `IdentityCommandOutcome::Accepted(IdentityComma
 | Error taxonomy / condition | Public surface | Rejection kind / fields | Retryability | Stored/effect rule |
 |---|---|---|---|---|
 | fresh command accepted and committed | `Accepted(response)` | response has `result_ref`, typed result, accepted effect summary | NotApplicable | save accepted stored result/effect;trace/audit/outbox/stale per Step 9/11 |
-| duplicate same key/digest with stored accepted result | `Accepted(response)` replay | same stored accepted response/effect | ReplayOnly | load stored result/effect only;no mutation/no new trace/outbox |
+| duplicate same key/digest with stored accepted command envelope | `Accepted(response)` replay | same typed result/effect from `IdentityCommandAcceptedResultEnvelope` | ReplayOnly | load generic stored shell + `IdentityCommandAcceptedResultEnvelope`;no mutation/no new trace/outbox |
 | request/DTO/marker invalid after application reached | `Rejected(rejection)` | `InvalidRequest` with issue refs | NonRetryableInput | no truth/effect;stored rejected only if 12.3/Step 13 says replayable |
 | forbidden body detected in request/material | `Rejected(rejection)` | `ForbiddenBody` with safe issue refs | NonRetryableInput / ManualRecovery if persisted | no truth/effect;must not persist body |
 | command actor/policy/domain guard denied | `Rejected(rejection)` | `PolicyDenied` unless conflict-specific mapping applies | NonRetryablePolicy | no accepted effect;replayable rejected scope later |
@@ -361,7 +361,7 @@ Command public surface 只能是 `IdentityCommandOutcome::Accepted(IdentityComma
 | required resolver/source/basis temporary unavailable | `Rejected(rejection)` | `AdapterUnavailable` with optional degraded marker | RetryAfterDependencyRecovery | no accepted active truth |
 | feature/adapter disabled before application-level command decision | `Rejected(rejection)` only if facade reached;otherwise entry surface | `Disabled` | NonRetryableInput until config change | no accepted effect |
 | stored result missing on duplicate replay | no successful command outcome;surface is replay consistency failure in 12.3 | not mapped as fresh `Rejected` unless Step 13 defines replayable error shell | ManualRecovery | do not rerun command |
-| commit status unknown | no accepted success reported unless stored accepted surface is later found | `AdapterUnavailable`/temporary failure shell in 12.3/12.4 | ManualRecovery / idempotency check | do not claim accepted without stored result |
+| commit status unknown | no accepted success reported unless stored accepted generic shell + typed command envelope are later found | `AdapterUnavailable`/temporary failure shell in 12.3/12.4 | ManualRecovery / idempotency check | do not claim accepted without stored result and typed envelope |
 
 ### 3.4 Query mapping and priority
 
@@ -545,7 +545,7 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 
 | Branch | Detection position | UoW / rollback | Public surface | Stored / side-effect rule |
 |---|---|---|---|---|
-| duplicate replay available | idempotency reserve before domain mutation | do not execute mutation branch | stored accepted/rejected command outcome | no new truth/trace/audit/outbox/stale/effect |
+| duplicate replay available | idempotency reserve before domain mutation | do not execute mutation branch | typed stored accepted/rejected command envelope | no new truth/trace/audit/outbox/stale/effect |
 | same key/different digest | idempotency reserve | no mutation;rollback if record was marked conflict in same UoW only as Step 13 defines | `DuplicateConflict` | original stored surface authoritative |
 | idempotency in-flight | reserve | no mutation | temporary/delayed conflict surface | no stored command result |
 | request/domain guard rejected before any truth save | service/domain policy | rollback UoW if opened | `InvalidRequest` / `PolicyDenied` / `Conflict` / `NotFound` | stored rejected only if 12.3/Step 13 classifies replayable;no trace/outbox |
@@ -553,7 +553,7 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 | resolver invalid/untrusted summary | resolver typed outcome / domain guard | rollback UoW | `PolicyDenied` or `InvalidRequest` depending source | no accepted active truth |
 | optimistic version conflict on truth/save | repository save/update | rollback all staged writes | `Conflict` | no partial truth/effect/stored result |
 | unique conflict on create/append | repository create/save | rollback unless classified no-op by flow | `Conflict` or policy rejection | no second append/outbox/effect |
-| stored accepted result save fails | stored result repository before commit | rollback whole accepted UoW | dependency/consistency failure | accepted truth must not commit without replay surface |
+| stored accepted shell or typed envelope save fails | stored result repository before commit | rollback whole accepted UoW | dependency/consistency failure | accepted truth must not commit without replay surface |
 | idempotency complete fails | idempotency repository before commit | rollback whole accepted UoW | dependency/consistency failure | no committed accepted truth without completed replay guard |
 | commit fails / unknown | UoW commit | do not report accepted unless durable stored result confirms | commit unknown / temporary failure | recovery in 12.4;no duplicate rerun |
 
@@ -625,8 +625,8 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 
 | Replay source | Missing / wrong-kind condition | Required branch | Forbidden branch |
 |---|---|---|---|
-| command accepted result | idempotency points to stored result but command accepted surface/effect missing or wrong kind | return replay consistency failure;manual recovery wording in 12.4 | reload truth and rebuild response |
-| command rejected result | idempotency points to stored rejected but rejection shell missing/wrong kind | replay consistency failure | rerun validation/domain guard |
+| command accepted result | idempotency points to stored result but generic shell or `IdentityCommandAcceptedResultEnvelope` missing/wrong kind,command variant mismatch,or effect missing | return replay consistency failure;manual recovery wording in 12.4 | reload truth and rebuild response |
+| command rejected result | idempotency points to stored rejected but generic shell or `IdentityCommandRejectedResultEnvelope` missing/wrong kind | replay consistency failure | rerun validation/domain guard |
 | consumer receipt | stored shell exists but typed `IdentityConsumerReceiptEnvelope` missing/wrong kind | replay consistency failure | parse original event/payload |
 | handoff callback receipt | callback stored shell points to wrong receipt kind | replay consistency failure | treat as normal consumer receipt |
 | job report | stored `JobReport` shell exists but `IdentityJobRunReport` missing/wrong kind | replay consistency failure | rescan projection/reference/outbox/handoff |
@@ -673,7 +673,7 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 |---|---|---|---|
 | NoStoreEntryFailure | failure before application facade | entry validation/dispatch surface only | stored result、receipt、job report、truth、trace、audit、outbox、handoff |
 | RollbackOnly | application flow opened UoW but failed before committed outcome | no staged material visible after rollback | partial truth、cursor、stored result、effect、receipt、job report |
-| ReplayOnly | idempotency duplicate found stored surface | stored command result/effect、typed receipt、job report already persisted | rerun mutation/job,read current truth to rebuild result |
+| ReplayOnly | idempotency duplicate found stored surface | command generic shell + typed command envelope/effect、typed receipt、job report already persisted | rerun mutation/job,read current truth to rebuild result |
 | RetryableMarker | dependency/version/publisher/handoff failure can be retried by formal flow | safe issue marker、outbox/handoff retryable state、job report issue,or delayed receipt if application outcome | raw adapter/source/error body |
 | TerminalMarker | current record/intent/report is terminal for this operation | failed/skipped/cancelled state,issue refs,job report item refs | flip terminal state to pending without formal new operation |
 | ManualRecovery | consistency/security defect needs operator or durable repair | safe issue refs,failed/degraded query/job/report surface | automatic query repair,duplicate rerun,body persistence |
@@ -685,8 +685,8 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 | Scenario | May write | Must not write |
 |---|---|---|
 | API / worker / jobs entry pre-dispatch failure | no application store;entry surface only | stored result、typed receipt、job report、truth、trace、audit、outbox、projection/reference repair |
-| command accepted | truth,truth cursor,trace,audit,outbox,projection stale,effect,stored accepted result,idempotency complete | publisher delivery result,external body,raw request |
-| command rejected before accepted truth | stored rejected result only if replayable by 12.3/Step 13 | truth,accepted cursor,success trace/outbox/stale/effect |
+| command accepted | truth,truth cursor,trace,audit,outbox,projection stale,effect,generic stored accepted shell,typed accepted envelope,idempotency complete | publisher delivery result,external body,raw request |
+| command rejected before accepted truth | generic stored rejected shell + typed rejected envelope only if replayable by 12.3/Step 13 | truth,accepted cursor,success trace/outbox/stale/effect |
 | query degraded/missing/stale/not-visible | query response surface only | UoW,stored result,trace/audit append,projection rebuild,reference refresh |
 | consumer/callback accepted | identity-owned truth/reference/marker,trace/outbox/stale if flow requires,typed receipt,stored shell,idempotency complete | raw event body,receipt body,external owner truth |
 | consumer/callback delayed/quarantined/noop/rejected as application outcome | typed receipt,stored shell,safe issue refs,optional marker trace only if Step 9 branch requires | active truth unless branch explicitly owns it,raw payload |
@@ -805,7 +805,7 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 | Step 6 object/state/policy error owners | 12.1 domain taxonomy,12.2 command/consumer/job mapping | 通过 | `IdentityDomainError`、forbidden body、invalid transition、policy denied、missing source/basis/evidence 均有分类和 surface |
 | Step 6 query/read/degraded markers | 12.2 query mapping,12.4 query degraded recovery | 通过 | not-visible、missing、empty、degraded、stale-visible、rebuilding、disabled 均用 `IdentityQuerySurface`;query no-write |
 | Step 6 outbox/handoff states | 12.2 outbox/handoff mapping,12.3 branches,12.4 marker recovery | 通过 | retryable/permanent/skipped/unsupported/delivered/failed/cancelled 均有 marker/report-only 恢复 |
-| Step 6 application helper / replay objects | 12.1 application taxonomy,12.3 replay consistency branches | 通过 | stored result、typed receipt、job report missing/wrong-kind 不重跑 |
+| Step 6 application helper / replay objects | 12.1 application taxonomy,12.3 replay consistency branches | 通过 | generic stored shell、typed command envelope、typed receipt、job report missing/wrong-kind 不重跑 |
 | Step 7 port failure surfaces | 12.1 port taxonomy,12.3 branch tables | 通过 | repository、UoW、idempotency、resolver、publisher、handoff、runtime failure 均分类 |
 | Step 7 fake/durable parity | 12.4 fake/durable recovery parity | 通过 | version、unique、stored replay、query degraded、forbidden body、outbox/handoff terminal 均有 parity rule |
 | Step 8 public protocol surface | 12.2 public mapping by protocol family | 通过 | command、query、consumer/callback、job、entry 都只使用 Step 8/10 既有 surface |
@@ -839,7 +839,7 @@ Step 13 must start from these Step 12 constraints:
 | Step 13 topic | Must carry from Step 12 | Must not introduce |
 |---|---|---|
 | concurrency resources | version conflict,unique conflict and terminal state conflict taxonomy | last-write-wins,source version as optimistic version |
-| command idempotency | same key/same digest stored command replay;different digest duplicate conflict;stored missing no-rerun | rebuilding response from current truth |
+| command idempotency | same key/same digest replay from stored generic shell + typed command envelope;different digest duplicate conflict;stored shell/envelope missing no-rerun | rebuilding response from current truth |
 | consumer/callback idempotency | typed receipt envelope required for replay;unsupported/quarantined/delayed/noop only replay if saved as application outcome | parsing original event/callback body on duplicate |
 | job idempotency | stored `IdentityJobRunReport` required;duplicate replay does not rerun job or rescan item refs | job report reconstruction from current repository state |
 | in-flight duplicate | no second writer while same operation/channel/key/digest reserved | concurrent second mutation/job body |

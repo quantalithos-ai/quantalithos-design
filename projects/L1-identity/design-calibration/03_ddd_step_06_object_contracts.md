@@ -1541,7 +1541,7 @@ pub struct IdentityAnchorPolicy {
 
 | 功能 / capability | 输入 | 输出 | 状态 / 副作用 | 所属对象 | 后续 Step 承接 |
 |---|---|---|---|---|---|
-| 建立初始生命周期 | 已建立 `GlobalMemberRef`, `ActorRef`, `LifecycleReasonRef`, `IdentityTimestamp` | `GlobalLifecycleState::Available` | 建档 accepted 后的初始 lifecycle;不改变 anchor ref | `GlobalLifecycleState` | Step 7 lifecycle repository / clock;Step 8 establish result;Step 9 create flow;Step 10 lifecycle state |
+| 建立初始生命周期 | 已建立 `GlobalMemberRef`, `ActorRef`, `LifecycleReasonRef`, `IdentityTimestamp` | `GlobalLifecycleState::Available` | 建档 accepted 后的初始 lifecycle;`GlobalMemberRef` 作为 repository row key 显式传入 save,不进入 lifecycle state value;不改变 anchor ref | `GlobalLifecycleState` | Step 7 lifecycle repository / clock;Step 8 establish result;Step 9 create flow;Step 10 lifecycle state |
 | 显式生命周期迁移 | 当前 `GlobalLifecycleState`, 目标 `GlobalLifecycleStateKind`, `LifecycleReasonRef`, `ActorRef`, `IdentityOperationChannel`, `IdentityTimestamp` | 新 `GlobalLifecycleState` 或 domain rejection | 只允许 command write;非法迁移 rejected;query / job 不写 truth | `GlobalLifecycleState`, `LifecycleTransitionPolicy` | Step 8 `UpdateGlobalLifecycleState`;Step 9 transition flow;Step 10 transition matrix |
 | 高风险处置 basis guard | 目标 lifecycle action, `LifecycleRiskRef`, `Option<GovernanceBasisRef>`, `ActorRef` | `Ok(())` 或 domain rejection / pending basis surface | 缺 basis 不得 accepted;identity 只保存 body-free basis ref | `HighRiskLifecycleGuard`, `GlobalLifecycleState` | Step 7 basis resolver;Step 8 high-risk request/result;Step 10 missing basis;Step 12 rejected/pending |
 | lifecycle / anchor 分离 | `GlobalLifecycleStateKind`, `IdentityAnchorState` | 明确的 truth state 边界 | `Retired` / `Tombstoned` 不释放 `GlobalMemberRef`;anchor hold 由 6.A 对象承接 | `GlobalLifecycleState`, `IdentityAnchorState` | Step 9 lifecycle terminal flow;Step 10 anchor/lifecycle cross-check |
@@ -1551,7 +1551,7 @@ pub struct IdentityAnchorPolicy {
 
 | 对象 | 承接功能 | 对象类别 | 对象能力 | 不承接的功能 / 禁止事项 |
 |---|---|---|---|---|
-| `GlobalLifecycleState` | 建立初始生命周期;显式生命周期迁移;lifecycle / anchor 分离 | state value / truth state | 保存 lifecycle state kind、reason、actor、changed time、optional basis;提供可用性、终态和迁移构造入口 | 不表达 anchor ref reuse、不保存 runtime / ProjectMember / governance truth、不写 trace / outbox / projection |
+| `GlobalLifecycleState` | 建立初始生命周期;显式生命周期迁移;lifecycle / anchor 分离 | state value / truth state | 保存 lifecycle state kind、reason、actor、changed time、optional basis;提供可用性、终态和迁移构造入口 | 不携带 `member_ref`;不表达 anchor ref reuse、不保存 runtime / ProjectMember / governance truth、不写 trace / outbox / projection |
 | `LifecycleTransitionPolicy` | 显式生命周期迁移;排除 runtime / ProjectMember 状态 | policy / guard | 校验 command-only、actor、reason、合法迁移和 wrong-owner 状态 | 不解析 governance basis body、不读取 repository、不调用 runtime、不决定 high-risk basis 有效性 |
 | `HighRiskLifecycleGuard` | 高风险处置 basis guard;排除 governance truth ownership | policy / guard | 判断目标 action 是否高风险、是否需要 basis、basis 与 action 风险是否匹配 | 不保存 governance Gate / Approval / Policy / Control truth;不替代 governance 裁决 |
 
@@ -1602,6 +1602,8 @@ pub struct GlobalLifecycleState {
 | `changed_by_ref` | `ActorRef` | 最近一次显式变化 actor | 必填;来自 command metadata;job / query 不得伪造业务 actor |
 | `changed_at` | `IdentityTimestamp` | 最近一次变化时间 | 来自 clock port;不得用作 truth cursor / version |
 | `basis_ref` | `Option<GovernanceBasisRef>` | 高风险变化的 body-free basis 引用 | 非高风险可为空;高风险必填规则由 `HighRiskLifecycleGuard` / Step 10 闭口;不得保存 governance body |
+
+`GlobalLifecycleState` deliberately does not carry `GlobalMemberRef`. The lifecycle row owner is the explicit `member_ref` argument on `GlobalLifecycleRepository.save_lifecycle(...)`; application services must pass the same `member_ref` used for `get_lifecycle_with_version(member_ref)`. Implementations must not infer the lifecycle row key from reason refs, basis refs, actor refs, source strings, or lifecycle state contents.
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
@@ -3711,7 +3713,7 @@ pub struct AuditCursorRef {
 | `VisibilityResultRef` | 可见性结果 | 由 policy / resolver summary 形成;不表达 truth state |
 | `IdentityRedactionMarkerRef` | public redaction marker | 来自 redaction matrix / visibility decision;不保存 policy body、denied raw reason 或字段正文 |
 | `IdentityDegradedMarkerRef` | public degraded marker | 来自 resolver/dependency/projection safe summary;不保存 raw external error、stack trace 或 secret |
-| `AuditScopeRef` | audit 范围 | 不得改变 trace truth 顺序 |
+| `AuditScopeRef` | audit 范围 | query/read 时来自 audit request;accepted write 创建 trail 时来自 Step 7 accepted audit trail marker mapper;不得改变 trace truth 顺序 |
 | `AuditCursorRef` | audit 分页 cursor | 不等于 `IdentityTruthCursor` |
 
 ##### visibility access summary / read material
@@ -4059,14 +4061,21 @@ pub struct AuditTrail {
 }
 ```
 
+`AuditTrailEntry.visibility_result_ref` 的来源规则:
+
+| 写入 / 读取场景 | 正式来源 | 禁止事项 |
+|---|---|---|
+| accepted command / handoff prepare append entry | Step 7 `IdentityAcceptedAuditTrailMarkerMapper.accepted_command_audit_markers(...)` 返回的 `entry_visibility_result_ref` | 不调用 read visibility resolver;不使用默认 visible;不由 operation name、audit subject 字符串、trace id、timestamp 或 hard-coded marker 拼接 |
+| query / read 组装 entry view | `VisibilityPolicy::for_audit(...)` / `IdentityReadVisibilityRepository.resolve_audit_read(...)` 的输出 | 不把 accepted write marker 当作 public authorization decision |
+
 | 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
 | `audit_trail_ref` | `AuditTrailRef` | audit timeline identity | Step 7 id/lookup;不得由 audit subject 拼接 |
 | `audit_subject_ref` | `IdentityAuditSubjectRef` | audit 主语 | subject mapper 输出 |
 | `member_ref` | `Option<GlobalMemberRef>` | 可选成员范围 | member-level audit 必填;system/report audit 可留后续 |
-| `audit_scope_ref` | `AuditScopeRef` | 读取范围 | query metadata / audit request;不改变 trace truth |
+| `audit_scope_ref` | `AuditScopeRef` | audit 范围 | read/query surface 中来自 query metadata / audit request;accepted write 创建 missing trail 时必须来自 Step 7 `IdentityAcceptedAuditTrailMarkerMapper.accepted_command_audit_markers(...)`;不允许 service 使用默认 scope、常量、route、operation name 字符串或 audit subject 字符串拼接 |
 | `entries` | `Vec<AuditTrailEntry>` | timeline entries | 来自 trace refs + read assembler;不保存 raw log |
-| `visibility_result_ref` | `VisibilityResultRef` | trail 可见性结果 | `VisibilityPolicy` output |
+| `visibility_result_ref` | `VisibilityResultRef` | trail 可见性结果 | read/query surface 中来自 `VisibilityPolicy` output;accepted write 创建 missing trail 时来自 Step 7 accepted audit trail marker mapper 的 trail visibility marker;该 marker 只证明 body-free audit material 已随 accepted transaction materialized,不是 public authorization/read decision |
 | `read_surface_kind` | `IdentityReadSurfaceKind` | found/empty/not_visible/degraded | query surface,不是 truth state |
 | `cursor_ref` | `Option<AuditCursorRef>` | 分页 cursor | 不等于 `IdentityTruthCursor` |
 | `assembled_at` | `IdentityTimestamp` | 组装时间 | clock port;不表达 accepted change time |
@@ -4074,6 +4083,7 @@ pub struct AuditTrail {
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
 | `pub fn assemble(audit_trail_ref: AuditTrailRef, audit_subject_ref: IdentityAuditSubjectRef, member_ref: Option<GlobalMemberRef>, audit_scope_ref: AuditScopeRef, entries: Vec<AuditTrailEntry>, visibility_result_ref: VisibilityResultRef, cursor_ref: Option<AuditCursorRef>, assembled_at: IdentityTimestamp) -> Result<Self, IdentityDomainError>` | 从 trace refs 组装 audit trail | entries 已经 body-free/redacted | `AuditTrail` | 不读取 repo、不修复 trace |
+| `pub fn from_accepted_write(audit_trail_ref: AuditTrailRef, audit_subject_ref: IdentityAuditSubjectRef, member_ref: Option<GlobalMemberRef>, audit_scope_ref: AuditScopeRef, initial_entry: AuditTrailEntry, visibility_result_ref: VisibilityResultRef, assembled_at: IdentityTimestamp) -> Result<Self, IdentityDomainError>` | accepted command missing trail 时创建 body-free trail | `audit_scope_ref` 与 `visibility_result_ref` 必须来自 Step 7 accepted audit trail marker mapper;initial entry 引用同事务 trace | `AuditTrail` | 只在 accepted write flow 使用;不执行 read visibility;不保存 raw log |
 | `pub fn empty(audit_trail_ref: AuditTrailRef, audit_subject_ref: IdentityAuditSubjectRef, audit_scope_ref: AuditScopeRef, visibility_result_ref: VisibilityResultRef, assembled_at: IdentityTimestamp) -> Self` | 构造 empty surface | 无可见 entries | `AuditTrail` | 不补 trace |
 | `pub fn not_visible(audit_trail_ref: AuditTrailRef, audit_subject_ref: IdentityAuditSubjectRef, audit_scope_ref: AuditScopeRef, visibility_result_ref: VisibilityResultRef, assembled_at: IdentityTimestamp) -> Self` | 构造 not visible surface | 不携带 entries | `AuditTrail` | 不泄漏 subject 详情 |
 | `pub fn contains_trace(&self, trace_record_ref: &IdentityTraceRecordRef) -> bool` | 判断是否包含 trace | trace ref 来自 query/read | `bool` | 只比较 typed ref |
@@ -5466,7 +5476,7 @@ pub struct HandoffPolicy {
 | 统一 operation metadata | `02` §7 command / query / consumer / job 均要求 actor、metadata、idempotency / cursor / trace context | `IdentityOperationContext` | 只定义 context 字段和 factory;不定义 API/worker/job entry DTO |
 | 幂等 reserve / complete / replay 判断 | `02` §8 / §12 要求 accepted、rejected、duplicate replay 闭环 | `IdentityIdempotencyRecord`、`IdentityIdempotencyKey`、`IdentityRequestDigest` | 只定义 record state 和 digest identity;repository reserve/load/save 留 Step 7/13 |
 | 请求摘要稳定化 | command / consumer / job 需要 same key same digest / same key different digest 判断 | `IdentityRequestDigest` | 只固定 canonical material marker;hash 算法、canonical serialization 留 Step 8/13 |
-| stored result replay surface | duplicate command / consumer / job 不能重跑 mutation | `StoredIdentityOperationResult` | 只定义 replay snapshot variant;具体 payload DTO 和存储 schema 留 Step 8/11/13 |
+| stored result replay surface | duplicate command / consumer / job 不能重跑 mutation | `StoredIdentityOperationResult`;`IdentityCommandAcceptedResultEnvelope`;`IdentityCommandRejectedResultEnvelope` | generic shell 只标记 stored kind;command accepted/rejected typed envelope 是 command replay 的正式 public surface 来源 |
 | accepted command effect 汇总 | accepted path 必须关联 truth、trace、audit、outbox、stale projection、stored result | `IdentityCommandEffectSummary` | 只作为 application 汇总对象;不定义 transaction order |
 | query visibility 裁决 surface | query 必须区分 visible / redacted / not visible / degraded / stale | `IdentityVisibilityDecision` | 只承接 resolver/policy result;不读取授权系统、不做 redaction matrix |
 | job report 汇总 | operations job 需要 run metadata、scope、cursor、partial / failed / retryable result | `IdentityJobRunReport` | 只定义 report assembly object;job entry、scheduler、retry 留 Step 6.7 / 9 / 14 |
@@ -5478,7 +5488,7 @@ pub struct HandoffPolicy {
 | operation metadata | `IdentityOperationContext` | `IdentityOperationContextRef`、`IdentityOperationName`、`IdentityOperationChannel` | context 来自入口和调用环境,不是 identity truth |
 | 幂等记录 | `IdentityIdempotencyRecord` | `IdentityIdempotencyRecordRef`、`IdentityIdempotencyKey`、`IdentityIdempotencyStateKind` | 幂等记录服务 operation replay,不改变成员、career、memory 等业务事实 |
 | 请求摘要 | `IdentityRequestDigest` | `IdentityCanonicalRequestMarkerRef`、`IdentityRequestDigestValue` | digest 是请求 material 的稳定摘要,不是业务状态 |
-| stored replay | `StoredIdentityOperationResult` | `IdentityStoredResultRef`、`IdentityStoredResultKind` | stored result 是 replay snapshot,不是 source truth 或 public DTO 本体 |
+| stored replay | `StoredIdentityOperationResult` / command typed replay envelopes | `IdentityStoredResultRef`、`IdentityStoredResultKind`、`IdentityStoredSurfaceMarkerRef` | generic stored result 是 replay shell;command duplicate replay 必须读取 typed envelope,不能只靠 marker 或 current truth 重建 public DTO |
 | command effect | `IdentityCommandEffectSummary` | `IdentityCommandEffectSummaryRef`、`IdentityAcceptedEffectKind` | effect summary 汇总一次 accepted write 的副产物,不拥有 trace/outbox/projection truth |
 | query visibility | `IdentityVisibilityDecision` | `IdentityVisibilityDecisionRef`、`IdentityReadDispositionKind` | visibility 是一次 read 结果的裁决,不是 view truth |
 | job report | `IdentityJobRunReport` | `IdentityJobRunRef`、`IdentityJobReportRef`、`IdentityJobResultKind`、projection/reference/report/outbox/handoff item refs | report 汇总 job run,不直接修复 truth 或 projection |
@@ -5686,8 +5696,8 @@ pub enum IdentityIdempotencyStateKind {
 | 组件 / crate | `application::results` |
 | capability | 为 duplicate replay 提供稳定 stored result surface |
 | 对象类别 | application helper / replay snapshot |
-| 责任 | 保存 replay 所需的 accepted/rejected/receipt/report surface marker 和 result kind |
-| 非责任 | 不保存 raw response body、不定义 public DTO、不定义 repository save/load trait、不重建业务结果 |
+| 责任 | 保存 replay 所需的 accepted/rejected/receipt/report generic shell、surface marker 和 result kind |
+| 非责任 | 不保存 raw response body、不单独承载 command typed result、不定义 repository save/load trait、不重建业务结果 |
 | 后续 Step | Step 8 DTO/result schema;Step 11 persistence;Step 13 replay semantics |
 
 ```rust
@@ -5718,20 +5728,73 @@ pub enum IdentityStoredResultKind {
 
 | 函数 / factory | 输入 | 输出 | 约束 |
 |---|---|---|---|
-| `command_accepted(context_ref, marker, now)` | context ref、accepted surface marker、now | stored accepted result | marker 必须足够 replay public accepted response |
-| `command_rejected(context_ref, marker, now)` | context ref、rejected surface marker、now | stored rejected result | 只用于已定义可 replay 的 rejection,非所有 error |
+| `command_accepted(context_ref, marker, now)` | context ref、accepted surface marker、now | stored accepted generic shell | marker 只标记 stored kind;public accepted response 必须由 `IdentityCommandAcceptedResultEnvelope` replay |
+| `command_rejected(context_ref, marker, now)` | context ref、rejected surface marker、now | stored rejected generic shell | 只用于已定义可 replay 的 rejection;public rejection 必须由 `IdentityCommandRejectedResultEnvelope` replay |
 | `consumer_receipt(context_ref, marker, now)` | context ref、receipt marker、now | stored consumer receipt | 不保存 event body |
 | `job_report(context_ref, marker, now)` | context ref、report marker、now | stored job report | 不保存 raw job log |
 | `handoff_callback_receipt(context_ref, marker, now)` | context ref、receipt marker、now | stored callback receipt | 不保存 external receipt body |
 
 不变量:
 
-- stored result 是 replay snapshot,duplicate replay 必须读取它,不得重跑 mutation 或重新查询 truth 拼 response。
+- stored result 是 replay generic shell,duplicate replay 必须先读取它确认 kind/context,再读取对应 typed envelope/report;不得重跑 mutation 或重新查询 truth 拼 response。
+- command duplicate replay 不能只读取 `StoredIdentityOperationResult`;accepted replay 必须再读取 `IdentityCommandAcceptedResultEnvelope`,rejected replay 必须再读取 `IdentityCommandRejectedResultEnvelope`。
 - stored result surface marker 不能保存 raw request、event body、job payload、external receipt body、secret 或 forbidden material。
 - `CommandRejected` 只表示 Step 12 / Step 13 明确允许持久化并 replay 的 rejected surface;普通 validation error 是否存储留后续闭口。
 - query success 不进入此对象,除非后续 Step 13 明确 query cache / result replay surface。
 
-#### 7.16.8 `IdentityCommandEffectSummary`
+#### 7.16.8 `IdentityCommandAcceptedResultEnvelope` / `IdentityCommandRejectedResultEnvelope`
+
+| 项 | 内容 |
+|---|---|
+| 所属批次 | `6.6 application helper objects` |
+| 组件 / crate | `application::results` |
+| capability | 为 command duplicate replay 提供 typed stored public surface |
+| 对象类别 | application helper / replay envelope |
+| 责任 | 保存 command accepted public result/effect 或 replayable rejected public rejection,使 duplicate replay 不依赖 current truth |
+| 非责任 | 不保存 command request body、不保存 raw error body、不决定 rejected 是否 replayable、不替代 generic stored shell |
+| 后续 Step | Step 7 repository save/get;Step 8 command typed result enum;Step 11 persistence;Step 12/13 replay consistency |
+
+```rust
+pub struct IdentityCommandAcceptedResultEnvelope {
+    pub stored_result_ref: IdentityStoredResultRef,
+    pub operation_context_ref: IdentityOperationContextRef,
+    pub command_name: IdentityCommandName,
+    pub surface_marker_ref: IdentityStoredSurfaceMarkerRef,
+    pub result: IdentityCommandTypedResult,
+    pub effect: IdentityCommandEffectPublicSummary,
+    pub recorded_at: IdentityTimestamp,
+}
+
+pub struct IdentityCommandRejectedResultEnvelope {
+    pub stored_result_ref: IdentityStoredResultRef,
+    pub operation_context_ref: IdentityOperationContextRef,
+    pub command_name: IdentityCommandName,
+    pub surface_marker_ref: IdentityStoredSurfaceMarkerRef,
+    pub rejection: IdentityProtocolRejection,
+    pub recorded_at: IdentityTimestamp,
+}
+```
+
+| 字段 | 来源 | 约束 |
+|---|---|---|
+| `stored_result_ref` | `StoredIdentityOperationResult.stored_result_ref` | 必须存在同 ref generic shell;accepted kind 为 `CommandAccepted`,rejected kind 为 `CommandRejected` |
+| `operation_context_ref` | `IdentityOperationContext.context_ref` | 只保存 context ref,不保存 request metadata body |
+| `command_name` | command route catalog / operation context | 必须与 `result` variant 或 `rejection.surface_ref` 对应 command surface 一致 |
+| `surface_marker_ref` | public surface builder | 必须等于 generic shell 的 `surface_marker_ref`;只作为 body-free marker |
+| `result` | Step 8 command-specific typed result DTO union | 只保存 accepted command business result fields;不得包含 effect 或 raw command body |
+| `effect` | accepted command effect public summary assembler | 只在 accepted envelope 出现;rejected envelope 不保存 effect |
+| `rejection` | Step 8 `IdentityProtocolRejection` | 只用于 Step 12/13 判定 replayable 的 rejected surface;internal/repository failure 不得伪装为 rejected envelope |
+| `recorded_at` | clock | 不替代 truth cursor、version、digest 或 idempotency key |
+
+不变量:
+
+- accepted duplicate replay 返回 `IdentityCommandResponse<T>` 时,`result` 必须来自 `IdentityCommandAcceptedResultEnvelope.result`,`effect` 必须来自 `IdentityCommandAcceptedResultEnvelope.effect`。
+- rejected duplicate replay 返回 `IdentityProtocolRejection` 时,必须来自 `IdentityCommandRejectedResultEnvelope.rejection`。
+- `IdentityCommandTypedResult` 是 Step 8 protocol-owned command result sum type,其 variant 必须覆盖所有 formal command result DTO;新增 command DTO 时必须同步新增 variant。
+- generic `StoredIdentityOperationResult(CommandAccepted/CommandRejected)` 只用于 kind/context/ref consistency check,不能替代 typed envelope。
+- typed envelope missing、wrong kind、command/result variant mismatch 或 effect missing 都是 replay consistency defect;不得读取 current truth、重新调用 resolver 或重跑 domain guard。
+
+#### 7.16.9 `IdentityCommandEffectSummary`
 
 | 项 | 内容 |
 |---|---|
@@ -5786,7 +5849,7 @@ pub struct IdentityCommandEffectSummary {
 - `primary_truth_ref` 必须是 typed identity-owned ref,不得保存 `ExternalSourceRef` 字符串或 ad hoc subject key。
 - projection stale 只保存 affected refs,query / summary builder 不得通过此对象拼 view ref。
 
-#### 7.16.9 `IdentityVisibilityDecision`
+#### 7.16.10 `IdentityVisibilityDecision`
 
 | 项 | 内容 |
 |---|---|
@@ -5851,7 +5914,7 @@ pub enum IdentityReadDispositionKind {
 - `NotVisible` 不能伪装为 empty result;`Degraded` 不能伪装为 accepted success。
 - redaction/degraded marker 不保存 raw denial reason、external error body、credential、secret 或 policy body。
 
-#### 7.16.10 `IdentityJobRunReport`
+#### 7.16.11 `IdentityJobRunReport`
 
 | 项 | 内容 |
 |---|---|
@@ -5938,7 +6001,7 @@ pub enum IdentityJobResultKind {
 - cursor 必须来自正式 job / source cursor 来源;timestamp、page cursor、idempotency key 均不能替代。
 - affected refs 和 issue refs 只保存 body-free refs / markers。
 
-#### 7.16.11 本批并入 / 后移 / 排除对象
+#### 7.16.12 本批并入 / 后移 / 排除对象
 
 | 候选 | 处理 | 理由 | 后续位置 |
 |---|---|---|---|
@@ -5953,7 +6016,7 @@ pub enum IdentityJobResultKind {
 | query cache object | 排除本批 | `02` 未要求 query stored replay;不能在 Step 6 发明 cache | 若后续需要,Step 13 另行闭口 |
 | retry schedule / backoff policy | 后移 | runtime operations config | Step 14 |
 
-#### 7.16.12 6.6 模块内停审记录
+#### 7.16.13 6.6 模块内停审记录
 
 | 审查项 | 结论 | 说明 |
 |---|---|---|
@@ -5970,7 +6033,7 @@ pub enum IdentityJobResultKind {
 | 是否修改正式 `03` | 未修改 | 正式 `03` 仍等 Step 19 装配 |
 | 下一批 | `6.7` | 用户审核通过后进入 infra / api / worker / jobs entry objects |
 
-#### 7.16.13 6.6 正反例
+#### 7.16.14 6.6 正反例
 
 | 场景 | 正例 | 反例 |
 |---|---|---|
@@ -5980,10 +6043,10 @@ pub enum IdentityJobResultKind {
 | consumer context | consumer context 必须带 `source_event_ref` 和 dedup key | consumer flow 没有 event identity,靠 payload 内容去重 |
 | job context | job context 必须带 `job_run_ref` | 用 job name + timestamp 临时拼 run id |
 | request digest | digest 来自 canonical marker + schema version + algorithm marker | 用 timestamp、version、idempotency key 或 raw JSON 字符串当 digest |
-| duplicate replay | same key + same digest + stored result 才 replay | same key 直接 replay,不比较 digest |
+| duplicate replay | same key + same digest + stored result shell + typed envelope/report 才 replay | same key 直接 replay,不比较 digest |
 | duplicate conflict | same key + different digest 标为 conflict | 覆盖旧 record 或保存 incoming raw request |
-| stored accepted result | stored result 保存 accepted surface marker | duplicate 时重新查询 truth 拼 response |
-| stored rejected result | 仅存 Step 12/13 明确可 replay 的 rejected marker | 所有 validation error 都写 stored result |
+| stored accepted result | stored result 保存 generic shell,`IdentityCommandAcceptedResultEnvelope` 保存 typed result/effect | duplicate 时重新查询 truth 拼 response |
+| stored rejected result | 仅存 Step 12/13 明确可 replay 的 rejected generic shell + `IdentityCommandRejectedResultEnvelope` | 所有 validation error 都写 stored result |
 | command effect summary | summary 引用 truth ref、cursor、trace、outbox、stale projection、stored result refs | summary 保存 raw event body 或决定 transaction order |
 | accepted cursor | `accepted_cursor_ref` 来自正式 truth cursor assigner | 用 `started_at`、optimistic version 或 idempotency key 当 cursor |
 | visibility scope | scope 来自 request/view/resolver summary | 从 read subject 字符串拆出 scope |

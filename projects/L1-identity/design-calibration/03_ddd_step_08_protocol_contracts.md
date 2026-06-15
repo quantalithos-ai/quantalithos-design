@@ -398,6 +398,16 @@ pub enum IdentityCommandOutcome<T> {
     Accepted(IdentityCommandResponse<T>),
     Rejected(IdentityProtocolRejection),
 }
+
+/// Stored typed command result variants used only by duplicate replay.
+pub enum IdentityCommandTypedResult {
+    GlobalMember(GlobalMemberCommandResult),
+    GlobalLifecycle(GlobalLifecycleCommandResult),
+    RoleCapability(RoleCapabilityCommandResult),
+    CareerRecord(CareerRecordCommandResult),
+    MemoryReference(MemoryReferenceCommandResult),
+    TraceHandoff(TraceHandoffCommandResult),
+}
 ```
 
 正式承载规则: `IdentityCommandEffectPublicSummary` 只出现在 `IdentityCommandResponse<T>.effect`。所有 command-specific typed result DTO 只承载业务结果字段,不得再定义 `effect` 字段或复制 effect summary。
@@ -423,6 +433,18 @@ pub struct IdentityCommandEffectPublicSummary {
 | `effect.accepted_cursor_ref` | Step 7 UoW truth cursor assigner | accepted-only;rejected/entry failure 不生成 |
 | `trace_refs` / `outbox_refs` | accepted transaction append or explicit empty side-effect inventory | 只返回 refs,不返回 trace body或 event body;`outbox_refs` 仅在该 flow 有正式 canonical outbound payload 时非空 |
 | `stale_projection_refs` | projection stale marker expansion | stale marker 不是 query rebuild |
+
+`IdentityCommandTypedResult` 是 command duplicate replay 的 typed stored result union。它不作为普通 handler 泛型返回值的替代;正常 handler 仍返回 `IdentityCommandOutcome<T>`。当 accepted command 进入 idempotency complete 前,application service 必须同时保存:
+
+- `StoredIdentityOperationResult(CommandAccepted)` generic shell。
+- `IdentityCommandAcceptedResultEnvelope` typed envelope,其中 `result` 为对应 `IdentityCommandTypedResult` variant,`effect` 为最终 public `IdentityCommandEffectPublicSummary`。
+
+当 replayable rejected command 进入 rejected idempotency complete 前,application service 必须同时保存:
+
+- `StoredIdentityOperationResult(CommandRejected)` generic shell。
+- `IdentityCommandRejectedResultEnvelope`,其中 `rejection` 为最终 public `IdentityProtocolRejection`。
+
+Duplicate replay 必须按 command name 校验 `IdentityCommandTypedResult` variant,再投射为 `IdentityCommandResponse<T>.result`;不得通过 current truth、surface marker、effect summary repository 或 command-specific repository 重建 result。
 
 ### 8.1.5 Query request / response envelope
 
@@ -974,7 +996,7 @@ pub struct GlobalMemberCommandResult {
 #### 9.3.6 幂等与审计要求
 
 - 必须使用 8.1 `IdentityCommandMetadata.idempotency_key` 和 `IdentityRequestDigestMarker`。
-- accepted path 必须保存 stored accepted result surface,以支持 duplicate replay。
+- accepted path 必须保存 stored accepted generic shell 和 `IdentityCommandAcceptedResultEnvelope`,以支持 duplicate replay。
 - accepted path 必须产生 trace refs、outbox refs 和 command effect summary refs;具体顺序留 Step 9/11。
 - rejected 是否 stored 由 Step 12/13 细化,但若 stored rejected,必须使用 8.1 `IdentityProtocolRejection` surface。
 
@@ -1082,7 +1104,7 @@ pub struct GlobalLifecycleCommandResult {
 #### 9.4.6 幂等与审计要求
 
 - 必须使用 8.1 `IdentityCommandMetadata.idempotency_key` 和 `IdentityRequestDigestMarker`。
-- accepted path 必须 stored accepted result,duplicate replay 不重跑 lifecycle transition。
+- accepted path 必须保存 stored accepted generic shell 和 `IdentityCommandAcceptedResultEnvelope`,duplicate replay 不重跑 lifecycle transition。
 - accepted path 必须 append trace/outbox/effect summary;具体 trace kind、outbox payload 和 projection stale refs 留 Step 9/11。
 - basis invalid/unavailable 的 rejected 是否 stored 留 Step 12/13,但 surface 必须是 8.1 `IdentityProtocolRejection`。
 
@@ -1730,7 +1752,7 @@ pub struct TraceHandoffCommandResult {
 #### 11.3.6 幂等与审计要求
 
 - 必须使用 8.1 `IdentityCommandMetadata.idempotency_key` 和 `IdentityRequestDigestMarker`。
-- accepted path 必须 stored accepted result,duplicate replay 不重新创建 handoff intent。
+- accepted path 必须保存 stored accepted generic shell 和 `IdentityCommandAcceptedResultEnvelope`,duplicate replay 不重新创建 handoff intent。
 - accepted path 可追加 handoff preparation trace marker,但不得追加 delivery receipt marker。
 - accepted path 不创建 outbox record,`IdentityCommandEffectPublicSummary.outbox_refs = []`;Step 8 当前十条 canonical outbound event 没有 `TraceHandoffIntentPrepared` payload,不得复用 `MemoryArchiveHandoffStateChangedPayload` 或由实现私造第十一条 event。
 - accepted response 只能返回 refs/markers;不能返回 trace body、audit body、archive package、adapter raw response、target secret 或 receipt body。
@@ -4309,13 +4331,13 @@ Stored job report surface 必须足够 replay public `IdentityJobResponse<T>` �
 
 | Replay surface | Public output | Stored source | Missing / wrong-kind rule |
 |---|---|---|---|
-| command accepted | `IdentityCommandResponse<T>` carrying `effect` | `StoredIdentityOperationResult(CommandAccepted)` + command result/effect summary marker | Step 13 定义 degraded/rejected replay error;不得重跑 command |
-| command rejected | `IdentityProtocolRejection` | `StoredIdentityOperationResult(CommandRejected)` only for replayable rejection | 普通 validation/internal error 是否存储留 Step 12/13 |
+| command accepted | `IdentityCommandResponse<T>` carrying `effect` | `IdentityCommandAcceptedResultEnvelope` + `StoredIdentityOperationResult(CommandAccepted)` shell | missing typed envelope、variant mismatch 或 effect missing 不得重跑 command 或重读 truth |
+| command rejected | `IdentityProtocolRejection` | `IdentityCommandRejectedResultEnvelope` + `StoredIdentityOperationResult(CommandRejected)` shell,only for replayable rejection | 普通 validation/internal error 是否存储留 Step 12/13;missing envelope 不得重跑 validation/domain guard |
 | consumer receipt | `IdentityConsumerReceipt` | `IdentityConsumerReceiptEnvelope(result_kind = ConsumerReceipt)` + `StoredIdentityOperationResult(ConsumerReceipt)` shell | missing typed envelope 不得重放 consumer mutation |
 | handoff callback receipt | `IdentityConsumerReceipt` with callback family | `IdentityConsumerReceiptEnvelope(result_kind = HandoffCallbackReceipt)` + `StoredIdentityOperationResult(HandoffCallbackReceipt)` shell | kind mismatch 不得当普通 consumer receipt |
 | operations job report | `IdentityJobResponse<T>` with `IdentityJobReportSurface` | `StoredIdentityOperationResult(JobReport)` + `IdentityJobRunReport` | missing stored report 不得重扫 projection/reference/outbox/handoff |
 
-审计结论:Step 8 public replay surface 已和 Step 6/7 stored result kind 对齐。Consumer/callback replay 必须使用 typed receipt envelope,不只使用 generic stored shell。Step 13 必须补 digest、same-key conflict、missing typed envelope、wrong-kind stored result 和 in-flight replay matrix;Step 8 不定义 digest algorithm 或 durable table。
+审计结论:Step 8 public replay surface 已和 Step 6/7 stored result kind 对齐。Command accepted/rejected replay 必须使用 typed command envelope,consumer/callback replay 必须使用 typed receipt envelope,均不只使用 generic stored shell。Step 13 必须补 digest、same-key conflict、missing typed envelope、wrong-kind stored result 和 in-flight replay matrix;Step 8 不定义 digest algorithm 或 durable table。
 
 ### 18.5 Handler target and entry boundary audit
 

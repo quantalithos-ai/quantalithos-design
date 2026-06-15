@@ -171,8 +171,8 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | `external_reference_owner_index` | owner / kind / stale target lookup for refresh and reconciliation | unique `(owner_ref, reference_ref, reference_kind)` | `owner_ref`,`reference_kind`,`resolution_state`,`reference_ref` | owned by `external_reference_states` save |
 | `external_reference_sidecars` | typed safe summary / snapshot / marker sidecar bound to reference bundle | unique `(reference_ref, sidecar_kind, sidecar_ref)` | `reference_ref`,`sidecar_kind`,`sidecar_ref`,`source_version_ref` | uses same loaded bundle `identity_version`;no standalone optimistic version |
 | `identity_trace_records` | accepted trace, marker trace and correction trace | PK `trace_record_ref` | `member_ref`,`subject_ref`,`change_kind_ref`,`source_cursor` | append-only;no optimistic overwrite |
-| `identity_audit_trails` | audit trail aggregate / timeline owner | PK `audit_trail_ref`;unique `audit_subject_ref` | `audit_subject_ref`,`scope_ref`,`latest_trace_ref`,`audit_cursor_ref` | `identity_version` |
-| `identity_audit_entries` | body-free audit trail entries | unique `(audit_trail_ref, ordinal_or_cursor)` | `audit_trail_ref`,`trace_record_ref`,`audit_cursor_ref` | owned by audit trail append |
+| `identity_audit_trails` | audit trail aggregate / timeline owner | PK `audit_trail_ref`;unique `audit_subject_ref` | `audit_subject_ref`,`member_ref`,`audit_scope_ref`,`visibility_result_ref`,`read_surface_kind`,`latest_trace_ref`,`audit_cursor_ref` | `identity_version`;accepted write create uses `IdentityAcceptedAuditTrailMarkerMapper` for scope / visibility markers |
+| `identity_audit_entries` | body-free audit trail entries | unique `(audit_trail_ref, ordinal_or_cursor)` | `audit_trail_ref`,`trace_record_ref`,`change_kind_ref`,`visibility_result_ref`,`occurred_at`,`audit_cursor_ref` | owned by audit trail append;accepted write entry visibility marker comes from `IdentityAcceptedAuditTrailMarkerMapper` |
 | `trace_handoff_intents` | trace handoff marker and state | PK `handoff_intent_ref` | `member_ref`,`target_ref`,`scope_ref`,`handoff_state`,`receipt_ref`,`issue_ref` | `identity_version` |
 | `trace_handoff_items` | handoff intent trace / audit item set | unique `(handoff_intent_ref, trace_record_ref)`;optional audit item unique by `audit_trail_ref` | `trace_record_ref`,`audit_trail_ref`,`target_ref` | owned by handoff intent save |
 | `identity_outbox_records` | accepted-only outbound publication marker | PK `outbox_record_ref`;optional unique `(trace_record_ref, event_kind_ref)` | `outbox_state`,`topic_key_ref`,`subject_ref`,`trace_record_ref`,`attempt_ref` | `identity_version` |
@@ -263,7 +263,7 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | `GlobalMemberRepository.save_member` | PK `member_ref` | create `None`;update loaded member version;UoW write | member ref unique;terminal hold 不释放 ref;不自动写 lifecycle/trace/outbox |
 | `GlobalLifecycleRepository.get_lifecycle_with_version` | `identity_global_lifecycles` by `member_ref` | returns lifecycle version | read-only;version 只用于 lifecycle transition save |
 | `GlobalLifecycleRepository.list_lifecycles` | lifecycle page / state indexes | page cursor only | body-free scan;不根据 runtime disabled 改 lifecycle |
-| `GlobalLifecycleRepository.save_lifecycle` | PK `member_ref` | create `None`;update loaded lifecycle version;UoW write | current lifecycle 一行一真相;不自动释放 anchor |
+| `GlobalLifecycleRepository.save_lifecycle(member_ref, lifecycle_state, expected_version, uow)` | `identity_global_lifecycles` PK `member_ref` from explicit argument | create `None`;update version from `get_lifecycle_with_version(member_ref)`;UoW write | current lifecycle 一行一真相;不得从 lifecycle_state、reason_ref、governance_basis_ref、actor 或 source string 推断 member key;不自动释放 anchor |
 | `RoleCapabilityRepository.get_summary_with_version` | `role_capability_summaries` by `summary_ref` | returns summary version | read-only;不从 safe summary marker 拼 truth |
 | `RoleCapabilityRepository.find_current_summary_by_member` | current summary index by `member_ref` | returns versioned summary | current 判定来自 formal index;不得用 list 后 ad hoc 选择 |
 | `RoleCapabilityRepository.list_summaries_by_member` | summary member index | page cursor only | read-only;不保存 role/capability definition body |
@@ -300,8 +300,8 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | `IdentityAuditTrailRepository.get_audit_trail_with_version` | `identity_audit_trails` by `audit_trail_ref` | returns audit aggregate version | read-only;version 用于 save/append |
 | `IdentityAuditTrailRepository.find_audit_trail_by_subject` | unique `audit_subject_ref` | returns versioned trail | missing 由 service 用 id generator 创建;repo 不隐式创建 |
 | `IdentityAuditTrailRepository.list_audit_entries` | `identity_audit_entries` by trail/scope/cursor | audit cursor + page cursor only | audit cursor 不等于 truth cursor;不保存 raw log |
-| `IdentityAuditTrailRepository.save_audit_trail` | PK `audit_trail_ref`;unique subject | create `None`;update loaded trail version;UoW write | 不修复 missing trace |
-| `IdentityAuditTrailRepository.append_audit_entry` | audit entry set owned by trail | expected loaded trail version;UoW write | entry 引用 trace ref;不保存 trace body/debug body |
+| `IdentityAuditTrailRepository.save_audit_trail` | PK `audit_trail_ref`;unique subject | create `None`;update loaded trail version;UoW write | accepted write create must use `AuditTrail::from_accepted_write(...)` with scope / visibility markers from `IdentityAcceptedAuditTrailMarkerMapper`;不修复 missing trace |
+| `IdentityAuditTrailRepository.append_audit_entry` | audit entry set owned by trail | expected loaded trail version;UoW write | entry 引用 trace ref;accepted write visibility marker comes from `IdentityAcceptedAuditTrailMarkerMapper`;不保存 trace body/debug body |
 | `IdentityTraceHistoryRepository.list_history_by_member` | read facade over trace/audit stores | page cursor only | 不创建第二套 history row |
 | `IdentityTraceHistoryRepository.list_history_by_subject` | read facade by trace subject | page cursor only | 不从 raw subject 字符串查询 |
 | `IdentityTraceHistoryRepository.list_history_between_cursors` | trace subject + cursor range | truth/reference marker cursor only | 不用 audit/page cursor 替代 |
@@ -376,8 +376,12 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | `IdentityIdempotencyRepository.mark_conflict` | loaded idempotency row | expected loaded idempotency version;UoW write | 保留原 digest;不覆盖旧 record |
 | `IdentityStoredResultRepository.get_stored_result` | `stored_identity_operation_results` by stored result ref | read-only immutable | missing 不重跑 mutation |
 | `IdentityStoredResultRepository.find_by_operation_context` | stored result context index | read-only | 不从 raw request 查 |
-| `IdentityStoredResultRepository.save_command_accepted_result` | stored result PK/context/kind index | append immutable;UoW write | result kind must be `CommandAccepted`;不保存 response body |
-| `IdentityStoredResultRepository.save_command_rejected_result` | stored result PK/context/kind index | append immutable;UoW write | result kind must be `CommandRejected`;internal error 不当 rejected result |
+| `IdentityStoredResultRepository.save_command_accepted_result` | stored result PK/context/kind index | append immutable;UoW write | generic shell only;result kind must be `CommandAccepted`;typed replay 仍需 accepted envelope |
+| `IdentityStoredResultRepository.get_command_accepted_result` | `identity_command_accepted_result_envelopes` by stored result ref | read-only immutable | missing/wrong-kind/variant mismatch 不重跑 command、不重读 truth |
+| `IdentityStoredResultRepository.save_command_accepted_envelope` | accepted command envelope PK/result index | append immutable;UoW write | 同 UoW 保存 typed result + effect;不保存 command request body;result DTO 不重复 effect |
+| `IdentityStoredResultRepository.save_command_rejected_result` | stored result PK/context/kind index | append immutable;UoW write | generic shell only;result kind must be `CommandRejected`;internal error 不当 rejected result |
+| `IdentityStoredResultRepository.get_command_rejected_result` | `identity_command_rejected_result_envelopes` by stored result ref | read-only immutable | missing/wrong-kind 不重跑 validation/domain guard |
+| `IdentityStoredResultRepository.save_command_rejected_envelope` | rejected command envelope PK/result index | append immutable;UoW write | 只保存 replayable `IdentityProtocolRejection`;不保存 raw error body |
 | `IdentityStoredResultRepository.save_consumer_receipt_result` | generic stored shell | append immutable;UoW write | typed replay 仍需 receipt envelope;不保存 event body |
 | `IdentityStoredResultRepository.get_consumer_receipt` | `identity_consumer_receipt_envelopes` by stored result ref | read-only immutable | missing/wrong-kind 不重跑 consumer |
 | `IdentityStoredResultRepository.save_consumer_receipt` | receipt envelope PK/result index | append immutable;UoW write | 同 UoW 保存完整 public receipt envelope;不保存 event body |
@@ -403,7 +407,7 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | core truth | unique key、version conflict、append-only career、duplicate source lookup | truth stores + typed indexes + optimistic update | fake query miss 自动建 truth 或保存外部正文 |
 | trace/audit/history/handoff | append order、subject/cursor indexes、audit/handoff version conflict、receipt marker guard | append-only trace/audit stores + handoff state indexes | fake 用 raw body 搜索或把 adapter success 当 delivered |
 | projection/read/reference/report | stable lookup missing、query no-write、bundle sidecar same-version、report-only | projection/reference/report stores + formal indexes | fake 拼 view/ref、扫描 sibling body、query rebuild/refresh |
-| outbox/replay/job | same key/digest semantics、stored result save/load symmetry、pending/retry indexes、job run uniqueness | idempotency/result/outbox/job stores + unique indexes | fake missing stored result 时重跑 mutation |
+| outbox/replay/job | same key/digest semantics、stored generic shell + typed command envelope / receipt / job report save-load symmetry、pending/retry indexes、job run uniqueness | idempotency/result/outbox/job stores + unique indexes | fake missing stored result 或 typed envelope 时重跑 mutation |
 
 #### 7.3.8 11.2 stop-review
 
@@ -427,8 +431,8 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | flow family | 是否开启 write UoW | commit 前必须完成 | commit 后才允许 | rollback / no-write 规则 |
 |---|---|---|---|---|
 | API / worker / jobs entry pre-dispatch | 否 | entry context、validation、dispatch target decision 只在 entry surface 内形成 | 调用 application facade 后由 application result 接管 | pre-dispatch failure 不保存 stored result、receipt、job report 或 truth |
-| command accepted | 是 | idempotency reserve、versioned load、domain transition、truth save、truth cursor、trace/audit/outbox/stale/effect/stored result、idempotency complete | publish outbox、deliver handoff、external downstream consumption | guard/domain/repository failure before commit rollback;accepted truth 与 side effects 同 UoW |
-| command replayable rejected | 是,仅当 Step 12/13 判定该 rejected surface 可 replay | idempotency reserve、stored rejected result、idempotency rejected complete | 无业务 side effect | 不写 truth、trace、audit、outbox、projection;不可 replay error rollback |
+| command accepted | 是 | idempotency reserve、versioned load、domain transition、truth save、truth cursor、trace/audit/outbox/stale/effect、generic stored shell、typed command accepted envelope、idempotency complete | publish outbox、deliver handoff、external downstream consumption | guard/domain/repository failure before commit rollback;accepted truth 与 replay surface 同 UoW |
+| command replayable rejected | 是,仅当 Step 12/13 判定该 rejected surface 可 replay | idempotency reserve、generic stored rejected shell、typed command rejected envelope、idempotency rejected complete | 无业务 side effect | 不写 truth、trace、audit、outbox、projection;不可 replay error rollback |
 | query | 否 | visibility precheck、read truth/view/reference/report/outbox/handoff、assemble read surface | 无写 side effect | 禁止 UoW、idempotency、stored result、trace/audit append、projection rebuild、reference refresh |
 | inbound consumer accepted / marker-only / receipt branch | 是 | idempotency reserve、payload/material guard、identity-owned truth/reference/sidecar/marker update、cursor、trace/outbox/stale when required、typed receipt envelope、stored result shell、idempotency complete | worker ack/dead-letter transport mapping | duplicate replay 不 parse/reapply payload;delayed/quarantined/noop 保存 typed receipt 时也不保存 external body |
 | handoff callback accepted / failure receipt branch | 是 | callback idempotency、target lookup、formal attempt/receipt/issue marker guard、handoff or memory state update、trace/outbox/stale when required、callback receipt envelope、stored result shell、idempotency complete | worker ack/dead-letter transport mapping | `Delivered` without formal attempt + receipt rollback/rejected surface;receipt body never stored |
@@ -441,14 +445,14 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 
 | command group | UoW start | Same-UoW writes on accepted path | External/non-transactional work | Commit / rollback rule |
 |---|---|---|---|---|
-| `EstablishGlobalMemberFlow` | before idempotency reserve and member/lifecycle guard | member create,initial lifecycle create,truth cursor,trace,audit,accepted outbox material when defined,affected projection stale,effect summary,stored accepted result,idempotency complete | none after accepted commit except later outbox job | any guard/version/store failure before commit rolls back all staged rows |
-| `UpdateGlobalLifecycleStateFlow` | before idempotency reserve and loaded member/lifecycle read | lifecycle update,optional anchor hold update,truth cursor,trace/audit,outbox for lifecycle/availability/anchor material,projection stale,effect summary,stored result,idempotency complete | governance basis resolver output is body-free input;publish happens later | high-risk basis missing/invalid cannot partially save lifecycle or anchor |
-| `MaintainRoleCapabilitySummaryFlow` | before idempotency reserve and source/snapshot/summary load | summary/snapshot/reference sidecar updates that Step 9 accepted path requires,truth cursor or reference marker cursor as applicable,trace/audit/outbox/stale,effect/stored result,idempotency complete | source/evidence resolver calls produce safe summary/version only | source unavailable/invalid or forbidden material cannot save partial active summary |
-| `AppendCareerRecordFlow` | before idempotency reserve and duplicate source guard | career append or explicit pending-review record,truth cursor,trace/audit,outbox/stale,effect/stored result,idempotency complete | work source resolver output is body-free input | duplicate source no-new-history branch uses stored surface;does not append second record |
-| `MaintainMemoryReferenceFlow` | before idempotency reserve and member/relation/source guard | memory relation create/update,optional reference sidecar,truth or marker cursor,trace/audit/outbox/stale,effect/stored result,idempotency complete | memory/archive resolver output is body-free input | handoff marker state cannot become delivered without callback/job receipt |
-| `PrepareTraceHandoffFlow` | before idempotency reserve and trace/audit/material guard | pending handoff intent,trace/audit marker when required,projection stale/effect/stored result,idempotency complete | target resolution may validate target/scope but does not deliver | accepted command creates pending intent only;delivery is job/callback boundary |
+| `EstablishGlobalMemberFlow` | before idempotency reserve and member/lifecycle guard | member create,initial lifecycle create,truth cursor,trace,audit,accepted outbox material when defined,affected projection stale,effect summary,generic stored accepted shell,typed accepted envelope,idempotency complete | none after accepted commit except later outbox job | any guard/version/store failure before commit rolls back all staged rows |
+| `UpdateGlobalLifecycleStateFlow` | before idempotency reserve and loaded member/lifecycle read | lifecycle update,optional anchor hold update,truth cursor,trace/audit,outbox for lifecycle/availability/anchor material,projection stale,effect summary,generic stored accepted shell,typed accepted envelope,idempotency complete | governance basis resolver output is body-free input;publish happens later | high-risk basis missing/invalid cannot partially save lifecycle or anchor |
+| `MaintainRoleCapabilitySummaryFlow` | before idempotency reserve and source/snapshot/summary load | summary/snapshot/reference sidecar updates that Step 9 accepted path requires,truth cursor or reference marker cursor as applicable,trace/audit/outbox/stale,effect summary,generic stored accepted shell,typed accepted envelope,idempotency complete | source/evidence resolver calls produce safe summary/version only | source unavailable/invalid or forbidden material cannot save partial active summary |
+| `AppendCareerRecordFlow` | before idempotency reserve and duplicate source guard | career append or explicit pending-review record,truth cursor,trace/audit,outbox/stale,effect summary,generic stored accepted shell,typed accepted envelope,idempotency complete | work source resolver output is body-free input | duplicate source no-new-history branch uses stored surface;does not append second record |
+| `MaintainMemoryReferenceFlow` | before idempotency reserve and member/relation/source guard | memory relation create/update,optional reference sidecar,truth or marker cursor,trace/audit/outbox/stale,effect summary,generic stored accepted shell,typed accepted envelope,idempotency complete | memory/archive resolver output is body-free input | handoff marker state cannot become delivered without callback/job receipt |
+| `PrepareTraceHandoffFlow` | before idempotency reserve and trace/audit/material guard | pending handoff intent,trace/audit marker when required,projection stale,effect summary,generic stored accepted shell,typed accepted envelope,idempotency complete | target resolution may validate target/scope but does not deliver | accepted command creates pending intent only;delivery is job/callback boundary |
 
-Command duplicate replay is outside the accepted mutation branch. Same key/same digest duplicate must load the stored command accepted/rejected surface named by the idempotency record. It must not reload truth to reconstruct response, re-run resolver, append trace/audit/outbox, mark projections stale again, or create a second effect summary.
+Command duplicate replay is outside the accepted mutation branch. Same key/same digest duplicate must load the generic stored shell plus `IdentityCommandAcceptedResultEnvelope` or `IdentityCommandRejectedResultEnvelope` named by the idempotency record. It must not reload truth to reconstruct response, re-run resolver, append trace/audit/outbox, mark projections stale again, or create a second effect summary.
 
 #### 7.4.3 query no-write transaction boundary
 
@@ -495,7 +499,7 @@ Operations job duplicate replay must load `StoredIdentityOperationResult(JobRepo
 | commit failure | if commit fails, application must not report accepted/receipt/job success;exact recovery mapping留 Step 12 |
 | external side effect placement | publisher / handoff delivery outcome may be obtained during job processing, but durable publication/delivery state is only trusted after local commit |
 | no two-phase external commit | external broker/archive/downstream owner is not inside Identity UoW;Identity persists only attempt/receipt/issue markers |
-| accepted truth durability | accepted command truth is committed together with trace/audit/outbox/stale/effect/stored result/idempotency complete |
+| accepted truth durability | accepted command truth is committed together with trace/audit/outbox/stale/effect,generic stored shell,typed command envelope and idempotency complete |
 | propagation failure isolation | outbox/handoff failure updates marker/report only;it never rolls back member/lifecycle/role/career/memory accepted truth |
 | query no repair | query missing/stale/degraded returns surface;it never opens UoW to repair projection/reference/audit/report |
 
@@ -504,7 +508,7 @@ Operations job duplicate replay must load `StoredIdentityOperationResult(JobRepo
 | 审查项 | 结论 | 说明 |
 |---|---|---|
 | 是否只写 11.3 范围 | 通过 | 只写 transaction boundary;未写错误 taxonomy、幂等矩阵、retry/backoff 或测试矩阵 |
-| command accepted 原子写入是否闭合 | 通过 | truth、cursor、trace/audit/outbox/stale/effect/stored result/idempotency complete 均在同 UoW |
+| command accepted 原子写入是否闭合 | 通过 | truth、cursor、trace/audit/outbox/stale/effect,generic stored shell,typed command envelope,idempotency complete 均在同 UoW |
 | query no-write 是否闭合 | 通过 | query 不开 UoW、不写 stored result、不 repair projection/reference/report/outbox/handoff |
 | consumer/callback receipt replay 是否同事务闭合 | 通过 | typed receipt envelope、stored shell、idempotency complete 与本地 marker/state update 同 UoW |
 | job report replay 是否同事务闭合 | 通过 | job report、stored job result、idempotency complete 与 item state/report refs 同 UoW |
@@ -549,7 +553,7 @@ Operations job duplicate replay must load `StoredIdentityOperationResult(JobRepo
 | material | append/replay invariant | missing / wrong-kind recovery |
 |---|---|---|
 | `IdentityTraceRecord` | append once per generated trace ref;correction appends new trace and marks old trace by versioned update | missing trace in query/handoff/report becomes missing/degraded surface;do not recreate trace from truth |
-| `AuditTrailEntry` | entry append tied to loaded audit trail version and formal trace ref | missing audit trail is service-created only in accepted write flow;query does not repair |
+| `AuditTrailEntry` | entry append tied to loaded audit trail version,formal trace ref and accepted audit marker mapper visibility marker | missing audit trail is service-created only in accepted write flow with `IdentityAcceptedAuditTrailMarkerMapper`;query does not repair |
 | `CareerRecord` | new fact/correction is append-only;old record content immutable | duplicate source does not append;stored duplicate/noop behavior留 Step 13 |
 | `IdentityOutboxRecord` / payload marker | accepted material creates pending record and immutable payload marker | duplicate command replay uses stored effect/outbox refs;does not create new outbox |
 | `StoredIdentityOperationResult` | stored kind immutable after save | missing/wrong-kind replay is replay error in Step 12/13;never rerun command/consumer/job |
@@ -659,7 +663,7 @@ Operations job duplicate replay must load `StoredIdentityOperationResult(JobRepo
 | invalid domain transition | state update must rollback/no side effect unless replayable rejected is explicitly classified | `IdentityDomainError` / `ApplicationError` / protocol rejection mapping and retryability |
 | version conflict | stale `IdentityVersion` rejects write without overwrite | command/query/consumer/job public surface for conflict,including retry advice |
 | unique conflict | duplicate formal key cannot silently overwrite | duplicate vs conflict vs no-op public priority |
-| stored result missing / wrong kind | duplicate replay must not rerun mutation or reconstruct from current truth | duplicate replay error surface and operator recovery wording |
+| stored result or typed command/receipt/report surface missing / wrong kind | duplicate replay must not rerun mutation or reconstruct from current truth | duplicate replay error surface and operator recovery wording |
 | idempotency same key different digest | original digest/result remains authoritative | application/API/worker/job conflict mapping |
 | repository unavailable / commit unknown | no accepted success may be reported without committed stored surface | dependency unavailable / commit unknown mapping and caller action |
 | query not-visible/missing/degraded/empty/stale-visible | query never writes repair material | public query surface priority and redaction field behavior |

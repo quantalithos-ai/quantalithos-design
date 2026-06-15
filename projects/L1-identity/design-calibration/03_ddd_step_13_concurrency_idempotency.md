@@ -118,7 +118,7 @@ Step 13 的目标是把 L1-identity 的 command 写路径、inbound consumer / c
 | Step 13 topic | Must carry from Step 12 | 13.x 承接位置 |
 |---|---|---|
 | concurrency resources | version conflict,unique conflict and terminal state conflict taxonomy | 13.1 / 13.2 |
-| command idempotency | same key/same digest stored command replay;different digest duplicate conflict;stored missing no-rerun | 13.3 / 13.4 |
+| command idempotency | same key/same digest replay from stored generic shell + typed command envelope;different digest duplicate conflict;stored shell/envelope missing no-rerun | 13.3 / 13.4 |
 | consumer/callback idempotency | typed receipt envelope required for replay;unsupported/quarantined/delayed/noop only replay if saved as application outcome | 13.3 / 13.4 |
 | job idempotency | stored `IdentityJobRunReport` required;duplicate replay does not rerun job or rescan item refs | 13.3 / 13.4 |
 | in-flight duplicate | no second writer while same operation/channel/key/digest reserved | 13.4 |
@@ -176,7 +176,7 @@ Step 13 的目标是把 L1-identity 的 command 写路径、inbound consumer / c
 | Resource / store | Conflict owner / writer family | Control primitive | Formal source | Forbidden substitutes / notes |
 |---|---|---|---|---|
 | `GlobalMember` / `identity_global_members` | establish member, terminal lifecycle / anchor-hold application service | PK `member_ref`;create with `None`;update with loaded `IdentityVersion`;anchor reuse guard | Step 6 `GlobalMember` / `IdentityAnchorState`;Step 7 `GlobalMemberRepository.get_member_with_version/save_member`;Step 11 `identity_global_members` | account/runtime/ProjectMember cannot create identity truth;terminal hold does not release or reuse member ref |
-| `GlobalLifecycleState` / `identity_global_lifecycles` | establish initial lifecycle, explicit lifecycle transition | one current row by `member_ref`;loaded lifecycle `IdentityVersion`;Step 10 lifecycle state matrix | Step 6 lifecycle state;Step 7 `GlobalLifecycleRepository.get_lifecycle_with_version/save_lifecycle`;Step 11 lifecycle store | runtime disabled, account status, timestamp, governance basis ref presence cannot directly advance lifecycle |
+| `GlobalLifecycleState` / `identity_global_lifecycles` | establish initial lifecycle, explicit lifecycle transition | one current row by explicit `member_ref`;save uses `save_lifecycle(member_ref, ...)`;loaded lifecycle `IdentityVersion` must come from `get_lifecycle_with_version(member_ref)` for the same key;Step 10 lifecycle state matrix | Step 6 lifecycle state;Step 7 `GlobalLifecycleRepository.get_lifecycle_with_version/save_lifecycle`;Step 11 lifecycle store | runtime disabled, account status, timestamp, governance basis ref presence, lifecycle state contents, reason or actor cannot directly advance lifecycle or infer row key |
 | `RoleCapabilitySummary` / `role_capability_summaries` | maintain role/capability command, source changed consumer, reference refresh | summary `IdentityVersion`;current-by-member index when policy requires current summary | Step 6 role summary;Step 7 `RoleCapabilityRepository.get_summary_with_version/find_current_summary_by_member/save_summary`;Step 11 summary store | role/capability definition body, method body, evidence body, safe summary ref or source version cannot become truth/version |
 | `RoleCapabilitySourceSnapshot` / `role_capability_source_snapshots` | role/capability source consumer or refresh path | snapshot `IdentityVersion`;unique typed `source_ref` for current snapshot | Step 6 source snapshot;Step 7 `find_source_snapshot_by_source/get_source_snapshot_with_version/save_source_snapshot`;Step 11 source snapshot store | source version is external provenance only;repository must not parse source ref string or call resolver implicitly |
 | `MemoryReference` / `memory_references` | maintain memory reference command, memory source consumer, archive handoff callback | relation `IdentityVersion`;unique active `(member_ref,memory_ref)`, `(member_ref,archive_ref)` or handoff index when relation kind applies | Step 6 memory reference;Step 7 `MemoryReferenceRepository.get_memory_reference_with_version/find_reference_by_memory/find_reference_by_archive/find_reference_by_handoff/save_memory_reference`;Step 11 memory relation store | memory body, embedding, archive package, receipt body or callback raw body cannot drive state directly;delivered receipt is marker-only |
@@ -429,7 +429,7 @@ Operations jobs own maintenance/propagation markers only. They can produce item 
 | public key source | Step 8 metadata/envelope/job request | command/event/job keys are mandatory for mutating/replayable paths | cursor, timestamp, source version, job cursor, source event ref |
 | digest source | Step 8 `IdentityRequestDigestMarker`;Step 6 `IdentityRequestDigest` | digest comes from canonical body-free material marker, schema version and algorithm marker | raw JSON string, transport body hash, request id |
 | digest comparison | Step 7 idempotency reserve + Step 12 conflict taxonomy | same key + same digest can replay if completed;different digest is conflict | compare raw body, ignore digest mismatch |
-| stored replay source | Step 7 stored result/receipt/job report repositories | completed duplicate uses stored command result, typed receipt or job report | current truth/projection reconstruction |
+| stored replay source | Step 7 stored result/receipt/job report repositories | completed command duplicate uses generic shell + typed command envelope;consumer/callback duplicate uses typed receipt;job duplicate uses job report | current truth/projection reconstruction |
 | query exclusion | Step 9/12 query no-write | query has no idempotency key, no stored result and no digest replay matrix | query idempotency record or stored query result |
 
 ### 4.3 Digest material baseline
@@ -451,7 +451,7 @@ Digest material must be body-free and deterministic. `None` vs omitted, enum var
 
 | Operation | Key source | Operation namespace | Stable digest material | Stored replay surface | Explicit exclusions |
 |---|---|---|---|---|---|
-| `EstablishGlobalMember` | `IdentityCommandMetadata.idempotency_key` | command name + `Command` channel | actor, command name, schema version, optional requested/generated member ref marker, identity source ref, initial anchor/lifecycle material marker | `StoredIdentityOperationResult(CommandAccepted)` + command effect summary, or replayable command rejection | request marker, trace context, created_at, generated trace/outbox/effect refs |
+| `EstablishGlobalMember` | `IdentityCommandMetadata.idempotency_key` | command name + `Command` channel | actor, command name, schema version, optional requested/generated member ref marker, identity source ref, initial anchor/lifecycle material marker | `IdentityCommandAcceptedResultEnvelope` + `StoredIdentityOperationResult(CommandAccepted)`, or `IdentityCommandRejectedResultEnvelope` + rejected shell for replayable command rejection | request marker, trace context, created_at, generated trace/outbox/effect refs |
 | `UpdateGlobalLifecycleState` | command metadata key | command name + `Command` channel | actor, member ref, target lifecycle state, lifecycle reason ref, optional risk/basis refs, canonical material marker | stored command accepted/rejected result | current lifecycle version unless DTO makes expected version semantic, resolver timestamp, governance raw decision body |
 | `MaintainRoleCapabilitySummary` | command metadata key | command name + `Command` channel | actor, member ref, role/capability source ref, evidence refs, change reason, material marker, source/safe summary refs supplied by request/canonicalizer | stored command accepted/rejected result | role/capability definition body, method body, evidence body, source version as idempotency key |
 | `AppendCareerRecord` | command metadata key | command name + `Command` channel | actor, member ref, work/project participation refs, career source marker ref, safe summary ref, append/correction intent, original record ref when correction | stored command accepted/rejected result | Project/WorkItem/ProjectMember body, duplicate source lookup result, generated career record ref |
@@ -544,7 +544,7 @@ Query metadata has `visibility_context_ref` and `request_marker_ref`, but these 
 | Priority | Condition | Required branch | Stored / write behavior | Forbidden behavior |
 |---|---|---|---|---|
 | 1 | entry validation fails before application facade | entry failure | no UoW;no idempotency record;no stored result/receipt/report | save rejected result or receipt before operation context exists |
-| 2 | reserve returns `ReplayAvailable` and stored kind matches operation family | duplicate replay | load stored command result/rejection, typed receipt, or job report;no mutation | parse payload, reload current truth to rebuild result, relist job targets |
+| 2 | reserve returns `ReplayAvailable` and stored kind matches operation family | duplicate replay | load typed command accepted/rejected envelope, typed receipt, or job report;no mutation | parse payload, reload current truth to rebuild result, relist job targets |
 | 3 | reserve returns `ReplayAvailable` but stored surface missing/wrong kind | replay consistency defect | return replay consistency/manual recovery surface available to caller | rerun command/consumer/callback/job or overwrite stored result |
 | 4 | reserve returns `Conflict` or existing key has different digest | duplicate conflict | no mutation;original record remains authoritative;optional conflict marker only through loaded idempotency version | treat as noop, change old digest, save incoming raw body |
 | 5 | reserve returns `InFlight` for same digest | delayed / temporarily unavailable | no mutation;no stored result for second caller | wait by hidden loop, start second writer, call resolver/publisher/job body |
@@ -557,16 +557,16 @@ The reserve outcome is authoritative before domain transition. Business uniquene
 
 | Branch | Required behavior | Stored result | Side-effect rule |
 |---|---|---|---|
-| first-run accepted | save truth, cursor, trace/audit, outbox, projection stale, effect summary, stored accepted result, then complete idempotency | `CommandAccepted` + effect summary | all in same UoW before commit |
-| first-run replayable rejected | save stored rejected result, then complete rejected idempotency if Step 12/flow classifies rejection replayable | `CommandRejected` | no truth, no accepted trace/outbox/stale/effect |
-| duplicate accepted replay | load stored accepted command typed result and response effect | existing `CommandAccepted` | no new truth/trace/audit/outbox/stale/effect |
-| duplicate rejected replay | load stored rejected result | existing `CommandRejected` | no revalidation/domain guard rerun |
+| first-run accepted | save truth, cursor, trace/audit, outbox, projection stale, effect summary, generic stored accepted shell, typed accepted envelope, then complete idempotency | `CommandAccepted` + `IdentityCommandAcceptedResultEnvelope` | all in same UoW before commit |
+| first-run replayable rejected | save generic stored rejected shell + typed rejected envelope, then complete rejected idempotency if Step 12/flow classifies rejection replayable | `CommandRejected` + `IdentityCommandRejectedResultEnvelope` | no truth, no accepted trace/outbox/stale/effect |
+| duplicate accepted replay | load `IdentityCommandAcceptedResultEnvelope.result` and `.effect` after generic shell kind check | existing `CommandAccepted` | no new truth/trace/audit/outbox/stale/effect |
+| duplicate rejected replay | load `IdentityCommandRejectedResultEnvelope.rejection` after generic shell kind check | existing `CommandRejected` | no revalidation/domain guard rerun |
 | same key different digest | return duplicate conflict | none for incoming request | original record/result authoritative |
 | in-flight same digest | return delayed/temporary surface | none for second request | no second mutation |
-| stored accepted/rejected missing | replay consistency defect | missing/wrong-kind reported | no current truth reconstruction |
+| stored accepted/rejected shell or typed envelope missing | replay consistency defect | missing/wrong-kind/variant mismatch/effect missing reported | no current truth reconstruction |
 | commit unknown after first run | check idempotency/stored result before caller retries | found stored surface may be replayed;not found remains unknown/manual | no blind retry with new key |
 
-Command duplicate replay must return the previously stored public surface, even if current truth has since changed. That is the reason accepted effect summary and stored result must be saved before idempotency complete.
+Command duplicate replay must return the previously stored public surface, even if current truth has since changed. That is the reason accepted effect summary, generic stored shell and typed command envelope must be saved before idempotency complete.
 
 ### 5.4 Consumer / callback duplicate handling
 

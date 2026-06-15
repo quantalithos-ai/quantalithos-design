@@ -218,7 +218,8 @@ Command flow 只能在具体 9.1 批次写完整步骤。本批先固定所有 c
   | save changed truth with expected_version
   | assign accepted truth cursor through UoW
   | map accepted subject through IdentityTruthChangeSubjectMapper
-  | append trace and audit
+  | append trace
+  | append accepted audit entry through IdentityAcceptedAuditTrailMarkerMapper + IdentityAuditTrailRepository
   | build accepted outbox record + payload marker only when this flow has a canonical outbound payload
   | mark affected projections stale
   | save command effect summary and stored result
@@ -232,8 +233,53 @@ Command flow 只能在具体 9.1 批次写完整步骤。本批先固定所有 c
 | expected_version | versioned read / create result / formal request version | 用 cursor、timestamp、source version、digest 替代 |
 | cursor | `IdentityUnitOfWork.assign_truth_change_cursor()` | service、fake、repository 拼 cursor |
 | subject | `IdentityTruthChangeSubjectMapper` | trace/audit/outbox 使用不同 canonical key |
+| audit scope / visibility marker | `IdentityAcceptedAuditTrailMarkerMapper.accepted_command_audit_markers(context, subjects, change_kind_ref, cursor)` | accepted write path 调 query visibility resolver、使用默认 scope / 默认 visible、从 operation name/audit subject/trace id/timestamp 拼 marker |
 | outbox | accepted material + payload marker when Step 8/9 defines a canonical outbound payload;otherwise effect outbox refs must be explicit empty | rejected/pending/report-only 冒充 accepted event;service 私造 outbound payload |
 | stored result | `IdentityStoredResultRepository` | accepted path 只返回内存 result |
+
+#### 7.2.1 Shared accepted audit append subflow
+
+所有 accepted command / handoff prepare 写路径追加 audit material 时,必须使用同一子流程。该流程只 materialize body-free accepted audit entry,不执行 public read authorization,也不替代 query 的 `VisibilityPolicy::for_audit(...)`。
+
+```text
+[Accepted audit append]
+  | audit_markers = IdentityAcceptedAuditTrailMarkerMapper.accepted_command_audit_markers(
+  |   context,
+  |   subjects,
+  |   change_kind_ref,
+  |   cursor
+  | )
+  | audit_entry = AuditTrailEntry {
+  |   trace_record_ref,
+  |   change_kind_ref,
+  |   visibility_result_ref: audit_markers.entry_visibility_result_ref,
+  |   occurred_at: trace.occurred_at
+  | }
+  | trail_v = IdentityAuditTrailRepository.find_audit_trail_by_subject(subjects.audit_subject_ref)
+  | if trail_v Some:
+  |   IdentityAuditTrailRepository.append_audit_entry(trail_v.object.audit_trail_ref, audit_entry, trail_v.version, uow)
+  | else:
+  |   audit_trail_ref = IdentityIdGeneratorPort.new_audit_trail_id() -> AuditTrailRef::from_id(...)
+  |   trail = AuditTrail::from_accepted_write(
+  |     audit_trail_ref,
+  |     subjects.audit_subject_ref,
+  |     member_ref_or_none,
+  |     audit_markers.audit_scope_ref,
+  |     audit_entry,
+  |     audit_markers.trail_visibility_result_ref,
+  |     now
+  |   )
+  |   require audit_markers.read_surface_kind == IdentityReadSurfaceKind::Found
+  |   IdentityAuditTrailRepository.save_audit_trail(trail, None, uow)
+```
+
+| 字段 / 分支 | 正式来源 | 禁止事项 |
+|---|---|---|
+| `audit_scope_ref` | `IdentityAcceptedAuditTrailMarkerMapper` | query request scope、route、operation name、hard-coded scope |
+| trail / entry `visibility_result_ref` | `IdentityAcceptedAuditTrailMarkerMapper` | read visibility resolver、default visible、query visibility result |
+| existing trail version | `find_audit_trail_by_subject(...)` loaded version | repository implicit create、append without expected_version |
+| missing trail id | `IdentityIdGeneratorPort.new_audit_trail_id()` | derive from audit subject / trace id / timestamp |
+| member scope | current accepted flow loaded/request member ref when the accepted subject is member-scoped;otherwise `None` until a later flow defines a formal owner | parse audit subject string |
 
 ### 7.3 Shared query no-write discipline
 
@@ -483,15 +529,15 @@ Command 写路径必须在同一 UnitOfWork 中完成 idempotency reserve、trut
 | terminal hold reason 从哪里来 | 从 `UpdateGlobalLifecycleStateRequest.reason_ref.source_ref` 构造 `IdentityAnchorReasonRef`;`Retired` 映射 `IdentityAnchorReasonKind::Retired`,`Tombstoned` 映射 `IdentityAnchorReasonKind::Tombstoned`;不得从字符串、basis body 或 target enum name 解析 |
 | high-risk basis 如何校验 | 若 `action_risk_ref.requires_governance_basis()` 为 true,必须有 `basis_ref`,调用 resolver 得到 `GovernanceBasisSummary`,再用 `is_valid_for(action_risk_ref)` 判定;不以 basis ref presence accepted |
 | accepted outbox 发几类 material | 建档产生 `GlobalMemberEstablished` 和 initial `IdentityAnchorChanged`;initial lifecycle 由 `GlobalMemberEstablishedPayload.lifecycle_state_kind` 承载,不另发 lifecycle/availability material。lifecycle update 至少产生 `GlobalLifecycleChanged`;availability 同发规则由 9.4 固定 |
-| duplicate 如何 replay | idempotency reserve 返回 replay 时,只能读取 `IdentityStoredResultRepository.get_stored_result(stored_result_ref)` 并返回 stored accepted/rejected surface;不得重跑 repository save |
-| rejected 是否全部持久化 | 本批只要求可 replay rejected 使用 `save_command_rejected_result(...)`;普通 validation/internal error 的持久化优先级留 Step 12/13 |
+| duplicate 如何 replay | idempotency reserve 返回 replay 时,必须先读取 generic shell,再读取 `get_command_accepted_result(...)` 或 `get_command_rejected_result(...)` 的 typed envelope;不得重跑 repository save 或重读 truth |
+| rejected 是否全部持久化 | 本批只要求可 replay rejected 使用 `save_command_rejected_result(...)` + `save_command_rejected_envelope(...)`;普通 validation/internal error 的持久化优先级留 Step 12/13 |
 
 ### 12.3 当前材料诊断
 
 | 事项 | 诊断 | 本批处理 |
 |---|---|---|
 | `EstablishGlobalMember` 字段来源 | Step 8 request 提供 source、optional member、initial lifecycle reason;actor/idempotency/digest 来自 envelope/context | 可直接展开 |
-| initial lifecycle create | Step 6 有 `GlobalLifecycleState::initial_available(...)`,Step 7 有 `save_lifecycle(..., None, uow)` | 可直接展开 |
+| initial lifecycle create | Step 6 有 `GlobalLifecycleState::initial_available(...)`,Step 7 有 `save_lifecycle(member_ref, ..., None, uow)` | lifecycle row key 来自 accepted `member_ref`;不得从 lifecycle state 推断 |
 | terminal anchor hold | Step 8 明确留 Step 9/10 闭口;Step 6 有 anchor reason/lifecycle reason/source ref 和 terminal hold factory | 本批闭合 reason 映射和同步 hold 规则 |
 | high-risk basis | Step 6/7/8 已有 `GovernanceBasisSummary` 和 resolver | 本批闭合 precheck 顺序;unavailable/invalid public mapping留 Step 12 |
 | trace/audit/outbox/effect | Step 6/7 有正式对象和 repo;topic/payload 细节在 Step 8/9.4 | 本批写 side effect 顺序,不写 payload body |
@@ -514,7 +560,7 @@ Command 写路径必须在同一 UnitOfWork 中完成 idempotency reserve、trut
 | 入口 | `IdentityApplicationFacade::dispatch_command(...)` |
 | application service | `IdentityCommandService.establish_global_member(request, context)` |
 | 目标 object / policy | `IdentityAnchorPolicy`, `GlobalMember`, `GlobalLifecycleState` |
-| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `GlobalLifecycleRepository`, `IdentityTruthChangeSubjectMapper`, `IdentityTraceRecordRepository`, `IdentityAuditTrailRepository`, `IdentityOutboxRepository`, `IdentityProjectionRepository`, `IdentityCommandEffectSummaryRepository` |
+| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `GlobalLifecycleRepository`, `IdentityTruthChangeSubjectMapper`, `IdentityAcceptedAuditTrailMarkerMapper`, `IdentityTraceRecordRepository`, `IdentityAuditTrailRepository`, `IdentityOutboxRepository`, `IdentityProjectionRepository`, `IdentityCommandEffectSummaryRepository` |
 | accepted state | member anchor = `Established`;lifecycle = `Available` |
 | rejected candidates | missing actor/key/source, forbidden source owner, requested ref reuse, same key/different digest |
 
@@ -545,16 +591,17 @@ Command 写路径必须在同一 UnitOfWork 中完成 idempotency reserve、trut
   v
 [Persist accepted truth]
   | GlobalMemberRepository.save_member(member, None, uow)
-  | GlobalLifecycleRepository.save_lifecycle(lifecycle, None, uow)
+  | GlobalLifecycleRepository.save_lifecycle(member_ref, lifecycle, None, uow)
   | cursor = uow.assign_truth_change_cursor()
   | subjects = IdentityTruthChangeSubjectMapper.member_subjects(member_ref)
   | append IdentityTraceRecord::from_accepted_change(...)
-  | find or create AuditTrail by subjects.audit_subject_ref, append AuditTrailEntry
+  | run Shared accepted audit append subflow with context, subjects, change_kind_ref, cursor, trace_record_ref, member_ref
   | create IdentityOutboxRecord::from_accepted_change(...) for GlobalMemberEstablished and initial IdentityAnchorChanged material
   | affected = IdentityProjectionRepository.expand_affected_projection_refs(subjects)
   | mark each affected projection stale with cursor-backed ProjectionState
   | save IdentityCommandEffectSummary::from_accepted_change(...)
-  | save StoredIdentityOperationResult::command_accepted(...)
+  | save StoredIdentityOperationResult::command_accepted(...) generic shell
+  | save IdentityCommandAcceptedResultEnvelope for GlobalMemberCommandResult + effect
   | complete idempotency with stored_result_ref
   | commit
 ```
@@ -564,11 +611,11 @@ Command 写路径必须在同一 UnitOfWork 中完成 idempotency reserve、trut
 | Step | Required source | Notes |
 |---|---|---|
 | save member | `GlobalMemberRepository.save_member(member, None, uow)` | create must use `expected_version = None` |
-| save lifecycle | `GlobalLifecycleRepository.save_lifecycle(lifecycle, None, uow)` | initial lifecycle create,not derived at query time |
+| save lifecycle | `GlobalLifecycleRepository.save_lifecycle(member_ref, lifecycle, None, uow)` | initial lifecycle create keyed by accepted member_ref;not derived at query time |
 | assign cursor | `IdentityUnitOfWork.assign_truth_change_cursor()` | after accepted truth is prepared inside same UoW;not timestamp/version |
 | map subject | `IdentityTruthChangeSubjectMapper.member_subjects(member_ref)` | one canonical key for trace/audit/outbox |
 | append trace | `IdentityTraceRecord::from_accepted_change(...)` + repo append | reason may include lifecycle/anchor reason marker;body-free only |
-| audit | `find_audit_trail_by_subject(...)`;existing append or `AuditTrail::assemble(...)` create/save | repository must not implicit-create audit trail |
+| audit | shared accepted audit append subflow;existing append or `AuditTrail::from_accepted_write(...)` create/save | scope / visibility markers come from `IdentityAcceptedAuditTrailMarkerMapper`;repository must not implicit-create audit trail |
 | outbox | `IdentityOutboxRecord::from_accepted_change(...)` + save | payload marker/body details audited in 9.4 |
 | projection stale | `expand_affected_projection_refs(subjects)` then `mark_projection_stale(...)` | no ad hoc view ref |
 | effect/stored result | `IdentityCommandEffectSummary::from_accepted_change(...)`;`StoredIdentityOperationResult::command_accepted(...)` | stored result is duplicate replay source |
@@ -604,7 +651,7 @@ Command 写路径必须在同一 UnitOfWork 中完成 idempotency reserve、trut
 | 入口 | `IdentityApplicationFacade::dispatch_command(...)` |
 | application service | `IdentityCommandService.update_global_lifecycle_state(request, context)` |
 | 目标 object / policy | `GlobalLifecycleState`, `LifecycleTransitionPolicy`, `HighRiskLifecycleGuard`, optional `IdentityAnchorState` |
-| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityClockPort`, `GlobalMemberRepository`, `GlobalLifecycleRepository`, `IdentityExternalSourceResolverPort`, `IdentityTruthChangeSubjectMapper`, trace/audit/outbox/projection/effect repositories |
+| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityClockPort`, `GlobalMemberRepository`, `GlobalLifecycleRepository`, `IdentityExternalSourceResolverPort`, `IdentityTruthChangeSubjectMapper`, `IdentityAcceptedAuditTrailMarkerMapper`, trace/audit/outbox/projection/effect repositories |
 | accepted state | lifecycle target state;terminal target also updates member anchor hold |
 | rejected candidates | member/lifecycle missing, illegal transition, high-risk missing/invalid/stale/unavailable basis, same key/different digest |
 
@@ -653,17 +700,18 @@ Command 写路径必须在同一 UnitOfWork 中完成 idempotency reserve、trut
   |   member_v.object.hold_anchor(anchor_state, context.actor_ref)
   v
 [Persist accepted truth]
-  | GlobalLifecycleRepository.save_lifecycle(new_lifecycle, Some(lifecycle_v.version), uow)
+  | GlobalLifecycleRepository.save_lifecycle(request.member_ref, new_lifecycle, Some(lifecycle_v.version), uow)
   | if anchor changed -> GlobalMemberRepository.save_member(member_v.object, Some(member_v.version), uow)
   | cursor = uow.assign_truth_change_cursor()
   | subjects = IdentityTruthChangeSubjectMapper.member_subjects(request.member_ref)
   | append IdentityTraceRecord::from_accepted_change(...)
-  | update AuditTrail by subjects.audit_subject_ref
+  | run Shared accepted audit append subflow with context, subjects, change_kind_ref, cursor, trace_record_ref, request.member_ref
   | create IdentityOutboxRecord::from_accepted_change(...) for lifecycle material and optional anchor material
   | affected = IdentityProjectionRepository.expand_affected_projection_refs(subjects)
   | mark each affected projection stale
   | save IdentityCommandEffectSummary::from_accepted_change(...)
-  | save StoredIdentityOperationResult::command_accepted(...)
+  | save StoredIdentityOperationResult::command_accepted(...) generic shell
+  | save IdentityCommandAcceptedResultEnvelope for GlobalLifecycleCommandResult + effect
   | complete idempotency with stored_result_ref
   | commit
 ```
@@ -694,14 +742,14 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 
 | Step | Required source | Notes |
 |---|---|---|
-| save lifecycle | `GlobalLifecycleRepository.save_lifecycle(new_lifecycle, Some(lifecycle_v.version), uow)` | expected version from loaded lifecycle |
+| save lifecycle | `GlobalLifecycleRepository.save_lifecycle(request.member_ref, new_lifecycle, Some(lifecycle_v.version), uow)` | row key is request.member_ref;expected version from lifecycle loaded by the same member_ref |
 | save member anchor hold | only terminal target;`GlobalMemberRepository.save_member(member, Some(member_v.version), uow)` | expected version from loaded member |
 | assign cursor | UoW truth cursor | one accepted command cursor covers lifecycle and optional anchor side effect |
 | map subject | `IdentityTruthChangeSubjectMapper.member_subjects(member_ref)` | lifecycle/anchor accepted material share member canonical subject |
-| append trace/audit | trace reason uses lifecycle reason marker;basis marker optional | no governance body |
+| append trace/audit | trace reason uses lifecycle reason marker;basis marker optional;audit scope/visibility markers come from `IdentityAcceptedAuditTrailMarkerMapper` | no governance body;no query visibility/default visible marker |
 | outbox | `GlobalLifecycleChanged`;terminal anchor hold also creates `IdentityAnchorChanged`;availability changed creates `GlobalMemberAvailabilityChanged` only when old/new `is_available()` differs | follows 9.4 material rule |
 | projection stale | repository expansion by accepted subject | no direct view ref construction |
-| effect/stored result | command effect summary + stored accepted result | replay source |
+| effect/stored result | command effect summary + generic stored accepted shell + typed accepted envelope | replay source |
 
 #### 12.6.4 Rejected / duplicate branches
 
@@ -843,7 +891,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | 入口 | `IdentityApplicationFacade::dispatch_command(...)` |
 | application service | `IdentityCommandService.maintain_role_capability_summary(request, context)` |
 | 目标 object / policy | `RoleCapabilitySummary`, `RoleCapabilitySourceSnapshot`, `RoleCapabilitySourcePolicy` |
-| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `RoleCapabilityRepository`, `IdentityExternalSourceResolverPort`, `IdentityTruthChangeSubjectMapper`, trace/audit/outbox/projection/effect repositories |
+| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `RoleCapabilityRepository`, `IdentityExternalSourceResolverPort`, `IdentityTruthChangeSubjectMapper`, `IdentityAcceptedAuditTrailMarkerMapper`, trace/audit/outbox/projection/effect repositories |
 | accepted state | source snapshot = `SourceResolved`;summary = `Active` |
 | rejected / non-active candidates | member missing, source unavailable/unrecognized/stale, missing source version, missing safe summary, missing/invalid evidence, forbidden body, automatic scoring material, duplicate idempotency conflict |
 
@@ -916,12 +964,13 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
   | cursor = uow.assign_truth_change_cursor()
   | subjects = IdentityTruthChangeSubjectMapper.role_capability_subjects(summary_ref)
   | append IdentityTraceRecord::from_accepted_change(...)
-  | update AuditTrail by subjects.audit_subject_ref
+  | run Shared accepted audit append subflow with context, subjects, change_kind_ref, cursor, trace_record_ref, member_ref
   | create IdentityOutboxRecord::from_accepted_change(...) for role/capability material
   | affected = IdentityProjectionRepository.expand_affected_projection_refs(subjects)
   | mark each affected projection stale
   | save IdentityCommandEffectSummary::from_accepted_change(...)
-  | save StoredIdentityOperationResult::command_accepted(...)
+  | save StoredIdentityOperationResult::command_accepted(...) generic shell
+  | save IdentityCommandAcceptedResultEnvelope for RoleCapabilityCommandResult + effect
   | complete idempotency with stored_result_ref
   | commit
 ```
@@ -946,7 +995,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | save summary | `RoleCapabilityRepository.save_summary(summary, expected_version, uow)` | expected_version from loaded summary;create `None` |
 | assign cursor | UoW truth cursor | source version/time not cursor |
 | map subject | `IdentityTruthChangeSubjectMapper.role_capability_subjects(summary_ref)` | one canonical key for trace/audit/outbox |
-| trace/audit | accepted refs only | no role/capability/evidence body |
+| trace/audit | accepted refs only;audit scope/visibility markers come from `IdentityAcceptedAuditTrailMarkerMapper` | no role/capability/evidence body;no query visibility/default visible marker |
 | outbox | `RoleCapabilitySummaryChanged` accepted material;source state material audited in 9.4 | payload marker only |
 | projection stale | repository expansion | no ad hoc member summary view ref |
 | effect/stored result | accepted command effect + stored result | replay source |
@@ -986,7 +1035,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | 入口 | `IdentityApplicationFacade::dispatch_command(...)` |
 | application service | `IdentityCommandService.append_career_record(request, context)` |
 | 目标 object / policy | `CareerRecord`, `CareerAppendPolicy` |
-| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `CareerRecordRepository`, `IdentityExternalSourceResolverPort`, `IdentityTruthChangeSubjectMapper`, trace/audit/outbox/projection/effect repositories |
+| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `CareerRecordRepository`, `IdentityExternalSourceResolverPort`, `IdentityTruthChangeSubjectMapper`, `IdentityAcceptedAuditTrailMarkerMapper`, trace/audit/outbox/projection/effect repositories |
 | accepted state | `Appended`, `CorrectionAppended`,or explicit `SourcePendingReview` |
 | rejected / no-op candidates | member missing, duplicate source marker, source unresolved/untrusted/unavailable for mainline append, correction original missing, forbidden in-place update/delete/reorder, forbidden work body |
 
@@ -1044,12 +1093,13 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
   | cursor = uow.assign_truth_change_cursor()
   | subjects = IdentityTruthChangeSubjectMapper.career_record_subjects(record_ref)
   | append IdentityTraceRecord::from_accepted_change(...)
-  | update AuditTrail by subjects.audit_subject_ref
+  | run Shared accepted audit append subflow with context, subjects, change_kind_ref, cursor, trace_record_ref, member_ref
   | create IdentityOutboxRecord::from_accepted_change(...) for career material
   | affected = IdentityProjectionRepository.expand_affected_projection_refs(subjects)
   | mark each affected projection stale
   | save IdentityCommandEffectSummary::from_accepted_change(...)
-  | save StoredIdentityOperationResult::command_accepted(...)
+  | save StoredIdentityOperationResult::command_accepted(...) generic shell
+  | save IdentityCommandAcceptedResultEnvelope for CareerRecordCommandResult + effect
   | complete idempotency with stored_result_ref
   | commit
 ```
@@ -1074,7 +1124,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | save original superseded state | correction only;`save_career_record_state(original, original_v.version, uow)` | expected_version from loaded original |
 | assign cursor | UoW truth cursor | not source marker/idempotency key |
 | map subject | `IdentityTruthChangeSubjectMapper.career_record_subjects(record_ref)` | accepted new record is canonical subject |
-| trace/audit | accepted append/correction/pending marker | no work body |
+| trace/audit | accepted append/correction/pending marker;audit scope/visibility markers come from `IdentityAcceptedAuditTrailMarkerMapper` | no work body;no query visibility/default visible marker |
 | outbox | `CareerRecordAppended` for normal append;`CareerCorrectionAppended` for correction append | no original superseded event unless Step 8 is extended |
 | projection stale | repository expansion by subject | no direct member summary view ref |
 | effect/stored result | accepted command effect + stored result | duplicate replay source |
@@ -1114,7 +1164,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | 入口 | `IdentityApplicationFacade::dispatch_command(...)` |
 | application service | `IdentityCommandService.maintain_memory_reference(request, context)` |
 | 目标 object / policy | `MemoryReference`, `MemoryReferenceState`, `MemoryReferencePolicy` |
-| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `MemoryReferenceRepository`, `IdentityExternalSourceResolverPort`, `IdentityTruthChangeSubjectMapper`, trace/audit/outbox/projection/effect repositories |
+| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `MemoryReferenceRepository`, `IdentityExternalSourceResolverPort`, `IdentityTruthChangeSubjectMapper`, `IdentityAcceptedAuditTrailMarkerMapper`, trace/audit/outbox/projection/effect repositories |
 | accepted state | `Linked`, `Stale`, `Unavailable`, `Archived`, `HandoffPending`, `HandoffFailed`,or explicit `PendingVerification` as allowed by Step 6/10 |
 | rejected / non-success candidates | member missing, all refs missing, source untrusted/unavailable for link, handoff marker mismatch, external owner write/delete, forbidden memory/archive/receipt body |
 
@@ -1190,12 +1240,13 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
   | cursor = uow.assign_truth_change_cursor()
   | subjects = IdentityTruthChangeSubjectMapper.memory_reference_subjects(reference_ref)
   | append IdentityTraceRecord::from_accepted_change(...)
-  | update AuditTrail by subjects.audit_subject_ref
+  | run Shared accepted audit append subflow with context, subjects, change_kind_ref, cursor, trace_record_ref, member_ref
   | create IdentityOutboxRecord::from_accepted_change(...) for memory reference material
   | affected = IdentityProjectionRepository.expand_affected_projection_refs(subjects)
   | mark each affected projection stale
   | save IdentityCommandEffectSummary::from_accepted_change(...)
-  | save StoredIdentityOperationResult::command_accepted(...)
+  | save StoredIdentityOperationResult::command_accepted(...) generic shell
+  | save IdentityCommandAcceptedResultEnvelope for MemoryReferenceCommandResult + effect
   | complete idempotency with stored_result_ref
   | commit
 ```
@@ -1219,7 +1270,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | save memory relation | `MemoryReferenceRepository.save_memory_reference(reference, expected_version, uow)` | expected_version from loaded relation;create `None` |
 | assign cursor | UoW truth cursor | source/handoff marker not cursor |
 | map subject | `IdentityTruthChangeSubjectMapper.memory_reference_subjects(reference_ref)` | one canonical key for trace/audit/outbox |
-| trace/audit | accepted relation refs/state only | no memory/archive/receipt body |
+| trace/audit | accepted relation refs/state only;audit scope/visibility markers come from `IdentityAcceptedAuditTrailMarkerMapper` | no memory/archive/receipt body;no query visibility/default visible marker |
 | outbox | `MemoryReferenceChanged`;archive/handoff relation state may also create `MemoryArchiveHandoffStateChanged` per 9.4 rule | payload marker only |
 | projection stale | repository expansion | no ad hoc member summary view ref |
 | effect/stored result | accepted command effect + stored result | replay source |
@@ -1364,7 +1415,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | 入口 | `IdentityApplicationFacade::dispatch_command(...)` |
 | application service | `IdentityCommandService.prepare_trace_handoff(request, context)` |
 | 目标 object / policy | `TraceHandoffIntent`, `HandoffState`, `HandoffPolicy` |
-| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `IdentityTraceRecordRepository`, `IdentityAuditTrailRepository`, `TraceHandoffIntentRepository`, `IdentityHandoffTargetPort`, `IdentityTruthChangeSubjectMapper`, trace/audit/projection/effect repositories |
+| 主要 port | `IdentityUnitOfWorkManagerPort`, `IdentityIdempotencyRepository`, `IdentityStoredResultRepository`, `IdentityIdGeneratorPort`, `IdentityClockPort`, `GlobalMemberRepository`, `IdentityTraceRecordRepository`, `IdentityAuditTrailRepository`, `TraceHandoffIntentRepository`, `IdentityHandoffTargetPort`, `IdentityTruthChangeSubjectMapper`, `IdentityAcceptedAuditTrailMarkerMapper`, trace/audit/projection/effect repositories |
 | accepted state | `HandoffStateKind::PendingHandoff` |
 | accepted outbox | none;`effect.outbox_refs = []` |
 | rejected candidates | member missing, empty trace refs, trace missing/member mismatch, audit missing/member mismatch, target unsupported/unavailable/disabled, forbidden safe material, not visible for handoff, requested intent ref already exists, same key/different digest |
@@ -1432,13 +1483,14 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
   | subjects = IdentityTruthChangeSubjectMapper.handoff_intent_subjects(handoff_intent_ref)
   | handoff_trace = IdentityTraceRecord::from_accepted_change(..., request.member_ref, subjects.trace_subject_ref, subjects.audit_subject_ref, HandoffPrepared change kind, cursor, handoff_reason_ref, actor, now)
   | IdentityTraceRecordRepository.append_trace_record(handoff_trace, uow)
-  | find or create AuditTrail by subjects.audit_subject_ref, append AuditTrailEntry for handoff_trace
+  | run Shared accepted audit append subflow with context, subjects, HandoffPrepared change_kind_ref, cursor, handoff_trace.ref, request.member_ref
   | outbox_refs = []
   | affected = IdentityProjectionRepository.expand_affected_projection_refs(subjects)
   | mark each affected projection stale with cursor
-  | save StoredIdentityOperationResult::command_accepted(...) surface for TraceHandoffCommandResult
+  | save StoredIdentityOperationResult::command_accepted(...) generic shell for TraceHandoffCommandResult
   | effect = IdentityCommandEffectSummary::from_accepted_change(context_ref, IdentityTruthRef::TraceHandoffIntent(handoff_intent_ref), cursor, trace_refs=[handoff_trace.ref], audit_trail_ref, outbox_refs=[], stale_projection_refs, stored_result_ref)
   | save IdentityCommandEffectSummary
+  | save IdentityCommandAcceptedResultEnvelope for TraceHandoffCommandResult + effect
   | complete idempotency with stored_result_ref
   | commit
 ```
@@ -1451,7 +1503,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | assign cursor | `IdentityUnitOfWork.assign_truth_change_cursor()` | pending intent accepted cursor;not target resolution time |
 | map subject | `IdentityTruthChangeSubjectMapper.handoff_intent_subjects(handoff_intent_ref)` | canonical key `identity:trace-handoff-intent:<handoff_intent_id>` from Step 7 |
 | append trace | `IdentityTraceRecord::from_accepted_change(...)` | records preparation trace only;not delivery receipt marker |
-| audit | find or create audit trail by handoff intent audit subject | audit body remains refs/entries only |
+| audit | shared accepted audit append subflow by handoff intent audit subject | audit body remains refs/entries only;scope / visibility markers come from `IdentityAcceptedAuditTrailMarkerMapper` |
 | outbox | none | no canonical `TraceHandoffIntentPrepared` outbound payload exists;`effect.outbox_refs = []` |
 | projection stale | repository expansion by handoff intent subject | no ad hoc handoff state view ref |
 | stored result | `StoredIdentityOperationResult::command_accepted(...)` | replay source for accepted command result |
@@ -3342,7 +3394,7 @@ This table closes operations query item-level priority for 9.2-c. Field-level re
   | cursor = IdentityUnitOfWork.assign_truth_change_cursor()
   | subjects = IdentityTruthChangeSubjectMapper.<truth-family>_subjects(accepted_truth_ref)
   | append IdentityTraceRecord::from_accepted_change(...)
-  | update AuditTrail by subjects.audit_subject_ref
+  | run Shared accepted audit append subflow
   v
 [Outbound material audit]
   | for each allowed event material:

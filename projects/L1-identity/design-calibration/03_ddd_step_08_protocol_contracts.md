@@ -558,7 +558,7 @@ pub enum IdentityQueryDisposition {
 |---|---|---|
 | `visibility.visibility_result_ref` | Step 6 `IdentityVisibilityDecision.visibility_result_ref` 或等价 visibility resolver summary | 必填;不保存 policy body、credential、denied raw reason |
 | `visibility.read_surface_kind` | Step 6 `IdentityVisibilityDecision.surface_kind` / `VisibilityPolicy::classify_read_surface(...)` | 只表达 read surface;不替代 `IdentityQueryDisposition`,也不是 truth state |
-| `visibility.redaction_marker_ref` | Step 6 `IdentityVisibilityDecision.redaction_marker_ref` | `Redacted` 时必须存在;非 redacted 可为空;不保存被裁剪字段正文 |
+| `visibility.redaction_marker_ref` | Step 6 `IdentityVisibilityDecision.redaction_marker_ref`,which is copied from `IdentityVisibilityAccessSummary.redaction_marker_ref` or the same `VisibilityPolicy` redaction matrix result | `Redacted` 时必须存在;非 redacted 可为空;不得由 `redaction_profile_ref`、scope、result ref、route 或字符串推导;不保存被裁剪字段正文 |
 | `degraded.degraded_marker_ref` | Step 6 `IdentityVisibilityDecision.degraded_marker_ref` 或 resolver/projection/dependency safe summary | `Degraded` / `StaleVisible` / `Rebuilding` / `Disabled` 等 degraded-like surface 必填;不保存 raw external error |
 | `degraded.degraded_kind` | safe degraded classifier | 必须使用 `IdentityDegradedKind`;不得用自由字符串、`ApplicationError` 文本或 adapter 私有错误码 |
 
@@ -1833,7 +1833,7 @@ All five queries use the same construction order. Step 9 may expand this into pr
 |---|---|---|---|---|
 | entry envelope | `IdentityQueryRequest<T>` | API / SDK query handler | `actor_ref`, `query_name`, `metadata.visibility_context_ref`, optional page, body | handler 不从 body 推 actor;query 不使用 command idempotency |
 | read access seed | body `member_ref`, body `consumer_ref`, metadata `visibility_context_ref` | request body + 8.1 query metadata | `resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` | 不从 route/member id 拼 `IdentityReadSubjectRef` 或 `VisibilityScopeRef` |
-| visibility summary | `IdentityReadVisibilityRepository` | Step 7 formal read visibility repository | `IdentityVisibilityAccessSummary` with `read_subject_ref`, `scope_ref`, `visibility_result_ref`, access state | repository 返回 `None` 时只能 degraded / unavailable surface,不得默认 visible |
+| visibility summary | `IdentityReadVisibilityRepository` | Step 7 formal read visibility repository | `IdentityVisibilityAccessSummary` with `read_subject_ref`, `scope_ref`, `visibility_result_ref`, optional `redaction_marker_ref`, access state | repository 返回 `None` 时只能 degraded / unavailable surface,不得默认 visible;redacted/not-visible surface 不得私造 redaction marker |
 | stable view lookup | `member_ref`, `access_summary.scope_ref` | `IdentityProjectionRepository.find_member_summary_view_ref(...)` | optional `MemberSummaryViewRef` | 不拼 view ref;lookup missing 不触发 rebuild |
 | optional loaded view | `MemberSummaryViewRef` | `IdentityProjectionRepository.get_member_summary_view(...)` | optional `MemberSummaryView` | missing / stale / degraded 显式返回 surface |
 | view-specific visibility | optional `view_ref` | `resolve_member_summary_read(member_ref, Some(view_ref), consumer_ref, visibility_context_ref)` when needed | final access summary / decision marker | 不用 loaded view 自行推 scope 或权限 |
@@ -2300,7 +2300,7 @@ pub struct MemoryReferenceView {
 | 是否只覆盖 core truth query | 通过 | 未展开 member summary、trace、audit、maintenance/outbox/handoff query |
 | 是否沿用 8.1 shared query envelope/page/surface | 通过 | 单对象 query 使用 `IdentityQueryResponse<T>`;list query 使用 `IdentityPageResponse<T>` |
 | DTO 字段是否有 Step 6/7 来源 | 通过 | request/view 字段回指 Step 6 object/view/marker 和 Step 7 read visibility/projection/truth repository |
-| read subject/scope 是否正式 | 通过 | `read_subject_ref` 和 scope 均来自 `IdentityReadVisibilityRepository.resolve_member_summary_read(...)` 返回的 `IdentityVisibilityAccessSummary`;不从 route/member id 推断 |
+| read subject/scope/redaction marker 是否正式 | 通过 | `read_subject_ref`、scope 和 redacted/not-visible 所需 `redaction_marker_ref` 均来自 `IdentityReadVisibilityRepository.resolve_member_summary_read(...)` 返回的 `IdentityVisibilityAccessSummary`;不从 route/member id/profile/result 推断 |
 | stable view ref 是否正式 | 通过 | view ref 只来自 `IdentityProjectionRepository.find_member_summary_view_ref(...)` |
 | query no-write 是否保持 | 通过 | not found/empty/stale/degraded 均不创建 truth、不刷新 source、不 rebuild projection |
 | 外部正文是否排除 | 通过 | role/work/memory/archive/governance body 均不进入 query DTO |
@@ -2649,7 +2649,7 @@ pub struct AuditTrailEntryView {
 | 是否只覆盖 trace / audit / summary query | 通过 | 未展开 maintenance/outbox/handoff query |
 | 是否沿用 8.1 shared query envelope/page/surface | 通过 | summary 使用 `IdentityQueryResponse<T>`;trace/audit 使用 `IdentityPageResponse<T>` |
 | DTO 字段是否有 Step 6/7 来源 | 通过 | request/view 字段回指 Step 6 object/marker 和 Step 7 projection/trace/audit/read visibility port |
-| read subject/scope 是否正式 | 通过 | summary read subject / scope 来自 read visibility summary;trace subject 来自 request或 loaded trace;audit subject 来自 subject mapper |
+| read subject/scope/redaction marker 是否正式 | 通过 | summary read subject / scope / redaction marker 来自 read visibility summary;trace subject 来自 request或 loaded trace;audit subject 来自 subject mapper |
 | stable view / audit trail ref 是否正式 | 通过 | summary view ref 来自 projection lookup;audit trail ref 来自 repository lookup |
 | query no-write 是否保持 | 通过 | missing/empty/stale/degraded 均不创建、不修复、不 rebuild、不 append |
 | page / cursor 是否分离 | 通过 | public page cursor、trace truth cursor、audit cursor 三者分离 |
@@ -4468,7 +4468,7 @@ Step 8 shared protocol helper 定义 public protocol naming、metadata、digest�
 当前 8.3-a 可追加回填为:
 
 ```text
-`GetGlobalMemberAnchorRequest` / `GetGlobalLifecycleSummaryRequest` / `GetRoleCapabilitySummaryRequest` / `ListCareerRecordsRequest` / `ListMemoryReferencesRequest` 均沿用 `IdentityQueryRequest<T>`、`IdentityQueryResponse<T>`、`IdentityPageResponse<T>` 和 `IdentityQuerySurface`。request body 只承载 `member_ref`、`consumer_ref` 以及 role summary 的 optional `summary_ref`;list query 的分页只使用 envelope `IdentityPublicPageRequest`。`visibility_context_ref` 来自 `IdentityQueryMetadata`,read subject/scope/access summary 来自 Step 7 `IdentityReadVisibilityRepository.resolve_member_summary_read(...)`,其中 `access_summary.read_subject_ref` 是 public query surface / `IdentityVisibilityDecision` 的 read subject 唯一来源;stable member summary view ref 来自 `IdentityProjectionRepository.find_member_summary_view_ref(...)`;query service 不得从 route、member id、view id 或 source token 拼接 subject/scope/view ref。
+`GetGlobalMemberAnchorRequest` / `GetGlobalLifecycleSummaryRequest` / `GetRoleCapabilitySummaryRequest` / `ListCareerRecordsRequest` / `ListMemoryReferencesRequest` 均沿用 `IdentityQueryRequest<T>`、`IdentityQueryResponse<T>`、`IdentityPageResponse<T>` 和 `IdentityQuerySurface`。request body 只承载 `member_ref`、`consumer_ref` 以及 role summary 的 optional `summary_ref`;list query 的分页只使用 envelope `IdentityPublicPageRequest`。`visibility_context_ref` 来自 `IdentityQueryMetadata`,read subject/scope/access summary 来自 Step 7 `IdentityReadVisibilityRepository.resolve_member_summary_read(...)`,其中 `access_summary.read_subject_ref` 是 public query surface / `IdentityVisibilityDecision` 的 read subject 唯一来源,`access_summary.redaction_marker_ref` 是 redacted/not-visible public surface redaction marker 的唯一来源;stable member summary view ref 来自 `IdentityProjectionRepository.find_member_summary_view_ref(...)`;query service 不得从 route、member id、view id、source token、redaction profile、scope 或 visibility result 拼接 subject/scope/view ref/redaction marker。
 
 五条 core truth query 的 view DTO 只返回 typed refs、state kind、safe summary marker、reason/basis marker 和 optional projection slice refs。`GlobalMemberAnchorView` 读取 `GlobalMember` / `IdentityAnchorState`;`GlobalLifecycleSummaryView` 读取 `GlobalLifecycleState`;`RoleCapabilitySummaryView` 读取 `RoleCapabilitySummary` / `RoleCapabilitySourceSnapshot`;`CareerRecordView` 读取 append-only `CareerRecord`;`MemoryReferenceView` 读取 `MemoryReference` / `MemoryReferenceState`。query missing / empty / not visible / degraded / stale visible 均通过 `IdentityQuerySurface` 表达,不得创建 truth、刷新外部 source、rebuild projection、mark fresh、append trace/audit/outbox 或返回 role/work/memory/archive/governance 正文。
 ```

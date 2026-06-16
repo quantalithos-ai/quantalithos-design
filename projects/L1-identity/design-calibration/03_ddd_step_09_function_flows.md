@@ -1609,7 +1609,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | Step 6 `CareerRecord` | append-only career read page、correction fields read-only、missing item degraded partial |
 | Step 6 `MemoryReference` / `MemoryReferenceState` | memory/archive relation read page、state kind read-only、external body excluded |
 | Step 6 `MemberSummaryView` / `VisibilityPolicy` / `IdentityVisibilityDecision` | body-free optional projection slices、visible/redacted/not visible/degraded/stale surface |
-| Step 7 `IdentityReadVisibilityRepository.resolve_member_summary_read(...)` | `IdentityVisibilityAccessSummary.read_subject_ref`、visibility scope、access state 和 visibility result 的唯一来源 |
+| Step 7 `IdentityReadVisibilityRepository.resolve_member_summary_read(...)` | `IdentityVisibilityAccessSummary.read_subject_ref`、visibility scope、redaction marker、access state 和 visibility result 的唯一来源 |
 | Step 7 `IdentityProjectionRepository.find_member_summary_view_ref(...)` / `get_member_summary_view(...)` | stable summary view lookup/read;query 不拼 view ref,missing 不 rebuild |
 | Step 7 core truth repositories | member/lifecycle/role/career/memory read surface |
 | Step 8 query DTOs | `IdentityQueryRequest<T>`, `IdentityQueryResponse<T>`, `IdentityPageResponse<T>`, `IdentityQuerySurface`,五条 request/view DTO |
@@ -1620,7 +1620,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 |---|---|
 | query 是否开启写事务 | 否。query path 只构造 query operation context 并调用 read repositories;不得 begin write UoW |
 | query 是否使用 idempotency / stored result | 否。query 不 reserve idempotency、不保存 stored result、不做 duplicate replay |
-| read subject / visibility scope 从哪里来 | 只能来自 `IdentityVisibilityAccessSummary.read_subject_ref` 和 `IdentityVisibilityAccessSummary.scope_ref`,该 summary 由 `resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 返回 |
+| read subject / visibility scope / redaction marker 从哪里来 | 只能来自 `IdentityVisibilityAccessSummary.read_subject_ref`、`IdentityVisibilityAccessSummary.scope_ref` 和 `IdentityVisibilityAccessSummary.redaction_marker_ref`,该 summary 由 `resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 返回 |
 | stable summary view ref 从哪里来 | 只能来自 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, access_summary.scope_ref)`;lookup missing 不拼 ref、不扫描 store、不 rebuild |
 | 是否允许 view-specific visibility 复核 | 允许但必须通过 `resolve_member_summary_read(member_ref, Some(view_ref), consumer_ref, visibility_context_ref)`;loaded view 只能做归属/assembly,不能生成 scope |
 | `None` visibility summary 怎么处理 | 返回 `IdentityQuerySurface.disposition = Degraded`,body/items empty,带 Step 8 degraded marker;不得默认 visible |
@@ -1634,7 +1634,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 
 | 事项 | 诊断 | 本批处理 |
 |---|---|---|
-| read subject / scope 来源 | Step 7 `IdentityReadVisibilityRepository` 已闭合 member-scoped summary read seed,并在 `IdentityVisibilityAccessSummary` 中返回 `read_subject_ref` / `scope_ref` | 可直接使用;不新增 resolver |
+| read subject / scope / redaction marker 来源 | Step 7 `IdentityReadVisibilityRepository` 已闭合 member-scoped summary read seed,并在 `IdentityVisibilityAccessSummary` 中返回 `read_subject_ref` / `scope_ref` / `redaction_marker_ref` | 可直接使用;不新增 resolver;不得从 redaction profile/result ref 推导 marker |
 | stable member summary lookup | Step 7 `find_member_summary_view_ref(member_ref, scope_ref)` 已闭合 | 可作为 optional projection slice 来源 |
 | anchor/lifecycle truth read | Step 7 member/lifecycle repository 已有 versioned read | 可直接读取;query 不使用 version 写入 |
 | role summary current lookup | Step 7 role repository 已有 explicit summary read 和 current-by-member lookup | 可处理 request optional summary ref |
@@ -1694,7 +1694,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | Rule | Required source | Notes |
 |---|---|---|
 | query context | Step 7 operation context factory | channel fixed to `Query`;no idempotency key |
-| visibility summary | `resolve_member_summary_read(...)` | only source for read subject/scope/access/result;`None` is degraded |
+| visibility summary | `resolve_member_summary_read(...)` | only source for read subject/scope/redaction marker/access/result;`None` is degraded |
 | projection lookup | `find_member_summary_view_ref(member_ref, scope_ref)` | optional;missing never rebuilds |
 | loaded view guard | `MemberSummaryView.belongs_to(member_ref)` | mismatch is degraded invalid material,not hidden |
 | material marker | Step 6 `IdentityReadMaterialMarker` | safe refs only;forbidden body maps to degraded/rejection surface per Step 12 |
@@ -1975,7 +1975,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 | DTO 是否回指 Step 8 | 通过 | 使用 8.3-a request/view/page DTO |
 | Domain 是否回指 Step 6 | 通过 | 使用 member/lifecycle/role/career/memory truth、MemberSummaryView、VisibilityPolicy |
 | Port 是否回指 Step 7 | 通过 | read visibility、projection lookup/read、core truth repositories 均已定义 |
-| read subject/scope 是否正式 | 通过 | 仅来自 `IdentityVisibilityAccessSummary` |
+| read subject/scope/redaction marker 是否正式 | 通过 | 仅来自 `IdentityVisibilityAccessSummary` |
 | stable view ref 是否正式 | 通过 | 仅来自 `find_member_summary_view_ref(...)` |
 | query no-write 是否保持 | 通过 | 无 UoW、无 idempotency、无 stored result、无 trace/audit/outbox/projection write |
 | not visible / empty / missing 是否区分 | 通过 | not visible 不伪装 empty/missing;visible empty 才用 Empty |
@@ -1989,7 +1989,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 ```md
 ### 8.x Core truth query flows
 
-`GetGlobalMemberAnchorFlow`,`GetGlobalLifecycleSummaryFlow`,`GetRoleCapabilitySummaryFlow`,`ListCareerRecordsFlow` 和 `ListMemoryReferencesFlow` 都是 member-scoped read-only query。service 先通过 `IdentityReadVisibilityRepository.resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 取得 `IdentityVisibilityAccessSummary`,并只从该 summary 复制 `read_subject_ref`、`scope_ref` 和 `visibility_result_ref` 构造 query surface / `IdentityVisibilityDecision`;not visible/degraded 直接返回 `IdentityQuerySurface` body-free surface。可见时才读取 core truth repository,并可通过 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, scope_ref)` 读取 optional `MemberSummaryView` slices。query miss/stale/missing projection 均不创建 truth、不刷新 source、不 rebuild projection、不 append trace/audit/outbox、不保存 stored result。list query 的真实空集合返回 `Empty`;not visible 返回 `NotVisible`;member/truth missing 返回 `Missing`;page item missing 或 member mismatch 返回 degraded partial surface。
+`GetGlobalMemberAnchorFlow`,`GetGlobalLifecycleSummaryFlow`,`GetRoleCapabilitySummaryFlow`,`ListCareerRecordsFlow` 和 `ListMemoryReferencesFlow` 都是 member-scoped read-only query。service 先通过 `IdentityReadVisibilityRepository.resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 取得 `IdentityVisibilityAccessSummary`,并只从该 summary 复制 `read_subject_ref`、`scope_ref`、`visibility_result_ref` 和 `redaction_marker_ref` 构造 query surface / `IdentityVisibilityDecision`;not visible/degraded 直接返回 `IdentityQuerySurface` body-free surface。可见时才读取 core truth repository,并可通过 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, scope_ref)` 读取 optional `MemberSummaryView` slices。query miss/stale/missing projection 均不创建 truth、不刷新 source、不 rebuild projection、不 append trace/audit/outbox、不保存 stored result。list query 的真实空集合返回 `Empty`;not visible 返回 `NotVisible`;member/truth missing 返回 `Missing`;page item missing 或 member mismatch 返回 degraded partial surface。
 ```
 
 本草稿只作为 Step 19 装配输入,当前不写入正式 `03-详细设计.md`。
@@ -2359,7 +2359,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 ```md
 ### 8.x Trace / audit / summary query flows
 
-`ReadMemberSummaryFlow` 先通过 `IdentityReadVisibilityRepository.resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 取得 `IdentityVisibilityAccessSummary`,并只从该 summary 复制 `read_subject_ref`、`scope_ref` 和 `visibility_result_ref`;再通过 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, scope_ref)` 查找 stable `MemberSummaryViewRef`,随后 `get_member_summary_view(view_ref)` 读取 view 并执行 `belongs_to`、`matches_visibility_scope(access.scope_ref)` 与 body-free guard。lookup/view missing 只返回 `Missing` / degraded surface,scope mismatch 返回 degraded projection integrity surface,stale 只通过 loaded view freshness marker 表达;query 不拼 view ref、不读取未闭合 projection-state 反向映射、不从 `visibility_result_ref` 反推 scope、不触发 rebuild。
+`ReadMemberSummaryFlow` 先通过 `IdentityReadVisibilityRepository.resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 取得 `IdentityVisibilityAccessSummary`,并只从该 summary 复制 `read_subject_ref`、`scope_ref`、`visibility_result_ref` 和 `redaction_marker_ref`;再通过 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, scope_ref)` 查找 stable `MemberSummaryViewRef`,随后 `get_member_summary_view(view_ref)` 读取 view 并执行 `belongs_to`、`matches_visibility_scope(access.scope_ref)` 与 body-free guard。lookup/view missing 只返回 `Missing` / degraded surface,scope mismatch 返回 degraded projection integrity surface,stale 只通过 loaded view freshness marker 表达;query 不拼 view ref、不读取未闭合 projection-state 反向映射、不从 `visibility_result_ref` 或 `redaction_profile_ref` 反推 scope/redaction marker、不触发 rebuild。
 
 `ReadIdentityTraceFlow` 使用 `IdentityTraceReadSelector` 精确映射 Step 7 trace repository:by member、by subject after cursor、by member and change kind。每个 loaded trace record 必须通过 member/subject guard 和 `resolve_trace_read(record.subject_ref, consumer_ref, visibility_context_ref)` per-item visibility。visible empty page 返回 `Empty`;全部 loaded items denied 返回 `NotVisible`;mixed denied/redacted 返回 redacted partial;missing item 或 invalid material 返回 degraded partial。query 不 append trace、不修复 index。
 

@@ -3749,6 +3749,8 @@ pub struct IdentityVisibilityAccessSummary {
     pub access_state: IdentityVisibilityAccessState,
     /// Optional redaction profile marker.
     pub redaction_profile_ref: Option<RedactionProfileRef>,
+    /// Optional public redaction marker copied into query surface when redacted/not-visible material requires one.
+    pub redaction_marker_ref: Option<IdentityRedactionMarkerRef>,
     /// Body-free result marker.
     pub visibility_result_ref: VisibilityResultRef,
 }
@@ -4118,7 +4120,7 @@ pub struct AuditTrail {
 | summary read guard | `scope_ref`, `read_material_marker` | `for_summary(...)` | `assert_can_read_summary(...)` | read surface | query metadata + access summary |
 | trace/audit guard | `subject_ref`, `audit_subject_ref`, `read_material_marker` | `for_trace(...)` / `for_audit(...)` | `assert_can_read_trace(...)` | read surface | subject mapper + access summary |
 | forbidden body guard | `read_material_marker` | all factories | `assert_no_forbidden_body()` | material kind | DTO/assembler material precheck |
-| redaction output | `redaction_profile_ref`, `visibility_result_ref` | all factories | `classify_read_surface()` | `Found`/`Redacted`/`NotVisible`/`Degraded` | access summary |
+| redaction output | `redaction_profile_ref`, `redaction_marker_ref`, `visibility_result_ref` | all factories | `classify_read_surface()` | `Found`/`Redacted`/`NotVisible`/`Degraded` | access summary |
 
 ```rust
 /// Visibility guard for identity read and propagation material.
@@ -5521,7 +5523,7 @@ pub struct HandoffPolicy {
 | `IdentityVisibilityDecisionRef` | `IdentityVisibilityDecision` | 单次 read visibility decision identity | query assembler 或 policy evaluation 生成 | Step 8 / 12 |
 | `IdentityReadSubjectRef` | `IdentityVisibilityAccessSummary`;`IdentityVisibilityDecision` | query read subject marker | 来自 Step 7 `IdentityReadVisibilityRepository.resolve_*_read(...)` 返回的 prepared access summary;repository / adapter 内部可使用 formal read subject mapper 或 typed request/view/report ref,但 service 不得由 route/query param 拼接 | Step 7 / Step 9 |
 | `IdentityReadDispositionKind` | `IdentityVisibilityDecision` | visible/redacted/not visible/degraded/stale visible disposition | 由 visibility policy / resolver result 决定;不等于 HTTP status | Step 8 / Step 12 |
-| `IdentityRedactionMarkerRef` | `IdentityVisibilityDecision` | redaction reason / field-set safe marker | 来自 redaction matrix result;不保存 policy body 或 denied raw reason | Step 8 / Step 12 |
+| `IdentityRedactionMarkerRef` | `IdentityVisibilityAccessSummary`;`IdentityVisibilityDecision` | redaction reason / field-set safe marker | 来自 Step 7 visibility resolver / prepared access summary 中的 redaction matrix result;query service 只能复制到 decision / public surface,不得由 profile、scope、result 或字符串推导;不保存 policy body 或 denied raw reason | Step 7 / Step 8 / Step 12 |
 | `IdentityDegradedMarkerRef` | `IdentityVisibilityDecision` | degraded / stale / dependency issue safe marker | 来自 resolver/dependency summary;不保存 raw external error | Step 8 / Step 12 |
 | `IdentityJobRunRef` | `IdentityJobRunReport` | 单次 job run identity | job entry / scheduler 提供;不得由 job name + time 拼接 | Step 6.7 / 9 / 14 |
 | `IdentityJobReportRef` | `IdentityJobRunReport` | job report identity | report assembly 生成;不等于 run ref | Step 8 / 11 / 13 |
@@ -5895,7 +5897,7 @@ pub enum IdentityReadDispositionKind {
 | `visibility_result_ref` | visibility policy / resolver summary | public `IdentityVisibilityMarker` 从此字段复制;不保存 policy body、credential 或 raw denial reason |
 | `surface_kind` | visibility policy / query assembler | found/not_found/not_visible/redacted/stale/degraded/empty read surface;不表达 summary/trace/audit/report 目标类型 |
 | `disposition` | visibility policy result | `NotVisible` / `Degraded` 不应混同 |
-| `redaction_marker_ref` | redaction matrix result | body-free marker;具体字段裁剪留 Step 8/12 |
+| `redaction_marker_ref` | `IdentityVisibilityAccessSummary.redaction_marker_ref` or visibility policy redaction matrix result | body-free marker;query service 不得从 `redaction_profile_ref`、`visibility_result_ref`、scope、route 或字符串推导;具体字段裁剪留 Step 8/12 |
 | `degraded_marker_ref` | dependency / stale / unavailable summary | body-free marker;不得保存 raw error |
 | `decided_at` | clock | 不代表 source freshness cursor |
 
@@ -5913,6 +5915,7 @@ pub enum IdentityReadDispositionKind {
 - visibility decision 不能替代 `VisibilityPolicy`;它只是 policy / resolver 输出的 application surface。
 - `visibility_scope_ref` 必须有正式来源;后续 query flow 若无法映射 scope,必须暂停补 Step 7/9,不得自行拼 scope。
 - `visibility_result_ref` 必须来自正式 visibility policy / resolver summary,不得由 query route、HTTP status 或 ad hoc denied 字符串生成。
+- `redaction_marker_ref` 必须来自 `IdentityVisibilityAccessSummary.redaction_marker_ref` 或同一次 `VisibilityPolicy` redaction matrix result;`redaction_profile_ref` 只是配置 / profile marker,不能替代 public redaction marker。
 - `NotVisible` 不能伪装为 empty result;`Degraded` 不能伪装为 accepted success。
 - redaction/degraded marker 不保存 raw denial reason、external error body、credential、secret 或 policy body。
 
@@ -7206,7 +7209,7 @@ domain core 已写对象复核批次确认 6.A、6.B、6.C 的对象边界无需
 
 记忆引用关系批次定义 MemoryReference、MemoryReferenceState 和 MemoryReferencePolicy,并补齐 MemoryReferenceRef、MemoryRef、ArchiveRef、ArchiveHandoffRef、MemoryReferenceSourceRef、MemorySafeSummaryRef、MemoryReferenceReasonRef、MemoryReferenceSourceSummary、MemoryReferenceChangeIntent 和 MemoryReferenceChangeMaterialMarker。MemoryReference 是 identity-owned reference relation,保存 member ref、memory/archive/handoff refs、source marker、safe summary marker、reference state、reason、actor 和 changed time,但不保存 memory body、embedding、index、archive package、artifact body、conversation body、receipt body 或 external carrier truth。MemoryReferenceState 表达 Linked、PendingVerification、Stale、Unavailable、Migrated、Archived、HandoffPending、HandoffFailed,但不等于后续 6.5 的 trace / handoff delivery state。MemoryReferencePolicy 只消费 loaded member、body-free source summary、reason、operation channel、change intent 和 material marker,负责 member exists、reference present、source trusted、body-free、handoff marker、external-owner write 和 write channel guard,不读取 repository、不调用 memory/archive resolver、不执行 handoff。
 
-身份事实消费与追溯批次定义 MemberSummaryView、IdentityTraceRecord、AuditTrail 和 VisibilityPolicy,并补齐 MemberSummaryViewRef、MemberSummarySliceRef、IdentityTraceRecordRef、IdentityTraceSubjectRef、IdentityAuditSubjectRef、IdentityChangeKindRef、IdentityChangeReasonRef、AuditTrailRef、AuditScopeRef、AuditCursorRef、ConsumerRef、VisibilityContextRef、VisibilityScopeRef、VisibilityResultRef、IdentityVisibilityAccessSummary、IdentityReadSurfaceKind 和 IdentityReadMaterialMarker。MemberSummaryView 是 body-free read model,只聚合 anchor、lifecycle、role/capability、career 和 memory safe summary slice refs,并携带 visibility result、read surface 与 optional source cursor;view ref 必须来自正式 projection builder / lookup,不得由 query 拼接。IdentityTraceRecord 是 accepted change 的 append-only trace material,必须绑定 member、trace/audit subject、change kind、source cursor、actor/time 和 safe markers;source cursor 不得用 timestamp、version 或 idempotency key 替代。AuditTrail 只组织 trace refs 和 redacted entries,不保存 raw log 或修复缺失 trace。VisibilityPolicy 只消费已解析 IdentityVisibilityAccessSummary 和 read material marker,负责 summary/trace/audit 的 visible、redacted、not visible、degraded 和 forbidden body guard,不调用授权系统、不读取 repository、不写 truth。
+身份事实消费与追溯批次定义 MemberSummaryView、IdentityTraceRecord、AuditTrail 和 VisibilityPolicy,并补齐 MemberSummaryViewRef、MemberSummarySliceRef、IdentityTraceRecordRef、IdentityTraceSubjectRef、IdentityAuditSubjectRef、IdentityChangeKindRef、IdentityChangeReasonRef、AuditTrailRef、AuditScopeRef、AuditCursorRef、ConsumerRef、VisibilityContextRef、VisibilityScopeRef、VisibilityResultRef、IdentityVisibilityAccessSummary、IdentityReadSurfaceKind 和 IdentityReadMaterialMarker。MemberSummaryView 是 body-free read model,只聚合 anchor、lifecycle、role/capability、career 和 memory safe summary slice refs,并携带 visibility result、read surface 与 optional source cursor;view ref 必须来自正式 projection builder / lookup,不得由 query 拼接。IdentityTraceRecord 是 accepted change 的 append-only trace material,必须绑定 member、trace/audit subject、change kind、source cursor、actor/time 和 safe markers;source cursor 不得用 timestamp、version 或 idempotency key 替代。AuditTrail 只组织 trace refs 和 redacted entries,不保存 raw log 或修复缺失 trace。VisibilityPolicy 只消费已解析 IdentityVisibilityAccessSummary 和 read material marker,负责 summary/trace/audit 的 visible、redacted、not visible、degraded 和 forbidden body guard;redaction public marker 来自 access summary 或同次 redaction matrix result,不得由 redaction profile/result/scope 推导;不调用授权系统、不读取 repository、不写 truth。
 
 派生维护与对账批次定义 ProjectionState、ReferenceResolutionState、ReconciliationPolicy 和 ReconciliationReport,并补齐 ProjectionStateRef、IdentityProjectionRef、IdentityProjectionCursorRef、ProjectionFreshnessMarkerRef、ExternalReferenceRef、ReferenceResolutionStateRef、IdentityReferenceOwnerRef、ExternalSourceVersionRef、ExternalReferenceSafeSummaryRef、MaintenanceScopeRef、IdentityMaintenanceTargetRef、MaintenanceIssueRef、IdentityMaintenanceIntent、ReconciliationFindingIntentRef、ReconciliationFindingMaterial、ReconciliationReportRef 和 ReconciliationFindingRef。ProjectionState 只表达 identity-owned projection / derived view 与 source cursor 的 freshness、stale、pending、rebuilt、degraded 和 failed 状态,不保存 projection body,不修复 core truth,query 不得触发 rebuild。ReferenceResolutionState 只表达外部 reference 的 resolved、stale、unavailable、unrecognized、pending reconciliation 和 refresh failed 状态,并绑定 local owner、external version 和 safe summary marker,不保存外部正文、不补造 accepted truth。ReconciliationPolicy 保证 maintenance 只能 report-only,拒绝 identity truth repair、external truth repair、query path refresh 和 forbidden finding material。ReconciliationReport 保存 scope、target refs、finding refs、issue refs、report state 和 generated metadata,`Partial` / `Failed` 必须显式暴露,finding 不等于 repair action。
 

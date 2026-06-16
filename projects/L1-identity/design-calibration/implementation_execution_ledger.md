@@ -14,14 +14,14 @@
 | project | L1-identity |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| current_design_baseline | `2f0bfed` |
-| current_boundary | `commit-04-c` |
+| current_design_baseline | `ce18064` |
+| current_boundary | `commit-05-a` |
 | gate_status | pending |
-| gate_reason | `commit-04-c` boundary ledger created after design blocker; implementation agent must read and advance boundary gates before code changes |
+| gate_reason | `commit-05-a` boundary ledger created after design blocker; implementation agent must read and advance boundary gates before code changes |
 | next_allowed_action | read_docs |
-| current_recovery_point | `commit-04-c` open boundary / PH-04 trace handoff command and command side-effect replay audit |
+| current_recovery_point | `commit-05-a` open boundary / PH-05 query visibility, stable lookup, and query no-write foundation |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-16 00:07:16 +0800 |
+| last_updated_at | 2026-06-16 00:42:00 +0800 |
 
 ---
 
@@ -31,6 +31,7 @@
 |---|---|---|---|---|---|
 | `commit-04-b` | `d9f9e71` | pass | worktree_gate | implement | Required reads plus Design/Scope/Worktree gates passed; proceed with `commit-04-b` allowed scope only. |
 | `commit-04-c` | `2f0bfed` | pending | design_gate | read_docs | Trace handoff command and command side-effect/replay audit boundary; read `implementation-boundaries/commit-04-c.md` before implementation. |
+| `commit-05-a` | `ce18064` | pending | design_gate | read_docs | Query visibility, stable lookup, and no-write foundation boundary; read `implementation-boundaries/commit-05-a.md` before implementation. |
 
 ---
 
@@ -40,6 +41,7 @@
 |---|---|---|---|---|---|
 | BLK-ID-04B-LEDGER-001 | `commit-04-b` | implementation | resolved | `d9f9e71` | Implementation ledgers exist and pre-implementation gates are now advanced; continue `commit-04-b` from `implement`. |
 | BLK-ID-04C-LEDGER-001 | `commit-04-c` | implementation | resolved | `2f0bfed` | Boundary ledger now exists; implementation agent must continue from `read_docs` and advance gates before code changes. |
+| BLK-ID-05A-LEDGER-001 | `commit-05-a` | implementation | resolved | `ce18064` | Boundary ledger now exists; implementation agent must continue from `read_docs` and advance gates before code changes. |
 
 ---
 
@@ -48,7 +50,7 @@
 Any implementation agent resuming `L1-identity` must read files in this order:
 
 1. `projects/L1-identity/design-calibration/implementation_execution_ledger.md`
-2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-04-c.md`
+2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-05-a.md`
 3. `projects/L1-identity/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-identity/.codex/implementation_ledger.md`

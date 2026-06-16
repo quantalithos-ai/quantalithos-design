@@ -5,11 +5,11 @@
 | project | L1-identity |
 | boundary_id | commit-05-c |
 | phase | PH-05 Query / read model / visibility slices |
-| design_baseline | `current-design-with-commit-05-c-ledger` |
+| design_baseline | `current-design-with-operations-degradation-mapper` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
 | status | ready |
 | next_allowed_action | read_docs |
-| current_recovery_point | operations read query family opening gate after implementation `commit-05-b` at `073e336` and `3e11289`; covers `TC-ID-QUERY-009~014` plus shared no-write audit `TC-ID-QUERY-015` |
+| current_recovery_point | operations read query family opening gate after implementation `commit-05-b` at `073e336` and `3e11289`; covers `TC-ID-QUERY-009~014` plus shared no-write audit `TC-ID-QUERY-015`; degraded marker source closed through Step 7 operations mapper methods |
 
 ---
 
@@ -119,3 +119,4 @@
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
 | BLK-ID-05C-LEDGER-001 | design_gate | resolved | Project ledger still pointed to `commit-05-b` and `implementation-boundaries/commit-05-c.md` was missing, so implementation agent could not start operations read boundary. | Project ledger now advances to `commit-05-c`; this boundary ledger defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. | read_docs |
+| BLK-ID-05C-DEGRADED-MAPPER-001 | design_gate | resolved | Projection/reference/report/outbox/handoff operations reads returned `Degraded` in Step 9, but Step 7 did not define dedicated mapper methods, input signatures or `IdentityDegradedKind` mapping. | Step 7 now defines dedicated operations methods on `IdentityQueryMaterialDegradationMapper`; Step 9 and Step 12 require query service to copy mapper summaries only. | read_docs |

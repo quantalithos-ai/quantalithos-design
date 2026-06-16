@@ -496,7 +496,7 @@ pub trait IdentityMarkerSubjectMapper {
 Query read path has two different degraded marker sources:
 
 - resolver / dependency degraded before material load: `IdentityReadVisibilityRepository.resolve_*_read(...)` must return `Some(IdentityVisibilityAccessSummary { access_state: Degraded | Unavailable, degraded_marker_ref, degraded_kind, ... })`;
-- material / projection / trace / audit integrity degraded after a valid access summary already exists: service must call `IdentityQueryMaterialDegradationMapper` and copy the returned `IdentityQueryMaterialDegradationSummary` into public `IdentityQuerySurface.degraded`.
+- material / projection / reference / report / outbox / handoff / trace / audit integrity degraded after a valid access summary already exists: service must call `IdentityQueryMaterialDegradationMapper` and copy the returned `IdentityQueryMaterialDegradationSummary` into public `IdentityQuerySurface.degraded`.
 
 The mapper is application-local and body-free. It does not allocate ids, read repositories, call adapters, save decisions, repair projections, append trace/audit, or create visibility result refs. It only turns typed context plus the already-resolved access summary into a safe degraded marker summary.
 
@@ -591,6 +591,68 @@ pub trait IdentityQueryMaterialDegradationMapper {
         audit_trail_ref: AuditTrailRef,
         audit_scope_ref: AuditScopeRef,
     ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn projection_state_ref_mismatch(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        projection_ref: IdentityProjectionRef,
+        requested_state_ref: ProjectionStateRef,
+        loaded_state_ref: ProjectionStateRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn reference_state_owner_mismatch(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        reference_ref: ExternalReferenceRef,
+        expected_owner_ref: IdentityReferenceOwnerRef,
+        loaded_owner_ref: IdentityReferenceOwnerRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn reference_sidecar_degraded(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        reference_ref: ExternalReferenceRef,
+        resolution_state_ref: Option<ReferenceResolutionStateRef>,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn reconciliation_report_scope_mismatch(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        report_ref: ReconciliationReportRef,
+        expected_scope_ref: MaintenanceScopeRef,
+        loaded_scope_ref: MaintenanceScopeRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn reconciliation_report_item_missing_after_list(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        report_ref: ReconciliationReportRef,
+        expected_scope_ref: MaintenanceScopeRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn outbox_record_item_missing_after_list(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        outbox_ref: IdentityOutboxRecordRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn outbox_record_selector_mismatch(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        outbox_ref: IdentityOutboxRecordRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn handoff_intent_empty_trace_refs(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        intent_ref: TraceHandoffIntentRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn handoff_intent_delivered_without_receipt(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        intent_ref: TraceHandoffIntentRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
 }
 ```
 
@@ -609,6 +671,15 @@ pub trait IdentityQueryMaterialDegradationMapper {
 | `trace_item_invalid_member(...)` | `MaterialUnsafe` | copies access summary | loaded trace member mismatch |
 | `trace_item_subject_mismatch(...)` | `MaterialUnsafe` | copies access summary | selector.BySubject subject mismatch |
 | `audit_item_missing_or_invalid(...)` | `PartialResult` or `MaterialUnsafe` per audit safe material table | copies access summary and audit scope | audit trail / entry missing,scope mismatch,raw material guard failure |
+| `projection_state_ref_mismatch(...)` | `MaterialUnsafe` | copies access summary plus projection and requested/loaded state refs | `GetProjectionStateFlow` request state ref does not match loaded `ProjectionState.projection_state_ref` |
+| `reference_state_owner_mismatch(...)` | `MaterialUnsafe` | copies access summary plus external reference and expected/loaded owner refs | `GetReferenceResolutionStateFlow` request owner does not match loaded reference owner |
+| `reference_sidecar_degraded(...)` | `PartialResult` | copies access summary plus external reference and optional state ref | typed sidecar refs missing/degraded after stored reference state load |
+| `reconciliation_report_scope_mismatch(...)` | `MaterialUnsafe` | copies access summary plus report ref and expected/loaded maintenance scope refs | exact or listed reconciliation report belongs to another maintenance scope |
+| `reconciliation_report_item_missing_after_list(...)` | `PartialResult` | copies access summary plus report ref and expected scope | report ref returned by scope list cannot be loaded |
+| `outbox_record_item_missing_after_list(...)` | `PartialResult` | copies access summary plus outbox ref | outbox ref returned by selector list cannot be loaded |
+| `outbox_record_selector_mismatch(...)` | `MaterialUnsafe` | copies access summary plus outbox ref | loaded outbox topic/subject/trace/state does not match selector guard |
+| `handoff_intent_empty_trace_refs(...)` | `MaterialUnsafe` | copies access summary plus handoff intent ref | loaded handoff intent has empty `trace_record_refs` |
+| `handoff_intent_delivered_without_receipt(...)` | `MaterialUnsafe` | copies access summary plus handoff intent ref | loaded handoff state is `Delivered` but receipt marker is absent |
 
 Rules:
 
@@ -618,6 +689,8 @@ Rules:
 - `member_summary_view_missing_freshness(...)` is the only formal degraded marker source when `ReadMemberSummaryFlow` has loaded a stale/degraded `MemberSummaryView` but `projection_freshness_ref` is absent. Query service must return `Degraded` with the mapper summary;it must not read projection state, infer a projection ref from `view_ref`, reuse resolver markers, or synthesize a stale marker.
 - Career / memory list item methods are the only formal source of degraded markers for `ListCareerRecordsFlow` and `ListMemoryReferencesFlow` item missing / member mismatch after a valid access summary. Query service must not use generic `forbidden_read_material(...)`, trace/audit mapper methods, repository error strings, or fake-only rules for those branches.
 - For `ReadIdentityTrace` selector `ByMember` and `ByMemberAndChangeKind`, query service must first call `resolve_trace_member_page_read(...)`. Repository empty pages return `Empty` by copying this page access summary into the public surface. If the first listed `IdentityTraceRecordRef` is missing before an item subject can be loaded, the service must call `trace_item_missing_after_list(page_access, trace_ref)` and return page-level `Degraded`;it must not synthesize a visibility result, call `resolve_trace_read(...)` with a guessed subject, or silently turn the branch into `Empty`.
+- For `commit-05-c` operations reads, projection/reference/report/outbox/handoff material degraded branches must use the dedicated operations mapper methods above. The query service must copy the returned summary only;it must not reuse member/trace/audit methods, generic error strings, repository diagnostics, adapter diagnostics, or fake-only enums.
+- For `ListPendingIdentityOutboxFlow`, item missing after any selector list must have a valid access summary before calling `outbox_record_item_missing_after_list(...)`. If a selector has no topic/subject precheck, the service must call `resolve_outbox_record_read(Some(outbox_ref), None, None, ...)` for the listed ref before item load;resolver `None` remains malformed/unresolvable and cannot be turned into a synthesized degraded marker.
 - Fake runtime and durable adapters must use the same method-to-kind table and opaque marker creation rule. Fake may make markers deterministic for tests, but it must not use a private map to authorize degraded branches not represented by this trait.
 - Forbidden: query service synthesizes degraded marker, classifies degraded kind from `ApplicationError` text, repository error string, HTTP status, view id prefix, trace subject string, raw log body, projection body, adapter diagnostic or fake-only enum.
 
@@ -3571,7 +3644,7 @@ core truth repository 批次定义 GlobalMemberRepository、GlobalLifecycleRepos
 
 append-only / audit / history / trace repository 批次定义 IdentityTraceRecordRepository、IdentityAuditTrailRepository、IdentityTraceHistoryRepository 和 TraceHandoffIntentRepository。Step 6 已明确 HistoryRecord 并入 IdentityTraceRecord,因此 Step 7 不新增第二套 history truth。IdentityTraceRecordRepository 支撑 accepted trace、marker trace、correction trace 的 append-only create,并提供 by member、by subject、by cursor、by change kind 的读取面;旧 trace 的 correction 只能通过 loaded version 标记 superseded,不得覆盖或删除。IdentityAuditTrailRepository 支撑 audit trail by subject lookup、versioned get/save 和 body-free audit entry append;missing trail 必须由 service 使用 id generator 创建,repository 不隐式创建。IdentityTraceHistoryRepository 只是 trace/audit 只读 facade,用于 history query、report 和 handoff selection,不得新建 HistoryRecord 持久对象。TraceHandoffIntentRepository 支撑 pending handoff intent create/update、by member/trace/audit/target/retryable 读取和 versioned save;delivered 必须来自 formal HandoffReceiptRef,HTTP 2xx、request sent 或 job log success 不得伪装为 delivered。所有 append/update 都接收同一 IdentityUnitOfWork,subject 来自正式 mapper,cursor 来自 UoW / formal marker cursor,并保持 body-free。
 
-projection / read / reference / report repository 批次定义 IdentityProjectionRepository、IdentityReadVisibilityRepository、IdentityReferenceStateRepository、IdentityMaintenanceRepository 和 IdentityReconciliationReportRepository。IdentityProjectionRepository 提供 stable member summary view lookup、view read、projection state versioned read/save、stale mark 和 affected projection expansion;query 不得拼 view ref,也不得因 missing/stale 触发 rebuild。IdentityReadVisibilityRepository 负责把 member summary、trace、audit、report read request 映射为 prepared visibility access summary,从而给 VisibilityPolicy 提供 read subject、scope、visibility result、redaction marker 和 degraded/not visible 输入;`IdentityVisibilityAccessSummary.read_subject_ref` 是 service 构造 `IdentityVisibilityDecision.read_subject_ref` 的唯一正式来源,`IdentityVisibilityAccessSummary.redaction_marker_ref` 是 service 构造 redacted/not-visible public surface redaction marker 的唯一正式来源,service 不得从 route string、raw member id、view id、report id、scope、redaction profile、result ref 或字符串推断 subject/scope/redaction marker。IdentityReferenceStateRepository 以 ExternalReferenceRef 为 bundle key,所有 typed sidecar 保存必须显式传入同一 reference_ref 和 loaded bundle IdentityVersion;ExternalSourceVersionRef、IdentitySourceRef 和 safe summary ref 均不得替代 expected_version。IdentityMaintenanceRepository 只做 maintenance scope expansion,返回 projection/reference/report target,不得返回 core truth write target 或执行 repair。IdentityReconciliationReportRepository 只保存 body-free report-only finding/issue refs,不得保存 raw diagnostic、secret、external body 或 remediation plan。
+projection / read / reference / report repository 批次定义 IdentityProjectionRepository、IdentityReadVisibilityRepository、IdentityReferenceStateRepository、IdentityMaintenanceRepository 和 IdentityReconciliationReportRepository。IdentityProjectionRepository 提供 stable member summary view lookup、view read、projection state versioned read/save、stale mark 和 affected projection expansion;query 不得拼 view ref,也不得因 missing/stale 触发 rebuild。IdentityReadVisibilityRepository 负责把 member summary、trace、audit、projection/reference state、report、outbox 和 handoff read request 映射为 prepared visibility access summary,从而给 VisibilityPolicy 提供 read subject、scope、visibility result、redaction marker 和 degraded/not visible 输入;`IdentityVisibilityAccessSummary.read_subject_ref` 是 service 构造 `IdentityVisibilityDecision.read_subject_ref` 的唯一正式来源,`IdentityVisibilityAccessSummary.redaction_marker_ref` 是 service 构造 redacted/not-visible public surface redaction marker 的唯一正式来源,service 不得从 route string、raw member id、view id、report id、outbox id、handoff id、scope、redaction profile、result ref 或字符串推断 subject/scope/redaction marker。IdentityQueryMaterialDegradationMapper 是 loaded material integrity degraded 的唯一正式 marker 来源,覆盖 member/career/memory/trace/audit 和 projection/reference/report/outbox/handoff operations reads;service 只能复制 summary,不得从 repository error、adapter diagnostic 或 fake 私有规则分类。IdentityReferenceStateRepository 以 ExternalReferenceRef 为 bundle key,所有 typed sidecar 保存必须显式传入同一 reference_ref 和 loaded bundle IdentityVersion;ExternalSourceVersionRef、IdentitySourceRef 和 safe summary ref 均不得替代 expected_version。IdentityMaintenanceRepository 只做 maintenance scope expansion,返回 projection/reference/report target,不得返回 core truth write target 或执行 repair。IdentityReconciliationReportRepository 只保存 body-free report-only finding/issue refs,不得保存 raw diagnostic、secret、external body 或 remediation plan。
 
 outbox / result / idempotency repository 批次定义 IdentityOutboxRepository、IdentityIdempotencyRepository、IdentityStoredResultRepository、IdentityCommandEffectSummaryRepository 和 IdentityJobReportRepository。IdentityOutboxRepository 保存 accepted-only pending outbox、pending/retryable list、by subject/trace lookup 和 publish state update;publish failure 只更新 OutboxState 与 issue marker,不得回滚 accepted truth。IdentityIdempotencyRepository 的 reserve 必须接收 IdentityOperationContext,复制 operation name、channel、idempotency key 和 request digest;同 key 同 digest 且有 stored result 才 replay,同 key不同 digest 必须 conflict。IdentityStoredResultRepository 对 CommandAccepted、CommandRejected、ConsumerReceipt、JobReport 和 HandoffCallbackReceipt 提供 generic shell save/get 对称面,并对 command accepted/rejected 提供 typed envelope save/get 对称面;stored result 或 command typed envelope missing 不允许重跑 mutation。IdentityCommandEffectSummaryRepository 只保存 accepted truth、cursor、trace、audit、outbox、stale projection 和 stored result refs,不保存 command body、不决定 transaction order。IdentityJobReportRepository 保存 job run report,Partial / Failed / RetryableFailed 必须保留 safe issue refs,不得保存 raw job log 或把 partial 静默标成功。
 

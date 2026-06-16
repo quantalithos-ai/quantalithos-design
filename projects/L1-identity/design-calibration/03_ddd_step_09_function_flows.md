@@ -2505,7 +2505,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | visibility | matching Step 7 resolver | `None` is never visible by default |
 | exact ref read | request typed ref | missing exact object -> `Missing`,not `Empty` |
 | list read | Step 7 repository list by scope/selector | visible no rows -> `Empty` |
-| per-item check | loaded typed object | missing item or mismatch -> `Degraded` partial |
+| per-item check | loaded typed object + Step 7 `IdentityQueryMaterialDegradationMapper` | missing item or mismatch -> `Degraded` partial;query service copies mapper summary only |
 | no side effect | query service only reads | no UoW,stored result,trace/audit,outbox update,job trigger |
 
 ### 17.6 `GetProjectionStateFlow`
@@ -2532,7 +2532,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   | loaded_state None:
   |   optional state_ref = find_projection_state_ref(projection_ref)
   |   return Missing;body None;do not create state
-  | if request.projection_state_ref Some and != loaded_state.object.projection_state_ref -> Degraded invalid material
+  | if request.projection_state_ref Some(requested_state_ref) and requested_state_ref != loaded_state.object.projection_state_ref -> degradation = IdentityQueryMaterialDegradationMapper.projection_state_ref_mismatch(access, projection_ref, requested_state_ref, loaded_state.object.projection_state_ref);return Degraded invalid material
   | optional final_access = resolve_projection_state_read(projection_ref, Some(loaded_state.object.projection_state_ref), ...)
   | final_access NotVisible -> NotVisible;body None
   v
@@ -2548,7 +2548,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | visibility summary `None` | malformed / unresolvable read subject surface;no marker synthesis |
 | not visible | `NotVisible`,body `None`;do not reveal state existence |
 | state missing | `Missing`,body `None`;no create/rebuild |
-| request state ref mismatch | `Degraded` invalid material |
+| request state ref mismatch | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.projection_state_ref_mismatch(...)`;no state ref synthesis |
 | `Stale` / `RebuildPending` / `Rebuilding` | surface explicit;no rebuild |
 | `Failed` / `Degraded` / `Disabled` | safe issue marker only;no raw diagnostic |
 
@@ -2582,10 +2582,10 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   | state_v = get_reference_state_with_version(external_reference_ref)
   | state_v None -> Missing;body None;do not call external resolver
   | require state_v.object.external_reference_ref == request.external_reference_ref
-  | if request.owner_ref Some and != state_v.object.reference_owner_ref -> Degraded invalid material
+  | if request.owner_ref Some(expected_owner_ref) and expected_owner_ref != state_v.object.reference_owner_ref -> degradation = IdentityQueryMaterialDegradationMapper.reference_state_owner_mismatch(access, external_reference_ref, expected_owner_ref, state_v.object.reference_owner_ref);return Degraded invalid material
   | state_ref = find_reference_state_ref(external_reference_ref) optional consistency marker
   | sidecar_refs = get_typed_sidecar_refs(external_reference_ref)
-  | sidecar read unavailable -> Degraded partial;do not repair
+  | sidecar read unavailable -> degradation = IdentityQueryMaterialDegradationMapper.reference_sidecar_degraded(access, external_reference_ref, state_ref);return Degraded partial;do not repair
   v
 [Assemble]
   | body = ReferenceResolutionStateView from stored state + same-bundle sidecar refs
@@ -2599,9 +2599,9 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | visibility summary `None` | malformed / unresolvable read subject surface;no marker synthesis |
 | not visible | `NotVisible`,body `None` |
 | stored state missing | `Missing`,body `None`;no resolver call |
-| owner mismatch | `Degraded` invalid material |
+| owner mismatch | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.reference_state_owner_mismatch(...)` |
 | state stale/unavailable/unrecognized/refresh failed | explicit state + safe issue marker;no refresh |
-| sidecar read degraded | safe partial or body `None` with degraded marker per Step 12 |
+| sidecar read degraded | safe partial or body `None` with `IdentityQueryMaterialDegradationMapper.reference_sidecar_degraded(...)`;no sidecar repair |
 
 | Test cut | Expected |
 |---|---|
@@ -2633,7 +2633,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   | if request.report_ref Some:
   |   report_v = get_report_with_version(report_ref)
   |   report_v None -> Missing;items empty
-  |   require report_v.object.maintenance_scope_ref == request.maintenance_scope_ref;else Degraded invalid material
+  |   require report_v.object.maintenance_scope_ref == request.maintenance_scope_ref;else degradation = IdentityQueryMaterialDegradationMapper.reconciliation_report_scope_mismatch(scope_access, report_ref, request.maintenance_scope_ref, report_v.object.maintenance_scope_ref);return Degraded invalid material
   |   item_access = resolve_report_read(report_ref, consumer_ref, visibility_context_ref)
   |   item_access None -> malformed / unresolvable report item read subject surface;items empty
   |   item_access NotVisible -> NotVisible;items empty
@@ -2645,11 +2645,12 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   | page_refs = list_reports_by_scope(maintenance_scope_ref, repo_page)
   | page_refs empty -> Empty;items empty
   | for each report_ref:
-  |   report_v = get_report_with_version(report_ref)
-  |   missing -> Degraded partial;do not repair index
-  |   require report_v.object.maintenance_scope_ref == request.maintenance_scope_ref
   |   item_access = resolve_report_read(report_ref, consumer_ref, visibility_context_ref)
-  |   NotVisible -> withhold item and count denied
+  |   item_access None -> malformed / unresolvable report item read subject surface;items empty
+  |   item_access NotVisible -> withhold item and count denied;continue
+  |   report_v = get_report_with_version(report_ref)
+  |   missing -> degradation = IdentityQueryMaterialDegradationMapper.reconciliation_report_item_missing_after_list(item_access, report_ref, request.maintenance_scope_ref);mark Degraded partial;do not repair index
+  |   require report_v.object.maintenance_scope_ref == request.maintenance_scope_ref;else degradation = IdentityQueryMaterialDegradationMapper.reconciliation_report_scope_mismatch(item_access, report_ref, request.maintenance_scope_ref, report_v.object.maintenance_scope_ref);mark Degraded invalid material
   |   assemble ReconciliationReportView from body-free refs
   | page surface by visible/redacted/denied/degraded priority
 ```
@@ -2660,10 +2661,10 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | scope visibility `None` | malformed / unresolvable scope read subject surface;no marker synthesis |
 | scope not visible | `NotVisible`,items empty;no report list |
 | exact report missing | `Missing`,items empty |
-| exact report scope mismatch | `Degraded` invalid material |
+| exact report scope mismatch | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.reconciliation_report_scope_mismatch(...)` |
 | list page missing | entry validation failure when `report_ref` absent |
 | scope list empty | `Empty`,items empty |
-| listed report missing/scope mismatch | `Degraded` partial |
+| listed report missing/scope mismatch | `Degraded` partial or invalid material through `IdentityQueryMaterialDegradationMapper.reconciliation_report_item_missing_after_list(...)` / `reconciliation_report_scope_mismatch(...)` |
 | all loaded list items denied | `NotVisible`,items empty |
 | mixed visible/denied | `Redacted` partial |
 
@@ -2697,9 +2698,10 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   |   Retryable(topic) -> topic_key_ref
   |   BySubject(subject) -> subject_ref
   |   ByMember(member) -> IdentityTruthChangeSubjectMapper.member_subjects(member).outbox_subject_ref
-  |   ByTrace(trace) -> no pre-list visibility seed;per-item only
-  | run available list precheck through resolve_outbox_record_read(None, subject, topic, ...)
-  | precheck None -> Degraded;items empty
+  |   ByTrace(trace) -> no topic/subject pre-list visibility seed;per-listed-ref access before item load
+  | run available list precheck for Pending / Retryable / BySubject / ByMember through resolve_outbox_record_read(None, subject, topic, ...)
+  | precheck Some(Degraded | Unavailable) -> Degraded;items empty;copy markers
+  | precheck None -> malformed / unresolvable outbox list read subject surface;items empty;no marker synthesis
   | precheck NotVisible -> NotVisible;items empty
   v
 [Selector repository read]
@@ -2711,12 +2713,16 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   v
 [Per-item load / visibility]
   | for each outbox_ref:
+  |   ref_access = resolve_outbox_record_read(Some(outbox_ref), None, None, consumer_ref, visibility_context_ref)
+  |   ref_access None -> malformed / unresolvable outbox item read subject surface;no marker synthesis
+  |   ref_access NotVisible -> withhold item and count denied;continue
   |   record_v = get_outbox_record_with_version(outbox_ref)
-  |   missing -> Degraded partial;do not repair index
+  |   missing -> degradation = IdentityQueryMaterialDegradationMapper.outbox_record_item_missing_after_list(ref_access, outbox_ref);mark Degraded partial;do not repair index
   |   selector consistency guard:
   |     topic filters must match loaded topic when present
   |     subject filters must match loaded subject
   |     trace filter must match loaded trace ref
+  |     mismatch -> degradation = IdentityQueryMaterialDegradationMapper.outbox_record_selector_mismatch(ref_access, outbox_ref);mark Degraded invalid material
   |   item_access = resolve_outbox_record_read(Some(outbox_ref), Some(record.subject_ref), Some(record.topic_key_ref), ...)
   |   item_access NotVisible -> withhold item and count denied
   |   assemble IdentityOutboxRecordView from body-free marker/state refs
@@ -2729,15 +2735,15 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | `Retryable { topic_key_ref }` | `list_retryable_outbox_records(topic_key_ref, page)` | list topic precheck + per-item loaded record | loaded state must be retryable;topic matches when provided |
 | `BySubject { subject_ref }` | `list_outbox_records_by_subject(subject_ref, page)` | request subject precheck + per-item loaded record | loaded subject matches |
 | `ByMember { member_ref }` | mapper output subject then by subject | formal outbox subject from mapper | no string subject construction |
-| `ByTrace { trace_record_ref }` | `find_outbox_records_by_trace(trace_record_ref, page)` | per-item loaded record | loaded trace ref matches |
+| `ByTrace { trace_record_ref }` | `find_outbox_records_by_trace(trace_record_ref, page)` | per-listed-ref `resolve_outbox_record_read(Some(outbox_ref), None, None, ...)` before load,then per-item loaded record | loaded trace ref matches |
 
 | Branch | Handling |
 |---|---|
 | request page missing | entry validation failure |
 | list precheck not visible | `NotVisible`,items empty;no list |
 | repository page empty | `Empty`,items empty |
-| outbox item missing | `Degraded` partial |
-| item selector mismatch | `Degraded` invalid material |
+| outbox item missing | `Degraded` partial through `IdentityQueryMaterialDegradationMapper.outbox_record_item_missing_after_list(...)` |
+| item selector mismatch | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.outbox_record_selector_mismatch(...)` |
 | all loaded items denied | `NotVisible`,items empty;not `Empty` |
 | mixed visible/denied | `Redacted` partial |
 | payload marker forbidden body | `Degraded` / forbidden material surface;do not return payload body |
@@ -2823,10 +2829,10 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   | intent_v = TraceHandoffIntentRepository.get_handoff_intent_with_version(handoff_intent_ref)
   | intent_v None -> Missing;body None;do not create intent
   | require intent_v.object.handoff_intent_ref == request.handoff_intent_ref
-  | require intent_v.object.trace_record_refs not empty;else Degraded invalid material
+  | require intent_v.object.trace_record_refs not empty;else degradation = IdentityQueryMaterialDegradationMapper.handoff_intent_empty_trace_refs(access, handoff_intent_ref);return Degraded invalid material
   | require intent_v.object.safe_material_ref is body-free
   | if intent_v.object.handoff_state_kind == Delivered:
-  |   require receipt_ref Some;else Degraded fake delivered material
+  |   require receipt_ref Some;else degradation = IdentityQueryMaterialDegradationMapper.handoff_intent_delivered_without_receipt(access, handoff_intent_ref);return Degraded fake delivered material
   v
 [Assemble]
   | body = TraceHandoffStateView from loaded intent/state refs
@@ -2840,8 +2846,8 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | visibility `None` | malformed / unresolvable handoff read subject surface;no marker synthesis |
 | not visible | `NotVisible`,body `None` |
 | handoff intent missing | `Missing`,body `None`;no create |
-| trace refs empty | `Degraded` invalid material |
-| delivered without receipt marker | `Degraded` fake delivered material |
+| trace refs empty | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.handoff_intent_empty_trace_refs(...)` |
+| delivered without receipt marker | `Degraded` fake delivered material through `IdentityQueryMaterialDegradationMapper.handoff_intent_delivered_without_receipt(...)` |
 | retryable failed / failed / cancelled | return state + safe issue/attempt/receipt markers;no retry/delivery |
 | target/scope/private path unsafe | forbidden material surface;do not return target path/secret |
 
@@ -2898,11 +2904,11 @@ This table closes operations query item-level priority for 9.2-c. Field-level re
 
 `GetProjectionStateFlow` 和 `GetReferenceResolutionStateFlow` 只读取 stored operations state。projection query 通过 `resolve_projection_state_read(...)` 和 projection repository 读取 state,missing/stale/rebuilding/degraded 只返回 query surface,不触发 rebuild。reference query 通过 `resolve_reference_state_read(...)` 和 reference repository 读取 stored state 与同 bundle typed sidecar refs,missing/stale/unavailable 不调用 external resolver、不刷新 sidecar。
 
-`ReadReconciliationReportFlow` 先对 `maintenance_scope_ref` 调 `resolve_reconciliation_scope_read(...)`;scope not visible 时不 list reports。exact report 分支还必须 load report 并对 loaded `report_ref` 调 `resolve_report_read(...)`;scope mismatch 是 degraded invalid material。scope list visible empty 返回 `Empty`;listed report missing 或 invalid material 返回 degraded partial。report query 不生成 report、不修复 truth。
+`ReadReconciliationReportFlow` 先对 `maintenance_scope_ref` 调 `resolve_reconciliation_scope_read(...)`;scope not visible 时不 list reports。exact report 分支还必须 load report 并对 loaded `report_ref` 调 `resolve_report_read(...)`;scope mismatch 通过 `IdentityQueryMaterialDegradationMapper.reconciliation_report_scope_mismatch(...)` 返回 degraded invalid material。scope list visible empty 返回 `Empty`;listed report missing 或 invalid material 通过 dedicated report mapper 方法返回 degraded partial。report query 不生成 report、不修复 truth。
 
-`ListPendingIdentityOutboxFlow` 使用 `IdentityOutboxListSelector` 精确映射 Step 7 outbox repository:pending, retryable, by subject, by member through `IdentityTruthChangeSubjectMapper`, or by trace.每个 loaded record 还要按 outbox ref / subject / topic 做 per-item visibility。query 只返回 body-free outbox state,不 publish、不 retry、不展开 payload/topic secret。
+`ListPendingIdentityOutboxFlow` 使用 `IdentityOutboxListSelector` 精确映射 Step 7 outbox repository:pending, retryable, by subject, by member through `IdentityTruthChangeSubjectMapper`, or by trace.每个 listed ref 先取得 formal outbox access summary,再按 outbox ref / subject / topic 做 per-item visibility;item missing 或 selector mismatch 通过 dedicated outbox mapper 方法返回 degraded。query 只返回 body-free outbox state,不 publish、不 retry、不展开 payload/topic secret。
 
-`GetIdentityOutboxStateFlow` 和 `GetTraceHandoffStateFlow` 只读单个 outbox record / handoff intent state。outbox `Published` 只代表 outbound boundary accepted,不代表 downstream consumed。handoff `Delivered` 必须带 `HandoffReceiptRef` marker,receipt body 不进入 DTO;query 不调用 delivery adapter、不重试、不伪造 delivered。
+`GetIdentityOutboxStateFlow` 和 `GetTraceHandoffStateFlow` 只读单个 outbox record / handoff intent state。outbox `Published` 只代表 outbound boundary accepted,不代表 downstream consumed。handoff `Delivered` 必须带 `HandoffReceiptRef` marker,receipt body 不进入 DTO;empty trace refs 或 delivered without receipt 通过 dedicated handoff mapper 方法返回 degraded;query 不调用 delivery adapter、不重试、不伪造 delivered。
 ```
 
 本草稿只作为 Step 19 装配输入,当前不写入正式 `03-详细设计.md`。

@@ -551,7 +551,7 @@ pub enum IdentityQueryDisposition {
 | `visibility.read_surface_kind` | Step 6 `IdentityVisibilityDecision.surface_kind` / `VisibilityPolicy::classify_read_surface(...)` | 只表达 read surface;不替代 `IdentityQueryDisposition`,也不是 truth state |
 | `visibility.redaction_marker_ref` | Step 6 `IdentityVisibilityDecision.redaction_marker_ref`,which is copied from `IdentityVisibilityAccessSummary.redaction_marker_ref` or the same `VisibilityPolicy` redaction matrix result | `Redacted` 时必须存在;非 redacted 可为空;不得由 `redaction_profile_ref`、scope、result ref、route 或字符串推导;不保存被裁剪字段正文 |
 | `degraded.degraded_marker_ref` | Step 6 `IdentityVisibilityDecision.degraded_marker_ref`, `IdentityVisibilityAccessSummary.degraded_marker_ref`, or `IdentityQueryMaterialDegradationSummary.degraded_marker_ref` | `Degraded` / `StaleVisible` / `Rebuilding` / `Disabled` 等 degraded-like surface 必填;不保存 raw external error;resolver degraded 复制 access summary;loaded material missing/mismatch/unsafe/partial item 必须先调用 Step 7 `IdentityQueryMaterialDegradationMapper`;query service 不得在 resolver `None` 分支或 loaded material 分支自行合成 |
-| `degraded.degraded_kind` | `IdentityVisibilityAccessSummary.degraded_kind` or `IdentityQueryMaterialDegradationSummary.degraded_kind` | 必须使用 `IdentityDegradedKind`;不得用自由字符串、`ApplicationError` 文本、repository error、view id、trace ref 或 adapter 私有错误码 |
+| `degraded.degraded_kind` | `IdentityVisibilityAccessSummary.degraded_kind` or `IdentityQueryMaterialDegradationSummary.degraded_kind` | 必须使用 `IdentityDegradedKind`;不得用自由字符串、`ApplicationError` 文本、repository error、view id、trace ref、report ref、outbox ref、handoff ref 或 adapter 私有错误码 |
 
 | public surface | marker 规则 |
 |---|---|

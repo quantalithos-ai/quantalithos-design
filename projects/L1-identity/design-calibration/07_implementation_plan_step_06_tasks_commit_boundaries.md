@@ -139,8 +139,8 @@
 | PH-04 | commit-04-b | 落 role/career/memory command 写链 | BATCH-04-03~05 | service-flow-fast command subset + redaction |
 | PH-04 | commit-04-c | 落 trace handoff command 与 command side-effect/replay 收口 | BATCH-04-06~07 | command replay / handoff pending subset |
 | PH-05 | commit-05-a | 落 query visibility、projection lookup、read model helper 基座 | BATCH-05-01~02 | query no-write foundation |
-| PH-05 | commit-05-b | 落 core truth / member summary / trace / audit query family | BATCH-05-03~05 | service-flow-fast query subset |
-| PH-05 | commit-05-c | 落 maintenance/report/outbox/handoff query family 与 no-write audit | BATCH-05-06~07 | query no-write + degraded/stale subset |
+| PH-05 | commit-05-b | 落 core truth / member summary / trace / audit query family | BATCH-05-03~05 | service-flow-fast query subset;`TC-ID-QUERY-001~008`;`TC-ID-QUERY-015` |
+| PH-05 | commit-05-c | 落 maintenance/report/outbox/handoff query family 与 no-write audit | BATCH-05-06~07 | query no-write + degraded/stale subset;`TC-ID-QUERY-009~014`;`TC-ID-QUERY-015` |
 | PH-06 | commit-06-a | 落 inbound/callback envelope、receipt store、consumer context 基座 | BATCH-06-01~02 | entry-worker-job consumer scaffold subset |
 | PH-06 | commit-06-b | 落 5 consumer/callback accepted/delayed/quarantined/replay flow | BATCH-06-03~05 | entry-worker-job consumer subset |
 | PH-06 | commit-06-c | 落 10 outbound accepted material、payload marker 和 outbox snapshot | BATCH-06-06~07 | operations-replay-core outbox material subset |
@@ -478,8 +478,8 @@
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁方向 |
 |---|---|---|---|---|
 | commit-05-a | query foundation and stable lookup tests pass | visibility resolution, projection lookup, query service skeleton, fake no-write spies | actual 14 query full implementation,consumer/job | query no-write foundation |
-| commit-05-b | core/member/trace/audit query tests pass | core truth queries, member summary, trace/audit read | maintenance/outbox/handoff operations reads | service-flow-fast query subset |
-| commit-05-c | operations read queries and write-audit pass | projection/reference/report/outbox/handoff queries, degraded/stale/missing priority | rebuild/refresh/reconciliation/publish/deliver jobs | query no-write + degraded/stale subset |
+| commit-05-b | core/member/trace/audit query tests pass | core truth queries, member summary, trace/audit read;`TC-ID-QUERY-001~008`;`TC-ID-QUERY-015` | maintenance/outbox/handoff operations reads;`TC-ID-QUERY-009~014` | service-flow-fast query subset |
+| commit-05-c | operations read queries and write-audit pass | projection/reference/report/outbox/handoff queries, degraded/stale/missing priority;`TC-ID-QUERY-009~014`;`TC-ID-QUERY-015` | rebuild/refresh/reconciliation/publish/deliver jobs | query no-write + degraded/stale subset |
 
 #### Commit boundary 子功能分组
 

@@ -5,11 +5,11 @@
 | project | L1-identity |
 | boundary_id | commit-05-b |
 | phase | PH-05 Query / read model / visibility slices |
-| design_baseline | `pending-current-design-with-member-summary-missing-freshness-mapper` |
+| design_baseline | `current-design-with-query-boundary-scope-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
 | status | ready |
 | next_allowed_action | read_docs |
-| current_recovery_point | core truth, member summary, trace and audit query family opening gate after implementation `commit-05-a` at `bc6267a`; restart design gate after member summary missing freshness mapper closure |
+| current_recovery_point | core truth, member summary, trace and audit query family opening gate after implementation `commit-05-a` at `bc6267a`; `TC-ID-QUERY-009~014` are reserved for `commit-05-c` operations reads |
 
 ---
 
@@ -44,7 +44,7 @@
 | allowed_crate | `/home/aris/Projects/quantalithos-identity/crates/contracts` only if current design already defines missing query public refs/DTO/read markers and code has not caught up | pending |
 | allowed_crate | `/home/aris/Projects/quantalithos-identity/crates/domain` only if current design already defines read/visibility/redaction helper behavior needed by commit-05-b query family | pending |
 | allowed_crate | `/home/aris/Projects/quantalithos-identity/crates/infra` only for fake runtime read fixtures, stable lookup and query no-write spy support required by commit-05-b tests | pending |
-| allowed_tests | Targeted core truth, member summary, trace/audit, visibility-first, missing/not-visible, degraded/stale, redaction and no-write tests for `TC-ID-QUERY-001~011` and `TC-ID-QUERY-015` | pending |
+| allowed_tests | Targeted core truth, member summary, trace/audit, visibility-first, missing/not-visible, degraded/stale, redaction and no-write tests for `TC-ID-QUERY-001~008` and `TC-ID-QUERY-015` | pending |
 | allowed_reports | `reports/runs/<run_id>/suites/service-flow-fast.md`; optional `reports/runs/<run_id>/redaction-check.md` if output/log redaction is touched and formal writer exists | pending |
 | forbidden_rule | Do not implement maintenance/report/outbox/handoff operations read family in this boundary; reserve operations reads for `commit-05-c`. | active |
 | forbidden_rule | Do not implement consumer/callback, outbound propagation, operations jobs, API/worker/jobs entry, PH-08 scripts, rebuild/refresh/reconciliation/publish/deliver mutations, or handoff delivery. | active |

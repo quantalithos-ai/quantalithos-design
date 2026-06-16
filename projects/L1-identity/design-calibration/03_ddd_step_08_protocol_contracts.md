@@ -181,7 +181,7 @@ governance Step 8 只作为粒度参考:
 | `GetRoleCapabilitySummary` | 角色能力摘要 | `RoleCapabilitySummary`, `RoleCapabilitySourceSnapshot` | 8.3-a |
 | `ListCareerRecords` | 身份生涯记录 | `CareerRecord`, `MemberSummaryView` | 8.3-a |
 | `ListMemoryReferences` | 记忆引用关系 | `MemoryReference`, `MemoryReferenceState`, `MemberSummaryView` | 8.3-a |
-| `ReadMemberSummary` | 身份事实消费与追溯 | `MemberSummaryView`, `VisibilityPolicy`, `ProjectionState` | 8.3-b |
+| `ReadMemberSummary` | 身份事实消费与追溯 | `MemberSummaryView`, `VisibilityPolicy`, loaded `projection_freshness_ref` | 8.3-b |
 | `ReadIdentityTrace` | 身份事实消费与追溯 | `IdentityTraceRecord`, `VisibilityPolicy` | 8.3-b |
 | `ReadAuditTrail` | 身份事实消费与追溯 | `AuditTrail`, `IdentityTraceRecord`, `VisibilityPolicy` | 8.3-b |
 | `GetProjectionState` | 派生维护与对账 | `ProjectionState` | 8.3-c |
@@ -559,7 +559,7 @@ pub enum IdentityQueryDisposition {
 | `Redacted` | `visibility.redaction_marker_ref` 必填;`degraded` 仅在同时存在 dependency/source degraded 时填写 |
 | `NotVisible` | `visibility` 必填且 body/items 为空;不得改用 protocol rejection |
 | `Degraded` | `visibility` 与 `degraded` 均必填;body/items 是否为空由 flow 的 safe material 规则决定;若 resolver 无法形成 visibility summary,不得伪造 degraded surface |
-| `StaleVisible` | `projection_freshness_ref` 或 `degraded` 至少一个必填;query 不触发 rebuild/refresh |
+| `StaleVisible` | `projection_freshness_ref` 或 `degraded` 至少一个必填;`ReadMemberSummaryFlow` 的 `projection_freshness_ref` 只能复制 loaded `MemberSummaryView.projection_freshness_ref`;query 不触发 rebuild/refresh,也不得读取 projection state 反推 marker |
 | `Rebuilding` / `Disabled` | `degraded` 必填;不得伪造成 `Missing` 或 visible success |
 
 ### 8.1.6 Protocol rejection, issue and degraded shell
@@ -1840,9 +1840,9 @@ All five queries use the same construction order. Step 9 may expand this into pr
 | not visible | `NotVisible` | single body `None`;page items empty | `visibility`, `decision_ref` | 不泄露 found/missing 差异的内部原因正文 |
 | visibility dependency unavailable/degraded | `Degraded` | body 可空;items empty 或 safe partial | `visibility`;`degraded` | 来源必须是 `Some(IdentityVisibilityAccessSummary { access_state = Degraded | Unavailable, visibility_result_ref, degraded_marker_ref, degraded_kind })`;不默认 visible,不创建 synthetic decision |
 | visibility resolver cannot form subject/scope | protocol rejection / malformed query surface | body/items empty | `degraded` only if entry layer has formal degraded marker | 不生成 `IdentityVisibilityMarker`,不合成 `visibility_result_ref` |
-| loaded view/projection stale but allowed | `StaleVisible` | 可返回 stale safe refs | `projection_freshness_ref` 或 `degraded` | query 不 rebuild、不 mark fresh |
+| loaded view stale marker but allowed | `StaleVisible` | 可返回 stale safe refs | `projection_freshness_ref` 或 `degraded` | query 不 rebuild、不读取 projection state、不 mark fresh |
 | list has no records | `Empty` | items empty,page_info item_count 0 | `visibility` | 真实空集合,不是 not visible |
-| member/truth/projection lookup missing | `Missing` | body `None`;items empty | `visibility` if available | 缺 truth / view 不触发 create/rebuild |
+| member/truth/view lookup missing | `Missing` | body `None`;items empty | `visibility` if available | 缺 truth / view 不触发 create/rebuild |
 | projection rebuilding / disabled | `Rebuilding` / `Disabled` | body `None`;items empty | `degraded` | 本批只保留 surface;具体来源 Step 9/12 |
 
 ### 12.4 `GetGlobalMemberAnchor` protocol
@@ -2344,7 +2344,7 @@ pub struct MemoryReferenceView {
 
 | Query | Request DTO | Response DTO | 读取对象 / view | 依赖 Step 7 port/helper | 后续 flow |
 |---|---|---|---|---|---|
-| `ReadMemberSummary` | `ReadMemberSummaryRequest` | `IdentityQueryResponse<MemberSummaryView>` | `MemberSummaryView`, optional `ProjectionState` marker | `IdentityReadVisibilityRepository`, `IdentityProjectionRepository` | `ReadMemberSummaryFlow` |
+| `ReadMemberSummary` | `ReadMemberSummaryRequest` | `IdentityQueryResponse<MemberSummaryView>` | `MemberSummaryView`, loaded `projection_freshness_ref` marker | `IdentityReadVisibilityRepository`, `IdentityProjectionRepository` | `ReadMemberSummaryFlow` |
 | `ReadIdentityTrace` | `ReadIdentityTraceRequest` | `IdentityPageResponse<IdentityTraceRecordView>` | `IdentityTraceRecord` append-only history | `IdentityTraceRecordRepository`, `IdentityReadVisibilityRepository` | `ReadIdentityTraceFlow` |
 | `ReadAuditTrail` | `ReadAuditTrailRequest` | `IdentityPageResponse<AuditTrailEntryView>` | member canonical `AuditTrail`, `AuditTrailEntry`, trace refs | `IdentityTruthChangeSubjectMapper`, `IdentityAuditTrailRepository`, `IdentityReadVisibilityRepository` | `ReadAuditTrailFlow` |
 
@@ -2369,7 +2369,7 @@ pub struct MemoryReferenceView {
 | visible but redacted | `Redacted` | body/items 裁剪到允许字段 | `visibility`, `decision_ref` | 字段级矩阵留 Step 12 |
 | not visible | `NotVisible` | body `None`;items empty | `visibility`, `decision_ref` | 不泄露 found/missing/entry count 内部原因 |
 | dependency unavailable | `Degraded` | body/items 可空或 safe partial | `degraded` | visibility/projection/trace/audit material 不完整 |
-| summary projection stale | `StaleVisible` | 可返回 stale safe summary refs | `projection_freshness_ref` 或 `degraded` | query 不 rebuild、不 mark fresh |
+| summary loaded view stale marker | `StaleVisible` | 可返回 stale safe summary refs | `projection_freshness_ref` 或 `degraded` | query 不 rebuild、不读取 projection state、不 mark fresh |
 | no visible trace/audit entries after valid visible read | `Empty` | items empty,page_info item_count 0 | `visibility` | 表达真实空集合,不是 not visible |
 | summary view lookup missing | `Missing` | body `None` | `visibility` if available | 不创建 view、不触发 rebuild |
 | projection/audit material rebuilding or disabled | `Rebuilding` / `Disabled` | body `None`;items empty | `degraded` | 具体来源留 Step 9/12 |

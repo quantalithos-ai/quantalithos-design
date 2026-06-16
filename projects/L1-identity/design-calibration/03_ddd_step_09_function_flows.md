@@ -2188,6 +2188,16 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 [ReadIdentityTraceFlow]
   | require IdentityQueryRequest.page Some;map to IdentityRepositoryPage
   | selector = request.selector
+  | if selector.ByMember:
+  |   page_access = resolve_trace_member_page_read(member_ref, None, consumer_ref, visibility_context_ref)
+  |   page_access None -> malformed / unresolvable page read subject surface;items empty
+  |   page_access Degraded/Unavailable -> Degraded;items empty;copy page access markers
+  |   page_access NotVisible -> NotVisible;items empty
+  | if selector.ByMemberAndChangeKind:
+  |   page_access = resolve_trace_member_page_read(member_ref, Some(change_kind_ref), consumer_ref, visibility_context_ref)
+  |   page_access None -> malformed / unresolvable page read subject surface;items empty
+  |   page_access Degraded/Unavailable -> Degraded;items empty;copy page access markers
+  |   page_access NotVisible -> NotVisible;items empty
   | if selector.BySubject:
   |   seed_access = resolve_trace_read(selector.subject_ref, consumer_ref, visibility_context_ref)
   |   seed_access None -> malformed / unresolvable read subject surface;items empty
@@ -2200,12 +2210,13 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   |   page_refs = IdentityTraceRecordRepository.list_trace_records_after_cursor(subject_ref, after_cursor_ref, repo_page)
   | ByMemberAndChangeKind:
   |   page_refs = IdentityTraceRecordRepository.list_trace_records_by_change_kind(member_ref, change_kind_ref, repo_page)
-  | page_refs empty -> Empty;items empty
+  | page_refs empty -> Empty with seed_access/page_access visibility;items empty
   v
 [Per-item load / visibility]
   | for each trace_ref in page_refs.items:
   |   trace_v = IdentityTraceRecordRepository.get_trace_record(trace_ref)
-  |   missing -> response Degraded partial through IdentityQueryMaterialDegradationMapper.trace_item_missing_after_list(...);do not repair index
+  |   missing before item access in ByMember/ByMemberAndChangeKind -> response Degraded partial through IdentityQueryMaterialDegradationMapper.trace_item_missing_after_list(page_access, trace_ref);do not repair index;do not synthesize marker
+  |   missing after seed/item access exists -> response Degraded partial through IdentityQueryMaterialDegradationMapper.trace_item_missing_after_list(access, trace_ref);do not repair index
   |   require trace_v.object.belongs_to(selector.member_ref);else Degraded invalid material through IdentityQueryMaterialDegradationMapper.trace_item_invalid_member(...)
   |   if selector.BySubject -> require trace_v.object.matches_subject(subject_ref);else Degraded invalid material through IdentityQueryMaterialDegradationMapper.trace_item_subject_mismatch(...)
   |   access = resolve_trace_read(trace_v.object.subject_ref, consumer_ref, visibility_context_ref)
@@ -2216,7 +2227,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   |   assemble IdentityTraceRecordView with allowed refs/markers only
   v
 [Page surface]
-  | no loaded item refs missing and assembled_items empty because repository page empty -> Empty
+  | no loaded item refs missing and assembled_items empty because repository page empty -> Empty with page/seed access visibility
   | loaded items exist but all denied -> NotVisible,items empty,no internal count leak
   | some visible/redacted and some denied -> Redacted partial surface
   | any missing/invalid material -> Degraded partial surface
@@ -2225,16 +2236,19 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 
 | Selector | Repository read | Visibility source | Guard |
 |---|---|---|---|
-| `ByMember { member_ref }` | `list_trace_records_by_member(member_ref, page)` | each loaded record `subject_ref` | loaded `belongs_to(member_ref)` |
+| `ByMember { member_ref }` | `resolve_trace_member_page_read(member_ref, None, consumer_ref, visibility_context_ref)` then `list_trace_records_by_member(member_ref, page)` | page access for Empty / first-missing,then each loaded record `subject_ref` | loaded `belongs_to(member_ref)` |
 | `BySubject { member_ref, subject_ref, after_cursor_ref }` | `list_trace_records_after_cursor(subject_ref, after_cursor_ref, page)` | request `subject_ref` seed and each loaded record subject | loaded `belongs_to(member_ref)` and `matches_subject(subject_ref)` |
-| `ByMemberAndChangeKind { member_ref, change_kind_ref }` | `list_trace_records_by_change_kind(member_ref, change_kind_ref, page)` | each loaded record `subject_ref` | loaded `belongs_to(member_ref)`;change kind comes from repository filter |
+| `ByMemberAndChangeKind { member_ref, change_kind_ref }` | `resolve_trace_member_page_read(member_ref, Some(change_kind_ref), consumer_ref, visibility_context_ref)` then `list_trace_records_by_change_kind(member_ref, change_kind_ref, page)` | page access for Empty / first-missing,then each loaded record `subject_ref` | loaded `belongs_to(member_ref)`;change kind comes from repository filter |
 
 | Branch | Handling |
 |---|---|
 | request page missing | entry validation failure;do not invent default page |
+| `ByMember` / `ByMemberAndChangeKind` page access degraded/unavailable | `Degraded`,items empty;copy `resolve_trace_member_page_read(...)` markers |
+| `ByMember` / `ByMemberAndChangeKind` page access not visible | `NotVisible`,items empty;do not list/count leak |
 | `BySubject` seed not visible | `NotVisible`,items empty;do not list records |
-| repository page empty after visible seed | `Empty`,items empty |
-| trace ref missing after list | `Degraded` partial through `IdentityQueryMaterialDegradationMapper.trace_item_missing_after_list(...)`;no append/repair/delete |
+| repository page empty after visible seed/page access | `Empty`,items empty;copy seed/page access visibility |
+| first trace ref missing after member/change-kind list before item access | `Degraded` partial through `IdentityQueryMaterialDegradationMapper.trace_item_missing_after_list(page_access, trace_ref)`;no append/repair/delete/synthetic marker |
+| trace ref missing after item/subject access exists | `Degraded` partial through `IdentityQueryMaterialDegradationMapper.trace_item_missing_after_list(access, trace_ref)`;no append/repair/delete |
 | loaded member mismatch | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.trace_item_invalid_member(...)` |
 | loaded subject mismatch for `BySubject` | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.trace_item_subject_mismatch(...)` |
 | item visibility unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded` partial,copy markers |
@@ -2244,12 +2258,12 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 
 | Test cut | Expected |
 |---|---|
-| by member visible page | maps to `list_trace_records_by_member`,loads each record,per-item visibility applied |
+| by member visible page | first resolves page access,then maps to `list_trace_records_by_member`,loads each record,per-item visibility applied |
 | by subject after cursor | maps to `list_trace_records_after_cursor`;truth cursor not page cursor |
-| by change kind | maps to `list_trace_records_by_change_kind`;no string filter |
+| by change kind | first resolves page access with typed change kind,then maps to `list_trace_records_by_change_kind`;no string filter |
 | all items denied | `NotVisible`,not `Empty` |
-| visible empty page | `Empty` |
-| missing trace item | degraded partial,no repair |
+| visible empty page | `Empty` with seed/page access visibility |
+| first missing trace item in member/change-kind page | degraded partial from page access,no repair,no synthetic marker |
 | member or subject mismatch | degraded invalid material |
 | forbidden raw log marker | degraded/forbidden surface,no body |
 

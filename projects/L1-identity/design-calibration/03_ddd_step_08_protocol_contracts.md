@@ -2493,12 +2493,12 @@ pub struct ReadIdentityTraceRequest {
 
 | 输入字段 | 类型 | 目标读取 / visibility 输入 | 字段来源 | 缺失处理 |
 |---|---|---|---|---|
-| `selector.ByMember.member_ref` | `GlobalMemberRef` | `list_trace_records_by_member(member_ref, page)` | request body / route binding | 必填;no trace refs -> `Empty` |
+| `selector.ByMember.member_ref` | `GlobalMemberRef` | `resolve_trace_member_page_read(member_ref, None, consumer_ref, visibility_context_ref)` then `list_trace_records_by_member(member_ref, page)` | request body / route binding | 必填;page access `None` -> malformed / unresolvable surface;page access NotVisible -> `NotVisible`;no trace refs after visible/redacted page access -> `Empty` |
 | `selector.BySubject.member_ref` | `GlobalMemberRef` | loaded trace member guard | request body | 必填;loaded item member mismatch -> degraded / invalid material surface |
 | `selector.BySubject.subject_ref` | `IdentityTraceSubjectRef` | `list_trace_records_after_cursor(subject_ref, after_cursor, page)` and visibility seed | request body typed ref | 必填;不得从 member id 拼接 |
 | `selector.BySubject.after_cursor_ref` | `Option<IdentityTruthCursor>` | incremental trace read | request body | optional;只用于 trace source cursor,不当 page cursor |
-| `selector.ByMemberAndChangeKind.change_kind_ref` | `IdentityChangeKindRef` | `list_trace_records_by_change_kind(member_ref, change_kind_ref, page)` | request body | 必填;不得用字符串 filter |
-| `consumer_ref` | `ConsumerRef` | `resolve_trace_read(...)` | request body / API consumer context | 必填 |
+| `selector.ByMemberAndChangeKind.change_kind_ref` | `IdentityChangeKindRef` | `resolve_trace_member_page_read(member_ref, Some(change_kind_ref), consumer_ref, visibility_context_ref)` then `list_trace_records_by_change_kind(member_ref, change_kind_ref, page)` | request body | 必填;不得用字符串 filter;page access controls Empty / page-level Degraded marker |
+| `consumer_ref` | `ConsumerRef` | `resolve_trace_member_page_read(...)` or `resolve_trace_read(...)` | request body / API consumer context | 必填 |
 | `page` | `IdentityPublicPageRequest` | repository page | envelope `page` | trace list 必填;缺失是 entry validation failure |
 | `visibility_context_ref` | `VisibilityContextRef` | visibility context | `IdentityQueryMetadata.visibility_context_ref` | 必填 |
 
@@ -2540,17 +2540,17 @@ pub struct IdentityTraceRecordView {
 
 | selector | repository read | visibility source | public behavior |
 |---|---|---|---|
-| `ByMember` | `list_trace_records_by_member(member_ref, page)` then `get_trace_record(...)` | each loaded record `subject_ref` -> `resolve_trace_read(subject_ref, consumer_ref, visibility_context_ref)` | 返回可见/redacted items;全部不可见时 `NotVisible` 或 empty priority 留 Step 10/12 |
+| `ByMember` | `resolve_trace_member_page_read(member_ref, None, consumer_ref, visibility_context_ref)` then `list_trace_records_by_member(member_ref, page)` then `get_trace_record(...)` | page access summary supplies Empty and first-missing page surface;each loaded record `subject_ref` -> `resolve_trace_read(subject_ref, consumer_ref, visibility_context_ref)` | page access NotVisible -> `NotVisible`;repository page empty after visible/redacted page access -> `Empty`;first listed ref missing before item access -> `Degraded` via `trace_item_missing_after_list(page_access, trace_ref)` |
 | `BySubject` | `list_trace_records_after_cursor(subject_ref, after_cursor_ref, page)` then `get_trace_record(...)` | request `subject_ref` -> `resolve_trace_read(...)`;loaded record subject must match | after cursor 只用 `IdentityTruthCursor`;page cursor 仍来自 envelope |
-| `ByMemberAndChangeKind` | `list_trace_records_by_change_kind(member_ref, change_kind_ref, page)` then `get_trace_record(...)` | each loaded record `subject_ref` -> `resolve_trace_read(...)` | change kind 是 typed marker;不扫描 reason/body |
+| `ByMemberAndChangeKind` | `resolve_trace_member_page_read(member_ref, Some(change_kind_ref), consumer_ref, visibility_context_ref)` then `list_trace_records_by_change_kind(member_ref, change_kind_ref, page)` then `get_trace_record(...)` | page access summary supplies Empty and first-missing page surface;each loaded record `subject_ref` -> `resolve_trace_read(...)` | change kind 是 typed marker;不扫描 reason/body;first listed ref missing uses page access summary,not synthetic marker |
 
 | 输入契约 | 是否闭合 | 说明 |
 |---|---|---|
 | trace list page | 闭合 | `IdentityPublicPageRequest` -> Step 7 `IdentityRepositoryPage` |
-| trace subject source | 闭合 | request typed subject 或 loaded trace record,不拼字符串 |
-| trace visibility | 闭合 | `IdentityReadVisibilityRepository.resolve_trace_read(...)` |
+| trace subject source | 闭合 | request typed subject、loaded trace record,或 Step 7 `resolve_trace_member_page_read(...)` 的 page-level read subject,不拼字符串 |
+| trace visibility | 闭合 | `IdentityReadVisibilityRepository.resolve_trace_read(...)`;`ByMember` / `ByMemberAndChangeKind` page surface uses `resolve_trace_member_page_read(...)` |
 | trace redaction | 闭合 | `VisibilityPolicy::for_trace(...)` + field optionality |
-| trace missing / partial | 后续细化 | exact priority 留 Step 9/10/12,但本批固定不得补写或默认 visible |
+| trace missing / partial | 闭合 | listed ref missing before item access uses page access summary + `IdentityQueryMaterialDegradationMapper.trace_item_missing_after_list(...)`;loaded item missing/mismatch uses item access when available;不得补写或默认 visible |
 
 ### 13.6 `ReadAuditTrail` protocol
 
@@ -4470,7 +4470,7 @@ Step 8 shared protocol helper 定义 public protocol naming、metadata、digest�
 ```text
 `ReadMemberSummaryRequest` 读取统一成员摘要,request body 只承载 `member_ref` 和 `consumer_ref`;`visibility_context_ref` 来自 `IdentityQueryMetadata`。query service 先用 `IdentityReadVisibilityRepository.resolve_member_summary_read(...)` 取得可见性输入、read subject 和 scope,再通过 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, scope_ref)` 取得稳定 `MemberSummaryViewRef`,最后加载 `MemberSummaryView` 并用 `VisibilityPolicy::for_summary(...)` 分类为 visible/redacted/not visible/stale/degraded/missing。summary query 复制 `access_summary.read_subject_ref` 构造 decision / public surface,不创建 view、不重建 projection、不刷新外部 source、不追加 trace/audit/outbox。
 
-`ReadIdentityTraceRequest` 使用 `IdentityTraceReadSelector` 固定三种 Step 7 已支持的读取面:按 member、按 trace subject + optional accepted truth cursor、按 member + change kind。trace list 使用 envelope public page cursor;after-cursor 只能使用 `IdentityTruthCursor`,不得与 page cursor 混用。每条 loaded `IdentityTraceRecord` 通过其 typed `subject_ref` 调 `IdentityReadVisibilityRepository.resolve_trace_read(...)`,再由 `VisibilityPolicy::for_trace(...)` 生成可见/redacted/not visible/degraded surface。`IdentityTraceRecordView` 只返回 trace refs、member、trace/audit subject refs、change kind、source cursor、safe reason/source/basis/actor marker、visibility result、correction marker、material marker 和 occurred_at;不得返回 raw log、reason body、source body 或 governance body。
+`ReadIdentityTraceRequest` 使用 `IdentityTraceReadSelector` 固定三种 Step 7 已支持的读取面:按 member、按 trace subject + optional accepted truth cursor、按 member + change kind。trace list 使用 envelope public page cursor;after-cursor 只能使用 `IdentityTruthCursor`,不得与 page cursor 混用。`ByMember` / `ByMemberAndChangeKind` 在 repository list 前必须调用 `IdentityReadVisibilityRepository.resolve_trace_member_page_read(...)`,其 page access summary 是空页 `Empty` 与首个 listed ref 缺失 `Degraded` 的 visibility / marker 来源。每条 loaded `IdentityTraceRecord` 通过其 typed `subject_ref` 调 `IdentityReadVisibilityRepository.resolve_trace_read(...)`,再由 `VisibilityPolicy::for_trace(...)` 生成可见/redacted/not visible/degraded surface。`IdentityTraceRecordView` 只返回 trace refs、member、trace/audit subject refs、change kind、source cursor、safe reason/source/basis/actor marker、visibility result、correction marker、material marker 和 occurred_at;不得返回 raw log、reason body、source body 或 governance body。
 
 `ReadAuditTrailRequest` 承载 `member_ref`、`audit_scope_ref`、optional `audit_cursor_ref` 和 `consumer_ref`。本批 audit read 明确限定为 member canonical audit subject:audit subject 必须由 `IdentityTruthChangeSubjectMapper.member_subjects(member_ref).audit_subject_ref` 生成,visibility 通过 `IdentityReadVisibilityRepository.resolve_audit_read(...)` 取得,audit trail ref 通过 `IdentityAuditTrailRepository.find_audit_trail_by_subject(...)` 取得,entries 通过 `list_audit_entries(audit_trail_ref, audit_scope_ref, audit_cursor_ref, page)` 分页读取。若后续需要聚合 role/career/memory 等成员子 truth 的 audit trail,必须先在 Step 6/7/9/11 增加正式聚合规则或读取面。`AuditTrailEntryView` 只返回 audit trail/ref/scope、member、trace record ref、change kind、visibility result 和 occurred_at;missing/empty/not visible/degraded 均走 `IdentityQuerySurface`,不得创建 audit trail、修复缺失 trace 或保存 raw audit log。
 ```

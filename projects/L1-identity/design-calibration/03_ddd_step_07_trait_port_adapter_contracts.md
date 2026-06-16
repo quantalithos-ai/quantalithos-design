@@ -617,6 +617,7 @@ Rules:
 - `read_subject_ref` and `visibility_scope_ref` are copied from `IdentityVisibilityAccessSummary`;the mapper must not infer them from `member_ref`, `view_ref`, `trace_ref`, `audit_trail_ref`, cursor, route, scope string, or result marker.
 - `member_summary_view_missing_freshness(...)` is the only formal degraded marker source when `ReadMemberSummaryFlow` has loaded a stale/degraded `MemberSummaryView` but `projection_freshness_ref` is absent. Query service must return `Degraded` with the mapper summary;it must not read projection state, infer a projection ref from `view_ref`, reuse resolver markers, or synthesize a stale marker.
 - Career / memory list item methods are the only formal source of degraded markers for `ListCareerRecordsFlow` and `ListMemoryReferencesFlow` item missing / member mismatch after a valid access summary. Query service must not use generic `forbidden_read_material(...)`, trace/audit mapper methods, repository error strings, or fake-only rules for those branches.
+- For `ReadIdentityTrace` selector `ByMember` and `ByMemberAndChangeKind`, query service must first call `resolve_trace_member_page_read(...)`. Repository empty pages return `Empty` by copying this page access summary into the public surface. If the first listed `IdentityTraceRecordRef` is missing before an item subject can be loaded, the service must call `trace_item_missing_after_list(page_access, trace_ref)` and return page-level `Degraded`;it must not synthesize a visibility result, call `resolve_trace_read(...)` with a guessed subject, or silently turn the branch into `Empty`.
 - Fake runtime and durable adapters must use the same method-to-kind table and opaque marker creation rule. Fake may make markers deterministic for tests, but it must not use a private map to authorize degraded branches not represented by this trait.
 - Forbidden: query service synthesizes degraded marker, classifies degraded kind from `ApplicationError` text, repository error string, HTTP status, view id prefix, trace subject string, raw log body, projection body, adapter diagnostic or fake-only enum.
 
@@ -1863,6 +1864,14 @@ pub trait IdentityReadVisibilityRepository {
         visibility_context_ref: VisibilityContextRef,
     ) -> Result<Option<IdentityVisibilityAccessSummary>, ApplicationError>;
 
+    async fn resolve_trace_member_page_read(
+        &self,
+        member_ref: GlobalMemberRef,
+        change_kind_ref: Option<IdentityChangeKindRef>,
+        consumer_ref: ConsumerRef,
+        visibility_context_ref: VisibilityContextRef,
+    ) -> Result<Option<IdentityVisibilityAccessSummary>, ApplicationError>;
+
     async fn resolve_audit_read(
         &self,
         audit_subject_ref: IdentityAuditSubjectRef,
@@ -1935,6 +1944,7 @@ pub trait IdentityReadVisibilityRepository {
 |---|---|---|---|
 | `resolve_member_summary_read` | member summary query precheck | returns access summary containing read subject/scope/result/redaction marker refs;`read_subject_ref` and `redaction_marker_ref` are copied into `IdentityVisibilityDecision` / public surface | 不从 route/member string 拼 subject、scope 或 redaction marker |
 | `resolve_trace_read` | trace query precheck | trace subject 来自 7.1 mapper or request-loaded trace;resolver returns canonical read subject/scope/access summary | 不把 trace subject 强转 audit subject;service 不从 trace ref 拼 read subject |
+| `resolve_trace_member_page_read` | `ReadIdentityTrace` selector `ByMember` / `ByMemberAndChangeKind` page-level precheck and empty / first-missing surface | member trace page read subject / scope / result marker comes from formal visibility/read mapper inside the port;`change_kind_ref` narrows scope when present | service 不从 member ref、change kind、page cursor、first trace ref、repository empty result 或 fake rule 拼 page visibility marker |
 | `resolve_audit_read` | audit query precheck | audit subject/scope 均为 typed input;resolver returns canonical read subject/scope/access summary | not visible 不当 not found;service 不从 audit subject 字符串切 read subject |
 | `resolve_report_read` | reconciliation report query precheck | report ref 必须来自 repository/result | 不从 report id 拼 scope |
 | `resolve_reconciliation_scope_read` | reconciliation report list precheck | maintenance scope 来自 query request/job report scope;resolver 返回 scope-level read subject/scope/access summary | 不先扫描 report store 再推断 caller 是否可见该 scope |

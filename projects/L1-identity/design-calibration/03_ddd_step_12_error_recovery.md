@@ -568,7 +568,7 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 | target truth missing | repository read | no UoW | `Missing` | create member/lifecycle/summary |
 | stable view lookup missing | projection repository lookup | no UoW | `Missing` / `Degraded` per query type | synthesize view ref or rebuild view |
 | projection/reference/report stale | loaded state/view | no UoW | `StaleVisible` / `Degraded` | mark fresh or refresh reference |
-| partial item missing in page | item load after list | no UoW | `Degraded` with safe partial result and dedicated `IdentityQueryMaterialDegradationMapper` method for the item family | silently drop without marker, reuse wrong mapper family, or repair |
+| partial item missing in page | item load after list | no UoW | `Degraded` with safe partial result and dedicated `IdentityQueryMaterialDegradationMapper` method for the item family;`ReadIdentityTrace` ByMember/ByMemberAndChangeKind first-missing uses `resolve_trace_member_page_read(...)` page access as mapper input | silently drop without marker, reuse wrong mapper family, synthesize marker, or repair |
 | repository unavailable | read port | no UoW | `Degraded` / disabled/runtime surface | save diagnostic row |
 | page cursor invalid after facade | page mapper / repository page input | no UoW | degraded/invalid request surface per entry/application boundary | use truth cursor/job cursor as fallback |
 

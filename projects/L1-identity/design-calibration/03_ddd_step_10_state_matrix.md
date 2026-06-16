@@ -1013,17 +1013,19 @@ Forbidden core query behavior:
 
 | Selector | Repository read | Seed visibility | Per-item guard | Empty source |
 |---|---|---|---|---|
-| `ByMember` | `list_trace_records_by_member(member_ref,page)` | per item only | loaded record belongs to member | repository page empty |
+| `ByMember` | `resolve_trace_member_page_read(member_ref,None,consumer,context)` then `list_trace_records_by_member(member_ref,page)` | page access first,then per item | loaded record belongs to member | repository page empty after visible/redacted page access |
 | `BySubject` | `list_trace_records_after_cursor(subject_ref,after_cursor,page)` | request subject first | belongs to member and matches subject | repository page empty after visible seed |
-| `ByMemberAndChangeKind` | `list_trace_records_by_change_kind(member_ref,change_kind,page)` | per item only | belongs to member;change kind from repo filter | repository page empty |
+| `ByMemberAndChangeKind` | `resolve_trace_member_page_read(member_ref,Some(change_kind),consumer,context)` then `list_trace_records_by_change_kind(member_ref,change_kind,page)` | page access first,then per item | belongs to member;change kind from repo filter | repository page empty after visible/redacted page access |
 
 | Branch | Surface | Rule |
 |---|---|---|
 | page missing | entry validation failure | no default page |
 | seed visibility missing/unavailable | `Degraded` | no list when seed cannot be evaluated |
 | seed not visible | `NotVisible` | no list/count leak |
-| repository page empty | `Empty` | only after visible/allowed seed |
-| trace ref missing after list | `Degraded` partial | do not append/repair/delete |
+| member/change-kind page access degraded/unavailable | `Degraded` | no repository page assembly;copy `resolve_trace_member_page_read(...)` degraded marker |
+| repository page empty | `Empty` | only after visible/redacted seed or page access;`ByMember` / `ByMemberAndChangeKind` copy `resolve_trace_member_page_read(...)` visibility |
+| first trace ref missing after member/change-kind list before item access | `Degraded` partial | use `trace_item_missing_after_list(page_access, trace_ref)`;do not append/repair/delete/synthesize marker |
+| trace ref missing after item/subject access exists | `Degraded` partial | use `trace_item_missing_after_list(access, trace_ref)`;do not append/repair/delete |
 | loaded member/subject mismatch | `Degraded` invalid material | no raw diagnostic |
 | per-item visibility missing/degraded | `Degraded` partial | item skipped or safe marker per Step 12 |
 | per-item not visible | withhold item | count denied not leaked |

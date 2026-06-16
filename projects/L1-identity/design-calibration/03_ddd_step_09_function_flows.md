@@ -1623,7 +1623,8 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | read subject / visibility scope / redaction marker 从哪里来 | 只能来自 `IdentityVisibilityAccessSummary.read_subject_ref`、`IdentityVisibilityAccessSummary.scope_ref` 和 `IdentityVisibilityAccessSummary.redaction_marker_ref`,该 summary 由 `resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 返回 |
 | stable summary view ref 从哪里来 | 只能来自 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, access_summary.scope_ref)`;lookup missing 不拼 ref、不扫描 store、不 rebuild |
 | 是否允许 view-specific visibility 复核 | 允许但必须通过 `resolve_member_summary_read(member_ref, Some(view_ref), consumer_ref, visibility_context_ref)`;loaded view 只能做归属/assembly,不能生成 scope |
-| `None` visibility summary 怎么处理 | 返回 `IdentityQuerySurface.disposition = Degraded`,body/items empty,带 Step 8 degraded marker;不得默认 visible |
+| `None` visibility summary 怎么处理 | 只表示 resolver 无法形成 canonical read subject / scope 或 selector malformed;返回 entry validation / malformed query surface,不得合成 `visibility_result_ref` 或 degraded marker |
+| degraded / unavailable visibility summary 怎么处理 | resolver 必须返回 `Some(IdentityVisibilityAccessSummary { access_state = Degraded | Unavailable, visibility_result_ref, degraded_marker_ref, degraded_kind })`;query 复制 marker 返回 `Degraded`,body/items empty 或 safe partial |
 | not visible 怎么处理 | 返回 `NotVisible`;single query body `None`,list query items empty;不得用 `Missing` 或 `Empty` 掩盖权限结果 |
 | member/truth missing 怎么处理 | 在 visibility 已可判定且不 denied 后返回 `Missing`;不创建 member/lifecycle/summary/relation |
 | projection lookup/view missing 怎么处理 | single query 可继续返回 truth body但 projection slice refs 为 `None`/empty,并按 Step 8 surface 标记 missing/degraded/stale;不得 rebuild |
@@ -1671,7 +1672,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
   |   request.consumer_ref,
   |   metadata.visibility_context_ref
   | )
-  | access None -> return Degraded surface;body/items empty
+  | access None -> return entry validation / malformed query surface;do not synthesize visibility_result_ref
   | policy = VisibilityPolicy::for_summary(access, safe read material marker)
   | if access.access_state == NotVisible -> return NotVisible surface;body/items empty
   | if access.access_state == Unavailable or Degraded -> return Degraded surface unless Step 12 later permits safe partial
@@ -1694,7 +1695,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | Rule | Required source | Notes |
 |---|---|---|
 | query context | Step 7 operation context factory | channel fixed to `Query`;no idempotency key |
-| visibility summary | `resolve_member_summary_read(...)` | only source for read subject/scope/redaction marker/access/result;`None` is degraded |
+| visibility summary | `resolve_member_summary_read(...)` | only source for read subject/scope/redaction marker/access/result/degraded marker;`None` is malformed/unresolvable,not degraded |
 | projection lookup | `find_member_summary_view_ref(member_ref, scope_ref)` | optional;missing never rebuilds |
 | loaded view guard | `MemberSummaryView.belongs_to(member_ref)` | mismatch is degraded invalid material,not hidden |
 | material marker | Step 6 `IdentityReadMaterialMarker` | safe refs only;forbidden body maps to degraded/rejection surface per Step 12 |
@@ -1737,7 +1738,8 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 
 | Branch | Handling |
 |---|---|
-| visibility summary missing | `Degraded`,body `None` |
+| visibility summary unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,body `None`,copy `visibility_result_ref` / degraded marker |
+| visibility summary `None` | malformed / unresolvable read subject surface;no `IdentityVisibilityMarker` synthesis |
 | not visible | `NotVisible`,body `None`;do not read/return found/missing diagnostic body |
 | member missing | `Missing`,body `None`;do not create member |
 | projection lookup missing | may return visible body with `member_summary_view_ref = None`,plus missing/degraded/stale marker per Step 8/12 |
@@ -1956,7 +1958,8 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | Priority | Single-object query | List query |
 |---|---|---|
 | entry validation failure | `ApplicationError` / entry failure per Step 12 | same |
-| visibility resolver `None` / unavailable | `Degraded`,body `None` | `Degraded`,items empty |
+| visibility resolver unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,body `None`,copy markers | `Degraded`,items empty,copy markers |
+| visibility resolver `None` | malformed / unresolvable read subject surface | same |
 | `access_state = NotVisible` | `NotVisible`,body `None` | `NotVisible`,items empty |
 | member missing | `Missing`,body `None` | `Missing`,items empty |
 | target truth missing | `Missing`,body `None` | not applicable before page;item missing becomes degraded partial |
@@ -2082,7 +2085,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   | summary: resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)
   | trace: selector maps to typed subject or loaded trace subject then resolve_trace_read(...)
   | audit: member_subjects(member_ref).audit_subject_ref then resolve_audit_read(...)
-  | access None -> Degraded;not visible -> NotVisible
+  | access None -> malformed / unresolvable read subject surface;not visible -> NotVisible
   v
 [Repository read]
   | summary: projection stable lookup + get_member_summary_view
@@ -2121,7 +2124,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 ```text
 [ReadMemberSummaryFlow]
   | access = resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)
-  | access None -> return Degraded surface;body None
+  | access None -> return malformed / unresolvable read subject surface;body None
   | policy_seed = VisibilityPolicy::for_summary(access, SafeSummaryRefs marker)
   | if access.access_state == NotVisible -> return NotVisible;body None
   | if access.access_state == Unavailable or Degraded -> return Degraded unless Step 12 permits safe partial
@@ -2130,7 +2133,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   | view_ref = IdentityProjectionRepository.find_member_summary_view_ref(member_ref, access.scope_ref)
   | view_ref None -> return Missing;body None;do not construct view ref
   | optional view_access = resolve_member_summary_read(member_ref, Some(view_ref), consumer_ref, visibility_context_ref)
-  | view_access None -> return Degraded;body None
+  | view_access None -> return malformed / unresolvable view read subject surface;body None
   | if view_access.access_state == NotVisible -> return NotVisible;body None
   v
 [Load view and assemble]
@@ -2146,7 +2149,8 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 
 | Branch | Handling |
 |---|---|
-| visibility summary missing | `Degraded`,body `None` |
+| visibility summary unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,body `None`,copy markers |
+| visibility summary `None` | malformed / unresolvable read subject surface;no marker synthesis |
 | initial not visible | `NotVisible`,body `None`;do not reveal lookup found/missing |
 | stable lookup missing | `Missing`,body `None`;no view ref construction,no rebuild |
 | loaded view missing | `Missing` or `Degraded` projection inconsistency;no rebuild |
@@ -2183,7 +2187,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   | selector = request.selector
   | if selector.BySubject:
   |   seed_access = resolve_trace_read(selector.subject_ref, consumer_ref, visibility_context_ref)
-  |   seed_access None -> Degraded;items empty
+  |   seed_access None -> malformed / unresolvable read subject surface;items empty
   |   seed_access NotVisible -> NotVisible;items empty
   v
 [Selector repository read]
@@ -2202,7 +2206,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   |   require trace_v.object.belongs_to(selector.member_ref);else Degraded invalid material
   |   if selector.BySubject -> require trace_v.object.matches_subject(subject_ref);else Degraded invalid material
   |   access = resolve_trace_read(trace_v.object.subject_ref, consumer_ref, visibility_context_ref)
-  |   access None -> response Degraded partial
+  |   access None -> malformed / unresolvable item read subject surface;no synthetic degraded marker
   |   access NotVisible -> withhold item and count denied
   |   policy = VisibilityPolicy::for_trace(access, trace_v.object.subject_ref, trace_v.object.read_material_marker)
   |   require trace_v.object.assert_body_free()
@@ -2230,7 +2234,8 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 | trace ref missing after list | `Degraded` partial;no append/repair/delete |
 | loaded member mismatch | `Degraded` invalid material |
 | loaded subject mismatch for `BySubject` | `Degraded` invalid material |
-| item visibility missing/unavailable | `Degraded` partial |
+| item visibility unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded` partial,copy markers |
+| item visibility `None` | malformed / unresolvable item read subject surface;no marker synthesis |
 | all loaded items denied | `NotVisible`,items empty;not `Empty` |
 | mixed visible/redacted/denied | `Redacted` partial;denied items omitted or field-redacted per Step 12 |
 
@@ -2263,7 +2268,7 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   | subjects = IdentityTruthChangeSubjectMapper.member_subjects(request.member_ref)
   | audit_subject_ref = subjects.audit_subject_ref
   | access = resolve_audit_read(audit_subject_ref, audit_scope_ref, consumer_ref, visibility_context_ref)
-  | access None -> Degraded;items empty
+  | access None -> malformed / unresolvable audit read subject surface;items empty
   | access NotVisible -> NotVisible;items empty
   v
 [Canonical audit trail read]
@@ -2300,7 +2305,8 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 |---|---|
 | request page missing | entry validation failure |
 | mapper unavailable | `Degraded`;do not synthesize audit subject |
-| visibility summary missing/unavailable | `Degraded`,items empty |
+| visibility summary unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,items empty,copy markers |
+| visibility summary `None` | malformed / unresolvable read subject surface;no marker synthesis |
 | not visible | `NotVisible`,items empty;do not reveal trail existence |
 | canonical audit trail missing | `Empty`,items empty;do not create audit trail |
 | trail subject/member mismatch | `Degraded` invalid material |
@@ -2323,7 +2329,8 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 | Priority | `ReadMemberSummary` | `ReadIdentityTrace` | `ReadAuditTrail` |
 |---|---|---|---|
 | entry validation failure | `ApplicationError` / entry failure per Step 12 | same;page required | same;page required |
-| visibility resolver `None` / unavailable | `Degraded`,body `None` | `Degraded`,items empty | `Degraded`,items empty |
+| visibility resolver unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,body `None`,copy markers | `Degraded`,items empty,copy markers | `Degraded`,items empty,copy markers |
+| visibility resolver `None` | malformed / unresolvable read subject surface | same | same |
 | `access_state = NotVisible` | `NotVisible`,body `None` | `NotVisible`,items empty | `NotVisible`,items empty |
 | stable lookup / canonical material missing | summary view lookup missing -> `Missing` | repository page empty -> `Empty` | canonical trail missing -> `Empty` |
 | loaded material missing after index | loaded view missing -> `Missing` / `Degraded` | missing trace item -> `Degraded` partial | entry material invalid -> `Degraded` partial |
@@ -2461,7 +2468,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   | report item -> resolve_report_read(...)
   | outbox -> resolve_outbox_record_read(...)
   | handoff -> resolve_handoff_intent_read(...)
-  | access None -> Degraded;not visible -> NotVisible
+  | access None -> malformed / unresolvable operations read subject surface;not visible -> NotVisible
   v
 [Repository read]
   | load exact state/report/outbox/handoff or list refs by formal selector/scope
@@ -2500,7 +2507,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 [GetProjectionStateFlow]
   | state_ref_hint = request.projection_state_ref
   | access = resolve_projection_state_read(projection_ref, state_ref_hint, consumer_ref, visibility_context_ref)
-  | access None -> Degraded;body None
+  | access None -> malformed / unresolvable projection read subject surface;body None
   | access NotVisible -> NotVisible;body None
   v
 [Lookup and load]
@@ -2520,7 +2527,8 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 
 | Branch | Handling |
 |---|---|
-| visibility summary missing/unavailable | `Degraded`,body `None` |
+| visibility summary unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,body `None`,copy markers |
+| visibility summary `None` | malformed / unresolvable read subject surface;no marker synthesis |
 | not visible | `NotVisible`,body `None`;do not reveal state existence |
 | state missing | `Missing`,body `None`;no create/rebuild |
 | request state ref mismatch | `Degraded` invalid material |
@@ -2550,7 +2558,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 ```text
 [GetReferenceResolutionStateFlow]
   | access = resolve_reference_state_read(external_reference_ref, owner_ref, consumer_ref, visibility_context_ref)
-  | access None -> Degraded;body None
+  | access None -> malformed / unresolvable reference read subject surface;body None
   | access NotVisible -> NotVisible;body None
   v
 [Load stored reference bundle]
@@ -2570,7 +2578,8 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 
 | Branch | Handling |
 |---|---|
-| visibility summary missing/unavailable | `Degraded`,body `None` |
+| visibility summary unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,body `None`,copy markers |
+| visibility summary `None` | malformed / unresolvable read subject surface;no marker synthesis |
 | not visible | `NotVisible`,body `None` |
 | stored state missing | `Missing`,body `None`;no resolver call |
 | owner mismatch | `Degraded` invalid material |
@@ -2600,7 +2609,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 ```text
 [ReadReconciliationReportFlow]
   | scope_access = resolve_reconciliation_scope_read(maintenance_scope_ref, consumer_ref, visibility_context_ref)
-  | scope_access None -> Degraded;items empty
+  | scope_access None -> malformed / unresolvable report scope read subject surface;items empty
   | scope_access NotVisible -> NotVisible;items empty;do not list reports
   v
 [Exact report branch]
@@ -2609,7 +2618,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   |   report_v None -> Missing;items empty
   |   require report_v.object.maintenance_scope_ref == request.maintenance_scope_ref;else Degraded invalid material
   |   item_access = resolve_report_read(report_ref, consumer_ref, visibility_context_ref)
-  |   item_access None -> Degraded;items empty
+  |   item_access None -> malformed / unresolvable report item read subject surface;items empty
   |   item_access NotVisible -> NotVisible;items empty
   |   assemble one ReconciliationReportView
   |   return one-item page
@@ -2630,7 +2639,8 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 
 | Branch | Handling |
 |---|---|
-| scope visibility missing/unavailable | `Degraded`,items empty |
+| scope visibility unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,items empty,copy markers |
+| scope visibility `None` | malformed / unresolvable scope read subject surface;no marker synthesis |
 | scope not visible | `NotVisible`,items empty;no report list |
 | exact report missing | `Missing`,items empty |
 | exact report scope mismatch | `Degraded` invalid material |
@@ -2739,14 +2749,14 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 ```text
 [GetIdentityOutboxStateFlow]
   | access = resolve_outbox_record_read(Some(outbox_record_ref), None, None, consumer_ref, visibility_context_ref)
-  | access None -> Degraded;body None
+  | access None -> malformed / unresolvable outbox read subject surface;body None
   | access NotVisible -> NotVisible;body None
   v
 [Load outbox record]
   | record_v = get_outbox_record_with_version(outbox_record_ref)
   | record_v None -> Missing;body None;do not create outbox
   | final_access = resolve_outbox_record_read(Some(outbox_record_ref), Some(record.subject_ref), Some(record.topic_key_ref), ...)
-  | final_access None -> Degraded;body None
+  | final_access None -> malformed / unresolvable outbox read subject surface;body None
   | final_access NotVisible -> NotVisible;body None
   v
 [Assemble]
@@ -2758,7 +2768,8 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 
 | Branch | Handling |
 |---|---|
-| initial visibility missing/unavailable | `Degraded`,body `None` |
+| initial visibility unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,body `None`,copy markers |
+| initial visibility `None` | malformed / unresolvable outbox read subject surface;no marker synthesis |
 | initial or final not visible | `NotVisible`,body `None` |
 | outbox missing | `Missing`,body `None`;no create |
 | payload/topic/attempt/issue marker unsafe | `Degraded`;no raw body |
@@ -2788,7 +2799,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 ```text
 [GetTraceHandoffStateFlow]
   | access = resolve_handoff_intent_read(handoff_intent_ref, consumer_ref, visibility_context_ref)
-  | access None -> Degraded;body None
+  | access None -> malformed / unresolvable handoff read subject surface;body None
   | access NotVisible -> NotVisible;body None
   v
 [Load handoff intent]
@@ -2808,7 +2819,8 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 
 | Branch | Handling |
 |---|---|
-| visibility missing/unavailable | `Degraded`,body `None` |
+| visibility unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,body `None`,copy markers |
+| visibility `None` | malformed / unresolvable handoff read subject surface;no marker synthesis |
 | not visible | `NotVisible`,body `None` |
 | handoff intent missing | `Missing`,body `None`;no create |
 | trace refs empty | `Degraded` invalid material |
@@ -2830,7 +2842,8 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | Priority | Single-object operations query | List operations query |
 |---|---|---|
 | entry validation failure | `ApplicationError` / entry failure per Step 12 | same;page required for list branch |
-| visibility resolver `None` / unavailable | `Degraded`,body `None` | `Degraded`,items empty |
+| visibility resolver unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded`,body `None`,copy markers | `Degraded`,items empty,copy markers |
+| visibility resolver `None` | malformed / unresolvable read subject surface | same |
 | `access_state = NotVisible` | `NotVisible`,body `None` | `NotVisible`,items empty;do not list when scope/subject/topic precheck exists |
 | exact requested object missing | `Missing`,body `None` | exact report branch: `Missing` |
 | scope/list repository page empty | not applicable | `Empty`,items empty |

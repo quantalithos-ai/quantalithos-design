@@ -1701,7 +1701,15 @@ pub trait IdentityProjectionRepository {
 
 本 repository 只保存和读取 visibility decision/read mapping 的 application-side material。外部授权、consumer entitlement、adapter availability resolver 留 7.7;本批只定义 query path 需要的正式 read subject/scope/access summary 读取面,防止 handler/service 从 route string、member id 或 view ref 临时推断。
 
-所有 `resolve_*_read(...)` 的 `Some(IdentityVisibilityAccessSummary)` 必须包含 `read_subject_ref`、`scope_ref`、`visibility_result_ref`、`access_state` 和 redacted / not-visible surface 所需的 `redaction_marker_ref`。`read_subject_ref` 是 query service 构造 `IdentityVisibilityDecision.read_subject_ref` 的唯一正式来源;`redaction_marker_ref` 是 query service 构造 `IdentityVisibilityDecision.redaction_marker_ref` 与 `IdentityQuerySurface.visibility.redaction_marker_ref` 的唯一正式来源。repository / adapter 内部可调用 formal read subject mapper 和 redaction matrix / prepared context,或使用 request-scoped typed ref、loaded view/report typed ref 生成 canonical read subject;application service、handler 和 fake 不得从 route、member id、view id、report id、topic key、scope、redaction profile、result ref 或字符串反推。
+所有 `resolve_*_read(...)` 的 `Some(IdentityVisibilityAccessSummary)` 必须包含 `read_subject_ref`、`scope_ref`、`visibility_result_ref`、`access_state` 和 redacted / not-visible surface 所需的 `redaction_marker_ref`。当 `access_state = Degraded | Unavailable` 时,同一个 summary 还必须包含 `degraded_marker_ref` 与 `degraded_kind`。`read_subject_ref` 是 query service 构造 `IdentityVisibilityDecision.read_subject_ref` 的唯一正式来源;`redaction_marker_ref` 是 query service 构造 `IdentityVisibilityDecision.redaction_marker_ref` 与 `IdentityQuerySurface.visibility.redaction_marker_ref` 的唯一正式来源;`degraded_marker_ref` / `degraded_kind` 是 query service 构造 public degraded surface 的唯一正式来源。repository / adapter 内部可调用 formal read subject mapper 和 redaction matrix / prepared context,或使用 request-scoped typed ref、loaded view/report typed ref 生成 canonical read subject;application service、handler 和 fake 不得从 route、member id、view id、report id、topic key、scope、redaction profile、result ref、error string 或字符串反推。
+
+Resolver `None` rule:
+
+| resolver result | 正式含义 | query service 处理 |
+|---|---|---|
+| `Some(access_state = Visible | Redacted | NotVisible)` | 已解析 read subject/scope/visibility result,可继续由 `VisibilityPolicy` 分类。 | 复制 summary 中的 subject/scope/result/redaction marker;不得重建 marker。 |
+| `Some(access_state = Degraded | Unavailable)` | 已解析 read subject/scope,但 dependency/source/projection/policy 只能返回 degraded-like safe surface。 | 复制 summary 中的 visibility result、degraded marker 和 degraded kind,返回 `Degraded` / degraded-like surface。 |
+| `None` | resolver 无法形成 canonical read subject / scope,或 request selector malformed / unsupported。 | 返回 entry validation / malformed query surface;不得合成 `VisibilityResultRef`、`IdentityDegradedMarkerRef`、`IdentityVisibilityDecision` 或默认 visible。 |
 
 ```rust
 /// Read-side port for Identity visibility mapping and optional visibility decision material.
@@ -1807,9 +1815,9 @@ Operations and propagation query visibility rules:
 
 - Maintenance / operations queries that expose `ProjectionState`, `ReferenceResolutionState`, `ReconciliationReport`, `IdentityOutboxRecord` or `TraceHandoffIntent` must call the matching resolver before `VisibilityPolicy`.
 - `ReadReconciliationReport` scope listing must call `resolve_reconciliation_scope_read(...)` before `list_reports_by_scope(...)`;single report reads must additionally call `resolve_report_read(...)` for the loaded `report_ref`.
-- Resolver output is only `IdentityVisibilityAccessSummary` with `read_subject_ref` and optional `redaction_marker_ref`;it must not return projection body,reference safe summary body,outbox payload,topic binding secret,handoff receipt body,target path or archive package.
+- Resolver output is only `IdentityVisibilityAccessSummary` with `read_subject_ref`, `scope_ref`, `visibility_result_ref`, optional `redaction_marker_ref`, and degraded/unavailable 时必填的 `degraded_marker_ref` / `degraded_kind`;it must not return projection body,reference safe summary body,outbox payload,topic binding secret,handoff receipt body,target path or archive package.
 - Query services may load the target object after resolver precheck and may use loaded fields only for consistency checks and view assembly. They must not derive read subject/scope from loaded object when resolver is missing.
-- `None` from these resolvers maps to not visible / degraded / malformed query surface in Step 8/9/12;it is never treated as visible by default.
+- `None` from these resolvers maps only to entry validation / malformed query surface in Step 8/9/12;dependency unavailable,source unavailable,projection unavailable and policy degraded must be `Some(IdentityVisibilityAccessSummary)` with degraded markers. `None` is never treated as visible by default and never authorizes service-side synthetic markers.
 - Fake and durable adapters must use the same typed ref and index rules. Fake must not authorize operations/outbox/handoff query by string prefixes,topic names,raw route paths or private maps.
 
 #### 7.11.5 `IdentityReferenceStateRepository`

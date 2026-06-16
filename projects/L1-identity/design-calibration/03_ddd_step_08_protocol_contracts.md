@@ -509,17 +509,7 @@ pub struct IdentityDegradedMarker {
     pub degraded_kind: IdentityDegradedKind,
 }
 
-/// Public degraded category. Variants are safe to expose and never carry raw errors.
-pub enum IdentityDegradedKind {
-    DependencyUnavailable,
-    SourceUnavailable,
-    ProjectionStale,
-    ProjectionRebuilding,
-    MaterialUnsafe,
-    PartialResult,
-    AdapterUnavailable,
-    Disabled,
-}
+// `IdentityDegradedKind` is the Step 6 public degraded enum reused here.
 
 pub struct IdentityQuerySurface {
     pub disposition: IdentityQueryDisposition,
@@ -559,15 +549,15 @@ pub enum IdentityQueryDisposition {
 | `visibility.visibility_result_ref` | Step 6 `IdentityVisibilityDecision.visibility_result_ref` 或等价 visibility resolver summary | 必填;不保存 policy body、credential、denied raw reason |
 | `visibility.read_surface_kind` | Step 6 `IdentityVisibilityDecision.surface_kind` / `VisibilityPolicy::classify_read_surface(...)` | 只表达 read surface;不替代 `IdentityQueryDisposition`,也不是 truth state |
 | `visibility.redaction_marker_ref` | Step 6 `IdentityVisibilityDecision.redaction_marker_ref`,which is copied from `IdentityVisibilityAccessSummary.redaction_marker_ref` or the same `VisibilityPolicy` redaction matrix result | `Redacted` 时必须存在;非 redacted 可为空;不得由 `redaction_profile_ref`、scope、result ref、route 或字符串推导;不保存被裁剪字段正文 |
-| `degraded.degraded_marker_ref` | Step 6 `IdentityVisibilityDecision.degraded_marker_ref` 或 resolver/projection/dependency safe summary | `Degraded` / `StaleVisible` / `Rebuilding` / `Disabled` 等 degraded-like surface 必填;不保存 raw external error |
-| `degraded.degraded_kind` | safe degraded classifier | 必须使用 `IdentityDegradedKind`;不得用自由字符串、`ApplicationError` 文本或 adapter 私有错误码 |
+| `degraded.degraded_marker_ref` | Step 6 `IdentityVisibilityDecision.degraded_marker_ref` 或 `IdentityVisibilityAccessSummary.degraded_marker_ref` / projection / dependency safe summary | `Degraded` / `StaleVisible` / `Rebuilding` / `Disabled` 等 degraded-like surface 必填;不保存 raw external error;query service 不得在 resolver `None` 分支合成 |
+| `degraded.degraded_kind` | `IdentityVisibilityAccessSummary.degraded_kind` 或 safe degraded classifier | 必须使用 `IdentityDegradedKind`;不得用自由字符串、`ApplicationError` 文本或 adapter 私有错误码 |
 
 | public surface | marker 规则 |
 |---|---|
 | `Visible` / `Empty` / `Missing` | `visibility` 必填;`degraded` 为空,除非 loaded material 同时带 safe stale/degraded 条件 |
 | `Redacted` | `visibility.redaction_marker_ref` 必填;`degraded` 仅在同时存在 dependency/source degraded 时填写 |
 | `NotVisible` | `visibility` 必填且 body/items 为空;不得改用 protocol rejection |
-| `Degraded` | `degraded` 必填;body/items 是否为空由 flow 的 safe material 规则决定 |
+| `Degraded` | `visibility` 与 `degraded` 均必填;body/items 是否为空由 flow 的 safe material 规则决定;若 resolver 无法形成 visibility summary,不得伪造 degraded surface |
 | `StaleVisible` | `projection_freshness_ref` 或 `degraded` 至少一个必填;query 不触发 rebuild/refresh |
 | `Rebuilding` / `Disabled` | `degraded` 必填;不得伪造成 `Missing` 或 visible success |
 
@@ -1833,7 +1823,7 @@ All five queries use the same construction order. Step 9 may expand this into pr
 |---|---|---|---|---|
 | entry envelope | `IdentityQueryRequest<T>` | API / SDK query handler | `actor_ref`, `query_name`, `metadata.visibility_context_ref`, optional page, body | handler 不从 body 推 actor;query 不使用 command idempotency |
 | read access seed | body `member_ref`, body `consumer_ref`, metadata `visibility_context_ref` | request body + 8.1 query metadata | `resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` | 不从 route/member id 拼 `IdentityReadSubjectRef` 或 `VisibilityScopeRef` |
-| visibility summary | `IdentityReadVisibilityRepository` | Step 7 formal read visibility repository | `IdentityVisibilityAccessSummary` with `read_subject_ref`, `scope_ref`, `visibility_result_ref`, optional `redaction_marker_ref`, access state | repository 返回 `None` 时只能 degraded / unavailable surface,不得默认 visible;redacted/not-visible surface 不得私造 redaction marker |
+| visibility summary | `IdentityReadVisibilityRepository` | Step 7 formal read visibility repository | `IdentityVisibilityAccessSummary` with `read_subject_ref`, `scope_ref`, `visibility_result_ref`, optional `redaction_marker_ref`, access state, and degraded markers when degraded/unavailable | dependency degraded/unavailable 必须返回 degraded access summary;repository 返回 `None` 时只能 malformed / unresolvable surface,不得默认 visible或私造 marker |
 | stable view lookup | `member_ref`, `access_summary.scope_ref` | `IdentityProjectionRepository.find_member_summary_view_ref(...)` | optional `MemberSummaryViewRef` | 不拼 view ref;lookup missing 不触发 rebuild |
 | optional loaded view | `MemberSummaryViewRef` | `IdentityProjectionRepository.get_member_summary_view(...)` | optional `MemberSummaryView` | missing / stale / degraded 显式返回 surface |
 | view-specific visibility | optional `view_ref` | `resolve_member_summary_read(member_ref, Some(view_ref), consumer_ref, visibility_context_ref)` when needed | final access summary / decision marker | 不用 loaded view 自行推 scope 或权限 |
@@ -1847,7 +1837,8 @@ All five queries use the same construction order. Step 9 may expand this into pr
 | visible and found | `Visible` | single body `Some(view)`;page items 可非空 | `visibility`, optional `decision_ref` | view 只含 refs/state/safe markers |
 | visible but redacted | `Redacted` | body/items 只保留允许字段;敏感 marker 用 `None` | `visibility`, `decision_ref` | 字段级矩阵留 Step 12;不得返回 forbidden body |
 | not visible | `NotVisible` | single body `None`;page items empty | `visibility`, `decision_ref` | 不泄露 found/missing 差异的内部原因正文 |
-| visibility dependency missing/unavailable | `Degraded` | body 可空;items empty 或 safe partial | `degraded` | 不默认 visible,不创建 decision |
+| visibility dependency unavailable/degraded | `Degraded` | body 可空;items empty 或 safe partial | `visibility`;`degraded` | 来源必须是 `Some(IdentityVisibilityAccessSummary { access_state = Degraded | Unavailable, visibility_result_ref, degraded_marker_ref, degraded_kind })`;不默认 visible,不创建 synthetic decision |
+| visibility resolver cannot form subject/scope | protocol rejection / malformed query surface | body/items empty | `degraded` only if entry layer has formal degraded marker | 不生成 `IdentityVisibilityMarker`,不合成 `visibility_result_ref` |
 | loaded view/projection stale but allowed | `StaleVisible` | 可返回 stale safe refs | `projection_freshness_ref` 或 `degraded` | query 不 rebuild、不 mark fresh |
 | list has no records | `Empty` | items empty,page_info item_count 0 | `visibility` | 真实空集合,不是 not visible |
 | member/truth/projection lookup missing | `Missing` | body `None`;items empty | `visibility` if available | 缺 truth / view 不触发 create/rebuild |
@@ -1923,7 +1914,7 @@ pub struct GlobalMemberAnchorView {
 
 | 输入契约 | 目标读取 / assembler | 必填字段是否齐全 | 派生字段来源 | 缺失时行为 |
 |---|---|---|---|---|
-| `IdentityQueryRequest<GetGlobalMemberAnchorRequest>` | visibility seed | 齐全: member, consumer, visibility context, actor | visibility context 来自 metadata;actor 只进入 context/observability | visibility summary missing -> `Degraded`,不默认 visible |
+| `IdentityQueryRequest<GetGlobalMemberAnchorRequest>` | visibility seed | 齐全: member, consumer, visibility context, actor | visibility context 来自 metadata;actor 只进入 context/observability | degraded/unavailable -> resolver 返回 degraded access summary;resolver `None` -> malformed surface |
 | same | `IdentityProjectionRepository.find_member_summary_view_ref(...)` | 齐全: member, scope | scope 来自 `IdentityVisibilityAccessSummary.scope_ref` | lookup missing -> view/slice `None` 或 `Missing` surface,不 rebuild |
 | same | `GlobalMemberRepository.get_member_with_version(...)` / `get_anchor_state(...)` | 齐全: member ref | repository read | missing -> `Missing`,不调用 establish |
 | output | `IdentityQueryResponse<GlobalMemberAnchorView>` | 齐全: query name、surface、optional body | surface 来自 visibility + found/stale/degraded classification | not visible -> body `None`;redacted -> safe optional fields omitted |
@@ -2002,7 +1993,7 @@ pub struct GlobalLifecycleSummaryView {
 
 | 输入契约 | 目标读取 / assembler | 必填字段是否齐全 | 派生字段来源 | 缺失时行为 |
 |---|---|---|---|---|
-| `IdentityQueryRequest<GetGlobalLifecycleSummaryRequest>` | visibility seed and scope | 齐全: member, consumer, visibility context | `resolve_member_summary_read(member_ref, None, ...)` | not visible -> body `None`;summary missing -> `Degraded` |
+| `IdentityQueryRequest<GetGlobalLifecycleSummaryRequest>` | visibility seed and scope | 齐全: member, consumer, visibility context | `resolve_member_summary_read(member_ref, None, ...)` | not visible -> body `None`;degraded/unavailable -> degraded access summary;resolver `None` -> malformed surface |
 | same | `GlobalMemberRepository.get_member_with_version(...)` | 齐全: member ref | member repository | member missing -> `Missing`;不建档 |
 | same | `GlobalLifecycleRepository.get_lifecycle_with_version(member_ref)` | 齐全: member ref | lifecycle repository | lifecycle missing -> `Missing` / degraded surface,不补 initial lifecycle |
 | same | projection lookup/read | 齐全: member + scope | scope from visibility summary | view missing/stale -> optional slice omitted or stale/degraded surface |
@@ -2448,7 +2439,7 @@ pub struct MemberSummaryView {
 
 | 输入契约 | 目标读取 / assembler | 必填字段是否齐全 | 派生字段来源 | 缺失时行为 |
 |---|---|---|---|---|
-| `IdentityQueryRequest<ReadMemberSummaryRequest>` | initial visibility seed | 齐全: member, consumer, visibility context | `resolve_member_summary_read(member_ref, None, ...)` | access summary missing -> `Degraded`,不默认 visible |
+| `IdentityQueryRequest<ReadMemberSummaryRequest>` | initial visibility seed | 齐全: member, consumer, visibility context | `resolve_member_summary_read(member_ref, None, ...)` | dependency degraded/unavailable -> resolver 返回 degraded access summary;resolver `None` -> malformed query surface,不得合成 visibility marker |
 | same | stable projection lookup | 齐全: member + scope | `IdentityVisibilityAccessSummary.scope_ref`;scope 必须等于 loaded `MemberSummaryView.visibility_scope_ref` | view ref missing -> `Missing` 或 rebuilding/degraded surface,不 rebuild |
 | view ref | loaded summary view | 齐全: stable view ref | `get_member_summary_view(view_ref)` | view missing/stale -> `Missing` / `StaleVisible` / `Degraded` |
 | loaded view | final visibility policy | 齐全: access summary + material marker | `VisibilityPolicy::for_summary(...)` | not visible -> body `None`;redacted -> body-free fields only |
@@ -2628,7 +2619,7 @@ pub struct AuditTrailEntryView {
 | 输入契约 | 目标读取 / assembler | 必填字段是否齐全 | 派生字段来源 | 缺失时行为 |
 |---|---|---|---|---|
 | `IdentityQueryRequest<ReadAuditTrailRequest>` | member canonical audit subject mapping | 齐全: member ref | `IdentityTruthChangeSubjectMapper.member_subjects(member_ref).audit_subject_ref` | mapper 不得拼接外部字符串;本批不聚合 role/career/memory 等子 truth audit trail |
-| same | audit visibility seed | 齐全: audit subject, audit scope, consumer, visibility context | `resolve_audit_read(audit_subject_ref, audit_scope_ref, consumer_ref, visibility_context_ref)` | access summary missing -> `Degraded`;not visible -> empty items with `NotVisible` |
+| same | audit visibility seed | 齐全: audit subject, audit scope, consumer, visibility context | `resolve_audit_read(audit_subject_ref, audit_scope_ref, consumer_ref, visibility_context_ref)` | degraded/unavailable -> degraded access summary;resolver `None` -> malformed surface;not visible -> empty items with `NotVisible` |
 | audit subject | audit trail lookup | 齐全 | `IdentityAuditTrailRepository.find_audit_trail_by_subject(...)` | missing trail -> `Empty` / `Missing` priority 留 Step 10;不创建 trail |
 | loaded trail | paged entries | 齐全: audit trail ref, scope, audit cursor, repository page | `list_audit_entries(audit_trail_ref, audit_scope_ref, audit_cursor_ref, page)` | no entries -> `Empty` |
 | entries | public page items | 齐全 | `AuditTrailEntry` + visibility result | no raw log/body;degraded item missing 不修复 trace |
@@ -2809,7 +2800,7 @@ pub struct ProjectionStateView {
 
 | 输入契约 | 目标读取 / assembler | 必填字段是否齐全 | 派生字段来源 | 缺失时行为 |
 |---|---|---|---|---|
-| `IdentityQueryRequest<GetProjectionStateRequest>` | visibility precheck | 齐全: projection, optional state, consumer, visibility context | `resolve_projection_state_read(projection_ref, projection_state_ref, ...)` | access summary missing -> `NotVisible` / `Degraded`,不默认 visible |
+| `IdentityQueryRequest<GetProjectionStateRequest>` | visibility precheck | 齐全: projection, optional state, consumer, visibility context | `resolve_projection_state_read(projection_ref, projection_state_ref, ...)` | not visible -> `NotVisible`;degraded/unavailable -> degraded access summary;resolver `None` -> malformed surface |
 | same | projection state lookup | 齐全: `projection_ref` | `get_projection_state_with_version(projection_ref)`;optional `find_projection_state_ref(...)` for ref-only guard | missing -> `Missing`,不创建 state |
 | loaded state | state consistency check | 齐全: loaded state | request optional `projection_state_ref` must match loaded state when present | mismatch -> degraded / invalid material surface |
 | loaded state | public view | 齐全: loaded state + visibility | fields copied from `ProjectionState` | stale/degraded/failed only surfaced;no rebuild |
@@ -2894,7 +2885,7 @@ pub struct ReferenceResolutionSidecarRefsView {
 
 | 输入契约 | 目标读取 / assembler | 必填字段是否齐全 | 派生字段来源 | 缺失时行为 |
 |---|---|---|---|---|
-| `IdentityQueryRequest<GetReferenceResolutionStateRequest>` | visibility precheck | 齐全: external reference, optional owner, consumer, visibility context | `resolve_reference_state_read(external_reference_ref, owner_ref, ...)` | access summary missing -> `NotVisible` / `Degraded` |
+| `IdentityQueryRequest<GetReferenceResolutionStateRequest>` | visibility precheck | 齐全: external reference, optional owner, consumer, visibility context | `resolve_reference_state_read(external_reference_ref, owner_ref, ...)` | not visible -> `NotVisible`;degraded/unavailable -> degraded access summary;resolver `None` -> malformed surface |
 | same | stored reference state lookup | 齐全: `external_reference_ref` | `get_reference_state_with_version(external_reference_ref)` | missing -> `Missing`,不调用 resolver、不创建 state |
 | loaded state | owner consistency check | 齐全: loaded state + optional owner | request owner ref must match loaded owner when present | mismatch -> degraded / invalid material surface |
 | loaded state | typed sidecar read | 齐全: same external reference bundle | `get_typed_sidecar_refs(external_reference_ref)` -> `ReferenceResolutionSidecarRefsView` | sidecar missing -> `Degraded` or safe partial;不补写 |
@@ -3147,7 +3138,7 @@ pub struct IdentityOutboxStateView {
 
 | 输入契约 | 目标读取 / assembler | 必填字段是否齐全 | 派生字段来源 | 缺失时行为 |
 |---|---|---|---|---|
-| `IdentityQueryRequest<GetIdentityOutboxStateRequest>` | initial visibility seed | 齐全: outbox ref, consumer, visibility context | `resolve_outbox_record_read(Some(outbox_record_ref), None, None, ...)` | access summary missing -> `NotVisible` / `Degraded` |
+| `IdentityQueryRequest<GetIdentityOutboxStateRequest>` | initial visibility seed | 齐全: outbox ref, consumer, visibility context | `resolve_outbox_record_read(Some(outbox_record_ref), None, None, ...)` | not visible -> `NotVisible`;degraded/unavailable -> degraded access summary;resolver `None` -> malformed surface |
 | same | outbox load | 齐全: outbox ref | `get_outbox_record_with_version(outbox_record_ref)` | missing -> `Missing`,不创建 outbox |
 | loaded record | final visibility / consistency | 齐全: subject/topic from record | optional second visibility classification may pass `Some(subject_ref), Some(topic_key_ref)` | mismatch / forbidden body marker -> degraded |
 | output | `IdentityQueryResponse<IdentityOutboxStateView>` | 齐全: state + markers | fields copied from record/state | no publish / no retry / no downstream lookup |
@@ -3219,7 +3210,7 @@ pub struct TraceHandoffStateView {
 
 | 输入契约 | 目标读取 / assembler | 必填字段是否齐全 | 派生字段来源 | 缺失时行为 |
 |---|---|---|---|---|
-| `IdentityQueryRequest<GetTraceHandoffStateRequest>` | visibility precheck | 齐全: intent ref, consumer, visibility context | `resolve_handoff_intent_read(handoff_intent_ref, ...)` | access summary missing -> `NotVisible` / `Degraded` |
+| `IdentityQueryRequest<GetTraceHandoffStateRequest>` | visibility precheck | 齐全: intent ref, consumer, visibility context | `resolve_handoff_intent_read(handoff_intent_ref, ...)` | not visible -> `NotVisible`;degraded/unavailable -> degraded access summary;resolver `None` -> malformed surface |
 | same | handoff intent load | 齐全: intent ref | `get_handoff_intent_with_version(handoff_intent_ref)` | missing -> `Missing`,不创建 intent |
 | loaded intent | public view | 齐全: loaded intent + state | fields copied from `TraceHandoffIntent` / `HandoffState` | pending/delivered/failed/cancelled 显式暴露 |
 | output | `IdentityQueryResponse<TraceHandoffStateView>` | 齐全: query name、surface、optional body | surface from visibility + `HandoffStateKind` | no delivery / no retry / no fake delivered |

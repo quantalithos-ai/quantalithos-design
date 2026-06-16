@@ -3687,6 +3687,18 @@ pub struct IdentityDegradedMarkerRef {
     pub source_ref: IdentitySourceRef,
 }
 
+/// Public degraded category. Variants are safe to expose and never carry raw errors.
+pub enum IdentityDegradedKind {
+    DependencyUnavailable,
+    SourceUnavailable,
+    ProjectionStale,
+    ProjectionRebuilding,
+    MaterialUnsafe,
+    PartialResult,
+    AdapterUnavailable,
+    Disabled,
+}
+
 /// Audit read scope marker.
 pub struct AuditScopeRef {
     /// Opaque audit scope marker.
@@ -3753,8 +3765,26 @@ pub struct IdentityVisibilityAccessSummary {
     pub redaction_marker_ref: Option<IdentityRedactionMarkerRef>,
     /// Body-free result marker.
     pub visibility_result_ref: VisibilityResultRef,
+    /// Optional body-free degraded marker copied into degraded-like public surface.
+    pub degraded_marker_ref: Option<IdentityDegradedMarkerRef>,
+    /// Optional safe degraded classifier copied into public degraded surface.
+    pub degraded_kind: Option<IdentityDegradedKind>,
 }
+```
 
+Access summary degraded-source rule:
+
+| access_state | 必填 marker | 说明 |
+|---|---|---|
+| `Visible` | `visibility_result_ref` | 可见性结果来自正式 resolver / prepared context。 |
+| `Redacted` | `visibility_result_ref`;`redaction_marker_ref` | redaction marker 来自同一 resolver summary 或 redaction matrix。 |
+| `NotVisible` | `visibility_result_ref`;not-visible 所需 `redaction_marker_ref` | 不可见仍必须有 body-free visibility result,不得用 missing/empty 代替。 |
+| `Degraded` | `visibility_result_ref`;`degraded_marker_ref`;`degraded_kind` | resolver / dependency / projection safe summary 必须给出 public degraded marker 来源。 |
+| `Unavailable` | `visibility_result_ref`;`degraded_marker_ref`;`degraded_kind` | dependency unavailable 仍返回 safe access summary,不得让 query service 合成 marker。 |
+
+`IdentityReadVisibilityRepository.resolve_*_read(...)` 对合法 typed read request 不得用 `None` 表达 dependency unavailable、source unavailable、projection unavailable、redaction matrix unavailable 或 policy degraded。上述情况必须返回 `Some(IdentityVisibilityAccessSummary { access_state: Degraded | Unavailable, visibility_result_ref, degraded_marker_ref: Some(...), degraded_kind: Some(...) })`。`None` 仅保留给 resolver 无法形成 canonical read subject / scope 的非可读请求或 malformed selector 分支;query service 在该分支只能返回 entry validation / malformed query surface,不得私造 `VisibilityResultRef`、`IdentityDegradedMarkerRef` 或 `IdentityVisibilityDecision`。
+
+```rust
 /// Public read surface category.
 pub enum IdentityReadSurfaceKind {
     /// Material is found and visible.
@@ -5898,7 +5928,7 @@ pub enum IdentityReadDispositionKind {
 | `surface_kind` | visibility policy / query assembler | found/not_found/not_visible/redacted/stale/degraded/empty read surface;不表达 summary/trace/audit/report 目标类型 |
 | `disposition` | visibility policy result | `NotVisible` / `Degraded` 不应混同 |
 | `redaction_marker_ref` | `IdentityVisibilityAccessSummary.redaction_marker_ref` or visibility policy redaction matrix result | body-free marker;query service 不得从 `redaction_profile_ref`、`visibility_result_ref`、scope、route 或字符串推导;具体字段裁剪留 Step 8/12 |
-| `degraded_marker_ref` | dependency / stale / unavailable summary | body-free marker;不得保存 raw error |
+| `degraded_marker_ref` | `IdentityVisibilityAccessSummary.degraded_marker_ref` or dependency / stale / unavailable safe summary | body-free marker;`Degraded` / `Unavailable` access summary 必填;不得保存 raw error |
 | `decided_at` | clock | 不代表 source freshness cursor |
 
 | 函数 / factory | 输入 | 输出 | 约束 |
@@ -5916,6 +5946,7 @@ pub enum IdentityReadDispositionKind {
 - `visibility_scope_ref` 必须有正式来源;后续 query flow 若无法映射 scope,必须暂停补 Step 7/9,不得自行拼 scope。
 - `visibility_result_ref` 必须来自正式 visibility policy / resolver summary,不得由 query route、HTTP status 或 ad hoc denied 字符串生成。
 - `redaction_marker_ref` 必须来自 `IdentityVisibilityAccessSummary.redaction_marker_ref` 或同一次 `VisibilityPolicy` redaction matrix result;`redaction_profile_ref` 只是配置 / profile marker,不能替代 public redaction marker。
+- `Degraded` / `Unavailable` access summary 必须携带 `degraded_marker_ref` 和 safe degraded kind;query service 只能复制,不得在 resolver `None` 分支自行生成 degraded marker 或 visibility result。
 - `NotVisible` 不能伪装为 empty result;`Degraded` 不能伪装为 accepted success。
 - redaction/degraded marker 不保存 raw denial reason、external error body、credential、secret 或 policy body。
 

@@ -14,14 +14,14 @@
 | project | L1-identity |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| current_design_baseline | `current-design-with-outbox-trace-page-access` |
-| current_boundary | `commit-05-c` |
+| current_design_baseline | `current-design-with-commit-06-a-ledger` |
+| current_boundary | `commit-06-a` |
 | gate_status | ready_for_design_gate |
-| gate_reason | `commit-05-b` completed in implementation repo at `073e336` and `3e11289`; `commit-05-c` operations read query boundary is ready; operations degraded marker source is closed by Step 7 `IdentityQueryMaterialDegradationMapper` methods for projection/reference/report/outbox/handoff; ByTrace outbox empty page visibility is closed by `resolve_outbox_trace_page_read(...)`; blocker lessons recorded in standards and `MEM-ID-010` / `MEM-ID-011` |
+| gate_reason | `commit-05-c` completed in implementation repo at `b287e85` and evidence commit `82cae3b`; `commit-06-a` consumer context and typed receipt replay boundary is ready; boundary ledger now exists with required reads, allowed scope, required checks, Commit Gate and Handoff Gate |
 | next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | `commit-05-c` opening boundary / PH-05 projection, reference, report, outbox and handoff operations read query family |
+| current_recovery_point | `commit-06-a` opening boundary / PH-06 inbound and callback envelope, consumer context, typed receipt assembly, stored receipt replay and fake parity |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-16 21:47:31 +0800 |
+| last_updated_at | 2026-06-17 01:21:31 +0800 |
 
 ---
 
@@ -33,7 +33,8 @@
 | `commit-04-c` | `2f0bfed` | pending | design_gate | read_docs | Trace handoff command and command side-effect/replay audit boundary; read `implementation-boundaries/commit-04-c.md` before implementation. |
 | `commit-05-a` | `c48b462` | implemented | handoff_gate | advance_to_commit_05_b | Implementation repo reports `commit-05-a` completed at `bc6267a`; next boundary is `commit-05-b`. |
 | `commit-05-b` | `f91e72c` | implemented | handoff_gate | advance_to_commit_05_c | Implementation repo reports `commit-05-b` completed at `073e336` and `3e11289`; operations reads are excluded from 05-b evidence. |
-| `commit-05-c` | `current-design-with-outbox-trace-page-access` | ready | design_gate | read_docs | Projection/reference/report/outbox/handoff operations read query family; read `implementation-boundaries/commit-05-c.md` before implementation; operations degraded marker lesson recorded in standards and `MEM-ID-010`; ByTrace empty page visibility lesson recorded as `MEM-ID-011`. |
+| `commit-05-c` | `c101004` | implemented | handoff_gate | advance_to_commit_06_a | Implementation repo reports `commit-05-c` code completed at `b287e85` and run-scoped evidence committed at `82cae3b`; `GATE-05` service-flow-fast operations read evidence passed for run `20260616T230743+0800`. |
+| `commit-06-a` | `current-design-with-commit-06-a-ledger` | ready | design_gate | read_docs | Consumer context + typed receipt replay scaffold; read `implementation-boundaries/commit-06-a.md` before implementation. |
 
 ---
 
@@ -51,6 +52,7 @@
 | BLK-ID-05C-LEDGER-001 | `commit-05-c` | implementation | resolved | `current-design-with-commit-05-c-ledger` | Boundary ledger now exists and project ledger is advanced to `commit-05-c`; implementation agent must continue from `read_current_boundary_ledger` and advance gates before code changes. |
 | BLK-ID-05C-DEGRADED-MAPPER-001 | `commit-05-c` | implementation | resolved | `current-design-with-operations-degradation-mapper-experience-recorded` | Step 7 now defines dedicated operations read degradation mapper methods, Step 9 routes projection/reference/report/outbox/handoff degraded branches through them, Step 12 forbids service-side marker/kind synthesis, and the reusable lesson is recorded in standards plus `MEM-ID-010`. |
 | BLK-ID-05C-OUTBOX-BYTRACE-EMPTY-001 | `commit-05-c` | implementation | resolved | `current-design-with-outbox-trace-page-access` | Step 7 now defines `resolve_outbox_trace_page_read(...)`; Step 8/9/10/12/16 require `ListPendingIdentityOutbox(ByTrace)` empty pages to copy that page access summary, not synthesize `visibility_result_ref`; reusable lesson is recorded in standards plus `MEM-ID-011`. |
+| BLK-ID-06A-LEDGER-001 | `commit-06-a` | implementation | resolved | `current-design-with-commit-06-a-ledger` | Project ledger now advances to `commit-06-a`; `implementation-boundaries/commit-06-a.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
 
 ---
 
@@ -59,7 +61,7 @@
 Any implementation agent resuming `L1-identity` must read files in this order:
 
 1. `projects/L1-identity/design-calibration/implementation_execution_ledger.md`
-2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-05-c.md`
+2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-06-a.md`
 3. `projects/L1-identity/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-identity/.codex/implementation_ledger.md`

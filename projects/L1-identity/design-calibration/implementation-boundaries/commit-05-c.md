@@ -7,9 +7,9 @@
 | phase | PH-05 Query / read model / visibility slices |
 | design_baseline | `current-design-with-outbox-trace-page-access` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | operations read query family opening gate after implementation `commit-05-b` at `073e336` and `3e11289`; covers `TC-ID-QUERY-009~014` plus shared no-write audit `TC-ID-QUERY-015`; degraded marker source closed through Step 7 operations mapper methods; ByTrace outbox empty page visibility closed through `resolve_outbox_trace_page_read(...)`; reusable blocker lessons recorded in standards and `MEM-ID-010` / `MEM-ID-011` |
+| status | implemented |
+| next_allowed_action | advance_to_commit_06_a |
+| current_recovery_point | implemented in `/home/aris/Projects/quantalithos-identity` at code commit `b287e85` and evidence commit `82cae3b`; run `20260616T230743+0800` passed `GATE-05` service-flow-fast operations read subset for `TC-ID-QUERY-009~014` plus `TC-ID-QUERY-015`; next boundary is `commit-06-a` |
 
 ---
 
@@ -104,13 +104,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after commit. |
-| committed_message | pending | Fill after commit. |
-| gates_run | pending | List exact commands and reports. |
-| tests_not_run | pending | Must state none or explain. |
-| remaining_blockers | pending | Must reference blocker table. |
-| next_boundary | pending | Expected next boundary: `commit-06-a`. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Code commit `b287e85`; evidence commit `82cae3b`. |
+| committed_message | pass | `feat(identity-query): add commit-05-c operations reads`; `test(identity-query): add commit-05-c run evidence`. |
+| gates_run | pass | `reports/runs/20260616T230743+0800/suites/service-flow-fast.md`; raw artifact `artifacts/test/20260616T230743+0800/suites/service-flow-fast/report.json`; source commits `artifacts/test/20260616T230743+0800/meta/source-commits.json`. |
+| tests_not_run | pass | No omitted checks reported by implementation handoff; report records `cargo fmt --all`, `cargo check -p identity-contracts`, `cargo check -p identity-application`, `cargo check -p identity-infra`, `cargo test -p identity-contracts`, `cargo test -p identity-application`, and `cargo test -p identity-infra` passed. |
+| remaining_blockers | pass | No remaining `commit-05-c` blockers; ledger advancement blocker closed by `commit-06-a` boundary ledger. |
+| next_boundary | pass | `commit-06-a`. |
+| user_owned_changes_untouched | pass | Implementation repo handoff reports only untracked `.codex/` and `target/`; design repo keeps unrelated `commit-04-b.md`, `L3-method-library/**` and standards WIP outside this boundary. |
 
 ---
 

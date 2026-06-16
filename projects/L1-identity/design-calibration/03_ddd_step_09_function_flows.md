@@ -2454,7 +2454,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | reference state read | Step 7 有 `resolve_reference_state_read(...)`,`get_reference_state_with_version(...)`,`find_reference_state_ref(...)`,`get_typed_sidecar_refs(...)` | 可直接展开;不调用 resolver |
 | reconciliation report list | Step 7 有 scope visibility 和 report visibility,report repo 有 by scope / get | 可展开 exact and scope list |
 | outbox selector | Step 8 selector 与 Step 7 outbox repo read surfaces 一一对应 | 可直接展开;ByMember 用 subject mapper |
-| outbox visibility | Step 7 `resolve_outbox_record_read(...)` 支撑 topic/subject/outbox ref visibility | 可 list precheck + per-item visibility |
+| outbox visibility | Step 7 `resolve_outbox_record_read(...)` 支撑 topic/subject/outbox ref visibility;`resolve_outbox_trace_page_read(...)` 支撑 ByTrace page/empty visibility | 可 list precheck + per-item visibility;ByTrace 空页不合成 marker |
 | handoff state | Step 7 `resolve_handoff_intent_read(...)` 和 handoff intent repo 已闭合 | 可直接展开;no delivery |
 
 ### 17.4 本批设计取舍
@@ -2466,7 +2466,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | report list 先 list 再用 item visibility | 不采用 | scope-level not visible 必须先于 empty/count,避免泄露 report existence |
 | exact report 不校验 request scope | 不采用 | report DTO 包含 `maintenance_scope_ref`;loaded report scope mismatch 必须 degraded |
 | outbox list 用多个 optional filter | 不采用 | Step 8 已收敛为 selector,避免实现猜优先级 |
-| ByTrace outbox list 强行提前 visibility | 不采用 | Step 7 visibility port 没有 trace-ref 输入;正式口径是 load linked records 后按 loaded outbox ref/subject/topic per-item 检查 |
+| ByTrace outbox list 用 topic/subject precheck | 不采用 | ByTrace 没有 topic/subject seed;正式口径是先用 `resolve_outbox_trace_page_read(trace_record_ref, ...)` 取得 page access summary,再 load linked records 并按 loaded outbox ref/subject/topic per-item 检查 |
 | handoff state query 看到 retryable 就执行 retry | 不采用 | retry 属于 job boundary;query 只显示 state |
 
 ### 17.5 Shared operations query flow
@@ -2698,8 +2698,9 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   |   Retryable(topic) -> topic_key_ref
   |   BySubject(subject) -> subject_ref
   |   ByMember(member) -> IdentityTruthChangeSubjectMapper.member_subjects(member).outbox_subject_ref
-  |   ByTrace(trace) -> no topic/subject pre-list visibility seed;per-listed-ref access before item load
+  |   ByTrace(trace) -> no topic/subject pre-list visibility seed;trace page access through resolve_outbox_trace_page_read(trace_record_ref, ...);per-listed-ref access before item load
   | run available list precheck for Pending / Retryable / BySubject / ByMember through resolve_outbox_record_read(None, subject, topic, ...)
+  | run ByTrace page precheck through resolve_outbox_trace_page_read(trace_record_ref, ...)
   | precheck Some(Degraded | Unavailable) -> Degraded;items empty;copy markers
   | precheck None -> malformed / unresolvable outbox list read subject surface;items empty;no marker synthesis
   | precheck NotVisible -> NotVisible;items empty
@@ -2709,7 +2710,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
   | Retryable -> list_retryable_outbox_records(topic_key_ref, page)
   | BySubject / ByMember -> list_outbox_records_by_subject(subject_ref, page)
   | ByTrace -> find_outbox_records_by_trace(trace_record_ref, page)
-  | page_refs empty -> Empty;items empty
+  | page_refs empty -> Empty;items empty;copy list/topic/subject/page access visibility
   v
 [Per-item load / visibility]
   | for each outbox_ref:
@@ -2735,13 +2736,13 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | `Retryable { topic_key_ref }` | `list_retryable_outbox_records(topic_key_ref, page)` | list topic precheck + per-item loaded record | loaded state must be retryable;topic matches when provided |
 | `BySubject { subject_ref }` | `list_outbox_records_by_subject(subject_ref, page)` | request subject precheck + per-item loaded record | loaded subject matches |
 | `ByMember { member_ref }` | mapper output subject then by subject | formal outbox subject from mapper | no string subject construction |
-| `ByTrace { trace_record_ref }` | `find_outbox_records_by_trace(trace_record_ref, page)` | per-listed-ref `resolve_outbox_record_read(Some(outbox_ref), None, None, ...)` before load,then per-item loaded record | loaded trace ref matches |
+| `ByTrace { trace_record_ref }` | `find_outbox_records_by_trace(trace_record_ref, page)` | page access through `resolve_outbox_trace_page_read(trace_record_ref, ...)`;per-listed-ref `resolve_outbox_record_read(Some(outbox_ref), None, None, ...)` before load,then per-item loaded record | loaded trace ref matches;empty copies page access visibility |
 
 | Branch | Handling |
 |---|---|
 | request page missing | entry validation failure |
 | list precheck not visible | `NotVisible`,items empty;no list |
-| repository page empty | `Empty`,items empty |
+| repository page empty | `Empty`,items empty;copy formal list/page access summary;ByTrace uses `resolve_outbox_trace_page_read(...)` |
 | outbox item missing | `Degraded` partial through `IdentityQueryMaterialDegradationMapper.outbox_record_item_missing_after_list(...)` |
 | item selector mismatch | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.outbox_record_selector_mismatch(...)` |
 | all loaded items denied | `NotVisible`,items empty;not `Empty` |
@@ -2753,7 +2754,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 | pending by topic | list pending by `TopicKeyRef`,no broker string |
 | retryable by topic | returns retryable state only,no retry |
 | by member | subject from mapper,not string construction |
-| by trace | loads linked records and per-item visibility |
+| by trace | page access through `resolve_outbox_trace_page_read(...)`;empty page returns `Empty` with formal visibility;non-empty loads linked records and per-item visibility |
 | all denied | `NotVisible`,not `Empty` |
 | item missing | degraded partial,no outbox repair |
 

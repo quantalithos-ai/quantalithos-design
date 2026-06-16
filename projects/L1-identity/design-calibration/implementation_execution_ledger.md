@@ -14,14 +14,14 @@
 | project | L1-identity |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| current_design_baseline | `current-design-with-operations-degradation-mapper-experience-recorded` |
+| current_design_baseline | `current-design-with-outbox-trace-page-access` |
 | current_boundary | `commit-05-c` |
 | gate_status | ready_for_design_gate |
-| gate_reason | `commit-05-b` completed in implementation repo at `073e336` and `3e11289`; `commit-05-c` operations read query boundary is ready; operations degraded marker source is closed by Step 7 `IdentityQueryMaterialDegradationMapper` methods for projection/reference/report/outbox/handoff; blocker lesson recorded in standards and `MEM-ID-010` |
+| gate_reason | `commit-05-b` completed in implementation repo at `073e336` and `3e11289`; `commit-05-c` operations read query boundary is ready; operations degraded marker source is closed by Step 7 `IdentityQueryMaterialDegradationMapper` methods for projection/reference/report/outbox/handoff; ByTrace outbox empty page visibility is closed by `resolve_outbox_trace_page_read(...)`; blocker lessons recorded in standards and `MEM-ID-010` / `MEM-ID-011` |
 | next_allowed_action | read_current_boundary_ledger |
 | current_recovery_point | `commit-05-c` opening boundary / PH-05 projection, reference, report, outbox and handoff operations read query family |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-16 21:09:28 +0800 |
+| last_updated_at | 2026-06-16 21:47:31 +0800 |
 
 ---
 
@@ -33,7 +33,7 @@
 | `commit-04-c` | `2f0bfed` | pending | design_gate | read_docs | Trace handoff command and command side-effect/replay audit boundary; read `implementation-boundaries/commit-04-c.md` before implementation. |
 | `commit-05-a` | `c48b462` | implemented | handoff_gate | advance_to_commit_05_b | Implementation repo reports `commit-05-a` completed at `bc6267a`; next boundary is `commit-05-b`. |
 | `commit-05-b` | `f91e72c` | implemented | handoff_gate | advance_to_commit_05_c | Implementation repo reports `commit-05-b` completed at `073e336` and `3e11289`; operations reads are excluded from 05-b evidence. |
-| `commit-05-c` | `current-design-with-operations-degradation-mapper-experience-recorded` | ready | design_gate | read_docs | Projection/reference/report/outbox/handoff operations read query family; read `implementation-boundaries/commit-05-c.md` before implementation; operations degraded marker lesson recorded in standards and `MEM-ID-010`. |
+| `commit-05-c` | `current-design-with-outbox-trace-page-access` | ready | design_gate | read_docs | Projection/reference/report/outbox/handoff operations read query family; read `implementation-boundaries/commit-05-c.md` before implementation; operations degraded marker lesson recorded in standards and `MEM-ID-010`; ByTrace empty page visibility lesson recorded as `MEM-ID-011`. |
 
 ---
 
@@ -50,6 +50,7 @@
 | BLK-ID-05B-MISSING-FRESHNESS-001 | `commit-05-b` | implementation | resolved | `pending-current-design-with-member-summary-missing-freshness-mapper` | `ReadMemberSummaryFlow` loaded stale/degraded view without `projection_freshness_ref` must call `IdentityQueryMaterialDegradationMapper.member_summary_view_missing_freshness(...)` and return `Degraded`; implementation agent must not read projection state or synthesize stale/degraded markers. |
 | BLK-ID-05C-LEDGER-001 | `commit-05-c` | implementation | resolved | `current-design-with-commit-05-c-ledger` | Boundary ledger now exists and project ledger is advanced to `commit-05-c`; implementation agent must continue from `read_current_boundary_ledger` and advance gates before code changes. |
 | BLK-ID-05C-DEGRADED-MAPPER-001 | `commit-05-c` | implementation | resolved | `current-design-with-operations-degradation-mapper-experience-recorded` | Step 7 now defines dedicated operations read degradation mapper methods, Step 9 routes projection/reference/report/outbox/handoff degraded branches through them, Step 12 forbids service-side marker/kind synthesis, and the reusable lesson is recorded in standards plus `MEM-ID-010`. |
+| BLK-ID-05C-OUTBOX-BYTRACE-EMPTY-001 | `commit-05-c` | implementation | resolved | `current-design-with-outbox-trace-page-access` | Step 7 now defines `resolve_outbox_trace_page_read(...)`; Step 8/9/10/12/16 require `ListPendingIdentityOutbox(ByTrace)` empty pages to copy that page access summary, not synthesize `visibility_result_ref`; reusable lesson is recorded in standards plus `MEM-ID-011`. |
 
 ---
 

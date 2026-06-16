@@ -924,7 +924,7 @@ Forbidden public surface mappings:
 | `Stale` / public `StaleVisible` | loaded view `is_stale_or_degraded()` due stale marker but safe to show | 是,带 stale marker | loaded `projection_freshness_ref`;if missing return `Degraded` through mapper | 不 mark fresh;不读取 projection state 补 marker |
 | `Degraded` | visibility access missing/degraded;view mismatch;forbidden material;loaded view inconsistent | 可空或 safe partial | resolver degraded marker or `IdentityQueryMaterialDegradationSummary.degraded_marker_ref` | 不修复 projection;不在 query service 合成 marker |
 | `NotFound` / public `Missing` | stable lookup missing or loaded view missing as exact summary read | 否 | visibility if available | 不拼 view ref |
-| `Empty` | no relevant optional slices after visible read | 是,with empty vectors or public empty for list query only | visibility result | 不用于 hiding not visible |
+| `Empty` | no relevant optional slices after visible read,or repository page empty after formal page/list access summary | 是,with empty vectors or public empty for list query only | visibility result copied from access summary;selectors without item-level seed,including outbox `ByTrace`,must have page-level resolver | 不用于 hiding not visible;不得在 empty page 分支合成 visibility result |
 
 | From | To | 触发函数 | Step 9 flow | 前置条件 | 状态副作用 | Flow 副作用 | 非法时错误 |
 |---|---|---|---|---|---|---|---|

@@ -690,7 +690,7 @@ Rules:
 - Career / memory list item methods are the only formal source of degraded markers for `ListCareerRecordsFlow` and `ListMemoryReferencesFlow` item missing / member mismatch after a valid access summary. Query service must not use generic `forbidden_read_material(...)`, trace/audit mapper methods, repository error strings, or fake-only rules for those branches.
 - For `ReadIdentityTrace` selector `ByMember` and `ByMemberAndChangeKind`, query service must first call `resolve_trace_member_page_read(...)`. Repository empty pages return `Empty` by copying this page access summary into the public surface. If the first listed `IdentityTraceRecordRef` is missing before an item subject can be loaded, the service must call `trace_item_missing_after_list(page_access, trace_ref)` and return page-level `Degraded`;it must not synthesize a visibility result, call `resolve_trace_read(...)` with a guessed subject, or silently turn the branch into `Empty`.
 - For `commit-05-c` operations reads, projection/reference/report/outbox/handoff material degraded branches must use the dedicated operations mapper methods above. The query service must copy the returned summary only;it must not reuse member/trace/audit methods, generic error strings, repository diagnostics, adapter diagnostics, or fake-only enums.
-- For `ListPendingIdentityOutboxFlow`, item missing after any selector list must have a valid access summary before calling `outbox_record_item_missing_after_list(...)`. If a selector has no topic/subject precheck, the service must call `resolve_outbox_record_read(Some(outbox_ref), None, None, ...)` for the listed ref before item load;resolver `None` remains malformed/unresolvable and cannot be turned into a synthesized degraded marker.
+- For `ListPendingIdentityOutboxFlow`, selector `ByTrace` must call `resolve_outbox_trace_page_read(trace_record_ref, ...)` before `find_outbox_records_by_trace(...)`;repository empty pages return `Empty` by copying this page access summary into the public surface. Item missing after any selector list must still have a valid access summary before calling `outbox_record_item_missing_after_list(...)`;for ByTrace listed refs the service calls `resolve_outbox_record_read(Some(outbox_ref), None, None, ...)` before item load. Resolver `None` remains malformed/unresolvable and cannot be turned into a synthesized visibility result or degraded marker.
 - Fake runtime and durable adapters must use the same method-to-kind table and opaque marker creation rule. Fake may make markers deterministic for tests, but it must not use a private map to authorize degraded branches not represented by this trait.
 - Forbidden: query service synthesizes degraded marker, classifies degraded kind from `ApplicationError` text, repository error string, HTTP status, view id prefix, trace subject string, raw log body, projection body, adapter diagnostic or fake-only enum.
 
@@ -1992,6 +1992,13 @@ pub trait IdentityReadVisibilityRepository {
         visibility_context_ref: VisibilityContextRef,
     ) -> Result<Option<IdentityVisibilityAccessSummary>, ApplicationError>;
 
+    async fn resolve_outbox_trace_page_read(
+        &self,
+        trace_record_ref: IdentityTraceRecordRef,
+        consumer_ref: ConsumerRef,
+        visibility_context_ref: VisibilityContextRef,
+    ) -> Result<Option<IdentityVisibilityAccessSummary>, ApplicationError>;
+
     async fn resolve_handoff_intent_read(
         &self,
         intent_ref: TraceHandoffIntentRef,
@@ -2024,6 +2031,7 @@ pub trait IdentityReadVisibilityRepository {
 | `resolve_projection_state_read` | `GetProjectionState` precheck | projection ref 来自 query request;optional state ref 只能来自 repository lookup / request;resolver 返回 read subject/scope/access summary | 不从 projection ref string、state ref string、cursor 或 member id 推导 visibility scope |
 | `resolve_reference_state_read` | `GetReferenceResolutionState` precheck | external reference ref 和 optional owner ref 来自 query request / loaded reference state;resolver 返回 body-free access summary | 不调用 external resolver;不把 business source ref 或 owner ref 当 visibility scope |
 | `resolve_outbox_record_read` | `ListPendingIdentityOutbox` / `GetIdentityOutboxState` precheck | single read 使用 outbox ref;list read 可用 formal subject/topic filter;resolver 返回 operations/outbox read subject and scope | 不读取 outbox payload body;不把 topic string、broker route 或 record id 拼 visibility subject |
+| `resolve_outbox_trace_page_read` | `ListPendingIdentityOutbox` selector `ByTrace` page-level precheck and empty surface | trace page read subject/scope/result marker comes from formal trace-outbox relation visibility mapper inside the port;only authorizes listing relation by trace before any outbox item is available | 不读取 trace body/outbox payload;service 不从 trace ref、page cursor、repository empty result、first outbox ref 或 fake rule 拼 page visibility marker |
 | `resolve_handoff_intent_read` | `GetTraceHandoffState` precheck | intent ref 来自 query request;resolver 返回 handoff read subject/scope/access summary | 不读取 receipt body、target path、archive package 或 adapter state |
 | `get_visibility_decision` | duplicate/query diagnostics/read assembly | visibility result ref 来自 access summary/policy | 不调用 external auth |
 | `save_visibility_decision` | optional query/report decision material | create `None`;update loaded version if present | query 不写 truth;不保存 consumer private body |
@@ -2032,6 +2040,7 @@ Operations and propagation query visibility rules:
 
 - Maintenance / operations queries that expose `ProjectionState`, `ReferenceResolutionState`, `ReconciliationReport`, `IdentityOutboxRecord` or `TraceHandoffIntent` must call the matching resolver before `VisibilityPolicy`.
 - `ReadReconciliationReport` scope listing must call `resolve_reconciliation_scope_read(...)` before `list_reports_by_scope(...)`;single report reads must additionally call `resolve_report_read(...)` for the loaded `report_ref`.
+- `ListPendingIdentityOutbox` selector `ByTrace` must call `resolve_outbox_trace_page_read(...)` before repository list so a true empty page can still return `Empty` with formal `visibility_result_ref`;this page summary does not replace per-listed-ref or loaded-record visibility checks.
 - Resolver output is only `IdentityVisibilityAccessSummary` with `read_subject_ref`, `scope_ref`, `visibility_result_ref`, optional `redaction_marker_ref`, and degraded/unavailable 时必填的 `degraded_marker_ref` / `degraded_kind`;it must not return projection body,reference safe summary body,outbox payload,topic binding secret,handoff receipt body,target path or archive package.
 - Query services may load the target object after resolver precheck and may use loaded fields only for consistency checks and view assembly. They must not derive read subject/scope from loaded object when resolver is missing.
 - `None` from these resolvers maps only to entry validation / malformed query surface in Step 8/9/12;dependency unavailable,source unavailable,projection unavailable and policy degraded must be `Some(IdentityVisibilityAccessSummary)` with degraded markers. `None` is never treated as visible by default and never authorizes service-side synthetic markers.

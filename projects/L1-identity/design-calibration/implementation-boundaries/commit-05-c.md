@@ -5,11 +5,11 @@
 | project | L1-identity |
 | boundary_id | commit-05-c |
 | phase | PH-05 Query / read model / visibility slices |
-| design_baseline | `current-design-with-operations-degradation-mapper-experience-recorded` |
+| design_baseline | `current-design-with-outbox-trace-page-access` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
 | status | ready |
 | next_allowed_action | read_docs |
-| current_recovery_point | operations read query family opening gate after implementation `commit-05-b` at `073e336` and `3e11289`; covers `TC-ID-QUERY-009~014` plus shared no-write audit `TC-ID-QUERY-015`; degraded marker source closed through Step 7 operations mapper methods; reusable blocker lesson recorded in standards and `MEM-ID-010` |
+| current_recovery_point | operations read query family opening gate after implementation `commit-05-b` at `073e336` and `3e11289`; covers `TC-ID-QUERY-009~014` plus shared no-write audit `TC-ID-QUERY-015`; degraded marker source closed through Step 7 operations mapper methods; ByTrace outbox empty page visibility closed through `resolve_outbox_trace_page_read(...)`; reusable blocker lessons recorded in standards and `MEM-ID-010` / `MEM-ID-011` |
 
 ---
 
@@ -120,6 +120,7 @@
 |---|---|---|---|---|---|
 | BLK-ID-05C-LEDGER-001 | design_gate | resolved | Project ledger still pointed to `commit-05-b` and `implementation-boundaries/commit-05-c.md` was missing, so implementation agent could not start operations read boundary. | Project ledger now advances to `commit-05-c`; this boundary ledger defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. | read_docs |
 | BLK-ID-05C-DEGRADED-MAPPER-001 | design_gate | resolved | Projection/reference/report/outbox/handoff operations reads returned `Degraded` in Step 9, but Step 7 did not define dedicated mapper methods, input signatures or `IdentityDegradedKind` mapping. | Step 7 now defines dedicated operations methods on `IdentityQueryMaterialDegradationMapper`; Step 9 and Step 12 require query service to copy mapper summaries only. | read_docs |
+| BLK-ID-05C-OUTBOX-BYTRACE-EMPTY-001 | design_gate | resolved | `ListPendingIdentityOutbox(ByTrace)` had no topic/subject pre-list seed and no listed item on empty pages, while public `IdentityQuerySurface.visibility.visibility_result_ref` is required. | Step 7 now defines `resolve_outbox_trace_page_read(trace_record_ref, ...)`; Step 8/9/10/12/16 require ByTrace empty pages to return `Empty` by copying that page access summary. | read_docs |
 
 ---
 
@@ -128,3 +129,4 @@
 | item | conclusion | action |
 |---|---|---|
 | BLK-ID-05C-DEGRADED-MAPPER-001 | reusable experience required | Updated `standards/document/设计真相源闭环与可落码性标准.md` with Query material degraded mapper positive/negative examples and pre-boundary checklist; added `MEM-ID-010` to `projects/L1-identity/07-实施计划.md`; implementation agent must check this before adding or changing query degraded branches. |
+| BLK-ID-05C-OUTBOX-BYTRACE-EMPTY-001 | reusable experience required | Updated `standards/document/设计真相源闭环与可落码性标准.md` with Paged query Empty visibility seed positive/negative examples and pre-boundary checklist; added `MEM-ID-011` to `projects/L1-identity/07-实施计划.md`; implementation agent must check this before adding or changing paged query empty branches. |

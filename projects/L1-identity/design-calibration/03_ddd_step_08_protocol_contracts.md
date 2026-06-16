@@ -1841,7 +1841,7 @@ All five queries use the same construction order. Step 9 may expand this into pr
 | visibility dependency unavailable/degraded | `Degraded` | body 可空;items empty 或 safe partial | `visibility`;`degraded` | 来源必须是 `Some(IdentityVisibilityAccessSummary { access_state = Degraded | Unavailable, visibility_result_ref, degraded_marker_ref, degraded_kind })`;不默认 visible,不创建 synthetic decision |
 | visibility resolver cannot form subject/scope | protocol rejection / malformed query surface | body/items empty | `degraded` only if entry layer has formal degraded marker | 不生成 `IdentityVisibilityMarker`,不合成 `visibility_result_ref` |
 | loaded view stale marker but allowed | `StaleVisible` | 可返回 stale safe refs | `projection_freshness_ref` 或 `degraded` | query 不 rebuild、不读取 projection state、不 mark fresh |
-| list has no records | `Empty` | items empty,page_info item_count 0 | `visibility` | 真实空集合,不是 not visible |
+| list has no records | `Empty` | items empty,page_info item_count 0 | `visibility` | 真实空集合,不是 not visible;selector 无 item 可供 per-item resolver 时必须先有正式 page-level access summary |
 | member/truth/view lookup missing | `Missing` | body `None`;items empty | `visibility` if available | 缺 truth / view 不触发 create/rebuild |
 | projection rebuilding / disabled | `Rebuilding` / `Disabled` | body `None`;items empty | `degraded` | 本批只保留 surface;具体来源 Step 9/12 |
 
@@ -3076,7 +3076,7 @@ pub struct IdentityOutboxRecordView {
 | `Retryable` | `list_retryable_outbox_records(topic_key_ref, page)` then load records | same as pending | retryable 是 state view,query 不执行 retry |
 | `BySubject` | `list_outbox_records_by_subject(subject_ref, page)` then load records | request subject -> `resolve_outbox_record_read(None, Some(subject_ref), None, ...)`;per-item visibility also checked | subject not visible -> `NotVisible`,not empty |
 | `ByMember` | `IdentityTruthChangeSubjectMapper.member_subjects(member_ref).outbox_subject_ref` then by subject | formal mapper output | mapper missing/degraded -> `Degraded`;不拼 subject |
-| `ByTrace` | `find_outbox_records_by_trace(trace_record_ref, page)` then load records | loaded record outbox ref/subject/topic | missing relation -> `Empty`;不补 outbox |
+| `ByTrace` | `find_outbox_records_by_trace(trace_record_ref, page)` then load records | `resolve_outbox_trace_page_read(trace_record_ref, ...)` for page/empty surface,then loaded record outbox ref/subject/topic | missing relation -> `Empty` by copying trace page access summary;不补 outbox;不合成 visibility result |
 
 ### 14.8 `GetIdentityOutboxState` protocol
 

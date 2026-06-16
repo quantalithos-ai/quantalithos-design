@@ -5,11 +5,11 @@
 | project | L1-identity |
 | boundary_id | commit-05-a |
 | phase | PH-05 Query / read model / visibility slices |
-| design_baseline | `ce18064` |
+| design_baseline | `pending-current-design-with-read-subject-access-summary` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | pending |
-| next_allowed_action | read_docs |
-| current_recovery_point | query visibility, stable lookup, and no-write foundation opening gate |
+| status | design_updated |
+| next_allowed_action | implementation_agent_restart_design_gate |
+| current_recovery_point | read subject source closed via `IdentityVisibilityAccessSummary.read_subject_ref`;query visibility, stable lookup, and no-write foundation opening gate |
 
 ---
 
@@ -76,7 +76,7 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| design_gate | pending | Read all required design sources and confirm no schema / port / state / mapper / config / evidence / phase-scope gap. | wait_design |
+| design_gate | ready_for_implementation_recheck | Step 6/7/8/9 now close `IdentityReadSubjectRef` source through `IdentityVisibilityAccessSummary.read_subject_ref`;implementation agent must reread required docs and confirm no remaining schema / port / state / mapper / config / evidence / phase-scope gap. | wait_design |
 | scope_gate | pending | `git status --short` and diff scope match Allowed Scope. | fix_gate_failure |
 | worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
 | build_gate | pending | Required cargo checks pass or failure recorded. | fix_gate_failure |

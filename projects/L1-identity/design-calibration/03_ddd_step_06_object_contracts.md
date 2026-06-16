@@ -3464,7 +3464,7 @@ pub struct MemoryReferenceChangeMaterialMarker {
 | `AuditTrail` / `AuditTrailEntry` | 组装审计时间线 | audit / history aggregate | 组织 trace refs、scope、visibility 和 read surface | 不保存 raw log、不修复缺失 trace |
 | `ConsumerRef` / `VisibilityContextRef` / `VisibilityScopeRef` | visibility 输入 marker | boundary refs | 表达消费方、上下文和读取范围 | 不保存 consumer 私有权限状态 |
 | `VisibilityResultRef` / `IdentityReadSurfaceKind` | read surface marker | public marker | 表达 found/not_found/not_visible/redacted/stale/degraded/empty | 不成为业务 truth state |
-| `IdentityVisibilityAccessSummary` | visibility policy 输入 | resolver safe summary shape | 承载已解析的可见性 / redaction 结果 | 不定义 resolver port;不查询外部授权 |
+| `IdentityVisibilityAccessSummary` | visibility policy 输入 | resolver safe summary shape | 承载已解析的 read subject、scope、可见性 / redaction 结果 | 不定义 resolver port;不查询外部授权 |
 | `IdentityReadMaterialMarker` | read/trace/audit material 分类 | material marker | 区分 safe marker 与 forbidden body | 不携带正文;forbidden 必须被 policy 拦截 |
 | `VisibilityPolicy` | 应用 visibility/redaction 与 forbidden body guard | policy / guard | 校验 summary/trace/audit/event material 可见性和 body-free | 不读取 repository、不调用授权系统、不写 truth |
 
@@ -3735,6 +3735,8 @@ pub enum IdentityVisibilityAccessState {
 
 /// Prepared visibility input consumed by VisibilityPolicy.
 pub struct IdentityVisibilityAccessSummary {
+    /// Canonical read subject resolved for this query/read target.
+    pub read_subject_ref: IdentityReadSubjectRef,
     /// Consumer requesting the material.
     pub consumer_ref: ConsumerRef,
     /// Optional actor represented by the request.
@@ -5517,7 +5519,7 @@ pub struct HandoffPolicy {
 | `IdentityTruthRef` | `IdentityCommandEffectSummary` | accepted primary truth / intent sum type | 只承接 typed identity-owned ref,例如 member/lifecycle/role/career/memory/handoff intent;不得存 external source string | Step 9 / Step 11 |
 | `IdentityTruthCursor` | `IdentityCommandEffectSummary` | accepted truth cursor marker | 来自 accepted truth cursor assigner;不得引入第二套 cursor ref 类型 | Step 7 / Step 11 / Step 13 |
 | `IdentityVisibilityDecisionRef` | `IdentityVisibilityDecision` | 单次 read visibility decision identity | query assembler 或 policy evaluation 生成 | Step 8 / 12 |
-| `IdentityReadSubjectRef` | `IdentityVisibilityDecision` | query read subject marker | 来自 formal read subject mapper / loaded view;不得由 route/query param 拼接 | Step 7 / Step 9 |
+| `IdentityReadSubjectRef` | `IdentityVisibilityAccessSummary`;`IdentityVisibilityDecision` | query read subject marker | 来自 Step 7 `IdentityReadVisibilityRepository.resolve_*_read(...)` 返回的 prepared access summary;repository / adapter 内部可使用 formal read subject mapper 或 typed request/view/report ref,但 service 不得由 route/query param 拼接 | Step 7 / Step 9 |
 | `IdentityReadDispositionKind` | `IdentityVisibilityDecision` | visible/redacted/not visible/degraded/stale visible disposition | 由 visibility policy / resolver result 决定;不等于 HTTP status | Step 8 / Step 12 |
 | `IdentityRedactionMarkerRef` | `IdentityVisibilityDecision` | redaction reason / field-set safe marker | 来自 redaction matrix result;不保存 policy body 或 denied raw reason | Step 8 / Step 12 |
 | `IdentityDegradedMarkerRef` | `IdentityVisibilityDecision` | degraded / stale / dependency issue safe marker | 来自 resolver/dependency summary;不保存 raw external error | Step 8 / Step 12 |
@@ -5887,7 +5889,7 @@ pub enum IdentityReadDispositionKind {
 | 字段 | 来源 | 约束 |
 |---|---|---|
 | `decision_ref` | query assembler / id generator | 单次 decision identity,不等于 view ref |
-| `read_subject_ref` | formal read subject mapper / loaded view | 不得从 URL、query param 或 raw member id 拼接 |
+| `read_subject_ref` | `IdentityVisibilityAccessSummary.read_subject_ref` from Step 7 `IdentityReadVisibilityRepository.resolve_*_read(...)` | service / handler 不得从 URL、query param、raw member id、view id 或 loaded view body 拼接;adapter 内部若需映射必须使用 formal read subject mapper 或 typed request/view/report ref |
 | `visibility_context_ref` | query operation metadata | 不保存 actor credential 或 policy body |
 | `visibility_scope_ref` | request、view/ref 或 resolver summary | Step 7/9 必须明确来源,不得从 subject 字符串推断 |
 | `visibility_result_ref` | visibility policy / resolver summary | public `IdentityVisibilityMarker` 从此字段复制;不保存 policy body、credential 或 raw denial reason |
@@ -6760,7 +6762,7 @@ pub enum IdentityEntrySurfaceKind {
 | `IdentityAuditSubjectRef` | audit trail canonical subject | Step 7 subject mapper / audit subject mapper | 不得从 trace subject 字符串派生,除非 mapper 明确同值 | Step 7 mapper/repo;Step 9 audit;Step 11 unique | audit trail save/update 需要 subject/ref 但读取面未闭合时暂停 |
 | `IdentityOutboxSubjectRef` | outbound payload canonical subject | Step 7 subject mapper from accepted fact | 不得使用 `IdentityOutboundSubjectRef` 临时类型或拼 topic key | Step 7 mapper;Step 8 payload;Step 9 outbox | outbox record 需要 subject 但 accepted fact 无 mapper 时暂停 |
 | marker trace subject | consumer/job/reference marker subject | formal marker subject mapper | 不得用 source string、event id、adapter ref 拼 subject | Step 7 marker mapper;Step 9 consumer/job;Step 15 trace | marker trace 要 append 但 mapper 未定义时暂停 |
-| `IdentityReadSubjectRef` | query visibility subject | read subject mapper、loaded view/report、request-scoped typed ref | 不得从 route/query param/raw member id 拼接 | Step 7 read resolver;Step 9 query;Step 12 not visible | query visibility 需要 subject 但 request/view 无来源时暂停 |
+| `IdentityReadSubjectRef` | query visibility subject | Step 7 `IdentityReadVisibilityRepository.resolve_*_read(...)` 返回的 `IdentityVisibilityAccessSummary.read_subject_ref`;repository / adapter 内部可使用 formal read subject mapper、loaded view/report 或 request-scoped typed ref | service / handler 不得从 route/query param/raw member id 拼接;不得从 `VisibilityScopeRef` 或 `VisibilityResultRef` 反推 | Step 7 read resolver;Step 9 query;Step 12 not visible | query visibility 需要 subject 但 access summary 无 `read_subject_ref` 时暂停 |
 | `VisibilityScopeRef` / `VisibilityContextRef` | read visibility scope/context | query metadata、view ref、resolver summary、request | 不得从 subject 字符串拆 scope;不得用 actor ref 替代 | Step 7 visibility resolver;Step 8 query DTO;Step 9 query precheck | query flow 无法映射 scope 时暂停 |
 | `MemberSummaryViewRef` / projection view refs | stable projection/read model identity | projection builder / projection index lookup | query 不得临时拼 view ref;不得扫描 store 私找 | Step 7 projection lookup;Step 11 index;Step 16 query tests | query 需要 view_ref 但无 builder/lookup 时暂停 |
 | `IdentityProjectionRef` / `ProjectionStateRef` | projection state identity | projection catalog / builder | 不等于 view ref unless formally mapped;不得由 scope 拼接 | Step 7 projection repo;Step 11 persistence | stale/rebuild 需要 projection ref 但 scope expansion 未定义时暂停 |

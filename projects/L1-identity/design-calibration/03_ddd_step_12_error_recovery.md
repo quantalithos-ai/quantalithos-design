@@ -382,7 +382,7 @@ entry pre-dispatch failure
   > Visible
 ```
 
-For paged reads, per-item not-visible/redacted/degraded decisions must be applied before page assembly. If the whole page target is not visible, return `NotVisible` with empty items. If some loaded items are missing/degraded, return `Degraded` or `StaleVisible` with safe partial items and degraded marker from `IdentityQueryMaterialDegradationMapper`;do not repair or silently drop without marker.
+For paged reads, per-item not-visible/redacted/degraded decisions must be applied before page assembly. If the whole page target is not visible, return `NotVisible` with empty items. If some loaded items are missing/degraded, return `Degraded` or `StaleVisible` with safe partial items and degraded marker from `IdentityQueryMaterialDegradationMapper`;do not repair or silently drop without marker. For `ListCareerRecordsFlow` and `ListMemoryReferencesFlow`, item missing / member mismatch after list must use the dedicated Step 7 mapper methods `career_record_item_missing_after_list(...)`, `career_record_item_invalid_member(...)`, `memory_reference_item_missing_after_list(...)`, or `memory_reference_item_invalid_member(...)`;the query service must not reuse trace/audit mapper methods or synthesize markers.
 
 | Error taxonomy / condition | Query disposition | Body/items rule | Retryability | Write rule |
 |---|---|---|---|---|
@@ -567,7 +567,7 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 | target truth missing | repository read | no UoW | `Missing` | create member/lifecycle/summary |
 | stable view lookup missing | projection repository lookup | no UoW | `Missing` / `Degraded` per query type | synthesize view ref or rebuild view |
 | projection/reference/report stale | loaded state/view | no UoW | `StaleVisible` / `Degraded` | mark fresh or refresh reference |
-| partial item missing in page | item load after list | no UoW | `Degraded` with safe partial result | silently drop without marker or repair |
+| partial item missing in page | item load after list | no UoW | `Degraded` with safe partial result and dedicated `IdentityQueryMaterialDegradationMapper` method for the item family | silently drop without marker, reuse wrong mapper family, or repair |
 | repository unavailable | read port | no UoW | `Degraded` / disabled/runtime surface | save diagnostic row |
 | page cursor invalid after facade | page mapper / repository page input | no UoW | degraded/invalid request surface per entry/application boundary | use truth cursor/job cursor as fallback |
 

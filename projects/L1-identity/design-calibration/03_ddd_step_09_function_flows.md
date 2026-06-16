@@ -1885,8 +1885,8 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
   | if page.items empty -> return Empty surface with public page_info
   | for each record_ref in page.items:
   |   record_v = CareerRecordRepository.get_career_record(record_ref)
-  |   missing -> mark response Degraded partial;do not repair index;skip item or include safe missing marker per Step 12
-  |   if !record_v.object.belongs_to(member_ref) -> mark Degraded invalid material
+  |   missing -> degradation = IdentityQueryMaterialDegradationMapper.career_record_item_missing_after_list(access, record_ref, member_ref);mark response Degraded partial;do not repair index;skip item or include safe missing marker per Step 12
+  |   if !record_v.object.belongs_to(member_ref) -> degradation = IdentityQueryMaterialDegradationMapper.career_record_item_invalid_member(access, record_ref, member_ref);mark Degraded invalid material
   |   assemble CareerRecordView from body-free refs/state
   | return IdentityPageResponse with page_info mapped from Step 7 Page
 ```
@@ -1897,7 +1897,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | not visible | `NotVisible`,items empty;not `Empty` |
 | member missing | `Missing`,items empty |
 | repository page empty | `Empty`,items empty |
-| item missing / member mismatch | `Degraded` partial surface;no repair or delete |
+| item missing / member mismatch | `Degraded` partial surface with `IdentityQueryMaterialDegradationMapper.career_record_item_missing_after_list(...)` or `career_record_item_invalid_member(...)`;no repair or delete |
 
 | Test cut | Expected |
 |---|---|
@@ -1930,8 +1930,8 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
   | if page.items empty -> return Empty surface with public page_info
   | for each reference_ref in page.items:
   |   reference_v = MemoryReferenceRepository.get_memory_reference_with_version(reference_ref)
-  |   missing -> mark response Degraded partial;do not repair index
-  |   if !reference_v.object.belongs_to(member_ref) -> mark Degraded invalid material
+  |   missing -> degradation = IdentityQueryMaterialDegradationMapper.memory_reference_item_missing_after_list(access, reference_ref, member_ref);mark response Degraded partial;do not repair index
+  |   if !reference_v.object.belongs_to(member_ref) -> degradation = IdentityQueryMaterialDegradationMapper.memory_reference_item_invalid_member(access, reference_ref, member_ref);mark Degraded invalid material
   |   assemble MemoryReferenceView from relation state and body-free refs
   | return IdentityPageResponse with page_info mapped from Step 7 Page
 ```
@@ -1942,7 +1942,7 @@ This rule uses only Step 6/8 fields. It does not parse `LifecycleReasonKind` str
 | not visible | `NotVisible`,items empty;not `Empty` |
 | member missing | `Missing`,items empty |
 | repository page empty | `Empty`,items empty |
-| item missing / member mismatch | `Degraded` partial surface;no repair or delete |
+| item missing / member mismatch | `Degraded` partial surface with `IdentityQueryMaterialDegradationMapper.memory_reference_item_missing_after_list(...)` or `memory_reference_item_invalid_member(...)`;no repair or delete |
 | relation stale/unavailable/pending | explicit state kind and degraded/stale marker;do not call memory/archive resolver |
 
 | Test cut | Expected |

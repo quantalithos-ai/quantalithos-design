@@ -819,7 +819,7 @@ Required marker table:
 | `Visible` | `IdentityVisibilityAccessState::Visible`;material safe;not stale | 允许 body-free body/items | `visibility_result_ref` | `IdentityQueryDisposition::Visible` / `IdentityReadSurfaceKind::Found` |
 | `Redacted` | `IdentityVisibilityAccessState::Redacted`;redaction marker present | 允许裁剪后的 body/items | redaction marker + `visibility_result_ref` | `Redacted` |
 | `NotVisible` | `IdentityVisibilityAccessState::NotVisible` | 不允许 body/items | `visibility_result_ref`;可有 safe denial marker | `NotVisible` |
-| `Degraded` | access summary missing,`Degraded` or `Unavailable`;material unsafe / dependency partial | 可空或 safe partial,由 Step 12 细化 | degraded marker | `Degraded` |
+| `Degraded` | access summary missing,`Degraded` or `Unavailable`;material unsafe / dependency partial | 可空或 safe partial,由 Step 12 细化 | resolver degraded marker or `IdentityQueryMaterialDegradationSummary.degraded_marker_ref` | `Degraded` |
 | `StaleVisible` | visible/redacted access + loaded view/truth stale marker | 允许 stale body-free body/items | freshness/degraded marker | `StaleVisible` |
 
 | From | To | 触发函数 | Step 9 flow | 前置条件 | 状态副作用 | Flow 副作用 | 非法时错误 |
@@ -827,7 +827,7 @@ Required marker table:
 | visibility access | `Visible` | `IdentityVisibilityDecision::visible(...)` / `VisibilityPolicy::classify_read_surface(found=true, stale=false)` | all query flows | access summary exists;access state visible;material marker safe | decision value only | query response surface;no save unless later diagnostics path authorizes | none |
 | visibility access | `Redacted` | `redacted(...)`;`VisibilityPolicy::requires_redaction()` | all query flows | access state redacted;redaction marker present;material body-free after redaction | decision value only | response omits redacted fields;no truth mutation | missing marker -> degraded/rejected surface Step 12 |
 | visibility access | `NotVisible` | `not_visible(...)` | all query flows | access state not visible | decision value only | single body `None`;list items empty;does not reveal found/missing | none |
-| missing/degraded access | `Degraded` | `degraded(...)` | all query flows | access summary missing or access state degraded/unavailable;or material guard fails | decision value only | response degraded with safe marker;no fallback to visible | none |
+| missing/degraded access or material | `Degraded` | `degraded(...)` | all query flows | access summary missing or access state degraded/unavailable;or material guard fails with `IdentityQueryMaterialDegradationSummary` | decision value only | response degraded with safe marker;no fallback to visible;no service-side marker synthesis | none |
 | visible access + stale | `StaleVisible` | `stale_visible(...)`;`classify_read_surface(found=true, stale=true)` | `ReadMemberSummaryFlow`;core truth queries with stale projection/source state | loaded view/truth stale marker;material safe | decision value only | return stale safe material;no rebuild/refresh | none |
 
 Forbidden visibility decision transitions:
@@ -845,7 +845,7 @@ Forbidden visibility decision transitions:
 | enum 是否存在 | 通过 | `IdentityReadDispositionKind::{Visible,Redacted,NotVisible,Degraded,StaleVisible}` 已在 Step 6 定义 |
 | 状态名是否一致 | 通过 | `Empty` / `Missing` 不写入 visibility decision enum |
 | 触发函数是否存在 | 通过 | `IdentityVisibilityDecision` factories 与 `VisibilityPolicy` classifier 已定义 |
-| 前置条件字段是否闭合 | 通过 | access summary、scope、subject、visibility result、redaction/degraded marker 来自 Step 7/9 |
+| 前置条件字段是否闭合 | 通过 | access summary、scope、subject、visibility result、redaction marker 来自 Step 7/9;query-internal material degraded marker 来自 Step 7 `IdentityQueryMaterialDegradationMapper` |
 | 非法转换错误是否有 Step 12 承接 | 通过 | marker missing / forbidden material 的 public mapping 留 Step 12 |
 | 副作用是否闭合 | 通过 | 本批 decision 是 response assembly helper;query 默认 no-write |
 | 测试切口是否可写 | 通过 | visible/redacted/not visible/degraded/stale visible;not visible 不读 count;degraded not default visible |
@@ -921,7 +921,7 @@ Forbidden public surface mappings:
 | `Redacted` | access redacted or field redaction required | 是,但 fields/slices are safe subset | redaction marker | 不保存 redacted copy |
 | `NotVisible` | initial or view-specific access not visible | 否 | visibility result | 不泄露 view existence |
 | `Stale` / public `StaleVisible` | loaded view `is_stale_or_degraded()` due stale marker but safe to show | 是,带 stale marker | source cursor/freshness/degraded marker | 不 mark fresh |
-| `Degraded` | visibility access missing/degraded;view mismatch;forbidden material;loaded view inconsistent | 可空或 safe partial | degraded marker | 不修复 projection |
+| `Degraded` | visibility access missing/degraded;view mismatch;forbidden material;loaded view inconsistent | 可空或 safe partial | resolver degraded marker or `IdentityQueryMaterialDegradationSummary.degraded_marker_ref` | 不修复 projection;不在 query service 合成 marker |
 | `NotFound` / public `Missing` | stable lookup missing or loaded view missing as exact summary read | 否 | visibility if available | 不拼 view ref |
 | `Empty` | no relevant optional slices after visible read | 是,with empty vectors or public empty for list query only | visibility result | 不用于 hiding not visible |
 
@@ -932,7 +932,7 @@ Forbidden public surface mappings:
 | loaded view | `Redacted` | `VisibilityPolicy::requires_redaction()` | all member summary reads | access redacted;redaction marker present | none | response safe subset | none |
 | loaded view | `StaleVisible` | `view.is_stale_or_degraded()` + policy visible | `ReadMemberSummaryFlow`;core truth optional projection reads | source cursor/freshness marker present or degraded marker safe | none | response stale safe material | none |
 | access / loaded view | `NotVisible` | `resolve_member_summary_read(...)` access not visible | all member summary reads | initial or view-specific access not visible | none | response body None | none |
-| loaded view invalid | `Degraded` | `belongs_to(...)` false,`assert_body_free()` fail,view missing after lookup,or access degraded | all member summary reads | invalid material or partial dependency | none | degraded response;no repair | none |
+| loaded view invalid | `Degraded` | `belongs_to(...)` false,`assert_body_free()` fail,view missing after lookup,or access degraded | all member summary reads | invalid material or partial dependency;material branch has `IdentityQueryMaterialDegradationSummary` | none | degraded response;no repair;no marker synthesis | none |
 
 Forbidden member summary read transitions:
 

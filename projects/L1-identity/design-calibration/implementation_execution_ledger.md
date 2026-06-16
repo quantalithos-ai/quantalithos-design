@@ -17,7 +17,7 @@
 | current_design_baseline | `c48b462` |
 | current_boundary | `commit-05-b` |
 | gate_status | ready_for_design_gate |
-| gate_reason | `commit-05-a` completed in implementation repo at `bc6267a`; design ledger advanced to `commit-05-b` core/member/trace/audit query family boundary |
+| gate_reason | `commit-05-a` completed in implementation repo at `bc6267a`; `commit-05-b` core/member/trace/audit query family boundary is ready; degraded query material marker source blocker is closed by `IdentityQueryMaterialDegradationSummary` and `IdentityQueryMaterialDegradationMapper` |
 | next_allowed_action | read_current_boundary_ledger |
 | current_recovery_point | `commit-05-b` opening boundary / PH-05 core truth, member summary, trace and audit query family |
 | last_updated_by | design agent |
@@ -45,6 +45,7 @@
 | BLK-ID-05A-LEDGER-001 | `commit-05-a` | implementation | resolved | `ce18064` | Boundary ledger now exists; implementation agent must continue from `read_docs` and advance gates before code changes. |
 | BLK-ID-05A-READ-SUBJECT-001 | `commit-05-a` | implementation | resolved | `pending-current-design-with-read-subject-access-summary` | Step 6/7/8/9 now define `IdentityVisibilityAccessSummary.read_subject_ref` as the only service-visible source for `IdentityVisibilityDecision.read_subject_ref`; implementation agent should restart design gate. |
 | BLK-ID-05B-LEDGER-001 | `commit-05-b` | implementation | resolved | `c48b462` | Project ledger advanced and `implementation-boundaries/commit-05-b.md` added; implementation agent must continue from `read_docs` and advance gates before code changes. |
+| BLK-ID-05B-DEGRADED-MARKER-001 | `commit-05-b` | implementation | resolved | `pending-current-design-with-query-material-degradation-summary` | Query-internal loaded material missing/mismatch/unsafe/partial item degraded branches now use Step 6 `IdentityQueryMaterialDegradationSummary` produced by Step 7 `IdentityQueryMaterialDegradationMapper`; implementation agent must restart design gate and copy markers rather than synthesize them. |
 
 ---
 

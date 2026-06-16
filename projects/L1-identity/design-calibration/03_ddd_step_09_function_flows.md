@@ -2138,10 +2138,10 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   v
 [Load view and assemble]
   | view = IdentityProjectionRepository.get_member_summary_view(view_ref)
-  | view None -> return Missing or Degraded projection material;do not rebuild
-  | require view.belongs_to(member_ref);else Degraded invalid material
-  | require view.matches_visibility_scope(access.scope_ref);else Degraded projection integrity surface
-  | require view.assert_body_free();else Degraded / forbidden material surface per Step 12
+  | view None -> return Missing or Degraded projection material through IdentityQueryMaterialDegradationMapper.member_summary_view_missing(...);do not rebuild
+  | require view.belongs_to(member_ref);else Degraded invalid material through IdentityQueryMaterialDegradationMapper.member_summary_view_invalid_owner(...)
+  | require view.matches_visibility_scope(access.scope_ref);else Degraded projection integrity surface through IdentityQueryMaterialDegradationMapper.member_summary_view_scope_mismatch(...)
+  | require view.assert_body_free();else Degraded / forbidden material surface through IdentityQueryMaterialDegradationMapper.forbidden_read_material(...)
   | policy = VisibilityPolicy::for_summary(view_access or access, view.read_material_marker)
   | surface = policy.classify_read_surface(found=true, stale=view.is_stale_or_degraded())
   | return IdentityQueryResponse<MemberSummaryView> with visible/redacted/stale/degraded surface
@@ -2153,10 +2153,10 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 | visibility summary `None` | malformed / unresolvable read subject surface;no marker synthesis |
 | initial not visible | `NotVisible`,body `None`;do not reveal lookup found/missing |
 | stable lookup missing | `Missing`,body `None`;no view ref construction,no rebuild |
-| loaded view missing | `Missing` or `Degraded` projection inconsistency;no rebuild |
-| view belongs to another member | `Degraded` invalid material;do not return another member slices |
-| view scope mismatch | `Degraded` projection integrity surface;do not infer scope from `visibility_result_ref` |
-| forbidden read material | `Degraded` / rejected read surface per Step 12;no body |
+| loaded view missing | `Missing` or `Degraded` projection inconsistency through `IdentityQueryMaterialDegradationMapper.member_summary_view_missing(...)`;no rebuild |
+| view belongs to another member | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.member_summary_view_invalid_owner(...)`;do not return another member slices |
+| view scope mismatch | `Degraded` projection integrity surface through `IdentityQueryMaterialDegradationMapper.member_summary_view_scope_mismatch(...)`;do not infer scope from `visibility_result_ref` |
+| forbidden read material | `Degraded` / rejected read surface through `IdentityQueryMaterialDegradationMapper.forbidden_read_material(...)` per Step 12;no body |
 | view stale/degraded | `StaleVisible` / `Degraded` using loaded view marker;no projection state write |
 
 | Test cut | Expected |
@@ -2202,9 +2202,9 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 [Per-item load / visibility]
   | for each trace_ref in page_refs.items:
   |   trace_v = IdentityTraceRecordRepository.get_trace_record(trace_ref)
-  |   missing -> response Degraded partial;do not repair index
-  |   require trace_v.object.belongs_to(selector.member_ref);else Degraded invalid material
-  |   if selector.BySubject -> require trace_v.object.matches_subject(subject_ref);else Degraded invalid material
+  |   missing -> response Degraded partial through IdentityQueryMaterialDegradationMapper.trace_item_missing_after_list(...);do not repair index
+  |   require trace_v.object.belongs_to(selector.member_ref);else Degraded invalid material through IdentityQueryMaterialDegradationMapper.trace_item_invalid_member(...)
+  |   if selector.BySubject -> require trace_v.object.matches_subject(subject_ref);else Degraded invalid material through IdentityQueryMaterialDegradationMapper.trace_item_subject_mismatch(...)
   |   access = resolve_trace_read(trace_v.object.subject_ref, consumer_ref, visibility_context_ref)
   |   access None -> malformed / unresolvable item read subject surface;no synthetic degraded marker
   |   access NotVisible -> withhold item and count denied
@@ -2231,9 +2231,9 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 | request page missing | entry validation failure;do not invent default page |
 | `BySubject` seed not visible | `NotVisible`,items empty;do not list records |
 | repository page empty after visible seed | `Empty`,items empty |
-| trace ref missing after list | `Degraded` partial;no append/repair/delete |
-| loaded member mismatch | `Degraded` invalid material |
-| loaded subject mismatch for `BySubject` | `Degraded` invalid material |
+| trace ref missing after list | `Degraded` partial through `IdentityQueryMaterialDegradationMapper.trace_item_missing_after_list(...)`;no append/repair/delete |
+| loaded member mismatch | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.trace_item_invalid_member(...)` |
+| loaded subject mismatch for `BySubject` | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.trace_item_subject_mismatch(...)` |
 | item visibility unavailable/degraded | `Some(access_state = Degraded | Unavailable)` -> `Degraded` partial,copy markers |
 | item visibility `None` | malformed / unresolvable item read subject surface;no marker synthesis |
 | all loaded items denied | `NotVisible`,items empty;not `Empty` |

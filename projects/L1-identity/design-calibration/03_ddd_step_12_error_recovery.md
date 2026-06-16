@@ -382,7 +382,7 @@ entry pre-dispatch failure
   > Visible
 ```
 
-For paged reads, per-item not-visible/redacted/degraded decisions must be applied before page assembly. If the whole page target is not visible, return `NotVisible` with empty items. If some loaded items are missing/degraded, return `Degraded` or `StaleVisible` with safe partial items and degraded marker;do not repair or silently drop without marker.
+For paged reads, per-item not-visible/redacted/degraded decisions must be applied before page assembly. If the whole page target is not visible, return `NotVisible` with empty items. If some loaded items are missing/degraded, return `Degraded` or `StaleVisible` with safe partial items and degraded marker from `IdentityQueryMaterialDegradationMapper`;do not repair or silently drop without marker.
 
 | Error taxonomy / condition | Query disposition | Body/items rule | Retryability | Write rule |
 |---|---|---|---|---|
@@ -394,7 +394,7 @@ For paged reads, per-item not-visible/redacted/degraded decisions must be applie
 | true visible collection empty | `Empty` | body `None` or items empty | NotApplicable | no write |
 | projection/report rebuild in progress or unavailable state says rebuilding | `Rebuilding` | body `None`;items empty | RetryAfterDependencyRecovery | no rebuild from query |
 | projection/reference/report stale but visible | `StaleVisible` | stale body/partial items allowed with freshness/degraded marker | RetryAfterDependencyRecovery | no mark fresh |
-| projection/reference/report/source sidecar missing or partial item missing | `Degraded` | body/items safe partial or empty with marker | ManualRecovery if consistency defect;dependency retry if unavailable | no repair |
+| projection/reference/report/source sidecar missing or partial item missing | `Degraded` | body/items safe partial or empty with marker from `IdentityQueryMaterialDegradationSummary` when detected after a valid access summary | ManualRecovery if consistency defect;dependency retry if unavailable | no repair;no service-side marker synthesis |
 | adapter/feature disabled for read surface | `Disabled` | body `None`;items empty | NonRetryableInput until config change | no write |
 | page cursor invalid | entry validation failure,not query surface | no query response body | NonRetryableInput | no facade call if caught pre-dispatch |
 

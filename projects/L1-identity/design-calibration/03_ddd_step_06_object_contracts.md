@@ -3828,6 +3828,22 @@ pub struct IdentityReadMaterialMarker {
     /// Optional source marker.
     pub source_ref: Option<IdentitySourceRef>,
 }
+
+/// Body-free degraded summary for query-internal material/projection integrity failures.
+pub struct IdentityQueryMaterialDegradationSummary {
+    /// Public degraded marker copied into query degraded surface.
+    pub degraded_marker_ref: IdentityDegradedMarkerRef,
+    /// Safe public degraded classifier.
+    pub degraded_kind: IdentityDegradedKind,
+    /// Read subject copied from the already-resolved access summary.
+    pub read_subject_ref: IdentityReadSubjectRef,
+    /// Visibility scope copied from the already-resolved access summary.
+    pub visibility_scope_ref: VisibilityScopeRef,
+    /// Read surface affected by this material degradation.
+    pub read_surface_kind: IdentityReadSurfaceKind,
+    /// Safe material marker that triggered the degradation, when available.
+    pub read_material_marker: Option<IdentityReadMaterialMarker>,
+}
 ```
 
 | 不变量 / 禁止事项 | 说明 |
@@ -3836,6 +3852,9 @@ pub struct IdentityReadMaterialMarker {
 | `NotVisible` 不等于 `NotFound` | public surface 可以按 Step 8/12 裁剪,但内部契约必须区分 |
 | `Redacted` 是 read surface | 不原地修改 `IdentityTraceRecord` 或 `MemberSummaryView` truth/projection |
 | forbidden material 必须拦截 | 外部正文、raw log、secret 不进入 view/trace/audit/report/outbox |
+| query material degraded marker 必须有正式 summary | loaded view missing、projection integrity violation、partial trace/audit item missing、forbidden read material 等 query 内部检测分支必须先由 Step 7 `IdentityQueryMaterialDegradationMapper` 生成 `IdentityQueryMaterialDegradationSummary`;query service 只能复制 `degraded_marker_ref` / `degraded_kind`,不得从 view ref、trace ref、scope、error string 或 fake 私有规则合成 |
+
+`IdentityQueryMaterialDegradationSummary` 只用于 query 已经取得合法 `IdentityVisibilityAccessSummary` 后,在加载 projection / trace / audit material 时发现 material missing、owner/scope/subject mismatch、unsafe/forbidden material 或 partial item missing 的分支。它不替代 visibility resolver:resolver dependency unavailable / policy degraded 仍必须通过 `IdentityVisibilityAccessSummary { access_state: Degraded | Unavailable, degraded_marker_ref, degraded_kind }` 表达。它也不保存 raw projection body、trace body、audit entry body、adapter error、stack trace、credential 或 secret。
 
 #### 7.13.4 `MemberSummaryView`
 

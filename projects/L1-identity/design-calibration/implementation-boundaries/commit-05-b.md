@@ -23,13 +23,13 @@
 | `projects/L1-identity/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | PH-05 / commit-05-b 的 BATCH-05-03~05、scope、经验复核、停审记录 | pending | core truth、member summary、trace/audit query family 的正式边界来源。 |
 | `projects/L1-identity/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | commit-05-b gate row | pending | `GATE-05`、必要时 `GATE-10`、TC、EV、report path 来源。 |
 | `projects/L1-identity/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | commit-05-b commit body grouping | pending | commit message body 分组来源。 |
-| `projects/L1-identity/design-calibration/03_ddd_step_06_object_contracts.md` | core truth/member summary/trace/audit read objects, visibility decision, redaction/degraded markers | pending | output 不得泄漏 existence、raw body 或 sibling truth。 |
-| `projects/L1-identity/design-calibration/03_ddd_step_07_trait_port_adapter_contracts.md` | core read repository ports, projection/read surface, trace/audit read ports, visibility/access resolver contracts | pending | 不新增私有 port、fake-only map 或字符串 lookup 规则。 |
+| `projects/L1-identity/design-calibration/03_ddd_step_06_object_contracts.md` | core truth/member summary/trace/audit read objects, visibility decision, redaction/degraded markers, `IdentityQueryMaterialDegradationSummary` | pending | output 不得泄漏 existence、raw body 或 sibling truth;loaded material degraded marker 必须来自正式 summary。 |
+| `projects/L1-identity/design-calibration/03_ddd_step_07_trait_port_adapter_contracts.md` | core read repository ports, projection/read surface, trace/audit read ports, visibility/access resolver contracts, `IdentityQueryMaterialDegradationMapper` | pending | 不新增私有 port、fake-only map 或字符串 lookup 规则;query 内部 degraded marker 只能复制 mapper 输出。 |
 | `projects/L1-identity/design-calibration/03_ddd_step_08_protocol_contracts.md` | query request/response DTOs for core/member/trace/audit reads, public redaction/degraded surface | pending | public DTO 和 marker 输出必须来自正式协议面。 |
 | `projects/L1-identity/design-calibration/03_ddd_step_09_function_flows.md` | Step 9 query flows 9.2-a/b for core truth/member summary/trace/audit reads | pending | visibility-first、stable lookup、query no-write 仍继承 commit-05-a 基座。 |
 | `projects/L1-identity/design-calibration/03_ddd_step_10_state_matrix.md` | read/visibility/projection/reference/report state priorities used by core read outputs | pending | stale/degraded/missing/not-visible 状态词表不得漂移。 |
 | `projects/L1-identity/design-calibration/03_ddd_step_11_persistence_transaction_consistency.md` | stable lookup indexes and read-only persistence semantics for member summary and trace/audit reads | pending | query 不 repair projection/reference/report/outbox/handoff。 |
-| `projects/L1-identity/design-calibration/03_ddd_step_12_error_recovery.md` | query missing/not-visible/degraded/stale, redaction and replay consistency failure rules | pending | missing/not-visible 不得泄漏 existence。 |
+| `projects/L1-identity/design-calibration/03_ddd_step_12_error_recovery.md` | query missing/not-visible/degraded/stale, redaction and replay consistency failure rules | pending | missing/not-visible 不得泄漏 existence;partial/mismatch/unsafe material degraded 必须带 mapper marker。 |
 | `projects/L1-identity/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | query no idempotency reserve / no mutation replay implications | pending | query 不能使用 command duplicate replay 路径补结果。 |
 | `projects/L1-identity/design-calibration/03_ddd_step_15_observability_audit.md` | trace/audit output redaction and safe observability material | pending | raw audit/trace body 不得泄漏。 |
 | `projects/L1-identity/design-calibration/03_ddd_step_16_test_cuts.md` | core/member/trace/audit query cuts, no-write and redaction cuts | pending | targeted tests 来源。 |
@@ -119,4 +119,4 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| none | not_applicable | not_applicable | No open blocker recorded at ledger creation. | not_applicable | read_docs |
+| BLK-ID-05B-DEGRADED-MARKER-001 | design_gate | resolved | Degraded/StaleVisible query branches for loaded view/trace/audit material missing,owner/scope/subject mismatch,forbidden material or partial item missing had no formal marker carrier. | Step 6 now defines `IdentityQueryMaterialDegradationSummary`;Step 7 defines `IdentityQueryMaterialDegradationMapper`;Step 8/9/10/12 and formal `03` require service to copy mapper markers. | read_docs |

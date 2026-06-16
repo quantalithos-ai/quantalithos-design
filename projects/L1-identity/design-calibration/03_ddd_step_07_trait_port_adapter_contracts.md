@@ -251,7 +251,7 @@
 
 ### 7.7 7.1 shared application port helpers
 
-本批定义 application-local helper surface,为后续 7.2~7.10 的 port trait 提供统一参数、返回值和禁止混用规则。本批只定义 helper 类型、UoW cursor helper、subject mapper helper、canonical key table 和 fake/durable parity;不定义 Clock、IdGenerator、repository、resolver、publisher、handoff、DTO、flow、state matrix 或 DDL。
+本批定义 application-local helper surface,为后续 7.2~7.10 的 port trait 提供统一参数、返回值和禁止混用规则。本批只定义 helper 类型、UoW cursor helper、subject mapper helper、query material degradation mapper、canonical key table 和 fake/durable parity;不定义 Clock、IdGenerator、repository、resolver、publisher、handoff、DTO、flow、state matrix 或 DDL。
 
 #### 7.7.1 7.1 capability / 接缝清单
 
@@ -264,6 +264,7 @@
 | reference marker cursor | `IdentityUnitOfWork.assign_reference_marker_cursor()` | consumer/reference refresh/job marker flows | durable/fake UoW | Step 9 consumer/job, Step 11, Step 13 |
 | accepted subject identity | `IdentityAcceptedSubjectRefs`, `IdentityTruthChangeSubjectMapper` | accepted command services | mapper implementation in application/infra wiring | 7.4/7.6, Step 9, Step 15 |
 | accepted audit material markers | `IdentityAcceptedAuditTrailMarkers`, `IdentityAcceptedAuditTrailMarkerMapper` | accepted command / handoff prepare services | mapper implementation in application/infra wiring | 7.4, Step 9, Step 11 |
+| query material degraded markers | `IdentityQueryMaterialDegradationSummary`, `IdentityQueryMaterialDegradationMapper` | query services / page assemblers | mapper implementation in application/infra wiring | Step 8 query surface, Step 9 query branches, Step 12 recovery |
 | marker trace subject | `IdentityMarkerSubjectMapper` | consumer/job/reference marker services | mapper implementation in application/infra wiring | 7.4, Step 9, Step 15 |
 | common ref set / versioned ref | typed ref set helpers and `VersionedRef<TRef>` | query/job/rebuild/report services | application local helper | 7.5/7.6, Step 8/9 |
 
@@ -490,6 +491,92 @@ pub trait IdentityMarkerSubjectMapper {
 | `IdentityJobRunRef { job_run_id }` | `identity:marker:job-run:<job_run_id>` |
 | `HandoffReceiptRef { receipt_id }` | `identity:marker:handoff-receipt:<receipt_id>` |
 
+#### 7.7.6A Query material degradation mapper helper
+
+Query read path has two different degraded marker sources:
+
+- resolver / dependency degraded before material load: `IdentityReadVisibilityRepository.resolve_*_read(...)` must return `Some(IdentityVisibilityAccessSummary { access_state: Degraded | Unavailable, degraded_marker_ref, degraded_kind, ... })`;
+- material / projection / trace / audit integrity degraded after a valid access summary already exists: service must call `IdentityQueryMaterialDegradationMapper` and copy the returned `IdentityQueryMaterialDegradationSummary` into public `IdentityQuerySurface.degraded`.
+
+The mapper is application-local and body-free. It does not allocate ids, read repositories, call adapters, save decisions, repair projections, append trace/audit, or create visibility result refs. It only turns typed context plus the already-resolved access summary into a safe degraded marker summary.
+
+```rust
+pub trait IdentityQueryMaterialDegradationMapper {
+    fn member_summary_view_missing(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        expected_member_ref: GlobalMemberRef,
+        expected_scope_ref: VisibilityScopeRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn member_summary_view_invalid_owner(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        view_ref: MemberSummaryViewRef,
+        expected_member_ref: GlobalMemberRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn member_summary_view_scope_mismatch(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        view_ref: MemberSummaryViewRef,
+        expected_scope_ref: VisibilityScopeRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn forbidden_read_material(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        read_material_marker: IdentityReadMaterialMarker,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn trace_item_missing_after_list(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        trace_ref: IdentityTraceRecordRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn trace_item_invalid_member(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        trace_ref: IdentityTraceRecordRef,
+        expected_member_ref: GlobalMemberRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn trace_item_subject_mismatch(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        trace_ref: IdentityTraceRecordRef,
+        expected_subject_ref: IdentityTraceSubjectRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
+    fn audit_item_missing_or_invalid(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        audit_trail_ref: AuditTrailRef,
+        audit_scope_ref: AuditScopeRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+}
+```
+
+| mapper method | `IdentityDegradedKind` | summary source | 使用分支 |
+|---|---|---|---|
+| `member_summary_view_missing(...)` | `PartialResult` | copies `access.read_subject_ref`, `access.scope_ref`, and `IdentityReadSurfaceKind::Degraded` | stable lookup/get view 后 material 缺失或 projection sidecar 不完整 |
+| `member_summary_view_invalid_owner(...)` | `MaterialUnsafe` | copies `access.read_subject_ref`, `access.scope_ref`, and `IdentityReadSurfaceKind::Degraded` | loaded view `belongs_to(member_ref)` 失败 |
+| `member_summary_view_scope_mismatch(...)` | `MaterialUnsafe` | copies `access.read_subject_ref`, `access.scope_ref`, and `IdentityReadSurfaceKind::Degraded` | loaded view `matches_visibility_scope(...)` 失败 |
+| `forbidden_read_material(...)` | `MaterialUnsafe` | copies access summary plus `read_material_marker` | `assert_body_free()` / forbidden material failure |
+| `trace_item_missing_after_list(...)` | `PartialResult` | copies `access.read_subject_ref`, `access.scope_ref`, and `IdentityReadSurfaceKind::Degraded` | trace page ref 已列出但 item get missing |
+| `trace_item_invalid_member(...)` | `MaterialUnsafe` | copies access summary | loaded trace member mismatch |
+| `trace_item_subject_mismatch(...)` | `MaterialUnsafe` | copies access summary | selector.BySubject subject mismatch |
+| `audit_item_missing_or_invalid(...)` | `PartialResult` or `MaterialUnsafe` per audit safe material table | copies access summary and audit scope | audit trail / entry missing,scope mismatch,raw material guard failure |
+
+Rules:
+
+- `degraded_marker_ref` comes from the mapper implementation's opaque degraded marker source;application query service receives a complete `IdentityQueryMaterialDegradationSummary` and only copies it.
+- `visibility_result_ref` still comes from the access summary / visibility policy. The mapper must not generate or override visibility result refs.
+- `read_subject_ref` and `visibility_scope_ref` are copied from `IdentityVisibilityAccessSummary`;the mapper must not infer them from `member_ref`, `view_ref`, `trace_ref`, `audit_trail_ref`, cursor, route, scope string, or result marker.
+- Fake runtime and durable adapters must use the same method-to-kind table and opaque marker creation rule. Fake may make markers deterministic for tests, but it must not use a private map to authorize degraded branches not represented by this trait.
+- Forbidden: query service synthesizes degraded marker, classifies degraded kind from `ApplicationError` text, repository error string, HTTP status, view id prefix, trace subject string, raw log body, projection body, adapter diagnostic or fake-only enum.
+
 #### 7.7.6 Maintenance issue mapper helper
 
 Projection/reference/reconciliation jobs expose `MaintenanceIssueRef` directly, while publisher and handoff adapter outcomes store propagation-specific issue markers in `OutboxState` / `HandoffState`. Application job services must use this mapper when converting typed maintenance markers or propagation failures into `IdentityJobRunReport.issue_refs` and job output `issue_refs`;they must not cast refs or parse raw adapter errors.
@@ -628,6 +715,7 @@ pub struct ExternalReferenceRefSet {
 | reference marker cursor helper | 7.2 UoW cursor assigner | Step 9 consumer/job marker;Step 11 stale marker;Step 13 receipt/report |
 | accepted subject mapper | 7.4 trace/audit, 7.6 outbox | Step 9 accepted side effect;Step 15 observability |
 | accepted audit marker mapper | 7.4 audit trail create / append | Step 9 accepted audit side effect;Step 11 audit trail persistence |
+| query material degradation mapper | 7.5 projection/read visibility,7.4 trace/audit read,7.8 query facade | Step 8 query degraded marker;Step 9 material degraded branches;Step 12 recovery priority |
 | marker subject mapper | 7.4 marker trace, 7.5/7.7 reference/job/handoff marker | Step 9 consumer/job/callback;Step 15 observability |
 | maintenance issue mapper | 7.7 publisher/handoff outcomes and 7.6 job report | Step 9 publish/handoff/retry jobs;Step 12 recovery;Step 16 failure tests |
 | ref set helper | 7.5 projection/reference/report, 7.7 resolver | Step 9 job/query;Step 11 persistence;Step 16 tests |
@@ -643,6 +731,7 @@ pub struct ExternalReferenceRefSet {
 | reference marker cursor | reference-only transaction commit 后可断言 | reference marker boundary cursor 来源稳定 | source version/dedupe key 当 cursor |
 | accepted subject mapper | fake 与 durable 使用同一 canonical key table | durable 不从 DB 私有 key 派生第二套 subject | trace/audit/outbox 不同 key |
 | accepted audit marker mapper | fake 与 durable 使用同一 accepted audit marker table | durable 不从 read visibility resolver 或 private audit store 派生 marker | default scope / default visible / hard-coded marker |
+| query material degradation mapper | fake 与 durable 使用同一 method-to-kind table 和 opaque degraded marker source | durable 不从 repository raw error 或 projection body 派生 marker/kind | query service 合成 marker、fake 私有 map、error string 分类 |
 | marker subject mapper | fake 与 durable 使用同一 marker key table | durable 不从 topic/payload 派生第二套 subject | event topic/payload type 当 subject |
 | maintenance issue mapper | fake 与 durable 使用同一 issue kind mapping table | durable 不从 adapter raw error 派生第二套 issue kind | raw error / HTTP status / topic string 决定 kind |
 
@@ -654,6 +743,7 @@ pub struct ExternalReferenceRefSet {
 | 是否覆盖 cursor/version/key | 通过 | §7.7.2~§7.7.3 固定 version/page/UoW/truth cursor/reference marker cursor |
 | 是否覆盖 accepted subject mapper | 通过 | §7.7.4 给出 mapper trait 和 canonical key table |
 | 是否覆盖 accepted audit marker mapper | 通过 | §7.7.4 给出 accepted audit trail marker mapper,闭合 accepted write 创建 trail 所需 scope / visibility marker |
+| 是否覆盖 query material degraded marker 来源 | 通过 | §7.7.6A 给出 query material degradation mapper,闭合 query 内部 missing/mismatch/unsafe/partial item 的 degraded marker 来源 |
 | 是否覆盖 marker subject mapper | 通过 | §7.7.5 给出 marker mapper trait 和 canonical key table |
 | 是否覆盖 fake/durable parity | 通过 | §7.7.9 固定 helper family 等价语义 |
 | 是否越过后续 Step | 未越过 | 未写 DTO、flow、state matrix、DDL、具体 repository trait |
@@ -670,6 +760,7 @@ pub struct ExternalReferenceRefSet {
 | reference marker cursor | reference state/sidecar staged 后由 UoW 分配 | 用 event dedupe key 当 marker cursor |
 | accepted subject | mapper 由 typed truth ref 生成同源 trace/audit/outbox subjects | service 拼 `member:<id>` |
 | audit subject | audit trail 使用 mapper 返回的 audit subject | 从 trace subject 字符串强转 |
+| query degraded marker | loaded view mismatch 先调用 `IdentityQueryMaterialDegradationMapper.member_summary_view_invalid_owner(...)`,再复制 summary marker | query service 用 `format!("degraded:{view_ref}")` 或 fake 私有 map 合成 marker |
 | marker subject | source/ref/job/receipt marker 使用 marker mapper | 用 event topic/payload type 当 trace subject |
 | fake parity | fake 和 durable 共享 canonical key table | fake 私有 map 让测试通过 |
 

@@ -7,9 +7,9 @@
 | phase | PH-06 Inbound / callback / outbound material slices |
 | design_baseline | `current-design-with-commit-06-a-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | consumer context and typed receipt replay scaffold after implementation `commit-05-c` code commit `b287e85` and evidence commit `82cae3b`; covers BATCH-06-01~02, `TC-ID-CONSUMER-006`, `TC-ID-IDEMP-003` and related `TC-ID-CONTRACT-003` |
+| status | implemented |
+| next_allowed_action | advance_to_commit_06_b |
+| current_recovery_point | implemented in `/home/aris/Projects/quantalithos-identity` at code commit `b7fa598` and evidence commit `67335fc`; run `20260617T015231+0800` passed `GATE-06` entry-worker-job scaffold and `GATE-03` infra-runtime-fake receipt replay subset for `TC-ID-CONSUMER-006`, `TC-ID-IDEMP-003` and related `TC-ID-CONTRACT-003`; next boundary is `commit-06-b` |
 
 ---
 
@@ -105,13 +105,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after commit. |
-| committed_message | pending | Fill after commit. |
-| gates_run | pending | List exact commands and reports. |
-| tests_not_run | pending | Must state none or explain. |
-| remaining_blockers | pending | Must reference blocker table. |
-| next_boundary | pending | Expected next boundary: `commit-06-b`. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Code commit `b7fa598`; evidence commit `67335fc`. |
+| committed_message | pass | `feat(identity-application): add consumer receipt replay`; `test(identity-consumer): add commit-06-a run evidence`. |
+| gates_run | pass | `reports/runs/20260617T015231+0800/suites/entry-worker-job.md`; `reports/runs/20260617T015231+0800/suites/infra-runtime-fake.md`; raw artifacts under `artifacts/test/20260617T015231+0800/`. |
+| tests_not_run | pass | No omitted checks reported by implementation handoff; reports record `cargo fmt --all`, `cargo check -p identity-application`, `cargo check -p identity-infra`, `cargo test -p identity-application`, and `cargo test -p identity-infra` passed. |
+| remaining_blockers | pass | No remaining `commit-06-a` blockers; next-boundary ledger blocker closed by `commit-06-b` boundary ledger. |
+| next_boundary | pass | `commit-06-b`. |
+| user_owned_changes_untouched | pass | Implementation repo handoff reports only untracked `.codex/` and `target/`; design repo keeps unrelated `commit-04-b.md`, `L3-method-library/**` and standards WIP outside this boundary. |
 
 ---
 

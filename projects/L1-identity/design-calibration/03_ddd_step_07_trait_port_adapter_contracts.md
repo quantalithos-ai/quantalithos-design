@@ -523,6 +523,14 @@ pub trait IdentityQueryMaterialDegradationMapper {
         expected_scope_ref: VisibilityScopeRef,
     ) -> IdentityQueryMaterialDegradationSummary;
 
+    fn member_summary_view_missing_freshness(
+        &self,
+        access: IdentityVisibilityAccessSummary,
+        view_ref: MemberSummaryViewRef,
+        expected_member_ref: GlobalMemberRef,
+        expected_scope_ref: VisibilityScopeRef,
+    ) -> IdentityQueryMaterialDegradationSummary;
+
     fn forbidden_read_material(
         &self,
         access: IdentityVisibilityAccessSummary,
@@ -591,6 +599,7 @@ pub trait IdentityQueryMaterialDegradationMapper {
 | `member_summary_view_missing(...)` | `PartialResult` | copies `access.read_subject_ref`, `access.scope_ref`, and `IdentityReadSurfaceKind::Degraded` | stable lookup/get view 后 material 缺失或 projection sidecar 不完整 |
 | `member_summary_view_invalid_owner(...)` | `MaterialUnsafe` | copies `access.read_subject_ref`, `access.scope_ref`, and `IdentityReadSurfaceKind::Degraded` | loaded view `belongs_to(member_ref)` 失败 |
 | `member_summary_view_scope_mismatch(...)` | `MaterialUnsafe` | copies `access.read_subject_ref`, `access.scope_ref`, and `IdentityReadSurfaceKind::Degraded` | loaded view `matches_visibility_scope(...)` 失败 |
+| `member_summary_view_missing_freshness(...)` | `MaterialUnsafe` | copies `access.read_subject_ref`, `access.scope_ref`, and `IdentityReadSurfaceKind::Degraded` | loaded member summary view 被判定 stale/degraded 但缺少 `projection_freshness_ref`;must return `Degraded`,not `StaleVisible` |
 | `forbidden_read_material(...)` | `MaterialUnsafe` | copies access summary plus `read_material_marker` | `assert_body_free()` / forbidden material failure |
 | `career_record_item_missing_after_list(...)` | `PartialResult` | copies access summary plus career record ref and expected member | career page ref 已列出但 item get missing |
 | `career_record_item_invalid_member(...)` | `MaterialUnsafe` | copies access summary plus career record ref and expected member | loaded career record `belongs_to(member_ref)` 失败 |
@@ -606,6 +615,7 @@ Rules:
 - `degraded_marker_ref` comes from the mapper implementation's opaque degraded marker source;application query service receives a complete `IdentityQueryMaterialDegradationSummary` and only copies it.
 - `visibility_result_ref` still comes from the access summary / visibility policy. The mapper must not generate or override visibility result refs.
 - `read_subject_ref` and `visibility_scope_ref` are copied from `IdentityVisibilityAccessSummary`;the mapper must not infer them from `member_ref`, `view_ref`, `trace_ref`, `audit_trail_ref`, cursor, route, scope string, or result marker.
+- `member_summary_view_missing_freshness(...)` is the only formal degraded marker source when `ReadMemberSummaryFlow` has loaded a stale/degraded `MemberSummaryView` but `projection_freshness_ref` is absent. Query service must return `Degraded` with the mapper summary;it must not read projection state, infer a projection ref from `view_ref`, reuse resolver markers, or synthesize a stale marker.
 - Career / memory list item methods are the only formal source of degraded markers for `ListCareerRecordsFlow` and `ListMemoryReferencesFlow` item missing / member mismatch after a valid access summary. Query service must not use generic `forbidden_read_material(...)`, trace/audit mapper methods, repository error strings, or fake-only rules for those branches.
 - Fake runtime and durable adapters must use the same method-to-kind table and opaque marker creation rule. Fake may make markers deterministic for tests, but it must not use a private map to authorize degraded branches not represented by this trait.
 - Forbidden: query service synthesizes degraded marker, classifies degraded kind from `ApplicationError` text, repository error string, HTTP status, view id prefix, trace subject string, raw log body, projection body, adapter diagnostic or fake-only enum.

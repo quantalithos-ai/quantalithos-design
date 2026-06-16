@@ -14,14 +14,14 @@
 | project | L1-identity |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| current_design_baseline | `c48b462` |
+| current_design_baseline | `pending-current-design-with-member-summary-missing-freshness-mapper` |
 | current_boundary | `commit-05-b` |
 | gate_status | ready_for_design_gate |
-| gate_reason | `commit-05-a` completed in implementation repo at `bc6267a`; `commit-05-b` core/member/trace/audit query family boundary is ready; degraded query material marker source blocker is closed by `IdentityQueryMaterialDegradationSummary` and `IdentityQueryMaterialDegradationMapper` |
+| gate_reason | `commit-05-a` completed in implementation repo at `bc6267a`; `commit-05-b` core/member/trace/audit query family boundary is ready; loaded member summary stale/degraded but missing freshness marker now uses dedicated `member_summary_view_missing_freshness(...)` degraded mapper path |
 | next_allowed_action | read_current_boundary_ledger |
 | current_recovery_point | `commit-05-b` opening boundary / PH-05 core truth, member summary, trace and audit query family |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-16 12:53:13 +0800 |
+| last_updated_at | 2026-06-16 17:25:16 +0800 |
 
 ---
 
@@ -32,7 +32,7 @@
 | `commit-04-b` | `d9f9e71` | pass | worktree_gate | implement | Required reads plus Design/Scope/Worktree gates passed; proceed with `commit-04-b` allowed scope only. |
 | `commit-04-c` | `2f0bfed` | pending | design_gate | read_docs | Trace handoff command and command side-effect/replay audit boundary; read `implementation-boundaries/commit-04-c.md` before implementation. |
 | `commit-05-a` | `c48b462` | implemented | handoff_gate | advance_to_commit_05_b | Implementation repo reports `commit-05-a` completed at `bc6267a`; next boundary is `commit-05-b`. |
-| `commit-05-b` | `c48b462` | ready | design_gate | read_docs | Core truth/member summary/trace/audit query family; read `implementation-boundaries/commit-05-b.md` before implementation. |
+| `commit-05-b` | `pending-current-design-with-member-summary-missing-freshness-mapper` | ready | design_gate | read_docs | Core truth/member summary/trace/audit query family; read `implementation-boundaries/commit-05-b.md` before implementation. |
 
 ---
 
@@ -46,6 +46,7 @@
 | BLK-ID-05A-READ-SUBJECT-001 | `commit-05-a` | implementation | resolved | `pending-current-design-with-read-subject-access-summary` | Step 6/7/8/9 now define `IdentityVisibilityAccessSummary.read_subject_ref` as the only service-visible source for `IdentityVisibilityDecision.read_subject_ref`; implementation agent should restart design gate. |
 | BLK-ID-05B-LEDGER-001 | `commit-05-b` | implementation | resolved | `c48b462` | Project ledger advanced and `implementation-boundaries/commit-05-b.md` added; implementation agent must continue from `read_docs` and advance gates before code changes. |
 | BLK-ID-05B-DEGRADED-MARKER-001 | `commit-05-b` | implementation | resolved | `pending-current-design-with-query-material-degradation-summary` | Query-internal loaded material missing/mismatch/unsafe/partial item degraded branches now use Step 6 `IdentityQueryMaterialDegradationSummary` produced by Step 7 `IdentityQueryMaterialDegradationMapper`; implementation agent must restart design gate and copy markers rather than synthesize them. |
+| BLK-ID-05B-MISSING-FRESHNESS-001 | `commit-05-b` | implementation | resolved | `pending-current-design-with-member-summary-missing-freshness-mapper` | `ReadMemberSummaryFlow` loaded stale/degraded view without `projection_freshness_ref` must call `IdentityQueryMaterialDegradationMapper.member_summary_view_missing_freshness(...)` and return `Degraded`; implementation agent must not read projection state or synthesize stale/degraded markers. |
 
 ---
 

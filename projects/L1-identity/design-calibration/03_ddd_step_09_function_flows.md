@@ -2144,7 +2144,8 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
   | require view.assert_body_free();else Degraded / forbidden material surface through IdentityQueryMaterialDegradationMapper.forbidden_read_material(...)
   | policy = VisibilityPolicy::for_summary(view_access or access, view.read_material_marker)
   | surface = policy.classify_read_surface(found=true, stale=view.is_stale_or_degraded())
-  | if surface == StaleVisible -> set IdentityQuerySurface.projection_freshness_ref = view.projection_freshness_ref; if absent require degraded marker per Step 8
+  | if surface == StaleVisible and view.projection_freshness_ref exists -> set IdentityQuerySurface.projection_freshness_ref = view.projection_freshness_ref
+  | if surface == StaleVisible and view.projection_freshness_ref absent -> return Degraded through IdentityQueryMaterialDegradationMapper.member_summary_view_missing_freshness(...);do not read projection state
   | return IdentityQueryResponse<MemberSummaryView> with visible/redacted/stale/degraded surface
 ```
 
@@ -2158,7 +2159,8 @@ This table only closes 9.2-a core truth queries. Trace/audit item-level redactio
 | view belongs to another member | `Degraded` invalid material through `IdentityQueryMaterialDegradationMapper.member_summary_view_invalid_owner(...)`;do not return another member slices |
 | view scope mismatch | `Degraded` projection integrity surface through `IdentityQueryMaterialDegradationMapper.member_summary_view_scope_mismatch(...)`;do not infer scope from `visibility_result_ref` |
 | forbidden read material | `Degraded` / rejected read surface through `IdentityQueryMaterialDegradationMapper.forbidden_read_material(...)` per Step 12;no body |
-| view stale/degraded | `StaleVisible` copies loaded `view.projection_freshness_ref`;`Degraded` uses mapper/access marker;no projection state read or write |
+| view stale/degraded with freshness marker | `StaleVisible` copies loaded `view.projection_freshness_ref`;no projection state read or write |
+| view stale/degraded without freshness marker | `Degraded` through `IdentityQueryMaterialDegradationMapper.member_summary_view_missing_freshness(...)`;no projection state read or write,no resolver marker reuse |
 
 | Test cut | Expected |
 |---|---|
@@ -2367,7 +2369,7 @@ This table closes trace/audit item-level priority for 9.2-b. Operations query pa
 ```md
 ### 8.x Trace / audit / summary query flows
 
-`ReadMemberSummaryFlow` 先通过 `IdentityReadVisibilityRepository.resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 取得 `IdentityVisibilityAccessSummary`,并只从该 summary 复制 `read_subject_ref`、`scope_ref`、`visibility_result_ref` 和 `redaction_marker_ref`;再通过 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, scope_ref)` 查找 stable `MemberSummaryViewRef`,随后 `get_member_summary_view(view_ref)` 读取 view 并执行 `belongs_to`、`matches_visibility_scope(access.scope_ref)` 与 body-free guard。lookup/view missing 只返回 `Missing` / degraded surface,scope mismatch 返回 degraded projection integrity surface,stale 只通过 loaded `MemberSummaryView.projection_freshness_ref` 表达;query 不拼 view ref、不读取未闭合 projection-state 反向映射、不从 `visibility_result_ref` 或 `redaction_profile_ref` 反推 scope/redaction marker、不触发 rebuild。
+`ReadMemberSummaryFlow` 先通过 `IdentityReadVisibilityRepository.resolve_member_summary_read(member_ref, None, consumer_ref, visibility_context_ref)` 取得 `IdentityVisibilityAccessSummary`,并只从该 summary 复制 `read_subject_ref`、`scope_ref`、`visibility_result_ref` 和 `redaction_marker_ref`;再通过 `IdentityProjectionRepository.find_member_summary_view_ref(member_ref, scope_ref)` 查找 stable `MemberSummaryViewRef`,随后 `get_member_summary_view(view_ref)` 读取 view 并执行 `belongs_to`、`matches_visibility_scope(access.scope_ref)` 与 body-free guard。lookup/view missing 只返回 `Missing` / degraded surface,scope mismatch 返回 degraded projection integrity surface,stale visible 只通过 loaded `MemberSummaryView.projection_freshness_ref` 表达;如果 loaded stale/degraded view 缺少该 marker,必须调用 `member_summary_view_missing_freshness(...)` 返回 `Degraded`;query 不拼 view ref、不读取未闭合 projection-state 反向映射、不从 `visibility_result_ref` 或 `redaction_profile_ref` 反推 scope/redaction marker、不触发 rebuild。
 
 `ReadIdentityTraceFlow` 使用 `IdentityTraceReadSelector` 精确映射 Step 7 trace repository:by member、by subject after cursor、by member and change kind。每个 loaded trace record 必须通过 member/subject guard 和 `resolve_trace_read(record.subject_ref, consumer_ref, visibility_context_ref)` per-item visibility。visible empty page 返回 `Empty`;全部 loaded items denied 返回 `NotVisible`;mixed denied/redacted 返回 redacted partial;missing item 或 invalid material 返回 degraded partial。query 不 append trace、不修复 index。
 

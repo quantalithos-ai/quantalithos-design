@@ -394,6 +394,7 @@ For paged reads, per-item not-visible/redacted/degraded decisions must be applie
 | true visible collection empty | `Empty` | body `None` or items empty | NotApplicable | no write |
 | projection/report rebuild in progress or unavailable state says rebuilding | `Rebuilding` | body `None`;items empty | RetryAfterDependencyRecovery | no rebuild from query |
 | projection/reference/report stale but visible | `StaleVisible` | stale body/partial items allowed with freshness/degraded marker | RetryAfterDependencyRecovery | no mark fresh |
+| member summary stale/degraded but missing freshness marker | `Degraded` | body empty or safe partial with marker from `IdentityQueryMaterialDegradationMapper.member_summary_view_missing_freshness(...)` | ManualRecovery if persisted material defect;dependency retry if projection rebuild later supplies marker | no projection state read;no marker synthesis;no resolver marker reuse |
 | projection/reference/report/source sidecar missing or partial item missing | `Degraded` | body/items safe partial or empty with marker from `IdentityQueryMaterialDegradationSummary` when detected after a valid access summary | ManualRecovery if consistency defect;dependency retry if unavailable | no repair;no service-side marker synthesis |
 | adapter/feature disabled for read surface | `Disabled` | body `None`;items empty | NonRetryableInput until config change | no write |
 | page cursor invalid | entry validation failure,not query surface | no query response body | NonRetryableInput | no facade call if caught pre-dispatch |

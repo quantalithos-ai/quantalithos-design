@@ -559,7 +559,7 @@ pub enum IdentityQueryDisposition {
 | `Redacted` | `visibility.redaction_marker_ref` 必填;`degraded` 仅在同时存在 dependency/source degraded 时填写 |
 | `NotVisible` | `visibility` 必填且 body/items 为空;不得改用 protocol rejection |
 | `Degraded` | `visibility` 与 `degraded` 均必填;body/items 是否为空由 flow 的 safe material 规则决定;若 resolver 无法形成 visibility summary,不得伪造 degraded surface |
-| `StaleVisible` | `projection_freshness_ref` 或 `degraded` 至少一个必填;`ReadMemberSummaryFlow` 的 `projection_freshness_ref` 只能复制 loaded `MemberSummaryView.projection_freshness_ref`;query 不触发 rebuild/refresh,也不得读取 projection state 反推 marker |
+| `StaleVisible` | `projection_freshness_ref` 或 `degraded` 至少一个必填;`ReadMemberSummaryFlow` 的 `projection_freshness_ref` 只能复制 loaded `MemberSummaryView.projection_freshness_ref`;若 loaded member summary stale/degraded 但该字段缺失,必须调用 Step 7 `IdentityQueryMaterialDegradationMapper.member_summary_view_missing_freshness(...)` 并返回 `Degraded`;query 不触发 rebuild/refresh,也不得读取 projection state 反推 marker |
 | `Rebuilding` / `Disabled` | `degraded` 必填;不得伪造成 `Missing` 或 visible success |
 
 ### 8.1.6 Protocol rejection, issue and degraded shell

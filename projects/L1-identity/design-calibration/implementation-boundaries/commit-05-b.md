@@ -5,11 +5,11 @@
 | project | L1-identity |
 | boundary_id | commit-05-b |
 | phase | PH-05 Query / read model / visibility slices |
-| design_baseline | `c48b462` |
+| design_baseline | `pending-current-design-with-member-summary-missing-freshness-mapper` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
 | status | ready |
 | next_allowed_action | read_docs |
-| current_recovery_point | core truth, member summary, trace and audit query family opening gate after implementation `commit-05-a` at `bc6267a` |
+| current_recovery_point | core truth, member summary, trace and audit query family opening gate after implementation `commit-05-a` at `bc6267a`; restart design gate after member summary missing freshness mapper closure |
 
 ---
 
@@ -23,8 +23,8 @@
 | `projects/L1-identity/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | PH-05 / commit-05-b 的 BATCH-05-03~05、scope、经验复核、停审记录 | pending | core truth、member summary、trace/audit query family 的正式边界来源。 |
 | `projects/L1-identity/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | commit-05-b gate row | pending | `GATE-05`、必要时 `GATE-10`、TC、EV、report path 来源。 |
 | `projects/L1-identity/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | commit-05-b commit body grouping | pending | commit message body 分组来源。 |
-| `projects/L1-identity/design-calibration/03_ddd_step_06_object_contracts.md` | core truth/member summary/trace/audit read objects, visibility decision, redaction/degraded markers, `IdentityQueryMaterialDegradationSummary` | pending | output 不得泄漏 existence、raw body 或 sibling truth;loaded material degraded marker 必须来自正式 summary。 |
-| `projects/L1-identity/design-calibration/03_ddd_step_07_trait_port_adapter_contracts.md` | core read repository ports, projection/read surface, trace/audit read ports, visibility/access resolver contracts, `IdentityQueryMaterialDegradationMapper` | pending | 不新增私有 port、fake-only map 或字符串 lookup 规则;query 内部 degraded marker 只能复制 mapper 输出。 |
+| `projects/L1-identity/design-calibration/03_ddd_step_06_object_contracts.md` | core truth/member summary/trace/audit read objects, visibility decision, redaction/degraded markers, `IdentityQueryMaterialDegradationSummary` | pending | output 不得泄漏 existence、raw body 或 sibling truth;loaded material degraded marker 必须来自正式 summary;member summary missing freshness is material degraded,not stale success. |
+| `projects/L1-identity/design-calibration/03_ddd_step_07_trait_port_adapter_contracts.md` | core read repository ports, projection/read surface, trace/audit read ports, visibility/access resolver contracts, `IdentityQueryMaterialDegradationMapper` | pending | 不新增私有 port、fake-only map 或字符串 lookup 规则;query 内部 degraded marker 只能复制 mapper 输出;missing freshness uses `member_summary_view_missing_freshness(...)`. |
 | `projects/L1-identity/design-calibration/03_ddd_step_08_protocol_contracts.md` | query request/response DTOs for core/member/trace/audit reads, public redaction/degraded surface | pending | public DTO 和 marker 输出必须来自正式协议面。 |
 | `projects/L1-identity/design-calibration/03_ddd_step_09_function_flows.md` | Step 9 query flows 9.2-a/b for core truth/member summary/trace/audit reads | pending | visibility-first、stable lookup、query no-write 仍继承 commit-05-a 基座。 |
 | `projects/L1-identity/design-calibration/03_ddd_step_10_state_matrix.md` | read/visibility/projection/reference/report state priorities used by core read outputs | pending | stale/degraded/missing/not-visible 状态词表不得漂移。 |
@@ -120,3 +120,4 @@
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
 | BLK-ID-05B-DEGRADED-MARKER-001 | design_gate | resolved | Degraded/StaleVisible query branches for loaded view/trace/audit material missing,owner/scope/subject mismatch,forbidden material or partial item missing had no formal marker carrier. | Step 6 now defines `IdentityQueryMaterialDegradationSummary`;Step 7 defines `IdentityQueryMaterialDegradationMapper`;Step 8/9/10/12 and formal `03` require service to copy mapper markers. | read_docs |
+| BLK-ID-05B-MISSING-FRESHNESS-001 | design_gate | resolved | `ReadMemberSummaryFlow` loaded stale/degraded `MemberSummaryView` can lack `projection_freshness_ref`, but service cannot synthesize degraded marker or read projection state. | Step 7 adds `member_summary_view_missing_freshness(...)`;Step 6/8/9/10/12 and formal `03` require this branch to return `Degraded` with mapper summary and no projection-state read. | read_docs |

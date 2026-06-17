@@ -636,7 +636,7 @@
 | Commit boundary | 重点复核项 | 证据位置 | 结论 |
 |---|---|---|---|
 | commit-07-a | public job surface、stored job report typed save/get、job idempotency key/digest、report item refs | Step 8 job;Step 11/13 | 通过 |
-| commit-07-b | projection rebuild source cursor、reference bundle version、report-only reconciliation、job no-repair | Step 7/9/10/11/12 | 通过 |
+| commit-07-b | projection rebuild view input/source cursor、reference bundle version、report-only reconciliation、job no-repair | Step 6/7/9/10/11/12 | 通过 |
 | commit-07-c | publisher/handoff outcome classification、outbox/handoff state transition、terminal retry guard、adapter body-free | Step 7 publisher/handoff;Step 9/10/12/13 | 通过 |
 
 #### Commit boundary 经验复核
@@ -644,7 +644,7 @@
 | Commit boundary | 涉及设计面 | 适用经验项 | 不适用理由 | 证据位置 | 结论 | 处理 | 复核责任 |
 |---|---|---|---|---|---|---|---|
 | commit-07-a | job replay | public job surface;stored receipt/report typed save/get;idempotency reserve context;entry loop detail surface | CLI runner 后续 PH-08 | Step 8 job;Step 11/13 | 通过 | 允许开工 | 设计者完成;实现者二次校验 |
-| commit-07-b | projection/reference/report maintenance | projection rebuild;Reference typed sidecar version;maintenance job typed plan/outcome/inspection;job policy executable summary;job no-repair;machine artifact 不适用 | publish/deliver 后续 | Step 6/7/9/10/11/12;`MEM-ID-013` | 通过 | 允许开工 | 设计者完成;实现者二次校验 |
+| commit-07-b | projection/reference/report maintenance | projection rebuild;projection rebuild view body-field input;Reference typed sidecar version;maintenance job typed plan/outcome/inspection;job policy executable summary;job no-repair;machine artifact 不适用 | publish/deliver 后续 | Step 6/7/9/10/11/12;`MEM-ID-013`;`MEM-ID-014` | 通过 | 允许开工 | 设计者完成;实现者二次校验 |
 | commit-07-c | outbox/handoff propagation | adapter failure outcome classification;handoff marker trace subject;terminal state closure;body-free recovery;Accepted truth isolation | entry/config/evidence 后续 | Step 7 publisher/handoff;Step 9/10/12/13 | 通过 | 允许开工 | 设计者完成;实现者二次校验 |
 
 #### 提交粒度判断

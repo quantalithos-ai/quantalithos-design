@@ -716,7 +716,7 @@ pub trait IdentityMaintenanceIssueMapper {
         projection_ref: IdentityProjectionRef,
     ) -> MaintenanceIssueRef;
 
-    fn projection_missing_rebuild_scope_issue(
+    fn projection_missing_rebuild_input_issue(
         &self,
         projection_ref: IdentityProjectionRef,
     ) -> MaintenanceIssueRef;
@@ -783,7 +783,7 @@ pub trait IdentityMaintenanceIssueMapper {
 | `projection_missing_state_issue(...)` | `Unrecognized` | `IdentityProjectionRef.projection_ref` |
 | `projection_missing_cursor_issue(...)` | `Stale` | `IdentityProjectionRef.projection_ref` |
 | `projection_unsupported_writer_issue(...)` | `Failed` | `IdentityProjectionRef.projection_ref` |
-| `projection_missing_rebuild_scope_issue(...)` | `Partial` | `IdentityProjectionRef.projection_ref` |
+| `projection_missing_rebuild_input_issue(...)` | `Partial` | `IdentityProjectionRef.projection_ref` |
 | `reference_missing_state_issue(...)` | `Unrecognized` | `ExternalReferenceRef.source_ref` |
 | `reference_refresh_failed_issue(...)` | `Failed` | `ExternalReferenceRef.source_ref` |
 | `maintenance_target_missing_issue(...)` | `Unrecognized` | `IdentityMaintenanceTargetRef.target_ref` |
@@ -1812,7 +1812,7 @@ pub trait TraceHandoffIntentRepository {
 
 | repository / read family | 必须支撑 | 调用方 | 实现方 | Step 6 来源 | 后续承接 |
 |---|---|---|---|---|---|
-| projection lookup/read/state | stable member summary view lookup、projection state versioned read/save、member summary rebuild plan、stale mark、affected target expansion | accepted command services、query service、rebuild job service | infra projection repo / fake | §6.3 `MemberSummaryView`;§6.4 `ProjectionState`;§6.8 view lookup | Step 9 query/rebuild;Step 11 lookup/index |
+| projection lookup/read/state | stable member summary view lookup、projection state versioned read/save、member summary rebuild view input plan、stale mark、affected target expansion | accepted command services、query service、rebuild job service | infra projection repo / fake | §6.3 `MemberSummaryView`;§6.4 `ProjectionState`;§6.8 view lookup | Step 9 query/rebuild;Step 11 lookup/index |
 | read visibility resolution | request/view/report -> read subject + scope + access summary、visibility decision optional save/read | query service、handoff/report read service | infra read resolver/read store / fake | §6.3 `VisibilityPolicy`;§6.8 read subject/scope | Step 8 query DTO;Step 9 query precheck;Step 12 not visible/degraded |
 | reference state and typed sidecar | external reference bundle versioned read/save、owner lookup、typed sidecar read/save using same bundle version | consumer/reference refresh/job services | infra reference repo / fake | §6.4 `ReferenceResolutionState`;§6.8 external ref boundary | Step 9 consumer/refresh;Step 11 expected_version |
 | maintenance expansion / inspection | maintenance scope -> projection/reference/report target refs、pending rebuild/refresh scans、target marker -> typed loaded state context | job services、reconciliation service | infra maintenance repo / fake | §6.4 `MaintenanceScopeRef`,`IdentityMaintenanceTargetRef`,`IdentityMaintenanceInspectionContext` | Step 9 maintenance jobs;Step 14 config binding |
@@ -1917,7 +1917,7 @@ pub trait IdentityProjectionRepository {
 | `list_projection_states` | maintenance scan | page cursor 只分页 | 不全表 repair truth |
 | `list_stale_projection_states` | rebuild job selection | stale 判定来自 `ProjectionState` | 不在 query path 调用来 rebuild |
 | `get_projection_source_cursor` | rebuild job before `mark_rebuilt(...)` | cursor 来自 projection builder / committed truth scan / projection source cursor store | 不用 page cursor、timestamp、truth cursor、job cursor 或 optimistic version 代替 |
-| `get_member_summary_rebuild_plan` | rebuild member summary projection body | projection catalog returns member ref and formal visibility scopes for this target | 不从 projection ref、view ref、config string、first existing view 或 fake private map 推 visibility scope |
+| `get_member_summary_rebuild_plan` | rebuild member summary projection body | projection builder/catalog returns non-empty `MemberSummaryProjectionRebuildViewInput[]`;each input already carries view ref,member ref,scope,slices,visibility result,read surface,source cursor,freshness marker and read material marker | 不从 projection ref、visibility scope、existing view、config string、error text、first existing view 或 fake private map 推 view body fields |
 | `expand_affected_projection_refs` | accepted side effect mark stale | subject refs 来自 7.1 mapper | 不从 subject string 前缀推 affected views |
 | `save_member_summary_view` | projection builder/rebuild job save view | create `None`;update loaded version;writes current `(view.member_ref, view.visibility_scope_ref) -> view.view_ref` lookup index | view 必须携带 `visibility_scope_ref`;不保存 forbidden body;不得保存无 scope 的 current view |
 | `save_projection_state` | create/update projection state | create `None`;update loaded version | 不修改 core truth |
@@ -2284,7 +2284,7 @@ pub trait IdentityReconciliationReportRepository {
 | not visible | not visible 是 visibility surface | 返回 not found 并泄漏 diagnostic |
 | reference version | `get_reference_state_with_version(reference_ref)` 后保存 sidecar | 用 `ExternalSourceVersionRef` 当 `IdentityVersion` |
 | sidecar bundle | sidecar save 显式传同一个 `ExternalReferenceRef` | `IdentitySourceRef` 自动等于 reference bundle key |
-| member summary rebuild plan | `get_member_summary_rebuild_plan(projection_ref)` 返回 member ref 与 visibility scopes | rebuild 从 projection ref、view ref 或 fake map 推 scope |
+| member summary rebuild view input plan | `get_member_summary_rebuild_plan(projection_ref)` 返回保存 `MemberSummaryView` 所需的完整 body-free view inputs | rebuild 从 projection ref、scope、view ref、existing view 或 fake map 推 slice / visibility / freshness / material marker |
 | maintenance expansion / inspection | scope expansion 返回 maintenance targets,inspection port 返回 typed loaded target context | job 全表扫描、解析 target marker 或直接修 core truth |
 | report | `save_report` 保存 body-free finding/issue refs | report 保存 raw diagnostic、secret 或 remediation plan |
 | fake parity | fake missing lookup 返回 missing/degraded | fake 私有 map 拼 view/ref 让测试通过 |

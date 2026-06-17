@@ -3701,16 +3701,38 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
   |   if projection kind has a formal writer:
   |      if projection_ref.projection_kind == MemberSummary:
   |         rebuild_plan = projection_repo.get_member_summary_rebuild_plan(projection_ref)
-  |         if rebuild_plan missing or rebuild_plan.visibility_scope_refs empty:
-  |            issue_ref = maintenance_issue_mapper.projection_missing_rebuild_scope_issue(projection_ref)
+  |         if rebuild_plan missing or rebuild_plan.view_inputs empty:
+  |            issue_ref = maintenance_issue_mapper.projection_missing_rebuild_input_issue(projection_ref)
+  |            mark_rebuild_failed(issue_ref,...)
+  |            save_projection_state(... loaded/reloaded version)
+  |            failed_projection_refs += projection_ref
+  |            issue_refs += issue_ref
+  |            continue
+  |         if rebuild_plan.projection_ref != projection_ref:
+  |            issue_ref = maintenance_issue_mapper.projection_missing_rebuild_input_issue(projection_ref)
   |            mark_rebuild_failed(issue_ref,...)
   |            save_projection_state(... loaded/reloaded version)
   |            failed_projection_refs += projection_ref
   |            issue_refs += issue_ref
   |            continue
   |         rebuild body-free member summary projection material
-  |         for each visibility_scope_ref in rebuild_plan.visibility_scope_refs:
-  |            build MemberSummaryView { member_ref: rebuild_plan.member_ref, visibility_scope_ref, ... }
+  |         for each view_input in rebuild_plan.view_inputs:
+  |            assert view_input.member_ref == rebuild_plan.member_ref
+  |            build MemberSummaryView::from_projection(
+  |               view_input.view_ref,
+  |               view_input.member_ref,
+  |               view_input.visibility_scope_ref,
+  |               view_input.anchor_slice_ref,
+  |               view_input.lifecycle_slice_ref,
+  |               view_input.role_capability_slice_refs,
+  |               view_input.career_slice_refs,
+  |               view_input.memory_slice_refs,
+  |               view_input.visibility_result_ref,
+  |               view_input.read_surface_kind,
+  |               view_input.source_cursor_ref,
+  |               view_input.projection_freshness_ref,
+  |               view_input.read_material_marker
+  |            )
   |            save_member_summary_view(...) for MemberSummaryView only
   |      else:
   |         issue_ref = maintenance_issue_mapper.projection_unsupported_writer_issue(projection_ref)
@@ -3744,12 +3766,12 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
 |---|---|
 | no target | `Noop` report;no projection write;stored report still saved for replay |
 | unsupported projection writer | failed item + `MaintenanceIssueRef`;do not invent `save_*_view` port |
-| member summary rebuild scopes | `get_member_summary_rebuild_plan(projection_ref)` is the only formal source for member ref and `visibility_scope_ref[]`;missing/empty plan is failed item with safe issue |
+| member summary rebuild inputs | `get_member_summary_rebuild_plan(projection_ref)` is the only formal source for member ref and complete `MemberSummaryProjectionRebuildViewInput[]`;missing/empty/mismatched plan is failed item with safe issue |
 | source cursor missing | failed item;do not substitute page cursor/job cursor/timestamp/version |
 | partial rebuild | `Partial` with rebuilt + failed refs and non-empty issue refs |
 | all failed retryable dependency | `RetryableFailed` only when issue kind indicates unavailable/retryable per Step 12;otherwise `Failed` / `Partial` |
 
-当前 Step 7 only exposes `save_member_summary_view(...)` as projection body writer and `get_member_summary_rebuild_plan(...)` as the formal projection target plan. Therefore this flow may rebuild `MemberSummaryView` only through that writer and only for scopes returned by the plan. Other projection kinds require a formal writer/catalog closure before implementation may persist their view body;until then they can be reported as failed/unsupported maintenance items,not silently marked rebuilt.
+当前 Step 7 only exposes `save_member_summary_view(...)` as projection body writer and `get_member_summary_rebuild_plan(...)` as the formal projection target plan. Therefore this flow may rebuild `MemberSummaryView` only through that writer and only from `MemberSummaryProjectionRebuildViewInput` entries returned by the plan. Other projection kinds require a formal writer/catalog closure before implementation may persist their view body;until then they can be reported as failed/unsupported maintenance items,not silently marked rebuilt.
 
 ### 20.4 `RefreshExternalReferenceStateFlow`
 
@@ -4082,7 +4104,7 @@ Step 10/12 may refine public disposition priority, but it must preserve the inva
 ```text
 Operations job 统一从 `IdentityJobRequest<T>` 进入 application facade,由 application job service 创建 operation context、计算 request digest、开启 UoW、reserve idempotency。same key / same digest duplicate 必须读取 `StoredIdentityOperationResult(JobReport)` 和 `IdentityJobRunReport` replay,不得重跑 rebuild、refresh、reconciliation、publish、handoff 或 retry body。first run 完成后必须保存 replayable job report item refs、保存 stored job result、complete idempotency 并提交事务。
 
-`RebuildIdentityProjectionFlow` 通过 explicit projection refs 或 maintenance scope expansion 选择 projection target,加载 `ProjectionState` 与 version,经 `ReconciliationPolicy::for_projection_rebuild(...)` 断言 no truth repair 后标记 rebuild pending。当前正式 projection body writer 只覆盖 member summary:flow 必须调用 `get_member_summary_rebuild_plan(projection_ref)` 取得 `member_ref` 与 non-empty `visibility_scope_ref[]`,再对每个 scope 通过 `save_member_summary_view(...)` 保存 body-free view。缺 writer、缺 rebuild plan / scope、缺 source cursor 或 rebuild failure 只能进入 failed item/report issue,不得私造 view writer、从 projection/view/config/fake map 推 scope、用 timestamp/page cursor/version 代替 cursor,也不得修改 core truth。
+`RebuildIdentityProjectionFlow` 通过 explicit projection refs 或 maintenance scope expansion 选择 projection target,加载 `ProjectionState` 与 version,经 `ReconciliationPolicy::for_projection_rebuild(...)` 断言 no truth repair 后标记 rebuild pending。当前正式 projection body writer 只覆盖 member summary:flow 必须调用 `get_member_summary_rebuild_plan(projection_ref)` 取得 non-empty `MemberSummaryProjectionRebuildViewInput[]`,每项已经携带 `MemberSummaryView::from_projection(...)` 所需 view ref、member ref、visibility scope、safe slices、visibility result、read surface、source cursor、freshness marker 和 material marker,再通过 `save_member_summary_view(...)` 保存 body-free view。缺 writer、缺 rebuild plan / input、缺 source cursor 或 rebuild failure 只能进入 failed item/report issue,不得私造 view writer、从 projection/scope/view/config/fake map 推 scope或 view 体字段、用 timestamp/page cursor/version 代替 cursor,也不得修改 core truth。
 
 `RefreshExternalReferenceStateFlow` 通过 explicit refs、stale-in-scope、owner 或 kind 选择 `ExternalReferenceRef` bundle,先加载 `ReferenceResolutionState` 与 version,再调用 `IdentityExternalReferenceResolverPort.resolve_external_reference(reference_ref, owner_ref)`。Resolver 必须返回 `ExternalReferenceResolutionOutcome { state, typed_sidecar_refs }`;保存 returned state 和 optional typed sidecar refs 时必须使用同一 bundle 的 loaded version,不得把 source version 或 business source ref 当 expected_version / bundle key,也不得从 returned state、safe summary、source version 或 error 文本反推 sidecar。Unavailable、unrecognized、refresh failed 必须显式进入 failed refs 与 safe issue marker。
 

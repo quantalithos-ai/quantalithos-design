@@ -611,7 +611,7 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 |---|---|---|---|---|
 | rebuild projection | duplicate replay available | job idempotency reserve | no rebuild/list | replay stored report |
 | rebuild projection | projection state/view missing | projection repository load/lookup | save failed/partial job report if application job reached | no query-side rebuild;no truth repair |
-| rebuild projection | member summary rebuild plan missing or empty scopes | `get_member_summary_rebuild_plan(projection_ref)` | save failed item/report issue | no default visibility scope;no projection/view/config/fake-map scope derivation |
+| rebuild projection | member summary rebuild plan missing, target-mismatched, or empty view inputs | `get_member_summary_rebuild_plan(projection_ref)` | save failed item/report issue | no default visibility scope;no projection/scope/view/config/fake-map slice/visibility/freshness/material derivation |
 | rebuild projection | source cursor missing/stale | projection cursor/source read | save failed item/report | no cursor fabrication from timestamp/page |
 | rebuild projection | writer unsupported | projection writer/mapper | save failed item/report | no private writer |
 | refresh reference | reference state missing | reference repository list/load | save failed reference item/report | no create bundle unless Step 9 target says so |

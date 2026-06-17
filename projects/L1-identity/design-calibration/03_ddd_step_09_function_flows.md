@@ -3699,10 +3699,26 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
   |   mark_rebuild_pending(...)
   |   save_projection_state(... expected_version)
   |   if projection kind has a formal writer:
-  |      rebuild body-free projection material
-  |      for each formal member summary visibility scope selected by the projection target:
-  |         build MemberSummaryView { member_ref, visibility_scope_ref, ... }
-  |         save_member_summary_view(...) for MemberSummaryView only
+  |      if projection_ref.projection_kind == MemberSummary:
+  |         rebuild_plan = projection_repo.get_member_summary_rebuild_plan(projection_ref)
+  |         if rebuild_plan missing or rebuild_plan.visibility_scope_refs empty:
+  |            issue_ref = maintenance_issue_mapper.projection_missing_rebuild_scope_issue(projection_ref)
+  |            mark_rebuild_failed(issue_ref,...)
+  |            save_projection_state(... loaded/reloaded version)
+  |            failed_projection_refs += projection_ref
+  |            issue_refs += issue_ref
+  |            continue
+  |         rebuild body-free member summary projection material
+  |         for each visibility_scope_ref in rebuild_plan.visibility_scope_refs:
+  |            build MemberSummaryView { member_ref: rebuild_plan.member_ref, visibility_scope_ref, ... }
+  |            save_member_summary_view(...) for MemberSummaryView only
+  |      else:
+  |         issue_ref = maintenance_issue_mapper.projection_unsupported_writer_issue(projection_ref)
+  |         mark_rebuild_failed(issue_ref,...)
+  |         save_projection_state(... loaded/reloaded version)
+  |         failed_projection_refs += projection_ref
+  |         issue_refs += issue_ref
+  |         continue
   |   else:
   |      issue_ref = maintenance_issue_mapper.projection_unsupported_writer_issue(projection_ref)
   |      mark_rebuild_failed(issue_ref,...)
@@ -3728,11 +3744,12 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
 |---|---|
 | no target | `Noop` report;no projection write;stored report still saved for replay |
 | unsupported projection writer | failed item + `MaintenanceIssueRef`;do not invent `save_*_view` port |
+| member summary rebuild scopes | `get_member_summary_rebuild_plan(projection_ref)` is the only formal source for member ref and `visibility_scope_ref[]`;missing/empty plan is failed item with safe issue |
 | source cursor missing | failed item;do not substitute page cursor/job cursor/timestamp/version |
 | partial rebuild | `Partial` with rebuilt + failed refs and non-empty issue refs |
 | all failed retryable dependency | `RetryableFailed` only when issue kind indicates unavailable/retryable per Step 12;otherwise `Failed` / `Partial` |
 
-当前 Step 7 only exposes `save_member_summary_view(...)` as projection body writer. Therefore this flow may rebuild `MemberSummaryView` only through that writer. Other projection kinds require a formal writer/catalog closure before implementation may persist their view body;until then they can be reported as failed/unsupported maintenance items,not silently marked rebuilt.
+当前 Step 7 only exposes `save_member_summary_view(...)` as projection body writer and `get_member_summary_rebuild_plan(...)` as the formal projection target plan. Therefore this flow may rebuild `MemberSummaryView` only through that writer and only for scopes returned by the plan. Other projection kinds require a formal writer/catalog closure before implementation may persist their view body;until then they can be reported as failed/unsupported maintenance items,not silently marked rebuilt.
 
 ### 20.4 `RefreshExternalReferenceStateFlow`
 
@@ -3764,15 +3781,15 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
   |   assert_body_free(...)
   |   assert_not_cross_repo_repair(...)
   |   call resolve_external_reference(external_reference_ref, loaded.reference_owner_ref)
-  |   if resolver returns resolved/stale/unavailable/unrecognized state:
-  |      save_reference_state(returned_state, loaded.version, uow)
-  |      if returned state has typed sidecar refs:
+  |   if resolver returns ExternalReferenceResolutionOutcome:
+  |      save_reference_state(outcome.state, loaded.version, uow)
+  |      if outcome.typed_sidecar_refs is Some(sidecar_refs):
   |         save_typed_sidecar_refs(external_reference_ref, sidecar_refs, loaded.version, uow)
-  |      if state is usable/resolved:
+  |      if outcome.state is usable/resolved:
   |         refreshed_reference_refs += external_reference_ref
   |      else:
   |         failed_reference_refs += external_reference_ref
-  |         issue_refs += returned_state.issue_ref
+  |         issue_refs += outcome.state.issue_ref
   |   if resolver returns ApplicationError without safe issue marker:
   |      issue_ref = maintenance_issue_mapper.reference_refresh_failed_issue(external_reference_ref)
   |      mark_refresh_failed(issue_ref, now)
@@ -3792,6 +3809,7 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
 | version source | `save_reference_state` and `save_typed_sidecar_refs` use the loaded bundle `IdentityVersion`;never use source version |
 | owner source | resolver owner is `loaded.reference_owner_ref`;do not infer owner from external ref string |
 | sidecar scope | sidecar refs attach to the same `ExternalReferenceRef` bundle;no cross-bundle version reuse |
+| resolver output | typed sidecar refs only come from `ExternalReferenceResolutionOutcome.typed_sidecar_refs`;service must not derive sidecars from returned state,source version,safe summary or error text |
 | unavailable/unrecognized | visible failed item with issue ref;do not create default safe summary |
 | resolver ApplicationError | mapped through `reference_refresh_failed_issue(...)`;raw error body is not stored or parsed |
 | external body | resolver may return safe refs/state only;external truth body never enters report or state |
@@ -3819,8 +3837,14 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
   |   assert_report_only(maintenance_scope_ref, target_ref)
   |   assert_not_truth_write(...)
   |   assert_not_cross_repo_repair(...)
-  |   collect inspected_target_refs
-  |   derive finding refs / issue refs only from formal body-free material and loaded maintenance state
+  |   inspection = maintenance_repo.load_maintenance_target_inspection_context(target_ref)
+  |   if inspection missing:
+  |      issue_ref = maintenance_issue_mapper.maintenance_target_missing_issue(target_ref)
+  |      inspected_target_refs += target_ref
+  |      issue_refs += issue_ref
+  |      continue
+  |   collect inspected_target_refs += inspection.target_ref
+  |   derive finding refs / issue refs only from formal body-free material and inspection.loaded_target
   | if no targets:
   |   create no-op/no_finding report with empty target refs
   | else if findings/issues present:
@@ -3836,6 +3860,7 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
 |---|---|
 | forbidden finding material | rejected/failed job surface per Step 12;do not save raw material |
 | partial expansion | `Partial` report with issue refs;do not hide missing targets |
+| target inspection | `load_maintenance_target_inspection_context(target_ref)` is the only formal source of typed projection/reference/report loaded state;service/fake must not decode `target_ref.target_ref` |
 | finding detected | save report-only finding refs;do not emit repair command |
 | no finding | `Noop` or `Succeeded` with no-finding report per Step 10 result matrix |
 
@@ -4057,11 +4082,11 @@ Step 10/12 may refine public disposition priority, but it must preserve the inva
 ```text
 Operations job 统一从 `IdentityJobRequest<T>` 进入 application facade,由 application job service 创建 operation context、计算 request digest、开启 UoW、reserve idempotency。same key / same digest duplicate 必须读取 `StoredIdentityOperationResult(JobReport)` 和 `IdentityJobRunReport` replay,不得重跑 rebuild、refresh、reconciliation、publish、handoff 或 retry body。first run 完成后必须保存 replayable job report item refs、保存 stored job result、complete idempotency 并提交事务。
 
-`RebuildIdentityProjectionFlow` 通过 explicit projection refs 或 maintenance scope expansion 选择 projection target,加载 `ProjectionState` 与 version,经 `ReconciliationPolicy::for_projection_rebuild(...)` 断言 no truth repair 后标记 rebuild pending,使用正式 projection writer 更新已有 body-free projection material,再通过 `get_projection_source_cursor(...)` 取得 projection source cursor 并 `mark_rebuilt(...)`。缺 writer、缺 source cursor 或 rebuild failure 只能进入 failed item/report issue,不得私造 view writer、用 timestamp/page cursor/version 代替 cursor,也不得修改 core truth。
+`RebuildIdentityProjectionFlow` 通过 explicit projection refs 或 maintenance scope expansion 选择 projection target,加载 `ProjectionState` 与 version,经 `ReconciliationPolicy::for_projection_rebuild(...)` 断言 no truth repair 后标记 rebuild pending。当前正式 projection body writer 只覆盖 member summary:flow 必须调用 `get_member_summary_rebuild_plan(projection_ref)` 取得 `member_ref` 与 non-empty `visibility_scope_ref[]`,再对每个 scope 通过 `save_member_summary_view(...)` 保存 body-free view。缺 writer、缺 rebuild plan / scope、缺 source cursor 或 rebuild failure 只能进入 failed item/report issue,不得私造 view writer、从 projection/view/config/fake map 推 scope、用 timestamp/page cursor/version 代替 cursor,也不得修改 core truth。
 
-`RefreshExternalReferenceStateFlow` 通过 explicit refs、stale-in-scope、owner 或 kind 选择 `ExternalReferenceRef` bundle,先加载 `ReferenceResolutionState` 与 version,再调用 `IdentityExternalReferenceResolverPort.resolve_external_reference(reference_ref, owner_ref)`。保存 returned state 和 typed sidecar refs 时必须使用同一 bundle 的 loaded version,不得把 source version 或 business source ref 当 expected_version / bundle key。Unavailable、unrecognized、refresh failed 必须显式进入 failed refs 与 safe issue marker。
+`RefreshExternalReferenceStateFlow` 通过 explicit refs、stale-in-scope、owner 或 kind 选择 `ExternalReferenceRef` bundle,先加载 `ReferenceResolutionState` 与 version,再调用 `IdentityExternalReferenceResolverPort.resolve_external_reference(reference_ref, owner_ref)`。Resolver 必须返回 `ExternalReferenceResolutionOutcome { state, typed_sidecar_refs }`;保存 returned state 和 optional typed sidecar refs 时必须使用同一 bundle 的 loaded version,不得把 source version 或 business source ref 当 expected_version / bundle key,也不得从 returned state、safe summary、source version 或 error 文本反推 sidecar。Unavailable、unrecognized、refresh failed 必须显式进入 failed refs 与 safe issue marker。
 
-`RunIdentityReconciliationFlow` 只生成 report-only material。flow 通过 explicit target 或 maintenance expansion 获取 target refs,使用 `ReconciliationPolicy::for_reconciliation(...)`、`assert_report_only(...)`、`assert_not_truth_write(...)` 和 `assert_not_cross_repo_repair(...)` 保证 finding 不变成 repair action,最后保存 `ReconciliationReport::generated(...)` 或 `no_finding(...)` / `failed(...)`。
+`RunIdentityReconciliationFlow` 只生成 report-only material。flow 通过 explicit target 或 maintenance expansion 获取 target refs 后,必须调用 `load_maintenance_target_inspection_context(target_ref)` 取得 typed loaded projection/reference/report state context,再使用 `ReconciliationPolicy::for_reconciliation(...)`、`assert_report_only(...)`、`assert_not_truth_write(...)` 和 `assert_not_cross_repo_repair(...)` 保证 finding 不变成 repair action。Finding / issue refs 只能来自 safe finding material 与 `inspection.loaded_target`,最后保存 `ReconciliationReport::generated(...)` 或 `no_finding(...)` / `failed(...)`;service/fake 不得解析 opaque target marker 或扫描 sibling store。
 
 `PublishIdentityOutboxFlow` 只读取 saved pending outbox record、topic binding 和 payload marker,不得读取 current truth 重构 event。Publisher outcome 更新 `OutboxState`:Published 带 attempt marker;retryable/permanent/skipped/unsupported failure 保存 `OutboxDeliveryIssueRef`,并通过 `IdentityMaintenanceIssueMapper` 写入 job report `MaintenanceIssueRef`。Publish success/failure 均不回滚 accepted truth;Published 不等于 downstream consumed。
 

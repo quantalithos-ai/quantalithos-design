@@ -716,6 +716,11 @@ pub trait IdentityMaintenanceIssueMapper {
         projection_ref: IdentityProjectionRef,
     ) -> MaintenanceIssueRef;
 
+    fn projection_missing_rebuild_scope_issue(
+        &self,
+        projection_ref: IdentityProjectionRef,
+    ) -> MaintenanceIssueRef;
+
     fn reference_missing_state_issue(
         &self,
         reference_ref: ExternalReferenceRef,
@@ -724,6 +729,11 @@ pub trait IdentityMaintenanceIssueMapper {
     fn reference_refresh_failed_issue(
         &self,
         reference_ref: ExternalReferenceRef,
+    ) -> MaintenanceIssueRef;
+
+    fn maintenance_target_missing_issue(
+        &self,
+        target_ref: IdentityMaintenanceTargetRef,
     ) -> MaintenanceIssueRef;
 
     fn outbox_retryable_issue(
@@ -773,8 +783,10 @@ pub trait IdentityMaintenanceIssueMapper {
 | `projection_missing_state_issue(...)` | `Unrecognized` | `IdentityProjectionRef.projection_ref` |
 | `projection_missing_cursor_issue(...)` | `Stale` | `IdentityProjectionRef.projection_ref` |
 | `projection_unsupported_writer_issue(...)` | `Failed` | `IdentityProjectionRef.projection_ref` |
+| `projection_missing_rebuild_scope_issue(...)` | `Partial` | `IdentityProjectionRef.projection_ref` |
 | `reference_missing_state_issue(...)` | `Unrecognized` | `ExternalReferenceRef.source_ref` |
 | `reference_refresh_failed_issue(...)` | `Failed` | `ExternalReferenceRef.source_ref` |
+| `maintenance_target_missing_issue(...)` | `Unrecognized` | `IdentityMaintenanceTargetRef.target_ref` |
 | `outbox_retryable_issue(...)` | `Unavailable` | `OutboxDeliveryIssueRef.issue_ref` |
 | `outbox_permanent_issue(...)` | `Failed` | `OutboxDeliveryIssueRef.issue_ref` |
 | `outbox_skipped_issue(...)` | `Failed` | `OutboxDeliveryIssueRef.issue_ref` |
@@ -1800,10 +1812,10 @@ pub trait TraceHandoffIntentRepository {
 
 | repository / read family | 必须支撑 | 调用方 | 实现方 | Step 6 来源 | 后续承接 |
 |---|---|---|---|---|---|
-| projection lookup/read/state | stable member summary view lookup、projection state versioned read/save、stale mark、affected target expansion | accepted command services、query service、rebuild job service | infra projection repo / fake | §6.3 `MemberSummaryView`;§6.4 `ProjectionState`;§6.8 view lookup | Step 9 query/rebuild;Step 11 lookup/index |
+| projection lookup/read/state | stable member summary view lookup、projection state versioned read/save、member summary rebuild plan、stale mark、affected target expansion | accepted command services、query service、rebuild job service | infra projection repo / fake | §6.3 `MemberSummaryView`;§6.4 `ProjectionState`;§6.8 view lookup | Step 9 query/rebuild;Step 11 lookup/index |
 | read visibility resolution | request/view/report -> read subject + scope + access summary、visibility decision optional save/read | query service、handoff/report read service | infra read resolver/read store / fake | §6.3 `VisibilityPolicy`;§6.8 read subject/scope | Step 8 query DTO;Step 9 query precheck;Step 12 not visible/degraded |
 | reference state and typed sidecar | external reference bundle versioned read/save、owner lookup、typed sidecar read/save using same bundle version | consumer/reference refresh/job services | infra reference repo / fake | §6.4 `ReferenceResolutionState`;§6.8 external ref boundary | Step 9 consumer/refresh;Step 11 expected_version |
-| maintenance expansion | maintenance scope -> projection/reference/report target refs、pending rebuild/refresh scans | job services、reconciliation service | infra maintenance repo / fake | §6.4 `MaintenanceScopeRef`,`IdentityMaintenanceTargetRef` | Step 9 maintenance jobs;Step 14 config binding |
+| maintenance expansion / inspection | maintenance scope -> projection/reference/report target refs、pending rebuild/refresh scans、target marker -> typed loaded state context | job services、reconciliation service | infra maintenance repo / fake | §6.4 `MaintenanceScopeRef`,`IdentityMaintenanceTargetRef`,`IdentityMaintenanceInspectionContext` | Step 9 maintenance jobs;Step 14 config binding |
 | reconciliation report | report versioned read/save、list by scope/target/state、finding issue lookup | reconciliation job/query service | infra report repo / fake | §6.4 `ReconciliationReport` | Step 8 report DTO;Step 9 reconciliation;Step 11 report table |
 
 #### 7.11.2 projection/read/reference/report 通用 contract 规则
@@ -1816,7 +1828,7 @@ pub trait TraceHandoffIntentRepository {
 | reference bundle key | reference state 和 typed sidecar save 的 expected_version 以同一 `ExternalReferenceRef` bundle 的 versioned read 为来源 |
 | source version separated | `ExternalSourceVersionRef` 只表达外部源版本;不得当 `IdentityVersion` expected_version |
 | typed sidecar | role/work/memory/governance/evidence safe sidecar 只保存 refs/summary markers,不保存 external body |
-| maintenance report-only | maintenance expansion 只能返回 projection/reference/report target;不得返回 core truth write target |
+| maintenance report-only | maintenance expansion 只能返回 projection/reference/report target;target inspection 必须返回 typed loaded maintenance context;不得返回 core truth write target |
 | UoW | projection/reference/report save/update 接收 `uow: &dyn IdentityUnitOfWork`;read/list/lookup 不接 UoW |
 | fake parity | fake 与 durable 必须使用同一 lookup/index/version/missing/degraded 语义;fake 不得私下扫描 body 或拼 view/ref |
 
@@ -1862,6 +1874,11 @@ pub trait IdentityProjectionRepository {
         projection_ref: IdentityProjectionRef,
     ) -> Result<Option<IdentityProjectionCursorRef>, ApplicationError>;
 
+    async fn get_member_summary_rebuild_plan(
+        &self,
+        projection_ref: IdentityProjectionRef,
+    ) -> Result<Option<MemberSummaryProjectionRebuildPlan>, ApplicationError>;
+
     async fn expand_affected_projection_refs(
         &self,
         subject_refs: IdentityAcceptedSubjectRefs,
@@ -1900,6 +1917,7 @@ pub trait IdentityProjectionRepository {
 | `list_projection_states` | maintenance scan | page cursor 只分页 | 不全表 repair truth |
 | `list_stale_projection_states` | rebuild job selection | stale 判定来自 `ProjectionState` | 不在 query path 调用来 rebuild |
 | `get_projection_source_cursor` | rebuild job before `mark_rebuilt(...)` | cursor 来自 projection builder / committed truth scan / projection source cursor store | 不用 page cursor、timestamp、truth cursor、job cursor 或 optimistic version 代替 |
+| `get_member_summary_rebuild_plan` | rebuild member summary projection body | projection catalog returns member ref and formal visibility scopes for this target | 不从 projection ref、view ref、config string、first existing view 或 fake private map 推 visibility scope |
 | `expand_affected_projection_refs` | accepted side effect mark stale | subject refs 来自 7.1 mapper | 不从 subject string 前缀推 affected views |
 | `save_member_summary_view` | projection builder/rebuild job save view | create `None`;update loaded version;writes current `(view.member_ref, view.visibility_scope_ref) -> view.view_ref` lookup index | view 必须携带 `visibility_scope_ref`;不保存 forbidden body;不得保存无 scope 的 current view |
 | `save_projection_state` | create/update projection state | create `None`;update loaded version | 不修改 core truth |
@@ -2113,6 +2131,12 @@ pub struct ExternalReferenceTypedSidecarRefs {
     pub evidence_summary_ref: Option<ExternalReferenceSafeSummaryRef>,
     pub source_version_ref: Option<ExternalSourceVersionRef>,
 }
+
+/// Safe resolver output for one ExternalReferenceRef bundle.
+pub struct ExternalReferenceResolutionOutcome {
+    pub state: ReferenceResolutionState,
+    pub typed_sidecar_refs: Option<ExternalReferenceTypedSidecarRefs>,
+}
 ```
 
 | 函数 | 使用场景 | reference / version 语义 | 禁止事项 |
@@ -2125,6 +2149,7 @@ pub struct ExternalReferenceTypedSidecarRefs {
 | `get_typed_sidecar_refs` | loaded reference query/report | sidecar refs 都属于同一 reference bundle | 不保存 external body |
 | `save_reference_state` | create/update resolution state | create `None`;update loaded version | 不修复 external truth |
 | `save_typed_sidecar_refs` | consumer/refresh save safe sidecars | must pass same `reference_ref` and loaded bundle version | 不把 business source ref 当 bundle key;不跨 bundle 共用 version |
+| `ExternalReferenceResolutionOutcome` | resolver output copied by refresh job | `state.external_reference_ref` must equal requested bundle;sidecar refs attach to the same bundle and are optional | service 不从 returned state、safe summary、source version 或 adapter diagnostic 反推 sidecar |
 
 #### 7.11.6 `IdentityMaintenanceRepository`
 
@@ -2153,6 +2178,11 @@ pub trait IdentityMaintenanceRepository {
         maintenance_scope_ref: MaintenanceScopeRef,
         page: IdentityRepositoryPage,
     ) -> Result<Page<IdentityMaintenanceTargetRef>, ApplicationError>;
+
+    async fn load_maintenance_target_inspection_context(
+        &self,
+        target_ref: IdentityMaintenanceTargetRef,
+    ) -> Result<Option<IdentityMaintenanceInspectionContext>, ApplicationError>;
 }
 ```
 
@@ -2162,6 +2192,7 @@ pub trait IdentityMaintenanceRepository {
 | `list_projection_targets_for_rebuild` | rebuild job | projection refs 来自 formal index/catalog | 不从 scope string 拼 projection ref |
 | `list_reference_targets_for_refresh` | reference refresh job | external reference refs 来自 formal reference state/index | 不从 business source ref 自动转换 |
 | `list_report_targets` | report job | report targets 是 body-free maintenance markers | 不执行 repair/remediation |
+| `load_maintenance_target_inspection_context` | reconciliation target inspection | target marker -> typed loaded projection/reference/report state context | 不解析 `target_ref.target_ref`;不扫描 sibling stores;missing target must become safe issue |
 
 #### 7.11.7 `IdentityReconciliationReportRepository`
 
@@ -2236,7 +2267,7 @@ pub trait IdentityReconciliationReportRepository {
 | stable view lookup 是否闭合 | 通过 | `find_member_summary_view_ref` 是 query 获取 view ref 的正式读取面 |
 | read subject/scope/redaction marker 是否闭合 | 通过 | visibility repository 返回带 `read_subject_ref` / `scope_ref` / `visibility_result_ref` / `redaction_marker_ref` 的 prepared access summary,service 不从 route/string/profile/result 推断 |
 | typed sidecar expected_version 是否闭合 | 通过 | sidecar save 显式接收 `ExternalReferenceRef` 和同 bundle `IdentityVersion` |
-| maintenance 是否保持 report-only | 通过 | expansion 只返回 projection/reference/report target |
+| maintenance 是否保持 report-only | 通过 | expansion 只返回 projection/reference/report target;inspection 只返回 typed loaded maintenance context |
 | query no-write 是否保持 | 通过 | missing/stale/degraded 不触发 rebuild/refresh/repair |
 | fake/durable parity 是否覆盖 | 通过 | §7.11.8 固定 lookup/index/version/missing/degraded 等价 |
 | 是否修改正式 `03` | 未修改 | 正式 `03` 仍等 Step 19 装配 |
@@ -2253,7 +2284,8 @@ pub trait IdentityReconciliationReportRepository {
 | not visible | not visible 是 visibility surface | 返回 not found 并泄漏 diagnostic |
 | reference version | `get_reference_state_with_version(reference_ref)` 后保存 sidecar | 用 `ExternalSourceVersionRef` 当 `IdentityVersion` |
 | sidecar bundle | sidecar save 显式传同一个 `ExternalReferenceRef` | `IdentitySourceRef` 自动等于 reference bundle key |
-| maintenance expansion | scope expansion 返回 maintenance targets | job 全表扫描并直接修 core truth |
+| member summary rebuild plan | `get_member_summary_rebuild_plan(projection_ref)` 返回 member ref 与 visibility scopes | rebuild 从 projection ref、view ref 或 fake map 推 scope |
+| maintenance expansion / inspection | scope expansion 返回 maintenance targets,inspection port 返回 typed loaded target context | job 全表扫描、解析 target marker 或直接修 core truth |
 | report | `save_report` 保存 body-free finding/issue refs | report 保存 raw diagnostic、secret 或 remediation plan |
 | fake parity | fake missing lookup 返回 missing/degraded | fake 私有 map 拼 view/ref 让测试通过 |
 
@@ -2831,7 +2863,7 @@ pub trait IdentityExternalReferenceResolverPort {
         &self,
         reference_ref: ExternalReferenceRef,
         owner_ref: IdentityReferenceOwnerRef,
-    ) -> Result<ReferenceResolutionState, ApplicationError>;
+    ) -> Result<ExternalReferenceResolutionOutcome, ApplicationError>;
 
     async fn map_role_capability_owner(
         &self,
@@ -2858,7 +2890,7 @@ pub trait IdentityExternalReferenceResolverPort {
 
 | 函数 | 使用场景 | reference / owner 语义 | 禁止事项 |
 |---|---|---|---|
-| `resolve_external_reference` | reference refresh/consumer | external ref bundle + local owner => resolution state | business source ref 自动等于 bundle key |
+| `resolve_external_reference` | reference refresh/consumer | external ref bundle + local owner => resolution state plus optional typed sidecar refs | business source ref 自动等于 bundle key;不从 returned state、safe summary、source version 或 error 文本反推 sidecar |
 | `map_role_capability_owner` | typed sidecar owner mapping | owner ref from local summary ref | 从 external source string 推 owner |
 | `map_career_owner` | career source reference | owner ref from career record ref | 用 work id 当 local owner |
 | `map_memory_owner` | memory/archive reference | owner ref from memory relation ref | 用 memory/archive external id 当 local owner |

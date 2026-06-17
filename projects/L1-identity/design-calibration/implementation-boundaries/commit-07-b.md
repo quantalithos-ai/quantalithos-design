@@ -5,7 +5,7 @@
 | project | L1-identity |
 | boundary_id | commit-07-b |
 | phase | PH-07 Operations job / propagation / maintenance slices |
-| design_baseline | `current-design-with-commit-07-b-ledger` |
+| design_baseline | `current-design-with-commit-07-b-maintenance-job-port-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
 | status | ready |
 | next_allowed_action | read_docs |
@@ -122,6 +122,7 @@
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
 | BLK-ID-07B-LEDGER-001 | design_gate | resolved | Project ledger still pointed to `commit-07-a` and `implementation-boundaries/commit-07-b.md` was missing, so implementation agent could not start the maintenance job family boundary. | Project ledger now advances to `commit-07-b`; this boundary ledger defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. | read_docs |
+| BLK-ID-07B-MAINTENANCE-JOB-PORTS-001 | design_gate | resolved | Projection rebuild lacked formal member-summary scope source; reference refresh resolver returned only `ReferenceResolutionState`; reconciliation target inspection lacked target marker -> typed loaded state context. Implementation could only parse opaque refs, infer sidecars or use fake-only scans. | Step 6/7/9/11/12/13 now define `MemberSummaryProjectionRebuildPlan`, `ExternalReferenceResolutionOutcome`, `IdentityMaintenanceInspectionContext`, `get_member_summary_rebuild_plan(...)`, `load_maintenance_target_inspection_context(...)`, resolver outcome return type and issue mapper methods. Service/fake must copy formal outputs only. | read_docs |
 
 ---
 
@@ -130,3 +131,4 @@
 | item | conclusion | action |
 |---|---|---|
 | BLK-ID-07B-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` already requires design-side next-boundary advancement after implementation handoff. This fix applies it to `commit-07-b` and records that the previous handoff did not supply an exact implementation commit hash. |
+| BLK-ID-07B-MAINTENANCE-JOB-PORTS-001 | reusable experience required | Added `MEM-ID-013` to `projects/L1-identity/07-实施计划.md` and updated `standards/document/设计真相源闭环与可落码性标准.md` with maintenance job plan / resolver outcome / target inspection positive/negative examples and pre-boundary checklist. Implementation agent must check this before adding or changing rebuild/refresh/reconciliation maintenance jobs. |

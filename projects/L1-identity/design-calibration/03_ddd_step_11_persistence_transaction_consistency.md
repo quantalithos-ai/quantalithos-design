@@ -325,6 +325,7 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | `IdentityProjectionRepository.list_projection_states` | projection state page index | page cursor only | job/report scan;不修复 truth |
 | `IdentityProjectionRepository.list_stale_projection_states` | maintenance scope + stale index | page cursor only | rebuild job selection;query 不调用 rebuild |
 | `IdentityProjectionRepository.get_projection_source_cursor` | projection source cursor store | read-only | cursor 来自 projection builder/committed scan;不等于 page cursor/version |
+| `IdentityProjectionRepository.get_member_summary_rebuild_plan` | member summary projection catalog/index | read-only | returns member ref plus non-empty visibility scopes selected by projection catalog;不从 projection/view/config string 或 fake map 推 scope |
 | `IdentityProjectionRepository.expand_affected_projection_refs` | `projection_dependency_index` by accepted subject refs | read-only | subject refs 来自 mapper;不解析 subject string |
 | `IdentityProjectionRepository.save_member_summary_view` | `member_summary_views` PK + current `(member_ref, visibility_scope_ref)` index | create `None`;update loaded view/projection version;UoW write | projection builder only;view 必须携带 `visibility_scope_ref`;保存时同步写 lookup index;不保存 forbidden body |
 | `IdentityProjectionRepository.save_projection_state` | `identity_projection_states` PK | create `None`;update loaded state version;UoW write | 不修改 core truth |
@@ -352,6 +353,7 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | `IdentityMaintenanceRepository.list_projection_targets_for_rebuild` | scope -> projection target index | read-only page | 不从 scope string 拼 projection ref |
 | `IdentityMaintenanceRepository.list_reference_targets_for_refresh` | scope -> external reference target index | read-only page | 不把 business source ref 自动转 bundle ref |
 | `IdentityMaintenanceRepository.list_report_targets` | scope -> report target index | read-only page | 不执行 repair/remediation |
+| `IdentityMaintenanceRepository.load_maintenance_target_inspection_context` | maintenance target -> typed projection/reference/report state context index | read-only | returns body-free loaded target context;不得解析 opaque target marker 或扫描 sibling stores |
 | `IdentityReconciliationReportRepository.get_report_with_version` | `identity_reconciliation_reports` by report ref | returns report version | read-only;不从 scope/time 拼 report ref |
 | `IdentityReconciliationReportRepository.list_reports_by_scope` | report scope index | page cursor only | scope 来自 request/job/config marker |
 | `IdentityReconciliationReportRepository.list_reports_by_target` | report target index | page cursor only | target 是 maintenance target;不返回 repair action |

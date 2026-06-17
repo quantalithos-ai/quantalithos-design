@@ -4280,6 +4280,7 @@ pub struct VisibilityPolicy {
 - `ExternalReferenceRef`、`ReferenceResolutionStateId` / `ReferenceResolutionStateRef`、`IdentityReferenceOwnerRef`、`ExternalSourceVersionRef`、`ExternalReferenceSafeSummaryRef` 和 `ReferenceResolutionState`。
 - `MaintenanceScopeRef`、`IdentityMaintenanceTargetRef`、`MaintenanceIssueRef`、`IdentityMaintenanceIntent`、`ReconciliationFindingIntentRef`、`ReconciliationFindingMaterial` 和 `ReconciliationPolicy`。
 - `ReconciliationReportId` / `ReconciliationReportRef`、`ReconciliationFindingRef`、`ReconciliationReportStateKind` 和 `ReconciliationReport`。
+- `MemberSummaryProjectionRebuildPlan`、`IdentityMaintenanceLoadedTarget` 和 `IdentityMaintenanceInspectionContext` 这类 Step 7 port 输出 helper shell,仅用于 maintenance job prepared context,不新增 truth。
 
 本批不定义:
 
@@ -4569,6 +4570,65 @@ pub struct ReconciliationFindingMaterial {
 | `IdentityMaintenanceIntent` | 维护意图分类 | `RepairIdentityTruth` / `RepairExternalTruth` 必须被 `ReconciliationPolicy` 拦截 |
 | `ReconciliationFindingIntentRef` | finding 意图 marker | 不等于 repair action 或执行计划 |
 | `ReconciliationFindingMaterial` | finding material 分类 | forbidden material 必须 rejected / failed report;不得入仓 |
+
+##### maintenance job prepared helper shells
+
+这些 helper shell 只作为 Step 7 port / resolver 的正式返回壳。它们不新增业务 truth,不保存 projection body / external body / raw diagnostic,也不替代 Step 11 persistence schema。实现侧只能复制这些 shell 中的 typed refs 和 safe issue/finding refs,不得从 `IdentityMaintenanceTargetRef.target_ref`、`IdentityProjectionRef.projection_ref`、external ref 字符串、fake private map 或 repository scan 反推。
+
+```rust
+/// Formal rebuild plan for the member summary projection writer.
+pub struct MemberSummaryProjectionRebuildPlan {
+    /// Projection target being rebuilt.
+    pub projection_ref: IdentityProjectionRef,
+    /// Member whose summary view is rebuilt.
+    pub member_ref: GlobalMemberRef,
+    /// Formal visibility scopes selected by the projection catalog for this target.
+    pub visibility_scope_refs: Vec<VisibilityScopeRef>,
+}
+
+/// Typed maintenance target loaded for report-only reconciliation inspection.
+pub enum IdentityMaintenanceLoadedTarget {
+    /// Loaded projection maintenance state.
+    Projection {
+        projection_ref: IdentityProjectionRef,
+        projection_state_ref: ProjectionStateRef,
+        state_kind: ProjectionStateKind,
+        source_cursor_ref: Option<IdentityProjectionCursorRef>,
+        issue_ref: Option<MaintenanceIssueRef>,
+    },
+    /// Loaded external reference resolution state.
+    ReferenceResolution {
+        external_reference_ref: ExternalReferenceRef,
+        resolution_state_ref: ReferenceResolutionStateRef,
+        state_kind: ReferenceResolutionStateKind,
+        source_version_ref: Option<ExternalSourceVersionRef>,
+        issue_ref: Option<MaintenanceIssueRef>,
+    },
+    /// Loaded reconciliation report state.
+    ReconciliationReport {
+        report_ref: ReconciliationReportRef,
+        report_state: ReconciliationReportStateKind,
+        finding_refs: Vec<ReconciliationFindingRef>,
+        issue_refs: Vec<MaintenanceIssueRef>,
+    },
+}
+
+/// Body-free inspection context for one maintenance target.
+pub struct IdentityMaintenanceInspectionContext {
+    /// Original target marker returned by formal maintenance expansion.
+    pub target_ref: IdentityMaintenanceTargetRef,
+    /// Typed loaded maintenance state for the target.
+    pub loaded_target: IdentityMaintenanceLoadedTarget,
+}
+```
+
+| helper shell | 来源 | 必填 / 非空规则 | 禁止替代 |
+|---|---|---|---|
+| `MemberSummaryProjectionRebuildPlan` | Step 7 projection repository/catalog method for member-summary projection rebuild | `visibility_scope_refs` must be non-empty when the member summary writer is selected;missing/empty plan is a maintenance issue,not a default scope | 不从 projection ref、member ref、view ref、config string 或 fake map 推 scope |
+| `IdentityMaintenanceLoadedTarget::Projection` | Step 7 maintenance inspection load over projection state | carries typed `IdentityProjectionRef` and `ProjectionStateRef`;issue is optional only when state is healthy | 不把 opaque target marker parsed into projection kind/ref |
+| `IdentityMaintenanceLoadedTarget::ReferenceResolution` | Step 7 maintenance inspection load over reference state | carries typed `ExternalReferenceRef` and `ReferenceResolutionStateRef`;source version remains external provenance only | 不把 external source version used as optimistic version or target identity |
+| `IdentityMaintenanceLoadedTarget::ReconciliationReport` | Step 7 maintenance inspection load over report state | carries report state plus body-free finding/issue refs from stored report | 不生成 remediation plan or raw diagnostic |
+| `IdentityMaintenanceInspectionContext` | `IdentityMaintenanceRepository.load_maintenance_target_inspection_context(...)` | target marker must equal the inspected typed loaded target family | 不允许 service/fake 根据 target_ref 字符串分派或扫描 sibling stores |
 
 ##### report refs / state
 
@@ -5008,6 +5068,7 @@ pub struct ReconciliationReport {
 | `ProjectionRepository` / projection index | 后移 | repository/read/write/lookup surface 属于 Step 7 / Step 11,不是 Step 6 对象 | Step 7 port;Step 11 persistence / lookup |
 | `ReferenceResolver` / external resolver summary port | 后移 | resolver trait、typed read、expected version 属于 Step 7/11 | Step 7 reference port;Step 11 version semantics |
 | `RebuildIdentityProjection` / `RefreshExternalReferenceState` / `RunIdentityReconciliation` | 后移 | job DTO 和 flow 属于 Step 8/9 | Step 8 job protocol;Step 9 job flow |
+| maintenance prepared helper shell | 并入 6.4 helper shell | rebuild plan / inspection context 是 Step 7 port 输出,不是新 aggregate | Step 7 projection / maintenance repository;Step 9 maintenance job |
 | `MaintenanceJobRunner` / retry schedule | 后移 | runner、retry、schedule、backoff 属于 application / job / config 设计 | Step 7 / Step 14 |
 | repair action / remediation plan | 排除 | 违反 report-only maintenance;修复必须走正式 owner 能力 | owner command flow 或相邻仓 |
 | projection body / report raw diagnostic / external body | 排除 | forbidden body,不得进入 truth、projection、event、trace、report 或 handoff | Step 8 / 12 / 16 negative tests |
@@ -5037,10 +5098,13 @@ pub struct ReconciliationReport {
 | source cursor | `ProjectionState::mark_stale(...)` 使用 `IdentityProjectionCursorRef` | 用 page cursor、timestamp、version、event id 或 idempotency key 当 source cursor |
 | stale query | query 返回 stale/degraded surface | query 发现 stale 后同步 rebuild 并写 projection state |
 | projection repair | rebuild 只更新 derived projection state / report issue | rebuild 过程中修改 `GlobalMember`、lifecycle、role、career 或 memory truth |
+| member summary rebuild scopes | `get_member_summary_rebuild_plan(projection_ref)` 返回 member ref 和 non-empty visibility scopes | rebuild 从 projection ref、view ref、config string 或 fake map 推 scope |
 | reference state | `ReferenceResolutionState::Unavailable` 显式记录 safe issue marker | resolver unavailable 时用默认 empty summary 继续 accepted |
+| resolver sidecar output | resolver 返回 `ExternalReferenceResolutionOutcome { state, typed_sidecar_refs }` | refresh service 从 state safe summary、source version 或 error text 推 sidecar |
 | external summary | `ExternalReferenceSafeSummaryRef` 只保存 body-free marker | 保存 method body、ProjectMember JSON、memory text 或 archive package |
 | owner ref | `IdentityReferenceOwnerRef` 来自本仓 typed object mapper | 从 external id 字符串切割出 owner |
 | maintenance policy | `ReconciliationPolicy` 拦截 `RepairExternalTruth` | reconciliation job 直接修复 method/work/memory/archive truth |
+| target inspection | `load_maintenance_target_inspection_context(target_ref)` 返回 typed loaded target | reconciliation service / fake 解析 `target_ref.target_ref` 或扫描 sibling store |
 | finding material | `ReconciliationFindingMaterial::SafeRefsOnly` 进入 report | finding 保存 raw log、debug dump、secret 或外部正文 |
 | report state | partial / failed 显式写成 `Partial` / `Failed` | 部分范围失败时仍返回 `NoFinding` |
 | report-only | finding 只作为后续正式修复入口线索 | report 自动携带 remediation plan 并执行修复 |
@@ -7078,7 +7142,7 @@ pub enum IdentityEntrySurfaceKind {
 |---|---|---|---|
 | core truth repository 启动清单 | member、lifecycle、role/capability、career、memory 的 versioned read/save/list 需求 | §7.20.2 | 不定义 trait 方法签名 |
 | mapper / resolver 启动清单 | subject/read subject/scope/reference/source/evidence/basis/visibility mapper | §7.20.3 | 不给 resolver 返回 schema |
-| projection / read / report 启动清单 | view lookup、projection state、reference state、reconciliation report、maintenance target expansion | §7.20.4 | 不写 query flow |
+| projection / read / report 启动清单 | view lookup、projection state、reference state、reconciliation report、maintenance target expansion / inspection | §7.20.4 | 不写 query flow |
 | outbox / handoff / adapter 启动清单 | outbox repo、publisher、handoff adapter、receipt/issue marker、topic/target binding | §7.20.5 | 不写 adapter implementation |
 | application support 启动清单 | id/clock/cursor/idempotency/stored result/operation context/job report | §7.20.6 | 不写 transaction/idempotency matrix |
 | fake equivalence 启动清单 | fake repo/resolver/publisher/handoff/projection/runtime 必须与正式 port 同语义 | §7.20.7 | 不允许 fake 私有补口 |
@@ -7116,7 +7180,7 @@ pub enum IdentityEntrySurfaceKind {
 | `ProjectionState` | projection state read/save、mark stale、rebuild source scan、source cursor read | projection cursor 不等于 truth cursor/page cursor/key | query path mark fresh/rebuild | 回 Step 7/9/11 闭 cursor/source scan |
 | `ReferenceResolutionState` | reference state versioned read/save、typed sidecar save/read | reference bundle key 与 business source ref 分离 | save typed sidecar 只靠 opaque source | 回 Step 7/11 闭 versioned read 和 bundle key |
 | `ReconciliationReport` | report write/read/list、finding/issue safe material read | report-only,不修 truth;partial/failed 显式 | report job 自动 repair 或 silent succeeded | 回 Step 7/9/12 闭 report surface |
-| maintenance target expansion | scope -> projection/reference/report targets | maintenance scope 不等于 full scan/config profile | job 私自全表扫描 | 回 Step 7/9/11 闭 expansion port |
+| maintenance target expansion / inspection | scope -> projection/reference/report targets;target -> typed loaded state context | maintenance scope 不等于 full scan/config profile;opaque target marker 不等于 typed state | job 私自全表扫描或解析 target marker | 回 Step 7/9/11 闭 expansion / inspection port |
 
 #### 7.20.5 Outbox / handoff / adapter 承接清单
 
@@ -7265,7 +7329,7 @@ domain core 已写对象复核批次确认 6.A、6.B、6.C 的对象边界无需
 
 身份事实消费与追溯批次定义 MemberSummaryView、IdentityTraceRecord、AuditTrail 和 VisibilityPolicy,并补齐 MemberSummaryViewRef、MemberSummarySliceRef、IdentityTraceRecordRef、IdentityTraceSubjectRef、IdentityAuditSubjectRef、IdentityChangeKindRef、IdentityChangeReasonRef、AuditTrailRef、AuditScopeRef、AuditCursorRef、ConsumerRef、VisibilityContextRef、VisibilityScopeRef、VisibilityResultRef、IdentityVisibilityAccessSummary、IdentityReadSurfaceKind 和 IdentityReadMaterialMarker。MemberSummaryView 是 body-free read model,只聚合 anchor、lifecycle、role/capability、career 和 memory safe summary slice refs,并携带 visibility result、read surface、optional source cursor 与 optional `projection_freshness_ref`;view ref 必须来自正式 projection builder / lookup,不得由 query 拼接。`ReadMemberSummaryFlow` 的 stale marker 只能复制 loaded `MemberSummaryView.projection_freshness_ref`;loaded stale/degraded view 缺少该 marker 时必须用 Step 7 `member_summary_view_missing_freshness(...)` 转为 degraded material surface,不得读取 projection state 或从 view ref 反推 projection ref。IdentityTraceRecord 是 accepted change 的 append-only trace material,必须绑定 member、trace/audit subject、change kind、source cursor、actor/time 和 safe markers;source cursor 不得用 timestamp、version 或 idempotency key 替代。AuditTrail 只组织 trace refs 和 redacted entries,不保存 raw log 或修复缺失 trace。VisibilityPolicy 只消费已解析 IdentityVisibilityAccessSummary 和 read material marker,负责 summary/trace/audit 的 visible、redacted、not visible、degraded 和 forbidden body guard;redaction public marker 来自 access summary 或同次 redaction matrix result,不得由 redaction profile/result/scope 推导;不调用授权系统、不读取 repository、不写 truth。
 
-派生维护与对账批次定义 ProjectionState、ReferenceResolutionState、ReconciliationPolicy 和 ReconciliationReport,并补齐 ProjectionStateRef、IdentityProjectionRef、IdentityProjectionCursorRef、ProjectionFreshnessMarkerRef、ExternalReferenceRef、ReferenceResolutionStateRef、IdentityReferenceOwnerRef、ExternalSourceVersionRef、ExternalReferenceSafeSummaryRef、MaintenanceScopeRef、IdentityMaintenanceTargetRef、MaintenanceIssueRef、IdentityMaintenanceIntent、ReconciliationFindingIntentRef、ReconciliationFindingMaterial、ReconciliationReportRef 和 ReconciliationFindingRef。ProjectionState 只表达 identity-owned projection / derived view 与 source cursor 的 freshness、stale、pending、rebuilt、degraded 和 failed 状态,不保存 projection body,不修复 core truth,query 不得触发 rebuild。ReferenceResolutionState 只表达外部 reference 的 resolved、stale、unavailable、unrecognized、pending reconciliation 和 refresh failed 状态,并绑定 local owner、external version 和 safe summary marker,不保存外部正文、不补造 accepted truth。ReconciliationPolicy 保证 maintenance 只能 report-only,拒绝 identity truth repair、external truth repair、query path refresh 和 forbidden finding material。ReconciliationReport 保存 scope、target refs、finding refs、issue refs、report state 和 generated metadata,`Partial` / `Failed` 必须显式暴露,finding 不等于 repair action。
+派生维护与对账批次定义 ProjectionState、ReferenceResolutionState、ReconciliationPolicy 和 ReconciliationReport,并补齐 ProjectionStateRef、IdentityProjectionRef、IdentityProjectionCursorRef、ProjectionFreshnessMarkerRef、ExternalReferenceRef、ReferenceResolutionStateRef、IdentityReferenceOwnerRef、ExternalSourceVersionRef、ExternalReferenceSafeSummaryRef、MaintenanceScopeRef、IdentityMaintenanceTargetRef、MaintenanceIssueRef、IdentityMaintenanceIntent、ReconciliationFindingIntentRef、ReconciliationFindingMaterial、ReconciliationReportRef 和 ReconciliationFindingRef。为 commit-07-b maintenance job 可落码性,本批同时固定 `MemberSummaryProjectionRebuildPlan`、`IdentityMaintenanceLoadedTarget` 和 `IdentityMaintenanceInspectionContext` 作为 Step 7 正式 port 输出 helper shell:它们只承载 rebuild plan / typed target inspection 所需 refs 和 safe issue/finding refs,不新增 truth。ProjectionState 只表达 identity-owned projection / derived view 与 source cursor 的 freshness、stale、pending、rebuilt、degraded 和 failed 状态,不保存 projection body,不修复 core truth,query 不得触发 rebuild。ReferenceResolutionState 只表达外部 reference 的 resolved、stale、unavailable、unrecognized、pending reconciliation 和 refresh failed 状态,并绑定 local owner、external version 和 safe summary marker,不保存外部正文、不补造 accepted truth。ReconciliationPolicy 保证 maintenance 只能 report-only,拒绝 identity truth repair、external truth repair、query path refresh 和 forbidden finding material。ReconciliationReport 保存 scope、target refs、finding refs、issue refs、report state 和 generated metadata,`Partial` / `Failed` 必须显式暴露,finding 不等于 repair action。
 
 身份事实传播与外部交接批次定义 IdentityOutboxRecord、OutboxState、OutboundEventPolicy、TraceHandoffIntent、HandoffState 和 HandoffPolicy,并补齐 IdentityOutboxRecordRef、IdentityOutboxSubjectRef、IdentityOutboxPayloadMarkerRef、TopicKeyRef、OutboxDeliveryAttemptRef、OutboxDeliveryIssueRef、TraceHandoffIntentRef、HandoffTargetRef、HandoffScopeRef、TraceHandoffSafeMaterialRef、HandoffAttemptRef、HandoffReceiptRef 和 HandoffIssueRef。IdentityOutboxRecord 只能从 accepted identity fact 和正式 trace 创建,保存 body-free payload marker、topic boundary 和 outbox state,不得保存 event body、publisher adapter detail 或下游 receipt。OutboxState 表达 PendingPublish、Published、RetryableFailed、Failed 和 SkippedByPolicy,其中 Published 只代表 outbound boundary 成功,不代表下游业务已消费。OutboundEventPolicy 固定 accepted-only、body-free、visibility、topic boundary 和 publish not acceptance gate。TraceHandoffIntent 必须绑定非空 trace refs、optional audit trail、target/scope boundary refs、safe material marker 和 handoff state,不得保存 archive package、observability raw log 或 receipt body。HandoffState 表达 PendingHandoff、Delivered、RetryableFailed、Failed 和 Cancelled,其中 Delivered 必须来自 formal HandoffReceiptRef。HandoffPolicy 固定 target/scope、trace refs、safe material、visibility、receipt marker 和 fake delivered guard。
 
@@ -7277,7 +7341,7 @@ infra / api / worker / jobs entry 批次定义 IdentityRuntimeConfigShell、Iden
 
 状态闭环批次不新增状态 variant,只审计 `6.1`~`6.7` 已出现状态族的初始来源、变更 owner、终态/准终态、禁止混用和 Step 10 承接输入。Domain truth 状态覆盖 IdentityAnchorState、GlobalLifecycleState、lifecycle high-risk precheck、RoleCapabilitySummaryStateKind、source snapshot state、CareerRecordStateKind 和 MemoryReferenceState,并固定 query/job/runtime/project/source 不得私自推进 truth state。Derived/reference/report 状态覆盖 MemberSummaryView freshness/read state、ProjectionState、ReferenceResolutionState、ReconciliationReport 和 maintenance issue/finding disposition,并固定 query 不 rebuild、reference unavailable 不删除 local truth、report 不等于 repair action。Propagation/handoff 状态覆盖 OutboxState、outbound visibility、HandoffState 和 handoff material disposition,并固定 Published 不等于 Delivered、side effect failure 不回滚 accepted truth、Delivered 必须有 formal receipt marker。Application/entry 状态覆盖 IdentityIdempotencyRecord、StoredIdentityOperationResult、IdentityVisibilityDecision、IdentityJobRunReport、IdentityRuntimeAssemblyState、IdentityAdapterAvailability、API/worker/job entry validation 和 dispatch result,并固定 entry valid / dispatch success 不等于 application accepted,assembled 不等于 adapter healthy,completed/rejected stored 必须有 stored result。实现暂停条件明确:flow 想新增状态、状态初始来源不明、terminal reopen、query 写 state、fake 私有 state、callback 缺 receipt/issue marker 或 duplicate replay 缺 stored result 时,必须回 Step 6.9 / Step 10 / Step 13 / Step 14 闭口。
 
-Step 7 承接批次不新增实现契约,只把 Step 6 的对象、字段和状态闭环转换为 Trait / Port / Adapter 契约的启动清单。Step 7 必须覆盖 core truth repository、mapper/resolver、projection/read/report、outbox/handoff/adapter、application support 和 fake equivalence 六类 port/adapter 能力。Core repository 必须支撑 member、lifecycle、role/capability、career 和 memory 的 versioned read/save、append-only、duplicate source lookup 和 terminal hold 语义。Mapper/resolver 必须支撑 trace/audit/outbox subject、marker subject、read subject/scope、governance basis、role/capability source、work/career source、memory/archive、external reference 和 adapter availability 的正式来源。Projection/read/report 必须支撑 stable view lookup、projection state、reference versioned read、report-only writer 和 maintenance target expansion。Outbox/handoff/adapter 必须支撑 body-free payload、topic/target binding、publish attempt/issue、handoff receipt/issue 和 fake delivered guard。Application support 必须支撑 id generator、clock、truth cursor assigner、idempotency reserve/result、stored result、operation context、job report 和 dispatch target catalog。Fake equivalence 必须使用同一 formal port surface,不得用私有 map、字符串拼接、默认 valid、伪造 delivered/published 或重跑 mutation 补齐正式缺口。
+Step 7 承接批次不新增实现契约,只把 Step 6 的对象、字段和状态闭环转换为 Trait / Port / Adapter 契约的启动清单。Step 7 必须覆盖 core truth repository、mapper/resolver、projection/read/report、outbox/handoff/adapter、application support 和 fake equivalence 六类 port/adapter 能力。Core repository 必须支撑 member、lifecycle、role/capability、career 和 memory 的 versioned read/save、append-only、duplicate source lookup 和 terminal hold 语义。Mapper/resolver 必须支撑 trace/audit/outbox subject、marker subject、read subject/scope、governance basis、role/capability source、work/career source、memory/archive、external reference 和 adapter availability 的正式来源。Projection/read/report 必须支撑 stable view lookup、projection state、reference versioned read、report-only writer、maintenance target expansion / inspection 和 member summary rebuild plan。Outbox/handoff/adapter 必须支撑 body-free payload、topic/target binding、publish attempt/issue、handoff receipt/issue 和 fake delivered guard。Application support 必须支撑 id generator、clock、truth cursor assigner、idempotency reserve/result、stored result、operation context、job report 和 dispatch target catalog。Fake equivalence 必须使用同一 formal port surface,不得用私有 map、字符串拼接、默认 valid、伪造 delivered/published 或重跑 mutation 补齐正式缺口。
 ```
 
 当前不写入正式 `03-详细设计.md`。
@@ -7313,10 +7377,10 @@ Step 7 承接批次不新增实现契约,只把 Step 6 的对象、字段和状�
 | DDD-S6-OPEN-023 | `IdentityVisibilityAccessSummary` 的正式 resolver / prepared context 来源 | summary/trace/audit query、event/handoff visibility、redaction failure | Step 7 / Step 8 / Step 12 闭口;当前 Step 6 只固定 policy 输入 shape |
 | DDD-S6-OPEN-024 | field-level redaction matrix 与 `IdentityReadSurfaceKind` 的 public DTO 映射 | query response、trace/audit redaction、not visible/degraded surface | PH-02 public marker shell 已由 Step 8 `IdentityVisibilityMarker` / `IdentityDegradedMarker` / `IdentityRedactionMarkerRef` / `IdentityDegradedMarkerRef` 闭合;剩余 field-level omission matrix 与 per-field DTO 裁剪规则留 Step 12 |
 | DDD-S6-OPEN-025 | `IdentityProjectionCursorRef` 的正式来源及其与 `IdentityTruthCursor` 的关系 | projection stale、rebuild、duplicate replay、fake runtime 等价语义 | Step 7 / Step 11 / Step 13 闭口;当前固定不得用 page cursor/timestamp/version/idempotency key 替代 |
-| DDD-S6-OPEN-026 | `IdentityProjectionRef` / `ProjectionStateRef` 的正式 builder / lookup / catalog 来源 | projection rebuild、projection state read、projection fake | Step 7 / Step 11 闭口;summary query stale marker 已由 `MemberSummaryView.projection_freshness_ref` 承载,缺失时通过 Step 7 `member_summary_view_missing_freshness(...)` 返回 degraded,不得由 query 拼接或反推 projection ref |
-| DDD-S6-OPEN-027 | `MaintenanceScopeRef` 展开 affected projection/reference/report target 的正式规则 | rebuild / refresh / reconciliation job、partial report、stale marker | Step 7 / Step 9 / Step 11 闭口;当前 Step 6 不定义扩展算法 |
+| DDD-S6-OPEN-026 | `IdentityProjectionRef` / `ProjectionStateRef` 的正式 builder / lookup / catalog 来源 | projection rebuild、projection state read、projection fake | commit-07-b member summary rebuild 已闭合:Step 7 `get_member_summary_rebuild_plan(projection_ref)` 是 member ref + visibility scope refs 的唯一来源;summary query stale marker 已由 `MemberSummaryView.projection_freshness_ref` 承载,缺失时通过 Step 7 `member_summary_view_missing_freshness(...)` 返回 degraded;future non-member projection writer/catalog 仍需单独闭口 |
+| DDD-S6-OPEN-027 | `MaintenanceScopeRef` 展开 affected projection/reference/report target 的正式规则 | rebuild / refresh / reconciliation job、partial report、stale marker | commit-07-b inspection 已闭合:Step 7 `load_maintenance_target_inspection_context(target_ref)` 是 target marker -> typed loaded state 的唯一来源;scope expansion 仍只能通过 Step 7 list/expand ports,不得解析 opaque target marker |
 | DDD-S6-OPEN-028 | `ExternalReferenceRef` / `IdentityReferenceOwnerRef` 的正式 mapper 与 typed read 来源 | role/career/memory/lifecycle basis source refresh、reference state fake | Step 7 / Step 8 / Step 11 闭口;当前固定 external ref 与 local owner ref 不可混用 |
-| DDD-S6-OPEN-029 | `ExternalReferenceSafeSummaryRef` 和 `ExternalSourceVersionRef` 的最小 public schema / versioned read 口径 | reference refresh、source changed consumer、optimistic save、degraded read | Step 7 / Step 8 / Step 11 / Step 12 闭口;当前只固定 body-free marker |
+| DDD-S6-OPEN-029 | `ExternalReferenceSafeSummaryRef` 和 `ExternalSourceVersionRef` 的最小 public schema / versioned read 口径 | reference refresh、source changed consumer、optimistic save、degraded read | commit-07-b refresh sidecar output 已闭合:Step 7 `ExternalReferenceResolutionOutcome` 显式返回 `state` 和 optional `typed_sidecar_refs`;service 不得从 state/source version/safe summary 推 sidecar;remaining public schema/read surface 留 Step 8/12 |
 | DDD-S6-OPEN-030 | `MaintenanceIssueRef` / `ReconciliationFindingRef` 的最小 safe issue/finding schema | report query、observability、forbidden body negative tests | Step 8 / Step 12 / Step 16 闭口;当前固定 raw diagnostic/external body/secret 不入仓 |
 | DDD-S6-OPEN-031 | `IdentityOutboxSubjectRef` 的正式 mapper 与 canonical key | trace/audit/outbox subject 同源、fake runtime、outbox lookup | Step 7 闭口;当前 6.5 固定不得使用 `IdentityOutboundSubjectRef` 或字符串拼接 |
 | DDD-S6-OPEN-032 | `IdentityOutboxPayloadMarkerRef` 的最小 public schema 与 builder 来源 | outbound event DTO、redaction、duplicate replay、consumer compatibility | Step 8 / Step 12 / Step 16 闭口;当前只固定 body-free marker |

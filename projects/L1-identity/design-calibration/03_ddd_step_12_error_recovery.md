@@ -611,12 +611,15 @@ Entry mapping is intentionally separate from application protocol mapping. If fa
 |---|---|---|---|---|
 | rebuild projection | duplicate replay available | job idempotency reserve | no rebuild/list | replay stored report |
 | rebuild projection | projection state/view missing | projection repository load/lookup | save failed/partial job report if application job reached | no query-side rebuild;no truth repair |
+| rebuild projection | member summary rebuild plan missing or empty scopes | `get_member_summary_rebuild_plan(projection_ref)` | save failed item/report issue | no default visibility scope;no projection/view/config/fake-map scope derivation |
 | rebuild projection | source cursor missing/stale | projection cursor/source read | save failed item/report | no cursor fabrication from timestamp/page |
 | rebuild projection | writer unsupported | projection writer/mapper | save failed item/report | no private writer |
 | refresh reference | reference state missing | reference repository list/load | save failed reference item/report | no create bundle unless Step 9 target says so |
 | refresh reference | resolver unavailable typed outcome | resolver returned body-free unavailable | save reference unavailable/failed state if Step 9 branch owns state update;report retryable issue | no local truth delete |
 | refresh reference | resolver call failure as `ApplicationError` | resolver port failed without business outcome | rollback state update;report dependency issue | do not infer invalid/unavailable from error string |
+| refresh reference | resolver returned no typed sidecar refs | `ExternalReferenceResolutionOutcome.typed_sidecar_refs = None` | save only returned state;do not call sidecar save | no sidecar derivation from state/summary/source version/error |
 | refresh reference | sidecar save version conflict | reference repository update | rollback item update;report conflict issue | no source version as expected_version |
+| reconciliation | target inspection missing | `load_maintenance_target_inspection_context(target_ref)` returns `None` | record safe issue and partial/failed report per Step 9 | no target marker decoding or sibling store scan |
 | reconciliation | finding/report material invalid | report assembly policy | rollback report item or save failed report branch | no raw diagnostic/remediation body |
 | reconciliation | drift found | reconciliation policy | save report/finding only | no repair of identity/external truth |
 | any job | stored job report save fails | job report repository | rollback job UoW | no public job success |

@@ -14,14 +14,14 @@
 | project | L1-identity |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| current_design_baseline | `current-design-with-commit-07-a-ledger` |
-| current_boundary | `commit-07-a` |
+| current_design_baseline | `current-design-with-commit-07-b-ledger` |
+| current_boundary | `commit-07-b` |
 | gate_status | ready_for_design_gate |
-| gate_reason | implementation agent reported `commit-06-c` complete and requested the next PH-07 boundary; `commit-07-a` job report/stored replay foundation boundary is ready; boundary ledger now exists with required reads, allowed scope, required checks, Commit Gate and Handoff Gate |
+| gate_reason | implementation agent reported `commit-07-a` complete and requested the next PH-07 boundary; exact implementation commit hash was not supplied in the handoff, so this ledger does not fabricate one; `commit-07-b` maintenance job family boundary is ready with required reads, allowed scope, required checks, Commit Gate and Handoff Gate |
 | next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | `commit-07-a` opening boundary / PH-07 job request/report shared surface, job report assembly, stored job report replay and fake parity without maintenance/propagation job bodies or job runner |
+| current_recovery_point | `commit-07-b` opening boundary / PH-07 projection rebuild, external reference refresh and reconciliation maintenance job family; excludes propagation publish/deliver/retry jobs, entry runner and PH-08 release scripts |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-17 11:38:13 +0800 |
+| last_updated_at | 2026-06-17 12:55:59 +0800 |
 
 ---
 
@@ -37,7 +37,8 @@
 | `commit-06-a` | `0f4d7a4` | implemented | handoff_gate | advance_to_commit_06_b | Implementation repo reports `commit-06-a` code completed at `b7fa598` and run-scoped evidence committed at `67335fc`; `GATE-06` entry-worker-job and `GATE-03` infra-runtime-fake evidence passed for run `20260617T015231+0800`. |
 | `commit-06-b` | `4a18d7a` | implemented | handoff_gate | advance_to_commit_06_c | Implementation repo reports `commit-06-b` supporting commits `12aa1ae`, `df6b21e`, code commit `2ae3bad` and run-scoped evidence commit `dde1dfc`; `GATE-06`, `GATE-03` subset and `GATE-10` evidence passed for run `20260617T032600+0800`. |
 | `commit-06-c` | `current-design-with-commit-06-c-ledger` | implemented | handoff_gate | advance_to_commit_07_a | Implementation agent reports `commit-06-c` complete; exact code/evidence commit hash was not supplied in the blocker handoff, so this ledger does not fabricate one. |
-| `commit-07-a` | `current-design-with-commit-07-a-ledger` | ready | design_gate | read_docs | Job report + stored replay foundation; read `implementation-boundaries/commit-07-a.md` before implementation. |
+| `commit-07-a` | `current-design-with-commit-07-a-ledger` | implemented | handoff_gate | advance_to_commit_07_b | Implementation agent reports `commit-07-a` complete; exact code/evidence commit hash was not supplied in the handoff, so this ledger does not fabricate one. |
+| `commit-07-b` | `current-design-with-commit-07-b-ledger` | ready | design_gate | read_docs | Maintenance job family; read `implementation-boundaries/commit-07-b.md` before implementation. |
 
 ---
 
@@ -59,6 +60,7 @@
 | BLK-ID-06B-LEDGER-001 | `commit-06-b` | implementation | resolved | `current-design-with-commit-06-b-ledger` | Project ledger now advances to `commit-06-b`; `implementation-boundaries/commit-06-b.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
 | BLK-ID-06C-LEDGER-001 | `commit-06-c` | implementation | resolved | `current-design-with-commit-06-c-ledger` | Project ledger now advances to `commit-06-c`; `implementation-boundaries/commit-06-c.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
 | BLK-ID-07A-LEDGER-001 | `commit-07-a` | implementation | resolved | `current-design-with-commit-07-a-ledger` | Project ledger now advances to `commit-07-a`; `implementation-boundaries/commit-07-a.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
+| BLK-ID-07B-LEDGER-001 | `commit-07-b` | implementation | resolved | `current-design-with-commit-07-b-ledger` | Project ledger now advances to `commit-07-b`; `implementation-boundaries/commit-07-b.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
 
 ---
 
@@ -67,7 +69,7 @@
 Any implementation agent resuming `L1-identity` must read files in this order:
 
 1. `projects/L1-identity/design-calibration/implementation_execution_ledger.md`
-2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-07-a.md`
+2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-07-b.md`
 3. `projects/L1-identity/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-identity/.codex/implementation_ledger.md`

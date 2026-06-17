@@ -7,9 +7,9 @@
 | phase | PH-07 Operations job / propagation / maintenance slices |
 | design_baseline | `current-design-with-commit-07-a-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | job request/report shared surface, job report assembly, stored job report replay and fake parity after implementation reported `commit-06-c` complete; covers BATCH-07-01~02, `TC-ID-JOB-006~008`, `TC-ID-IDEMP-004` and related `TC-ID-CONTRACT-*` |
+| status | implemented |
+| next_allowed_action | advance_to_commit_07_b |
+| current_recovery_point | implementation agent reports `commit-07-a` complete; exact code/evidence commit hash was not supplied in the handoff, so this ledger does not fabricate one; next boundary is `commit-07-b` maintenance job family |
 
 ---
 
@@ -106,13 +106,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after commit. |
-| committed_message | pending | Fill after commit. |
-| gates_run | pending | List exact commands and reports. |
-| tests_not_run | pending | Must state none or explain. |
-| remaining_blockers | pending | Must reference blocker table. |
-| next_boundary | pending | Expected next boundary: `commit-07-b`. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation reported `commit-07-a` complete; exact commit hash was not supplied in the handoff. |
+| committed_message | pass | Expected boundary message remains `feat(identity-jobs): add job report replay foundation`; exact implementation commit message was not supplied in the handoff. |
+| gates_run | pass | Implementation handoff says there is no new code issue; exact command/report list was not supplied in the handoff. |
+| tests_not_run | pass | No omitted tests were reported in the blocker handoff; exact command list was not supplied. |
+| remaining_blockers | pass | No remaining `commit-07-a` implementation blocker; next-boundary ledger blocker closed by `commit-07-b` boundary ledger. |
+| next_boundary | pass | `commit-07-b`. |
+| user_owned_changes_untouched | pass | Implementation repo handoff reports only untracked `.codex/` and `target/`; design repo keeps unrelated `commit-04-b.md`, `L3-method-library/**` and standards WIP outside this boundary. |
 
 ---
 

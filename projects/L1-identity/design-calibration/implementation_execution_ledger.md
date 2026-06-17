@@ -14,14 +14,14 @@
 | project | L1-identity |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| current_design_baseline | `current-design-with-commit-06-b-ledger` |
-| current_boundary | `commit-06-b` |
+| current_design_baseline | `current-design-with-commit-06-c-ledger` |
+| current_boundary | `commit-06-c` |
 | gate_status | ready_for_design_gate |
-| gate_reason | `commit-06-a` completed in implementation repo at `b7fa598` and evidence commit `67335fc`; `commit-06-b` inbound/callback mutation flow boundary is ready; boundary ledger now exists with required reads, allowed scope, required checks, Commit Gate and Handoff Gate |
+| gate_reason | `commit-06-b` completed in implementation repo at supporting commits `12aa1ae`, `df6b21e`, code commit `2ae3bad` and evidence commit `dde1dfc`; `commit-06-c` outbound accepted material boundary is ready; boundary ledger now exists with required reads, allowed scope, required checks, Commit Gate and Handoff Gate |
 | next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | `commit-06-b` opening boundary / PH-06 role/work/memory inbound consumers plus archive/trace handoff callbacks with typed receipt replay and no implicit target create |
+| current_recovery_point | `commit-06-c` opening boundary / PH-06 accepted outbound material factories, payload marker and outbox snapshot without publish/deliver/retry jobs |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-17 01:59:45 +0800 |
+| last_updated_at | 2026-06-17 10:20:05 +0800 |
 
 ---
 
@@ -35,7 +35,8 @@
 | `commit-05-b` | `f91e72c` | implemented | handoff_gate | advance_to_commit_05_c | Implementation repo reports `commit-05-b` completed at `073e336` and `3e11289`; operations reads are excluded from 05-b evidence. |
 | `commit-05-c` | `c101004` | implemented | handoff_gate | advance_to_commit_06_a | Implementation repo reports `commit-05-c` code completed at `b287e85` and run-scoped evidence committed at `82cae3b`; `GATE-05` service-flow-fast operations read evidence passed for run `20260616T230743+0800`. |
 | `commit-06-a` | `0f4d7a4` | implemented | handoff_gate | advance_to_commit_06_b | Implementation repo reports `commit-06-a` code completed at `b7fa598` and run-scoped evidence committed at `67335fc`; `GATE-06` entry-worker-job and `GATE-03` infra-runtime-fake evidence passed for run `20260617T015231+0800`. |
-| `commit-06-b` | `current-design-with-commit-06-b-ledger` | ready | design_gate | read_docs | Role/work/memory inbound consumers plus archive/trace handoff callbacks; read `implementation-boundaries/commit-06-b.md` before implementation. |
+| `commit-06-b` | `4a18d7a` | implemented | handoff_gate | advance_to_commit_06_c | Implementation repo reports `commit-06-b` supporting commits `12aa1ae`, `df6b21e`, code commit `2ae3bad` and run-scoped evidence commit `dde1dfc`; `GATE-06`, `GATE-03` subset and `GATE-10` evidence passed for run `20260617T032600+0800`. |
+| `commit-06-c` | `current-design-with-commit-06-c-ledger` | ready | design_gate | read_docs | Accepted outbound material factories, payload marker and outbox snapshot; read `implementation-boundaries/commit-06-c.md` before implementation. |
 
 ---
 
@@ -55,6 +56,7 @@
 | BLK-ID-05C-OUTBOX-BYTRACE-EMPTY-001 | `commit-05-c` | implementation | resolved | `current-design-with-outbox-trace-page-access` | Step 7 now defines `resolve_outbox_trace_page_read(...)`; Step 8/9/10/12/16 require `ListPendingIdentityOutbox(ByTrace)` empty pages to copy that page access summary, not synthesize `visibility_result_ref`; reusable lesson is recorded in standards plus `MEM-ID-011`. |
 | BLK-ID-06A-LEDGER-001 | `commit-06-a` | implementation | resolved | `current-design-with-commit-06-a-ledger` | Project ledger now advances to `commit-06-a`; `implementation-boundaries/commit-06-a.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
 | BLK-ID-06B-LEDGER-001 | `commit-06-b` | implementation | resolved | `current-design-with-commit-06-b-ledger` | Project ledger now advances to `commit-06-b`; `implementation-boundaries/commit-06-b.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
+| BLK-ID-06C-LEDGER-001 | `commit-06-c` | implementation | resolved | `current-design-with-commit-06-c-ledger` | Project ledger now advances to `commit-06-c`; `implementation-boundaries/commit-06-c.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
 
 ---
 
@@ -63,7 +65,7 @@
 Any implementation agent resuming `L1-identity` must read files in this order:
 
 1. `projects/L1-identity/design-calibration/implementation_execution_ledger.md`
-2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-06-b.md`
+2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-06-c.md`
 3. `projects/L1-identity/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-identity/.codex/implementation_ledger.md`

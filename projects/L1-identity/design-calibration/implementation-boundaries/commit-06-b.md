@@ -7,9 +7,9 @@
 | phase | PH-06 Inbound / callback / outbound material slices |
 | design_baseline | `current-design-with-commit-06-b-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | inbound/callback mutation flows after implementation `commit-06-a` code commit `b7fa598` and evidence commit `67335fc`; covers BATCH-06-03~05, `TC-ID-CONSUMER-001~006`, related `TC-ID-IDEMP-*` and related `TC-ID-REDACTION-*` |
+| status | implemented |
+| next_allowed_action | advance_to_commit_06_c |
+| current_recovery_point | implemented in `/home/aris/Projects/quantalithos-identity` at supporting commits `12aa1ae`, `df6b21e`, code commit `2ae3bad` and evidence commit `dde1dfc`; run `20260617T032600+0800` passed `GATE-06` entry-worker-job consumer/callback subset, `GATE-03` infra-runtime-fake receipt replay subset and `GATE-10` redaction-boundary for `TC-ID-CONSUMER-001~006`, related `TC-ID-IDEMP-*` and related `TC-ID-REDACTION-*`; next boundary is `commit-06-c` |
 
 ---
 
@@ -106,13 +106,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after commit. |
-| committed_message | pending | Fill after commit. |
-| gates_run | pending | List exact commands and reports. |
-| tests_not_run | pending | Must state none or explain. |
-| remaining_blockers | pending | Must reference blocker table. |
-| next_boundary | pending | Expected next boundary: `commit-06-c`. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Supporting commits `12aa1ae`, `df6b21e`; code commit `2ae3bad`; evidence commit `dde1dfc`. |
+| committed_message | pass | `feat(contracts): add inbound callback payload shells`; `feat(identity-infra): add external reference fake parity`; `feat(identity-application): add inbound callback mutation flows`; `test(identity-consumer): add commit-06-b run evidence`. |
+| gates_run | pass | `reports/runs/20260617T032600+0800/suites/entry-worker-job.md`; `reports/runs/20260617T032600+0800/suites/infra-runtime-fake.md`; `reports/runs/20260617T032600+0800/redaction-check.md`; raw artifacts under `artifacts/test/20260617T032600+0800/`. |
+| tests_not_run | pass | No omitted checks reported by implementation handoff; reports record `cargo fmt --all`, `cargo check -p identity-application`, `cargo check -p identity-infra`, `cargo test -p identity-infra`, plus run-scoped redaction review passed. |
+| remaining_blockers | pass | No remaining `commit-06-b` blockers; next-boundary ledger blocker closed by `commit-06-c` boundary ledger. |
+| next_boundary | pass | `commit-06-c`. |
+| user_owned_changes_untouched | pass | Implementation repo handoff reports only untracked `.codex/` and `target/`; design repo keeps unrelated `commit-04-b.md`, `L3-method-library/**` and standards WIP outside this boundary. |
 
 ---
 

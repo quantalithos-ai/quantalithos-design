@@ -17,11 +17,11 @@
 | current_design_baseline | `current-design-with-commit-07-b-ledger` |
 | current_boundary | `commit-07-b` |
 | gate_status | ready_for_design_gate |
-| gate_reason | implementation agent reported `commit-07-a` complete and requested the next PH-07 boundary; exact implementation commit hash was not supplied in the handoff, so this ledger does not fabricate one; `commit-07-b` maintenance job family boundary is ready with required reads, allowed scope, required checks, Commit Gate and Handoff Gate |
+| gate_reason | implementation agent reported `commit-07-a` complete and requested the next PH-07 boundary; exact implementation commit hash was not supplied in the handoff, so this ledger does not fabricate one; `commit-07-b` maintenance job family boundary is ready with required reads, allowed scope, required checks, Commit Gate and Handoff Gate; later `commit-07-c` and `commit-08-a/b/c` ledgers are precreated as planned future boundaries but are not current |
 | next_allowed_action | read_current_boundary_ledger |
 | current_recovery_point | `commit-07-b` opening boundary / PH-07 projection rebuild, external reference refresh and reconciliation maintenance job family; excludes propagation publish/deliver/retry jobs, entry runner and PH-08 release scripts |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-17 12:55:59 +0800 |
+| last_updated_at | 2026-06-17 13:04:15 +0800 |
 
 ---
 
@@ -39,6 +39,10 @@
 | `commit-06-c` | `current-design-with-commit-06-c-ledger` | implemented | handoff_gate | advance_to_commit_07_a | Implementation agent reports `commit-06-c` complete; exact code/evidence commit hash was not supplied in the blocker handoff, so this ledger does not fabricate one. |
 | `commit-07-a` | `current-design-with-commit-07-a-ledger` | implemented | handoff_gate | advance_to_commit_07_b | Implementation agent reports `commit-07-a` complete; exact code/evidence commit hash was not supplied in the handoff, so this ledger does not fabricate one. |
 | `commit-07-b` | `current-design-with-commit-07-b-ledger` | ready | design_gate | read_docs | Maintenance job family; read `implementation-boundaries/commit-07-b.md` before implementation. |
+| `commit-07-c` | `current-design-with-precreated-commit-07-c-ledger` | planned | design_gate | wait_until_current | Propagation job family; boundary ledger is precreated and must become current only after `commit-07-b` handoff. |
+| `commit-08-a` | `current-design-with-precreated-commit-08-a-ledger` | planned | design_gate | wait_until_current | Entry wiring and runtime config; boundary ledger is precreated and must become current only after `commit-07-c` handoff. |
+| `commit-08-b` | `current-design-with-precreated-commit-08-b-ledger` | planned | design_gate | wait_until_current | Gate scripts and artifact/report writer; boundary ledger is precreated and must become current only after `commit-08-a` handoff. |
+| `commit-08-c` | `current-design-with-precreated-commit-08-c-ledger` | planned | design_gate | wait_until_current | Release evidence and acceptance handoff; boundary ledger is precreated and must become current only after `commit-08-b` handoff. |
 
 ---
 
@@ -61,6 +65,10 @@
 | BLK-ID-06C-LEDGER-001 | `commit-06-c` | implementation | resolved | `current-design-with-commit-06-c-ledger` | Project ledger now advances to `commit-06-c`; `implementation-boundaries/commit-06-c.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
 | BLK-ID-07A-LEDGER-001 | `commit-07-a` | implementation | resolved | `current-design-with-commit-07-a-ledger` | Project ledger now advances to `commit-07-a`; `implementation-boundaries/commit-07-a.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
 | BLK-ID-07B-LEDGER-001 | `commit-07-b` | implementation | resolved | `current-design-with-commit-07-b-ledger` | Project ledger now advances to `commit-07-b`; `implementation-boundaries/commit-07-b.md` defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. Implementation agent must continue from `read_current_boundary_ledger`. |
+| BLK-ID-07C-LEDGER-001 | `commit-07-c` | implementation | resolved | `current-design-with-precreated-commit-07-c-ledger` | `implementation-boundaries/commit-07-c.md` now exists as a planned future boundary. It must not be implemented until the project ledger advances from `commit-07-b` after handoff. |
+| BLK-ID-08A-LEDGER-001 | `commit-08-a` | implementation | resolved | `current-design-with-precreated-commit-08-a-ledger` | `implementation-boundaries/commit-08-a.md` now exists as a planned future boundary. It must not be implemented until the project ledger advances from `commit-07-c` after handoff. |
+| BLK-ID-08B-LEDGER-001 | `commit-08-b` | implementation | resolved | `current-design-with-precreated-commit-08-b-ledger` | `implementation-boundaries/commit-08-b.md` now exists as a planned future boundary. It must not be implemented until the project ledger advances from `commit-08-a` after handoff. |
+| BLK-ID-08C-LEDGER-001 | `commit-08-c` | implementation | resolved | `current-design-with-precreated-commit-08-c-ledger` | `implementation-boundaries/commit-08-c.md` now exists as a planned future boundary. It must not be implemented until the project ledger advances from `commit-08-b` after handoff. |
 
 ---
 
@@ -75,3 +83,12 @@ Any implementation agent resuming `L1-identity` must read files in this order:
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-identity/.codex/implementation_ledger.md`
 
 If any required design source is missing or contradicts the current boundary, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation.
+
+---
+
+## Retrospective Boundary Note
+
+| range | status | decision |
+|---|---|---|
+| `commit-01-a`~`commit-04-a` | historical before implementation ledger adoption | Do not fabricate per-boundary execution ledgers or implementation hashes retroactively. If a future audit requires these files, create explicit retrospective ledgers marked `historical`, not current execution gates. |
+| `commit-07-c`~`commit-08-c` | planned future boundaries | Boundary ledger files are precreated to remove the same missing-file blocker class. They become actionable only when `current_boundary` is advanced by the project ledger after the previous implementation handoff. |

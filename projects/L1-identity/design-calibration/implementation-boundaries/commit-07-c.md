@@ -5,11 +5,11 @@
 | project | L1-identity |
 | boundary_id | commit-07-c |
 | phase | PH-07 Operations job / propagation / maintenance slices |
-| design_baseline | `current-design-with-precreated-commit-07-c-ledger` |
+| design_baseline | `current-design-with-commit-07-c-active-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | planned |
-| next_allowed_action | wait_until_project_ledger_points_here |
-| current_recovery_point | precreated propagation job family boundary; not current until `implementation_execution_ledger.md` advances from `commit-07-b` after implementation handoff |
+| status | ready |
+| next_allowed_action | read_docs |
+| current_recovery_point | active propagation job family boundary after `commit-07-b` implementation handoff; covers publish, deliver and retry job bodies and excludes PH-08 entry/runtime/report scripts |
 
 ---
 
@@ -17,7 +17,7 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | Design Gate、Scope Gate、Commit Gate、Handoff Gate 和 blocker 回流记录 | pending | 先按项目级台账确认当前 boundary 是否已推进到 `commit-07-c`。 |
+| `standards/document/代码实施台账与门禁规范.md` | Design Gate、Scope Gate、Commit Gate、Handoff Gate 和 blocker 回流记录 | pending | 项目级台账当前已推进到 `commit-07-c`;仍须先读台账再改代码。 |
 | `standards/document/设计真相源闭环与可落码性标准.md` | no self-invented schema/port/state/mapper/config/evidence, propagation outcome, body-free adapter and terminal retry rules | pending | 缺 publisher/handoff outcome、retry target、terminal guard 或 evidence schema 时必须暂停。 |
 | `projects/L1-identity/07-实施计划.md` | §3.5、§6、§7、§9、§11 的 `commit-07-c` boundary、gate、commit body 和 handoff 要求 | pending | 当前 boundary、门禁、提交信息来源。 |
 | `projects/L1-identity/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | PH-07 / `commit-07-c` 的 BATCH-07-06~08、scope、经验复核、停审记录 | pending | publish / deliver / retry propagation family 的正式边界来源。 |
@@ -119,7 +119,7 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ID-07C-LEDGER-001 | design_gate | resolved | `implementation-boundaries/commit-07-c.md` was missing while formal Step 6/7/11 already defined `commit-07-c`; implementation would block after `commit-07-b` handoff. | This planned boundary ledger defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. It is not current until the project ledger advances. | wait_until_current |
+| BLK-ID-07C-LEDGER-001 | design_gate | resolved | `implementation-boundaries/commit-07-c.md` was missing while formal Step 6/7/11 already defined `commit-07-c`; implementation would block after `commit-07-b` handoff. | This boundary ledger defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate, and the project ledger now advances to `commit-07-c`. | read_docs |
 
 ---
 
@@ -127,4 +127,4 @@
 
 | item | conclusion | action |
 |---|---|---|
-| BLK-ID-07C-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` requires next-boundary advancement after implementation handoff. This precreation prevents a missing-file blocker, but the project ledger must still advance after `commit-07-b` is actually complete. |
+| BLK-ID-07C-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` requires next-boundary advancement after implementation handoff. This fix advances the project ledger after `commit-07-b` completed at `9c0a5ca` / `0475d1a`; no new standard rule is needed. |

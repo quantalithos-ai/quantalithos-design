@@ -7,9 +7,9 @@
 | phase | PH-07 Operations job / propagation / maintenance slices |
 | design_baseline | `current-design-with-commit-07-b-reference-refresh-selection-key-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | maintenance job family after implementation reported `commit-07-a` complete; exact `commit-07-a` implementation hash was not supplied, so this boundary starts from the design ledger baseline and covers BATCH-07-03~05, `TC-ID-JOB-001~003`, `TC-ID-JOB-008`, related `TC-ID-IDEMP-*`, related `TC-ID-QUERY-*` and no-repair/write-audit evidence; reference refresh selection key closure is included in this same `commit-07-b` boundary |
+| status | implemented |
+| next_allowed_action | handoff_complete |
+| current_recovery_point | maintenance job family completed by implementation repo commits `9c0a5ca` and `0475d1a`; project ledger advances to `commit-07-c` for propagation jobs |
 
 ---
 
@@ -108,13 +108,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after commit. |
-| committed_message | pending | Fill after commit. |
-| gates_run | pending | List exact commands and reports. |
-| tests_not_run | pending | Must state none or explain. |
-| remaining_blockers | pending | Must reference blocker table. |
-| next_boundary | pending | Expected next boundary: `commit-07-c`. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | `9c0a5ca` code commit;`0475d1a` run-scoped evidence commit. |
+| committed_message | pass | `feat(identity-jobs): add maintenance job family`;`test(identity-jobs): add commit-07-b run evidence`. |
+| gates_run | pass | Implementation handoff reports commit-07-b code and run evidence completed; detailed command evidence remains in implementation repo reports. |
+| tests_not_run | pass | No unrun test exception was reported in the handoff. |
+| remaining_blockers | pass | No remaining `commit-07-b` design blocker reported; next blocker was only project ledger advancement to `commit-07-c`. |
+| next_boundary | pass | Project ledger advances to `commit-07-c`. |
+| user_owned_changes_untouched | pass | Implementation handoff reported only untracked `.codex/` and `target/` remained untouched. |
 
 ---
 
@@ -137,3 +137,4 @@
 | BLK-ID-07B-MAINTENANCE-JOB-PORTS-001 | reusable experience required | Added `MEM-ID-013` to `projects/L1-identity/07-实施计划.md` and updated `standards/document/设计真相源闭环与可落码性标准.md` with maintenance job plan / resolver outcome / target inspection positive/negative examples and pre-boundary checklist. Implementation agent must check this before adding or changing rebuild/refresh/reconciliation maintenance jobs. |
 | BLK-ID-07B-MEMBER-SUMMARY-VIEW-INPUT-001 | reusable experience required | Added `MEM-ID-014` to `projects/L1-identity/07-实施计划.md` and updated `standards/document/设计真相源闭环与可落码性标准.md` with projection rebuild view body-field input closure. Implementation agent must check this before adding or changing any projection rebuild writer. |
 | BLK-ID-07B-REFERENCE-REFRESH-SELECTION-KEY-001 | reusable experience required | Added `MEM-ID-015` to `projects/L1-identity/07-实施计划.md` and updated `standards/document/设计真相源闭环与可落码性标准.md` with reference refresh selection bundle-key closure. Implementation agent must check this before adding or changing owner/kind/stale/scope reference refresh selection. |
+| commit-07-b handoff to commit-07-c | existing reusable memory applies | `MEM-ID-012` already requires design-side next-boundary advancement after implementation handoff. This fix applies it to the actual `commit-07-b` handoff and records implementation commits `9c0a5ca` / `0475d1a`; no new standard rule is needed. |

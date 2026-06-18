@@ -14,14 +14,14 @@
 | project | L1-identity |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| current_design_baseline | `current-design-with-commit-07-b-reference-refresh-selection-key-closure` |
-| current_boundary | `commit-07-b` |
+| current_design_baseline | `current-design-with-commit-07-c-active-ledger` |
+| current_boundary | `commit-07-c` |
 | gate_status | ready_for_design_gate |
-| gate_reason | implementation agent reported `commit-07-a` complete and requested the next PH-07 boundary; exact implementation commit hash was not supplied in the handoff, so this ledger does not fabricate one; `commit-07-b` maintenance job family boundary is ready; blockers `BLK-ID-07B-MAINTENANCE-JOB-PORTS-001`, `BLK-ID-07B-MEMBER-SUMMARY-VIEW-INPUT-001` and `BLK-ID-07B-REFERENCE-REFRESH-SELECTION-KEY-001` are resolved by formal member summary rebuild view input plan, external reference resolver outcome, reference refresh selection bundle keys and maintenance target inspection ports; later `commit-07-c` and `commit-08-a/b/c` ledgers are precreated as planned future boundaries but are not current |
+| gate_reason | implementation agent reported `commit-07-b` complete with code commit `9c0a5ca` and run evidence commit `0475d1a`; this handoff closes the maintenance job family boundary and advances the project ledger to `commit-07-c`; `commit-07-c` propagation job family boundary is ready for Design Gate; later `commit-08-a/b/c` ledgers remain planned future boundaries and are not current |
 | next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | `commit-07-b` opening boundary / PH-07 projection rebuild, external reference refresh and reconciliation maintenance job family; excludes propagation publish/deliver/retry jobs, entry runner and PH-08 release scripts |
+| current_recovery_point | `commit-07-c` opening boundary / PH-07 publish, deliver and retry propagation job family; excludes API/worker/jobs entry wiring, runtime/config binding and PH-08 scripts |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-18 09:26:23 +0800 |
+| last_updated_at | 2026-06-18 11:23:44 +0800 |
 
 ---
 
@@ -38,8 +38,8 @@
 | `commit-06-b` | `4a18d7a` | implemented | handoff_gate | advance_to_commit_06_c | Implementation repo reports `commit-06-b` supporting commits `12aa1ae`, `df6b21e`, code commit `2ae3bad` and run-scoped evidence commit `dde1dfc`; `GATE-06`, `GATE-03` subset and `GATE-10` evidence passed for run `20260617T032600+0800`. |
 | `commit-06-c` | `current-design-with-commit-06-c-ledger` | implemented | handoff_gate | advance_to_commit_07_a | Implementation agent reports `commit-06-c` complete; exact code/evidence commit hash was not supplied in the blocker handoff, so this ledger does not fabricate one. |
 | `commit-07-a` | `current-design-with-commit-07-a-ledger` | implemented | handoff_gate | advance_to_commit_07_b | Implementation agent reports `commit-07-a` complete; exact code/evidence commit hash was not supplied in the handoff, so this ledger does not fabricate one. |
-| `commit-07-b` | `current-design-with-commit-07-b-reference-refresh-selection-key-closure` | ready | design_gate | read_docs | Maintenance job family; member summary rebuild view inputs, reference refresh selection keys, resolver outcome sidecar and target inspection context now formally closed; read `implementation-boundaries/commit-07-b.md` before implementation. |
-| `commit-07-c` | `current-design-with-precreated-commit-07-c-ledger` | planned | design_gate | wait_until_current | Propagation job family; boundary ledger is precreated and must become current only after `commit-07-b` handoff. |
+| `commit-07-b` | `current-design-with-commit-07-b-reference-refresh-selection-key-closure` | implemented | handoff_gate | advance_to_commit_07_c | Implementation repo reports `commit-07-b` code completed at `9c0a5ca` and run-scoped evidence committed at `0475d1a`; maintenance job family handoff is closed. |
+| `commit-07-c` | `current-design-with-commit-07-c-active-ledger` | ready | design_gate | read_docs | Propagation job family; project ledger now points here; read `implementation-boundaries/commit-07-c.md` before implementation. |
 | `commit-08-a` | `current-design-with-precreated-commit-08-a-ledger` | planned | design_gate | wait_until_current | Entry wiring and runtime config; boundary ledger is precreated and must become current only after `commit-07-c` handoff. |
 | `commit-08-b` | `current-design-with-precreated-commit-08-b-ledger` | planned | design_gate | wait_until_current | Gate scripts and artifact/report writer; boundary ledger is precreated and must become current only after `commit-08-a` handoff. |
 | `commit-08-c` | `current-design-with-precreated-commit-08-c-ledger` | planned | design_gate | wait_until_current | Release evidence and acceptance handoff; boundary ledger is precreated and must become current only after `commit-08-b` handoff. |
@@ -68,7 +68,7 @@
 | BLK-ID-07B-MAINTENANCE-JOB-PORTS-001 | `commit-07-b` | implementation | resolved | `current-design-with-commit-07-b-maintenance-job-port-closure` | Step 6/7/9/11/12/13 now define `MemberSummaryProjectionRebuildPlan`, `ExternalReferenceResolutionOutcome`, `IdentityMaintenanceInspectionContext`, matching ports and issue mapper methods; implementation agent must restart Design Gate and copy these outputs rather than derive from opaque refs/state/summary/fake maps. |
 | BLK-ID-07B-MEMBER-SUMMARY-VIEW-INPUT-001 | `commit-07-b` | implementation | resolved | `current-design-with-commit-07-b-member-summary-view-input-closure` | Step 6/7/9/11/12/13 now define `MemberSummaryProjectionRebuildViewInput`; `get_member_summary_rebuild_plan(...)` returns complete non-empty view inputs, and implementation must construct `MemberSummaryView` only from those inputs rather than deriving fields from projection/scope/view/config/error/fake maps. |
 | BLK-ID-07B-REFERENCE-REFRESH-SELECTION-KEY-001 | `commit-07-b` | implementation | resolved | `current-design-with-commit-07-b-reference-refresh-selection-key-closure` | Step 7/8/9/11/12/13 now require reference refresh owner/kind/stale/scope selection ports to return `ExternalReferenceRef` bundle keys directly; implementation agent must load each selected bundle through `get_reference_state_with_version(...)` and must not reverse lookup bundle keys from `ReferenceResolutionStateRef`, strings, sibling stores or fake private maps. |
-| BLK-ID-07C-LEDGER-001 | `commit-07-c` | implementation | resolved | `current-design-with-precreated-commit-07-c-ledger` | `implementation-boundaries/commit-07-c.md` now exists as a planned future boundary. It must not be implemented until the project ledger advances from `commit-07-b` after handoff. |
+| BLK-ID-07C-LEDGER-001 | `commit-07-c` | implementation | resolved | `current-design-with-commit-07-c-active-ledger` | `implementation-boundaries/commit-07-c.md` now exists and the project ledger advances to `commit-07-c`; implementation agent must continue from `read_current_boundary_ledger` and advance gates before code changes. |
 | BLK-ID-08A-LEDGER-001 | `commit-08-a` | implementation | resolved | `current-design-with-precreated-commit-08-a-ledger` | `implementation-boundaries/commit-08-a.md` now exists as a planned future boundary. It must not be implemented until the project ledger advances from `commit-07-c` after handoff. |
 | BLK-ID-08B-LEDGER-001 | `commit-08-b` | implementation | resolved | `current-design-with-precreated-commit-08-b-ledger` | `implementation-boundaries/commit-08-b.md` now exists as a planned future boundary. It must not be implemented until the project ledger advances from `commit-08-a` after handoff. |
 | BLK-ID-08C-LEDGER-001 | `commit-08-c` | implementation | resolved | `current-design-with-precreated-commit-08-c-ledger` | `implementation-boundaries/commit-08-c.md` now exists as a planned future boundary. It must not be implemented until the project ledger advances from `commit-08-b` after handoff. |
@@ -80,7 +80,7 @@
 Any implementation agent resuming `L1-identity` must read files in this order:
 
 1. `projects/L1-identity/design-calibration/implementation_execution_ledger.md`
-2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-07-b.md`
+2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-07-c.md`
 3. `projects/L1-identity/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-identity/.codex/implementation_ledger.md`
@@ -94,4 +94,5 @@ If any required design source is missing or contradicts the current boundary, se
 | range | status | decision |
 |---|---|---|
 | `commit-01-a`~`commit-04-a` | historical before implementation ledger adoption | Do not fabricate per-boundary execution ledgers or implementation hashes retroactively. If a future audit requires these files, create explicit retrospective ledgers marked `historical`, not current execution gates. |
-| `commit-07-c`~`commit-08-c` | planned future boundaries | Boundary ledger files are precreated to remove the same missing-file blocker class. They become actionable only when `current_boundary` is advanced by the project ledger after the previous implementation handoff. |
+| `commit-07-c` | active current boundary | This boundary became actionable after the `commit-07-b` implementation handoff recorded code commit `9c0a5ca` and evidence commit `0475d1a`. |
+| `commit-08-a`~`commit-08-c` | planned future boundaries | Boundary ledger files are precreated to remove the same missing-file blocker class. They become actionable only when `current_boundary` is advanced by the project ledger after the previous implementation handoff. |

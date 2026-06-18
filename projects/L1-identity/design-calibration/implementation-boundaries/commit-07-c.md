@@ -7,9 +7,9 @@
 | phase | PH-07 Operations job / propagation / maintenance slices |
 | design_baseline | `current-design-with-commit-07-c-active-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | active propagation job family boundary after `commit-07-b` implementation handoff; covers publish, deliver and retry job bodies and excludes PH-08 entry/runtime/report scripts |
+| status | implemented |
+| next_allowed_action | handoff_complete |
+| current_recovery_point | propagation job family boundary completed by implementation commits `9bd5dc0` and `75ca2ee`; project ledger advances to `commit-08-a` |
 
 ---
 
@@ -105,13 +105,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after commit. |
-| committed_message | pending | Fill after commit. |
-| gates_run | pending | List exact commands and reports. |
-| tests_not_run | pending | Must state none or explain. |
-| remaining_blockers | pending | Must reference blocker table. |
-| next_boundary | pending | Expected next boundary: `commit-08-a`. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation handoff records code commit `9bd5dc0` and run evidence commit `75ca2ee`. |
+| committed_message | pass | `9bd5dc0 test(identity-jobs): add propagation retryable coverage`;`75ca2ee test(identity-jobs): add commit-07-c run evidence`. |
+| gates_run | pass | Implementation handoff states commit-07-c code and run evidence completed; detailed command/report evidence remains in the implementation repo artifacts and reports. |
+| tests_not_run | pass | No omitted tests were reported in the implementation handoff. |
+| remaining_blockers | pass | No remaining `commit-07-c` design blocker in this handoff; the only reported blocker was project ledger advancement to `commit-08-a`. |
+| next_boundary | pass | Project ledger advances to `commit-08-a`. |
+| user_owned_changes_untouched | pass | Implementation handoff reported only untracked `.codex/` and `target/` left untouched. |
 
 ---
 
@@ -127,4 +127,4 @@
 
 | item | conclusion | action |
 |---|---|---|
-| BLK-ID-07C-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` requires next-boundary advancement after implementation handoff. This fix advances the project ledger after `commit-07-b` completed at `9c0a5ca` / `0475d1a`; no new standard rule is needed. |
+| commit-07-c handoff to commit-08-a | existing reusable memory applies | `MEM-ID-012` requires next-boundary advancement after implementation handoff. This fix advances the project ledger after `commit-07-c` completed at `9bd5dc0` / `75ca2ee`; no new standard rule is needed. |

@@ -5,11 +5,11 @@
 | project | L1-identity |
 | boundary_id | commit-08-a |
 | phase | PH-08 Entry / config / scripts / evidence release closure |
-| design_baseline | `current-design-with-precreated-commit-08-a-ledger` |
+| design_baseline | `current-design-with-commit-08-a-active-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | planned |
-| next_allowed_action | wait_until_project_ledger_points_here |
-| current_recovery_point | precreated entry wiring and runtime config boundary; not current until `implementation_execution_ledger.md` advances from `commit-07-c` after implementation handoff |
+| status | ready |
+| next_allowed_action | read_docs |
+| current_recovery_point | active entry wiring and runtime config boundary after `commit-07-c` implementation handoff; covers API, worker and jobs entry facade wiring and runtime config; excludes `commit-08-b/c` report/evidence scripts and release closure |
 
 ---
 
@@ -17,7 +17,7 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | Design Gate、Scope Gate、Commit Gate、Handoff Gate 和 blocker 回流记录 | pending | 先按项目级台账确认当前 boundary 是否已推进到 `commit-08-a`。 |
+| `standards/document/代码实施台账与门禁规范.md` | Design Gate、Scope Gate、Commit Gate、Handoff Gate 和 blocker 回流记录 | pending | 项目级台账当前已推进到 `commit-08-a`;仍须先读台账再改代码。 |
 | `standards/document/设计真相源闭环与可落码性标准.md` | entry facade, config binding, dependency boundary, no self-invented schema/port/state/mapper/config/evidence rules | pending | 缺 entry schema、runtime constructor、config key、adapter availability 或 dependency rule 时必须暂停。 |
 | `projects/L1-identity/07-实施计划.md` | §3.5、§6、§7、§9、§11 的 `commit-08-a` boundary、gate、commit body 和 handoff 要求 | pending | 当前 boundary、门禁、提交信息来源。 |
 | `projects/L1-identity/04-配置设计.md` | profile、adapter mode、runtime builder、config source、strict failure and redline rules | pending | Runtime/config 只能绑定正式配置语义,不得新增临时 env/flag。 |
@@ -119,7 +119,7 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ID-08A-LEDGER-001 | design_gate | resolved | `implementation-boundaries/commit-08-a.md` was missing while formal Step 6/7/11 already defined `commit-08-a`; implementation would block after `commit-07-c` handoff. | This planned boundary ledger defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. It is not current until the project ledger advances. | wait_until_current |
+| BLK-ID-08A-LEDGER-001 | design_gate | resolved | `implementation-boundaries/commit-08-a.md` was missing while formal Step 6/7/11 already defined `commit-08-a`; implementation would block after `commit-07-c` handoff. | This boundary ledger defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate, and the project ledger now advances to `commit-08-a`. | read_docs |
 
 ---
 
@@ -127,4 +127,4 @@
 
 | item | conclusion | action |
 |---|---|---|
-| BLK-ID-08A-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` applies. This precreated ledger does not open PH-08 by itself; project ledger advancement remains required after `commit-07-c` completion. |
+| BLK-ID-08A-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` applies. This fix opens PH-08 after `commit-07-c` completed at `9bd5dc0` / `75ca2ee`; no new standard rule is needed. |

@@ -4070,8 +4070,8 @@ pub enum IdentityHandoffDeliveryScopeDto {
 | `ExplicitProjectionRefs` | exact `IdentityProjectionRef` load/save | 不从 view ref、member id 或 scope string 拼 projection ref |
 | `StaleInMaintenanceScope` | outer `maintenance_scope_ref` + `IdentityProjectionRepository.list_stale_projection_states(...)` 或 `IdentityMaintenanceRepository.list_projection_targets_for_rebuild(...)` | 不全表扫描;不在 enum 内重复 scope 字段造成 mismatch |
 | `ExplicitReferenceRefs` | `IdentityReferenceStateRepository.get_reference_state_with_version(...)` | 不把 business source ref 自动当 reference bundle |
-| `StaleInMaintenanceScope` reference | outer `maintenance_scope_ref` + `IdentityReferenceStateRepository.list_stale_reference_states(...)` / `IdentityMaintenanceRepository.list_reference_targets_for_refresh(...)` | 不从 external ref 前缀猜 scope |
-| `ByOwner` / `ByKind` | `list_reference_states_by_owner(...)` / `list_reference_states_by_kind(...)` | owner/kind 必须是 typed ref/enum |
+| `StaleInMaintenanceScope` reference | outer `maintenance_scope_ref` + `IdentityReferenceStateRepository.list_stale_reference_states(...)` / `IdentityMaintenanceRepository.list_reference_targets_for_refresh(...)`,both returning `ExternalReferenceRef` bundle keys | 不从 external ref 前缀猜 scope;不从 `ReferenceResolutionStateRef` 反查 bundle |
+| `ByOwner` / `ByKind` | `list_reference_states_by_owner(...)` / `list_reference_states_by_kind(...)`,returning `ExternalReferenceRef` bundle keys | owner/kind 必须是 typed ref/enum;不得返回 state ref 后由 service 解析或扫描 sibling store |
 | propagation retry scope | `list_retryable_outbox_records(...)` 或 `list_retryable_handoff_intents(...)` | 单次 job run 只处理一种 retry family,避免一个 cursor/page 同时表达两条列表;组合调度留 Step 14 |
 | reconciliation target scope | explicit targets 或 `IdentityMaintenanceRepository.expand_maintenance_targets(...)` | 不从 report history 反推本次目标 |
 | handoff delivery scope | exact intent refs 或 `TraceHandoffIntentRepository.list_handoff_intents_by_target(...)` | 不支持“未指定目标时扫全量”;不得扫所有 intent |

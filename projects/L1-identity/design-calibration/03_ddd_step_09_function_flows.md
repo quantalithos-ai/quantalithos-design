@@ -3789,9 +3789,9 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
   | start report
   | resolve reference targets:
   |   ExplicitReferenceRefs -> exact input refs
-  |   StaleInMaintenanceScope -> list_stale_reference_states(...) or list_reference_targets_for_refresh(...)
-  |   ByOwner -> list_reference_states_by_owner(...)
-  |   ByKind -> list_reference_states_by_kind(...)
+  |   StaleInMaintenanceScope -> list_stale_reference_states(...) or list_reference_targets_for_refresh(...), both returning ExternalReferenceRef page
+  |   ByOwner -> list_reference_states_by_owner(...), returning ExternalReferenceRef page
+  |   ByKind -> list_reference_states_by_kind(...), returning ExternalReferenceRef page
   | for each external_reference_ref in page order:
   |   load ReferenceResolutionState with version
   |   if missing:
@@ -3832,6 +3832,7 @@ Handoff delivery 的 retryable/permanent failure outcome 必须带 `HandoffAttem
 | owner source | resolver owner is `loaded.reference_owner_ref`;do not infer owner from external ref string |
 | sidecar scope | sidecar refs attach to the same `ExternalReferenceRef` bundle;no cross-bundle version reuse |
 | resolver output | typed sidecar refs only come from `ExternalReferenceResolutionOutcome.typed_sidecar_refs`;service must not derive sidecars from returned state,source version,safe summary or error text |
+| target selection key | owner/kind/stale/scope selection returns `ExternalReferenceRef`;service must not receive `ReferenceResolutionStateRef` and reverse lookup/parse it into bundle key |
 | unavailable/unrecognized | visible failed item with issue ref;do not create default safe summary |
 | resolver ApplicationError | mapped through `reference_refresh_failed_issue(...)`;raw error body is not stored or parsed |
 | external body | resolver may return safe refs/state only;external truth body never enters report or state |
@@ -4106,7 +4107,7 @@ Operations job 统一从 `IdentityJobRequest<T>` 进入 application facade,由 a
 
 `RebuildIdentityProjectionFlow` 通过 explicit projection refs 或 maintenance scope expansion 选择 projection target,加载 `ProjectionState` 与 version,经 `ReconciliationPolicy::for_projection_rebuild(...)` 断言 no truth repair 后标记 rebuild pending。当前正式 projection body writer 只覆盖 member summary:flow 必须调用 `get_member_summary_rebuild_plan(projection_ref)` 取得 non-empty `MemberSummaryProjectionRebuildViewInput[]`,每项已经携带 `MemberSummaryView::from_projection(...)` 所需 view ref、member ref、visibility scope、safe slices、visibility result、read surface、source cursor、freshness marker 和 material marker,再通过 `save_member_summary_view(...)` 保存 body-free view。缺 writer、缺 rebuild plan / input、缺 source cursor 或 rebuild failure 只能进入 failed item/report issue,不得私造 view writer、从 projection/scope/view/config/fake map 推 scope或 view 体字段、用 timestamp/page cursor/version 代替 cursor,也不得修改 core truth。
 
-`RefreshExternalReferenceStateFlow` 通过 explicit refs、stale-in-scope、owner 或 kind 选择 `ExternalReferenceRef` bundle,先加载 `ReferenceResolutionState` 与 version,再调用 `IdentityExternalReferenceResolverPort.resolve_external_reference(reference_ref, owner_ref)`。Resolver 必须返回 `ExternalReferenceResolutionOutcome { state, typed_sidecar_refs }`;保存 returned state 和 optional typed sidecar refs 时必须使用同一 bundle 的 loaded version,不得把 source version 或 business source ref 当 expected_version / bundle key,也不得从 returned state、safe summary、source version 或 error 文本反推 sidecar。Unavailable、unrecognized、refresh failed 必须显式进入 failed refs 与 safe issue marker。
+`RefreshExternalReferenceStateFlow` 通过 explicit refs、stale-in-scope、owner 或 kind 选择 `ExternalReferenceRef` bundle;owner/kind/stale/scope list ports 必须直接返回 `ExternalReferenceRef`,不得返回 `ReferenceResolutionStateRef` 后由 service/fake 反查、解析或扫描 sibling store。flow 先加载 `ReferenceResolutionState` 与 version,再调用 `IdentityExternalReferenceResolverPort.resolve_external_reference(reference_ref, owner_ref)`。Resolver 必须返回 `ExternalReferenceResolutionOutcome { state, typed_sidecar_refs }`;保存 returned state 和 optional typed sidecar refs 时必须使用同一 bundle 的 loaded version,不得把 source version 或 business source ref 当 expected_version / bundle key,也不得从 returned state、safe summary、source version 或 error 文本反推 sidecar。Unavailable、unrecognized、refresh failed 必须显式进入 failed refs 与 safe issue marker。
 
 `RunIdentityReconciliationFlow` 只生成 report-only material。flow 通过 explicit target 或 maintenance expansion 获取 target refs 后,必须调用 `load_maintenance_target_inspection_context(target_ref)` 取得 typed loaded projection/reference/report state context,再使用 `ReconciliationPolicy::for_reconciliation(...)`、`assert_report_only(...)`、`assert_not_truth_write(...)` 和 `assert_not_cross_repo_repair(...)` 保证 finding 不变成 repair action。Finding / issue refs 只能来自 safe finding material 与 `inspection.loaded_target`,最后保存 `ReconciliationReport::generated(...)` 或 `no_finding(...)` / `failed(...)`;service/fake 不得解析 opaque target marker 或扫描 sibling store。
 

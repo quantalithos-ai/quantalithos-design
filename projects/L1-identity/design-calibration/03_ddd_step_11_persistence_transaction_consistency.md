@@ -343,9 +343,9 @@ Step 11 的目标是把 Step 6 的对象字段、Step 7 的 repository / UnitOfW
 | `IdentityReadVisibilityRepository.save_visibility_decision` | visibility decision material | create `None`;update loaded decision version;UoW write | optional material only;query 不写 truth |
 | `IdentityReferenceStateRepository.get_reference_state_with_version` | `external_reference_states` by `ExternalReferenceRef` | returns bundle version | version 是 state/sidecar save expected_version 来源 |
 | `IdentityReferenceStateRepository.find_reference_state_ref` | reference state lookup by external ref | read-only | missing 不创建 bundle |
-| `IdentityReferenceStateRepository.list_reference_states_by_owner` | owner index | page cursor only | owner 来自 formal mapper;不从 external ref 推断 |
-| `IdentityReferenceStateRepository.list_reference_states_by_kind` | reference kind index | page cursor only | kind 是 enum;不解析 string prefix |
-| `IdentityReferenceStateRepository.list_stale_reference_states` | maintenance scope + stale index | page cursor only | query 不触发 refresh |
+| `IdentityReferenceStateRepository.list_reference_states_by_owner` | owner -> `ExternalReferenceRef` bundle index | page cursor only | owner 来自 formal mapper;selection 直接返回 bundle key;不返回 state ref 后反查 |
+| `IdentityReferenceStateRepository.list_reference_states_by_kind` | reference kind -> `ExternalReferenceRef` bundle index | page cursor only | kind 是 enum;selection 直接返回 bundle key;不解析 string prefix 或 state ref |
+| `IdentityReferenceStateRepository.list_stale_reference_states` | maintenance scope + stale -> `ExternalReferenceRef` bundle index | page cursor only | query 不触发 refresh;selection 直接返回 bundle key |
 | `IdentityReferenceStateRepository.get_typed_sidecar_refs` | `external_reference_sidecars` by `reference_ref` | read-only | all sidecars same bundle;不保存 external body |
 | `IdentityReferenceStateRepository.save_reference_state` | `external_reference_states` PK/unique external ref | create `None`;update loaded bundle version;UoW write | 不修复 external truth |
 | `IdentityReferenceStateRepository.save_typed_sidecar_refs` | sidecar set by `(reference_ref, sidecar_kind, sidecar_ref)` | expected loaded bundle version;UoW write | 不把 business source ref 当 bundle key;不跨 bundle 共用 version |

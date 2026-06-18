@@ -2085,19 +2085,19 @@ pub trait IdentityReferenceStateRepository {
         &self,
         owner_ref: IdentityReferenceOwnerRef,
         page: IdentityRepositoryPage,
-    ) -> Result<Page<VersionedRef<ReferenceResolutionStateRef>>, ApplicationError>;
+    ) -> Result<Page<ExternalReferenceRef>, ApplicationError>;
 
     async fn list_reference_states_by_kind(
         &self,
         reference_kind: ExternalReferenceKind,
         page: IdentityRepositoryPage,
-    ) -> Result<Page<VersionedRef<ReferenceResolutionStateRef>>, ApplicationError>;
+    ) -> Result<Page<ExternalReferenceRef>, ApplicationError>;
 
     async fn list_stale_reference_states(
         &self,
         maintenance_scope_ref: MaintenanceScopeRef,
         page: IdentityRepositoryPage,
-    ) -> Result<Page<VersionedRef<ReferenceResolutionStateRef>>, ApplicationError>;
+    ) -> Result<Page<ExternalReferenceRef>, ApplicationError>;
 
     async fn get_typed_sidecar_refs(
         &self,
@@ -2143,9 +2143,9 @@ pub struct ExternalReferenceResolutionOutcome {
 |---|---|---|---|
 | `get_reference_state_with_version` | refresh/update/typed sidecar save precheck | returned version 是 `save_reference_state` / `save_typed_sidecar_refs` expected_version 来源 | 不用 source version 当 expected_version |
 | `find_reference_state_ref` | query/report lightweight lookup | only returns state ref | missing 不创建 reference bundle |
-| `list_reference_states_by_owner` | owner query/report/refresh scan | owner ref 来自 local typed owner mapper | 不从 external ref 推 owner |
-| `list_reference_states_by_kind` | maintenance scan | kind 是 enum,不是 string prefix | 不全表 body scan |
-| `list_stale_reference_states` | refresh job selection | stale 来自 `ReferenceResolutionState` | query 不触发 refresh |
+| `list_reference_states_by_owner` | owner query/report/refresh scan | returns `ExternalReferenceRef` bundle keys selected by owner index;caller must load each bundle through `get_reference_state_with_version(...)` before save/resolve | 不返回 `ReferenceResolutionStateRef` 后让 service 反查 bundle;不从 external ref 推 owner |
+| `list_reference_states_by_kind` | maintenance scan | returns `ExternalReferenceRef` bundle keys selected by typed kind index;caller must load each bundle through `get_reference_state_with_version(...)` before save/resolve | 不返回 state ref 后解析;不从 string prefix 推 kind |
+| `list_stale_reference_states` | refresh job selection | returns `ExternalReferenceRef` bundle keys selected by stale + maintenance scope index;stale comes from saved `ReferenceResolutionState` | query 不触发 refresh;不从 stale state ref 反查 bundle |
 | `get_typed_sidecar_refs` | loaded reference query/report | sidecar refs 都属于同一 reference bundle | 不保存 external body |
 | `save_reference_state` | create/update resolution state | create `None`;update loaded version | 不修复 external truth |
 | `save_typed_sidecar_refs` | consumer/refresh save safe sidecars | must pass same `reference_ref` and loaded bundle version | 不把 business source ref 当 bundle key;不跨 bundle 共用 version |

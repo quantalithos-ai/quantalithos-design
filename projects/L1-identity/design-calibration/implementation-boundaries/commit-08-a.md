@@ -7,9 +7,9 @@
 | phase | PH-08 Entry / config / scripts / evidence release closure |
 | design_baseline | `current-design-with-commit-08-a-active-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | active entry wiring and runtime config boundary after `commit-07-c` implementation handoff; covers API, worker and jobs entry facade wiring and runtime config; excludes `commit-08-b/c` report/evidence scripts and release closure |
+| status | implemented |
+| next_allowed_action | handoff_complete |
+| current_recovery_point | entry wiring and runtime config boundary completed by implementation commits `95ee4c6`, `db3b895` and `2f01025`; project ledger advances to `commit-08-b` |
 
 ---
 
@@ -105,13 +105,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after commit. |
-| committed_message | pending | Fill after commit. |
-| gates_run | pending | List exact commands and reports. |
-| tests_not_run | pending | Must state none or explain. |
-| remaining_blockers | pending | Must reference blocker table. |
-| next_boundary | pending | Expected next boundary: `commit-08-b`. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation handoff records entry wiring commit `95ee4c6`, config redline coverage commit `db3b895` and run evidence commit `2f01025`. |
+| committed_message | pass | `95ee4c6 feat(identity-entry): add entry wiring and runtime config`;`db3b895 test(identity-infra): add config redline coverage`;`2f01025 test(identity-entry): add commit-08-a run evidence`. |
+| gates_run | pass | Implementation handoff states `commit-08-a` completed and includes a run evidence commit; detailed command/report evidence remains in the implementation repo artifacts and reports. |
+| tests_not_run | pass | No omitted tests were reported in the implementation handoff. |
+| remaining_blockers | pass | No remaining `commit-08-a` schema/port/DTO blocker in this handoff; the only reported blocker was project ledger advancement to `commit-08-b`. |
+| next_boundary | pass | Project ledger advances to `commit-08-b`. |
+| user_owned_changes_untouched | pass | No user-owned implementation changes were reported in the handoff; design-side unrelated working tree changes remain unstaged. |
 
 ---
 
@@ -127,4 +127,4 @@
 
 | item | conclusion | action |
 |---|---|---|
-| BLK-ID-08A-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` applies. This fix opens PH-08 after `commit-07-c` completed at `9bd5dc0` / `75ca2ee`; no new standard rule is needed. |
+| commit-08-a handoff to commit-08-b | existing reusable memory applies | `MEM-ID-012` requires next-boundary advancement after implementation handoff. This fix advances the project ledger after `commit-08-a` completed at `95ee4c6` / `db3b895` / `2f01025`; no new standard rule is needed. |

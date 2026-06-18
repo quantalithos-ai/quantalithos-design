@@ -5,11 +5,11 @@
 | project | L1-identity |
 | boundary_id | commit-08-b |
 | phase | PH-08 Entry / config / scripts / evidence release closure |
-| design_baseline | `current-design-with-precreated-commit-08-b-ledger` |
+| design_baseline | `current-design-with-commit-08-b-active-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | planned |
-| next_allowed_action | wait_until_project_ledger_points_here |
-| current_recovery_point | precreated gate/report/check scripts and run-scoped artifact/report writer boundary; not current until `implementation_execution_ledger.md` advances from `commit-08-a` after implementation handoff |
+| status | ready |
+| next_allowed_action | read_docs |
+| current_recovery_point | active gate/report/check scripts and run-scoped artifact/report writer boundary after `commit-08-a` implementation handoff; excludes release smoke, final evidence index, acceptance handoff and final veto checklist |
 
 ---
 
@@ -17,7 +17,7 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | Design Gate、Scope Gate、Commit Gate、Handoff Gate 和 blocker 回流记录 | pending | 先按项目级台账确认当前 boundary 是否已推进到 `commit-08-b`。 |
+| `standards/document/代码实施台账与门禁规范.md` | Design Gate、Scope Gate、Commit Gate、Handoff Gate 和 blocker 回流记录 | pending | 项目级台账当前已推进到 `commit-08-b`;仍须先读台账再改代码。 |
 | `standards/document/设计真相源闭环与可落码性标准.md` | machine artifact schema, report pairing, no static evidence, redaction and no self-invented evidence rules | pending | 缺 JSON schema、digest rule、writer owner、TC/EV/AC/VETO traceability 或 report path 时必须暂停。 |
 | `projects/L1-identity/07-实施计划.md` | §3.5、§6、§7、§9、§11 的 `commit-08-b` boundary、gate、commit body 和 handoff 要求 | pending | 当前 boundary、门禁、提交信息来源。 |
 | `projects/L1-identity/05-测试方案.md` | automation gates, raw artifact, report generation, evidence index and report audit sections | pending | Artifact/report fields and run-scoped output root must come from formal test plan. |
@@ -114,7 +114,7 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ID-08B-LEDGER-001 | design_gate | resolved | `implementation-boundaries/commit-08-b.md` was missing while formal Step 6/7/11 already defined `commit-08-b`; implementation would block after `commit-08-a` handoff. | This planned boundary ledger defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate. It is not current until the project ledger advances. | wait_until_current |
+| BLK-ID-08B-LEDGER-001 | design_gate | resolved | `implementation-boundaries/commit-08-b.md` was missing while formal Step 6/7/11 already defined `commit-08-b`; implementation would block after `commit-08-a` handoff. | This boundary ledger defines required reads, allowed scope, required checks, Commit Gate and Handoff Gate, and the project ledger now advances to `commit-08-b`. | read_docs |
 
 ---
 
@@ -122,4 +122,4 @@
 
 | item | conclusion | action |
 |---|---|---|
-| BLK-ID-08B-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` applies. This ledger also preserves the report/evidence lesson: capability scripts may be built here, but final acceptance must wait for `commit-08-c` actual run evidence. |
+| BLK-ID-08B-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` applies. This fix opens report/evidence tooling after `commit-08-a` completed at `95ee4c6` / `db3b895` / `2f01025`; final acceptance still waits for `commit-08-c` actual run evidence, so no new standard rule is needed. |

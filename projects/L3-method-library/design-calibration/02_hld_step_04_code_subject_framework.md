@@ -1,530 +1,527 @@
-# Step 4. 代码主体框架映射
+# L3-method-library 02 概要 Step 4: 代码主体框架映射
 
-## 1. Step 状态
-
-- 状态：[x] 已确认
-- 对应 SOP：`standards/document/概要设计讨论流程_SOP.md` Step 4
-- 回填章节：`projects/L3-method-library/02-概要设计.md` §4 代码主体框架总览
+> 创建日期: 2026-06-16
+> 状态: completed
+> 当前模式: full-restart
+> 文档级 flow: `design-calibration/02_hld_calibration_flow.md`
+> 项目级台账: `design-calibration/project_execution_ledger.md`
+> 正式文档目标: `projects/L3-method-library/02-概要设计.md`
+> 本轮口径: 将新版 00 / 01 已收稳的核心语义、承载边界和交互机制映射为概要层代码主体骨架;旧七类 P0、fingerprint、snapshot、outbox、PostgreSQL / object storage 不作为当前代码主体结论。
 
 ---
 
-## 2. 本步输入
+## 0. Step 开工确认
 
-| 输入 | 内容 |
+| 项目 | 记录 |
 |---|---|
-| Step 2 设计目标 | 概要设计要收稳代码主体框架、主要组成部分、关键对象、接口骨架、处理流和状态机 |
-| Step 3 约束条件 | Definition / Use 分离、P0 / P1 分离、7 类 P0 MethodContent、发布一致性、event + snapshot、ViewProfile 服务端解析 |
-| 架构设计 §6 | method-library-api、application、domain、outbox-relay、snapshot-exporter、operations-job、plugin-composition-service、PostgreSQL、object storage、L0-bus |
-| 架构设计 §7 | inbound adapters -> application services -> domain model / policy -> ports -> outbound adapters |
-| 当前 02 §6 / §8 | 已有 A-H 主要组成部分和实现分层参考视图,但业务组成部分与实现分层混用 |
-
-已确认结论：
-
-```text
-本步只建立“架构模块 -> 代码主体骨架”的映射。
-不写 crate / module / file tree。
-不写完整 trait、struct、字段、函数签名或协议 schema。
-```
-
-依赖的前序 Step：
-
-```text
-Step 1 已确认上游输入边界。
-Step 2 已确认设计目标、非范围和当前设计深度。
-Step 3 已确认结构性约束条件。
-```
+| Step | Step 4 代码主体框架映射 |
+| 输出文件 | `design-calibration/02_hld_step_04_code_subject_framework.md` |
+| 已读取项目级台账 | yes:`design-calibration/project_execution_ledger.md` |
+| 已读取文档级 flow | yes:`design-calibration/02_hld_calibration_flow.md` |
+| 已读取前序 Step | yes:`design-calibration/02_hld_step_03_constraints.md` |
+| 已读取 SOP / 书写规范 | yes:`概要设计讨论流程_SOP.md` Step 4;`概要设计书写规范.md` 4.4 |
+| 已读取正式输入 | yes:`00-需求文档.md`;`01-架构设计.md` |
+| 旧材料处理 | 旧 `02_hld_step_04_code_subject_framework.md` 只作后置差异审计 |
+| 进入条件 | pass |
+| next_allowed_action | Step 4 已完成,等待用户确认后进入 Step 5。 |
 
 ---
 
-## 3. SOP 问题回答
+## 1. Step 内计划
 
-### 3.1 架构层已经收稳的模块，分别应落到哪些代码主体骨架上？
-
-回答：
-
-架构层模块需要转译为代码主体，而不是原样搬进概要设计的主要组成部分。
-
-| 架构层模块 / 机制 | 概要设计代码主体骨架 | 说明 |
-|---|---|---|
-| method-library-api | Command API、Query API、Operations Trigger | 入站入口,只做协议转换、上下文传递和错误映射 |
-| method-library-application | MethodContentCommandService、PublishGovernanceService、DefinitionSyncService、SnapshotExportService、ViewProfileResolveService、DefinitionTraceQueryService、MethodOperationsService | 用例编排主体,承接事务、gate、audit、outbox、snapshot、查询协调 |
-| method-definition-domain | MethodContent、7 类 MethodContent definition、MethodContentLifecycle、DefinitionReference | 领域真相主体,承载定义资产和生命周期规则 |
-| lifecycle / validation domain policy | PublishPolicy、ReferenceValidationPolicy、DefinitionUseBoundaryGuard、FingerprintPolicy、ViewProfileMatchPolicy | 领域策略主体,承载发布、引用、边界、防漂移和视图匹配规则 |
-| outbox-relay | OutboxRelayWorker、EventPublishService、EventPublisherPort | 异步传播主体,从 outbox 发布事件到 L0-bus |
-| snapshot-exporter | SnapshotExportService、DefinitionSnapshot、SnapshotRepository / SnapshotProjection | 快照供给主体,供下游重建索引和对账 |
-| operations-job | SeedInitialMethodAssetsJob、ReplayDefinitionEventsJob、RebuildDefinitionIndexJob、RecalculateFingerprintJob | 运维任务主体,只通过 application / domain 规则触发动作 |
-| plugin-composition-service(P1) | MethodPluginService、MethodConfigurationService、PluginCompositionPolicy(P1) | P1 打包组装主体,只保留位置和边界 |
-| PostgreSQL / object storage / L0-bus / cache | Repository、UnitOfWork、OutboxStore、AuditStore、BlobRefPort、BusPublisherAdapter、ReadProjection、CacheAdapter | 持久化和外部适配主体,不决定业务规则 |
-
-### 3.2 哪些主体属于 Inbound / Operations，哪些属于 Application Services？
-
-回答：
-
-| 实现层 | 代码主体 | 作用 |
-|---|---|---|
-| Inbound / Operations | Command API | 接收创建草稿、更新草稿、提交审核、发布、废弃、退役、supersede 等写请求 |
-| Inbound / Operations | Query API | 接收 Get / List / ExportSnapshot / ResolveViewProfile / GetDefinitionTrace 等读请求 |
-| Inbound / Operations | Operations Trigger | 接收 seed、replay、rebuild、recalculate 等运维触发 |
-| Inbound / Operations | Event Consumer / External Handler | 接收必要的外部依赖事件或 gate 结果通知;不作为下游写回定义入口 |
-| Application Services | MethodContentCommandService | 编排 MethodContent 草稿、审核、发布、废弃、退役、supersede 主用例 |
-| Application Services | PublishGovernanceService | 编排 approved_gate_ref、actor_ref、发布审计和发布前校验 |
-| Application Services | DefinitionSyncService | 编排 outbox、event metadata、snapshot_ref 和 replay 入口 |
-| Application Services | SnapshotExportService | 生成可供下游消费的 Definition Snapshot |
-| Application Services | ViewProfileResolveService | 编排 ViewProfile 匹配和默认 deny 规则 |
-| Application Services | DefinitionTraceQueryService | 聚合版本、fingerprint、audit、event、snapshot 追溯视图 |
-| Application Services | MethodOperationsService | 编排 seed、replay、rebuild、fingerprint 复算等后台任务 |
-
-### 3.3 哪些主体属于 Domain Model，哪些属于 Ports / Persistence / Projection / Outbox？
-
-回答：
-
-| 实现层 | 代码主体 | 作用 |
-|---|---|---|
-| Domain Model | MethodContent | P0 7 类定义资产的共同聚合轮廓 |
-| Domain Model | Qualification / RoleDefinition / TaskDefinition / WorkProductDefinition / ProcessTemplateDef / ViewProfile / AIPolicyDef | 7 类 P0 definition 的正式领域主体 |
-| Domain Model | MethodContentLifecycle | 定义 draft / in_review / published / deprecated / retired / superseded 的状态规则 |
-| Domain Model | DefinitionReference | 表达 definition 之间的引用锚点 |
-| Domain Policy | PublishPolicy | 约束发布门禁、published 不可原地修改、supersede |
-| Domain Policy | ReferenceValidationPolicy | 校验 definition 间引用是否允许 |
-| Domain Policy | DefinitionUseBoundaryGuard | 防止 QualificationProfile、QualificationBinding、ProcessInstance、WorkItem、Artifact instance 等 Use truth 混入本仓 |
-| Domain Policy | FingerprintPolicy | 约束 canonical 内容与 fingerprint 生成 / 对比 |
-| Domain Policy | ViewProfileMatchPolicy | 约束 role + object_kind + scope 的唯一 active 和默认 deny |
-| Ports | MethodContentRepository、AuditLogPort、OutboxPort、GateDecisionPort、BlobRefPort、EventPublisherPort、ClockPort、IdGeneratorPort | application / domain 面向外部能力的抽象接缝 |
-| Persistence | UnitOfWork、DefinitionWriteModel、VersionStore、AuditStore、OutboxStore、BlobRefStore | 保存本仓真相和可靠发布记录 |
-| Projection | DefinitionReadModel、DefinitionTraceProjection、ViewProfileProjection、SnapshotProjection | 支撑查询、追溯、视图解析和下游快照 |
-| Outbox | OutboxEvent、OutboxRelayWorker、EventPublishService | 承接跨仓最终一致传播 |
-
-### 3.4 哪些名称必须在概要设计层先点名，否则详细设计会重新发明主语？
-
-回答：
-
-必须先点名的名称分为 5 类。
-
-| 类型 | 必须点名的名称 | 原因 |
-|---|---|---|
-| 应用服务 | MethodContentCommandService、PublishGovernanceService、DefinitionSyncService、SnapshotExportService、ViewProfileResolveService、DefinitionTraceQueryService、MethodOperationsService | 这些是详细设计展开 use case、事务和接口处理流的主语 |
-| 领域对象 | MethodContent、7 类 definition、MethodContentLifecycle、DefinitionReference、DefinitionSnapshot、OutboxEvent | 这些是定义真相、状态、同步和追溯的共同对象主语 |
-| 领域策略 | PublishPolicy、ReferenceValidationPolicy、DefinitionUseBoundaryGuard、FingerprintPolicy、ViewProfileMatchPolicy | 这些是发布、引用、边界和视图解析规则的落点 |
-| 端口 / 持久化 | MethodContentRepository、UnitOfWork、AuditLogPort、OutboxPort、GateDecisionPort、BlobRefPort、EventPublisherPort | 这些是 03 继续展开 trait 和事务边界的主语 |
-| 后台主体 | OutboxRelayWorker、SeedInitialMethodAssetsJob、ReplayDefinitionEventsJob、RebuildDefinitionIndexJob、RecalculateFingerprintJob | 这些是可靠同步、恢复和基线初始化的主语 |
-
-P1 需要先点名但不展开：
-
-```text
-MethodPluginService
-MethodConfigurationService
-PluginCompositionPolicy
-MethodPlugin
-MethodConfiguration
-```
-
-### 3.5 哪些内容已经是代码目录、文件路径或框架实现，不应在本步展开？
-
-回答：
-
-以下内容不进入 Step 4。
-
-| 不展开内容 | 原因 |
-|---|---|
-| Rust crate / module / file tree | 属于详细设计 |
-| 完整 trait 名单和函数签名 | 属于详细设计对象实现契约 |
-| struct / enum 字段全集 | 属于详细设计 |
-| HTTP / RPC / Event / Job schema | 属于详细设计接口契约 |
-| SQL 表、索引、事务伪代码 | 属于详细设计 |
-| 具体缓存、搜索、消息中间件实现 | 属于详细设计或实现选型 |
-| 部署拓扑、进程拆分和资源配额 | 属于架构 / 实施计划 / 运维设计 |
+| 模块 | 状态 | 产物 | gate_status | next_allowed_action |
+|---|---|---|---|---|
+| 必读文档读取 | done | 必读文档摘要 | pass | 进入整体模块骨架。 |
+| 整体模块搭建 | done | Step 4 输出结构 | pass | 进入架构模块映射思考。 |
+| 架构模块映射:先思考 | done | 架构子域 / 承载到代码主体判断 | pass | 进入架构模块映射写入。 |
+| 架构模块映射:再写入 | done | 架构模块到代码主体映射图 | pass | 进入实现分层思考。 |
+| 实现分层:先思考 | done | Inbound / Application / Domain / Ports 等层次判断 | pass | 进入实现分层写入。 |
+| 实现分层:再写入 | done | 实现分层视图 | pass | 进入业务与分层关系思考。 |
+| 业务与分层关系:先思考 | done | 业务组成部分与代码分层关系判断 | pass | 进入关系说明写入。 |
+| 业务与分层关系:再写入 | done | 关系说明表和关键判断 | pass | 进入旧材料差异审计。 |
+| 旧材料差异审计 | done | 差异审计表 | pass | 进入自检与停审。 |
+| 自检与停审 | done | 完成门禁 | pass | 等待用户确认 Step 5。 |
 
 ---
 
-## 4. 当前文档问题诊断
+## 2. 必读文档
 
-| 位置 | 当前问题 | 影响 |
+| 文档 | 读取结论 | 对 Step 4 的影响 |
 |---|---|---|
-| §6.2 总体分层图 / 主要部分分层 | A-H 混合了业务职责、入口层、应用层和基础设施适配 | Step 5 如果沿用 A-H,会把业务主要组成部分和实现分层混成同一级 |
-| §6.3 A. 对外入口与访问部分 | 更像 Inbound / Operations 实现层 | 不适合作为业务主要组成部分,但应该保留为代码主体框架的一层 |
-| §6.3 H. 基础设施适配部分 | 更像 Persistence / Outbound Adapters 实现层 | 不适合作为业务主要组成部分,应转入实现分层视图 |
-| §8.7 实现分层参考视图 | 方向正确,但出现较晚,且与 A-H 的关系需要前置讲清 | 新版 §4 应先把“业务主线”和“实现分层”拆开 |
-| §8.8 A-H 到实现分层的映射 | 有价值,但建立在旧 A-H 上 | 需要改成“业务主要组成部分候选 -> 实现分层”的关系 |
-| 全文代码主体名称 | 部分主体只写通用描述,例如 application service / domain policy | 03 容易重新发明服务、策略、端口和 worker 名称 |
+| `standards/document/概要设计讨论流程_SOP.md` Step 4 | Step 4 必须输出架构模块到代码主体映射图、实现分层视图、业务主要组成部分与实现分层关系说明、关键判断小节。 | 本 Step 只建立代码主体骨架,不写目录树、文件路径、完整 trait、struct 或协议。 |
+| `standards/document/概要设计书写规范.md` 4.4 | 两张图必须使用 text 代码块;映射图从仓 / 模块名出发,分层图展示外部调用进入 Inbound / Application / Domain / Ports 等层。 | 本 Step 使用统一 ASCII 图格式,并避免写数据库表、HTTP path、topic、字段或函数实现。 |
+| `design-calibration/02_hld_step_03_constraints.md` | 已收稳定义 truth、Definition vs Use、数据归属、一致性分层、外围隔离和表达深度约束。 | 代码主体必须服从这些约束,不得吸收外部正文、下游运行 truth 或旧实现机制。 |
+| `projects/L3-method-library/00-需求文档.md` | 核心能力包括定义表达、身份目录、正式化、版本边界、受控消费、消费语境分发、追溯、一致性保护和证据线索。 | 这些能力转译为本步的主要代码主体候选。 |
+| `projects/L3-method-library/01-架构设计.md` | 当前子域为定义与目录、正式化与版本、受控消费、追溯一致性、关系分发、外围包 / 方法集、外部摘要 / 引用、下游影响摘要;运行承载为同步入口、异步协作、后台维护、正式状态、读取追溯。 | 这些架构模块和承载边界是本步映射图的主要来源。 |
+| 旧 `02_hld_step_04_code_subject_framework.md` | 旧文件恢复了 7 类 P0、fingerprint、snapshot、outbox、PostgreSQL、object storage 等旧口径。 | 本轮整体替换,旧内容只进入差异审计。 |
 
 ---
 
-## 5. 改动前后对比
+## 3. 整体模块骨架
 
-| 项 | 改动前 | 改动后 | 原因 |
-|---|---|---|---|
-| 主要组成部分来源 | A-H 中包含入口层和基础设施层 | 业务主要组成部分只保留功能职责主线;入口和基础设施进入实现分层 | 主要组成部分回答“做什么”,实现分层回答“代码如何安放” |
-| 代码主体命名 | 部分使用 application / domain / persistence 泛称 | 点名服务、领域对象、策略、端口、投影、worker / job | 03 需要稳定主语继续展开 |
-| 实现分层位置 | 放在旧 §8 后段作为参考 | 新版 §4 前置为代码主体框架 | 进入 Step 5 前必须先收稳业务主线与实现层关系 |
-| outbox / snapshot | 分散在同步、基础设施、应用编排中 | 明确为 DefinitionSyncService、SnapshotExportService、OutboxPort、OutboxRelayWorker 等主体 | 防止事件发布和快照导出无主语 |
-| P1 表达 | MethodPlugin / Configuration 作为 G 部分出现 | P1 只点名服务、对象和策略位置,不进入 P0 主图细节 | 避免 P1 污染 P0 |
-
----
-
-## 6. 设计取舍
-
-| 方案 | 优点 | 缺点 | 结论 |
-|---|---|---|---|
-| 沿用旧 A-H 作为主要组成部分 | 改动小,已有内容多 | 入口、应用、领域、基础设施和业务职责混层 | 不采用 |
-| 完全按 Inbound / Application / Domain / Persistence 分概要章节 | 接近代码实现 | 会把概要设计写成技术分层,丢失业务职责主线 | 不采用 |
-| 用业务主要组成部分表达“做什么”,再用实现分层表达“代码如何安放” | 层次清楚,能支撑详细设计 | 需要重排旧 §6 / §8 | 采用 |
+| 模块 | 本 Step 要做 | 本 Step 不做 |
+|---|---|---|
+| 架构模块到代码主体 | 将当前架构子域、运行承载和接口能力转成可供 03 继续展开的主体名。 | 不按旧对象清单或技术实现机制命名主体。 |
+| 实现分层 | 说明外部调用、事件、运维如何进入 Inbound / Application / Domain / Ports / Persistence / Projection / Collaboration。 | 不写 crate、目录、文件、trait 签名或 adapter 实现。 |
+| 业务与分层关系 | 区分“业务主要组成部分说明做什么”和“实现分层说明代码如何安放”。 | 不在本 Step 展开每个组成部分的详细职责,那属于 Step 5。 |
+| 关键判断 | 固定哪些名称是业务主体候选,哪些只是实现分层或技术支撑。 | 不把相邻仓、外部系统或旧实现机制当成本仓内部主体。 |
+| 旧材料差异 | 标记旧代码主体框架不继承的原因。 | 不从旧 02 / 03 反推当前代码主体。 |
 
 ---
 
-## 7. 结构化中间产物
+## 4. 模块思考记录
 
-### 7.1 架构模块到代码主体映射图
+### 4.1 架构模块映射:先思考
+
+问题回答:
+
+- 架构已收稳的核心语义可以映射为七组业务代码主体候选:定义与目录、正式化与版本、受控消费、追溯与一致性、关系与分发、外部摘要 / 引用、后台维护。
+- 外围包 / 方法集组织可以保留为外围增强主体,但不能进入核心闭环前置。
+- 运行承载中的同步入口、异步协作、后台维护、正式状态和读取追溯不是业务组成部分本身,而是这些业务主体落入代码后的承载层。
+
+诊断:
+
+- 旧 Step 4 直接用旧 `MethodContent` 七类和具体同步机制命名代码主体,会提前决定 Step 6 对象轮廓和 Step 7 接口骨架。
+- 新版 00 / 01 当前只授权抽象结构,没有授权旧算法、事件格式、存储和 snapshot/outbox 实现作为主体。
+
+取舍:
+
+- 使用“语义主体 + 服务/对象/材料/端口类别”的命名方式。
+- 主体名称保持可让 03 展开,但不写完整对象 schema 或端口签名。
+
+### 4.2 架构模块映射:再写入
+
+#### 架构模块到代码主体映射图
 
 ```text
 L3-method-library
-|
-+-- 1. 方法定义生命周期与发布治理
-|   +-- Command API                         接收写请求
-|   +-- MethodContentCommandService         编排草稿/审核/发布/废弃/退役/supersede
-|   +-- PublishGovernanceService            编排 gate_ref、actor_ref、audit、outbox
-|   +-- MethodContentLifecycle              维护生命周期状态规则
-|   +-- PublishPolicy                       维护发布与 published 不可变规则
-|
-+-- 2. 方法定义真相与规则
-|   +-- MethodContent                       P0 定义资产共同聚合轮廓
-|   +-- Qualification                       胜任力定义
-|   +-- RoleDefinition                      角色定义
-|   +-- TaskDefinition                      任务定义
-|   +-- WorkProductDefinition               制品定义
-|   +-- ProcessTemplateDef                  流程模板定义
-|   +-- ViewProfile                         视图策略定义
-|   +-- AIPolicyDef                         AI Policy 定义
-|
-+-- 3. 关系校验与边界保护
-|   +-- ReferenceValidationPolicy           校验 definition 间引用
-|   +-- DefinitionUseBoundaryGuard          阻止下游 Use truth 写入
-|   +-- FingerprintPolicy                   约束 canonical fingerprint
-|   +-- ViewProfileMatchPolicy              约束视图匹配与默认 deny
-|
-+-- 4. 定义同步与快照供给
-|   +-- DefinitionSyncService               编排 outbox、event、replay
-|   +-- SnapshotExportService               导出 Definition Snapshot
-|   +-- OutboxEvent                         可靠事件记录
-|   +-- OutboxRelayWorker                   从 outbox 发布到 L0-bus
-|   +-- DefinitionSnapshot                  下游同步快照
-|
-+-- 5. 查询解析与审计追溯
-|   +-- Query API                           接收只读查询
-|   +-- ViewProfileResolveService           解析 active ViewProfile
-|   +-- DefinitionTraceQueryService         查询版本/fingerprint/audit/event/snapshot
-|   +-- DefinitionReadModel                 支撑列表与详情查询
-|   +-- DefinitionTraceProjection           支撑审计追溯查询
-|
-+-- 6. 基线初始化与恢复运维
-|   +-- Operations Trigger                  接收运维触发
-|   +-- MethodOperationsService             编排 seed/replay/rebuild/recalculate
-|   +-- SeedInitialMethodAssetsJob          初始化基础方法资产
-|   +-- ReplayDefinitionEventsJob           重放定义事件
-|   +-- RebuildDefinitionIndexJob           重建查询投影
-|   +-- RecalculateFingerprintJob           复算 fingerprint
-|
-+-- 7. P1 资产打包与配置组装
-|   +-- MethodPluginService                 P1 方法资产包发布编排
-|   +-- MethodConfigurationService          P1 组织方法集激活编排
-|   +-- PluginCompositionPolicy             P1 plugin/config 组合规则
-|   +-- MethodPlugin                        P1 方法资产包对象
-|   +-- MethodConfiguration                 P1 方法配置对象
-|
-+-- 8. 端口、持久化与外部适配
-    +-- MethodContentRepository             读写定义真相
-    +-- UnitOfWork                          承接发布事务边界
-    +-- AuditLogPort                        写审计记录
-    +-- OutboxPort                          写 outbox 事件
-    +-- GateDecisionPort                    读取/校验 gate 结果
-    +-- BlobRefPort                         校验 blob 引用
-    +-- EventPublisherPort                  发布事件到 L0-bus
-    +-- ReadProjection / SnapshotProjection 支撑查询和 snapshot
+│
+├─ 1. 方法资产定义与目录
+│   ├─ MethodAssetDefinitionService      编排定义建立与调整
+│   ├─ MethodAssetCatalogService         编排身份、目录和适用语境
+│   ├─ MethodAssetDefinition             承载方法资产定义语义
+│   └─ MethodAssetCatalogEntry           承载目录识别语义
+│
+├─ 2. 正式化与版本
+│   ├─ MethodAssetFormalizationService   编排正式化和前置依据承接
+│   ├─ MethodAssetVersionService         编排版本语义变化
+│   ├─ FormalMethodAssetVersion          承载正式版本边界
+│   └─ FormalizationBasisSummary         承接治理结论或依据摘要
+│
+├─ 3. 受控消费
+│   ├─ MethodAssetConsumptionService     编排正式消费前提判断
+│   ├─ MethodAssetConsumptionMaterial    承载只读消费材料
+│   ├─ MethodAssetAvailabilityView       表达可消费 / 不可消费 / 待收敛
+│   └─ DownstreamConsumptionBoundary     保护下游不得反写定义 truth
+│
+├─ 4. 追溯与一致性保护
+│   ├─ MethodAssetTraceService           聚合版本、依据、引用和影响线索
+│   ├─ MethodAssetConsistencyService     编排消费一致性保护
+│   ├─ MethodAssetTraceMaterial          承载追溯材料
+│   └─ ConsumptionImpactSummary          承接下游影响摘要候选
+│
+├─ 5. 关系与分发语义
+│   ├─ MethodAssetRelationService        编排定义性关系
+│   ├─ MethodAssetDistributionService    编排分发语义
+│   ├─ MethodAssetRelation               承载资产间定义性关系
+│   └─ MethodAssetDistributionRef        指向分发或生态对象的引用
+│
+├─ 6. 外部摘要与引用
+│   ├─ ExternalBasisAcceptanceService    承接治理、标准、ADR 等正式输入
+│   ├─ ExternalSourceSummary             承载外部依据摘要
+│   ├─ ExternalSourceRef                 指向外部正文或来源
+│   └─ ArtifactArchiveRef                指向 artifact / archive,不保存正文
+│
+├─ 7. 后台维护与收敛
+│   ├─ MethodAssetMaintenanceService     编排读取材料、追溯材料和引用收敛
+│   ├─ ReadMaterialRefreshTask           刷新正式读取与消费材料
+│   ├─ TraceMaterialRefreshTask          刷新追溯和证据线索材料
+│   └─ ConsistencyRecoveryTask           推进协作和摘要的恢复收敛
+│
+└─ 8. 外围包与方法集组织
+    ├─ MethodPackageService              外围资产包组织入口
+    ├─ MethodSetAssemblyService          外围组织级方法集入口
+    ├─ MethodPackage                     组织核心方法资产定义的外围对象
+    └─ MethodSetAssembly                 组织级方法集语义,不替代核心 truth
 ```
 
-关键说明：
+关键说明:
 
-- 该图表达的是“架构模块与机制在概要设计层落成哪些代码主体主语”,不是目录树。
-- `1~7` 是业务主要组成部分候选,第 `8` 是实现支撑主体集合,不应在 Step 5 中当成业务主要组成部分。
-- `Command API`、`Query API`、`Operations Trigger` 是入口代码主体,不是业务部分本身。
-- P1 主体只保留位置和边界,不作为 P0 详细展开前置条件。
+- 该图表达当前架构子域和能力主线在概要层可落成的代码主体主语,不是代码目录树。
+- `1~7` 是当前核心闭环和支撑边界的代码主体候选;`8` 是外围增强位置,不作为核心闭环前置。
+- 图中 `Service`、`Material`、`Summary`、`Ref`、`Task` 只是概要层主体类别,不是 Rust 类型或 trait 签名。
+- 外部系统、下游仓、artifact 正文、治理执行、marketplace 交易和 UI 状态不作为本仓内部代码主体。
 
-### 7.2 实现分层视图
+### 4.3 实现分层:先思考
+
+问题回答:
+
+- 实现分层应沿用标准层次:Inbound / Operations、Application Services、Domain Model、Ports / Persistence / Projection / Collaboration。
+- 本仓还需要把“正式状态承载”和“读取 / 追溯承载”区分开,防止读取材料成为第二 truth。
+- 异步协作和后台维护应作为代码层位置出现,但不能在 Step 4 定义 event schema、topic、outbox 或 job 调度。
+
+诊断:
+
+- 旧 Step 4 把 outbox relay、snapshot exporter、PostgreSQL 等作为主体,会把技术承载误认为业务结构。
+- 新版架构要求“不固定数据库、缓存、消息、对象存储、指纹算法、事件格式、任务调度、部署环境和代码目录”。
+
+取舍:
+
+- 分层图点名层和主体类别,不点名具体技术产品。
+- 保留 Collaboration / Projection / Persistence 作为后续 03 展开线索,但不写实现细节。
+
+### 4.4 实现分层:再写入
+
+#### 实现分层视图
 
 ```text
 外部调用 / 外部事件 / 运维任务
-  - author / reviewer / admin / console
-  - identity / process / capability-hub / artifact / governance / UI
-  - L0-bus / operations
-        |
-        v
-+--------------------------------------------------------------+
-| Inbound / Operations                                         |
-| Command API / Query API / Event Handler / Operations Trigger |
-+-------------------------------+------------------------------+
-                                |
-                                v
-+--------------------------------------------------------------+
-| Application Services                                          |
-| MethodContentCommandService / PublishGovernanceService        |
-| DefinitionSyncService / SnapshotExportService                 |
-| ViewProfileResolveService / DefinitionTraceQueryService       |
-| MethodOperationsService / P1 PluginConfigurationService       |
-+-------------------------------+------------------------------+
-                                |
-                                v
-+--------------------------------------------------------------+
-| Domain Model / Domain Policies                               |
-| MethodContent + 7 definitions                                 |
-| Lifecycle / Publish / Reference / Boundary / Fingerprint      |
-| ViewProfileMatch / P1 Composition                             |
-+-------------------------------+------------------------------+
-                                |
-                                v
-+--------------------------------------------------------------+
-| Ports                                                         |
-| Repository / UnitOfWork / AuditLog / Outbox / GateDecision    |
-| BlobRef / EventPublisher / Clock / IdGenerator / Cache        |
-+-------------------------------+------------------------------+
-                                |
-                                v
-+--------------------------------------------------------------+
-| Persistence / Projection / Outbound Adapters                  |
-| PostgreSQL write model / version store / audit store / outbox |
-| read model / trace projection / snapshot projection           |
-| L0-bus adapter / object storage adapter / governance adapter  |
-+--------------------------------------------------------------+
+        │
+        ▼
+┌────────────────────────────────────────┐
+│ Inbound / Operations                   │
+│ command / query / consumer / task入口  │
+└──────────────────┬─────────────────────┘
+                   ▼
+┌────────────────────────────────────────┐
+│ Application Services                   │
+│ 定义 / 正式化 / 消费 / 追溯 / 维护编排 │
+└──────────────────┬─────────────────────┘
+                   ▼
+┌────────────────────────────────────────┐
+│ Domain Model                           │
+│ 定义 truth / 版本语义 / 关系 / 规则    │
+└──────────────────┬─────────────────────┘
+                   ▼
+┌────────────────────────────────────────┐
+│ Ports                                  │
+│ id / clock / uow / repo / resolver / bus│
+└──────────────┬───────────────┬─────────┘
+               ▼               ▼
+┌──────────────────────┐ ┌──────────────────────┐
+│ Persistence           │ │ Projection / Material │
+│ 正式状态与引用持久化 │ │ 读取 / 消费 / 追溯材料│
+└──────────────┬───────┘ └──────────────┬───────┘
+               ▼                        ▼
+┌────────────────────────────────────────┐
+│ Collaboration / External Adapters      │
+│ L0-core / L0-bus / 外部摘要与引用接缝 │
+└────────────────────────────────────────┘
 ```
 
-关键说明：
+关键说明:
 
-- 该图表达请求、事件和运维触发如何进入实现分层,不表达部署拓扑或具体进程拆分。
-- 业务主要组成部分可以跨多个实现层;实现层也会承载多个业务组成部分。
-- Domain 不依赖 HTTP、PostgreSQL、L0-bus、object storage 或下游系统。
-- Ports 是抽象接缝,在概要设计层只点名,完整 trait 与函数签名留给 `03-详细设计.md`。
+- 该图表达代码主体如何安放到实现分层,不表达 crate、目录、进程或部署拓扑。
+- `Application Services` 编排用例和一致性边界,但不拥有外部正文或下游运行 truth。
+- `Domain Model` 是核心定义 truth 和规则的落点,不依赖 projection、adapter 或外部仓运行状态。
+- `Persistence` 保存正式状态和引用;`Projection / Material` 支撑读取、消费和追溯,不得成为第二 truth。
+- `Collaboration / External Adapters` 表达跨仓接缝,不在本 Step 定义事件 payload、topic、重试或具体 adapter。
 
-### 7.3 业务主要组成部分与实现分层关系说明表
+### 4.5 业务与分层关系:先思考
+
+问题回答:
+
+- 业务主要组成部分回答“本仓做什么”:定义、正式化、消费、追溯、关系、外部承接、维护和外围组织。
+- 实现分层回答“代码怎么安放”:入口、应用服务、领域模型、端口、持久化、投影、协作适配。
+- 二者不能混用,否则 Step 5 会把 `Inbound` 或 `Persistence` 当成业务组成部分,Step 6 又会把技术层当成对象来源。
+
+诊断:
+
+- 旧文件的 A-H 把入口层、应用层、领域层和基础设施层混入主要组成部分。
+- 当前需要先建立映射关系,让 Step 5 只讨论业务主要组成部分,并把实现分层作为每个部分内部的代码主体安放方式。
+
+取舍:
+
+- 本 Step 点名业务组成部分候选,但不展开职责清单。
+- 详细职责和不承担什么留给 Step 5。
+
+### 4.6 业务与分层关系:再写入
 
 | 项 | 说明 |
 |---|---|
-| 业务主要组成部分 | 表达 method-library 在业务上承担哪些职责主线,例如方法定义生命周期、定义真相、关系校验、定义同步、查询追溯、恢复运维、P1 打包组装 |
-| 实现分层 | 表达代码如何安放这些主体,例如 Inbound / Operations、Application Services、Domain Model / Policies、Ports、Persistence / Projection / Outbound Adapters |
-| 二者关系 | 一个业务组成部分通常会跨多个实现层;一个实现层也会承接多个业务组成部分 |
-| 不能混用的原因 | 如果把 Inbound / Persistence 当业务主要组成部分,Step 5 会退化成技术分层;如果把业务部分当代码层,Step 6 / 7 / 8 会缺少清晰落点 |
-| 本步边界 | 本步只收稳代码主体框架,不决定文件目录、完整接口契约、数据库表或具体框架实现 |
+| 业务主要组成部分 | 从当前 00 / 01 承接而来的业务结构主语,包括方法资产定义与目录、正式化与版本、受控消费、追溯与一致性保护、关系与分发、外部摘要与引用、后台维护与收敛、外围包与方法集组织。 |
+| 实现分层 | Inbound / Operations、Application Services、Domain Model、Ports、Persistence、Projection / Material、Collaboration / External Adapters 等代码组织层。 |
+| 二者关系 | 业务组成部分说明“做什么”;实现分层说明每个业务主体在代码中如何被入口、服务、领域、端口、持久化和投影承载。 |
+| 使用规则 | Step 5 讨论业务主要组成部分;Step 6~9 再从这些业务部分内提取对象、接口、流程和状态,不能从实现分层直接发明业务对象。 |
+| 禁止混用 | `Inbound`、`Persistence`、`Projection`、`Adapter`、`Task` 不是业务组成部分;`method asset definition truth`、`formalization`、`controlled consumption` 不是目录或文件结构。 |
 
-### 7.4 关键判断
+### 4.7 关键判断
 
-必须作为业务主要组成部分继续进入 Step 5 的名称：
+业务主要组成部分候选:
 
-```text
-1. 方法定义生命周期与发布治理
-2. 方法定义真相与规则
-3. 关系校验与边界保护
-4. 定义同步与快照供给
-5. 查询解析与审计追溯
-6. 基线初始化与恢复运维
-7. P1 资产打包与配置组装
-```
+- 方法资产定义与目录。
+- 正式化与版本。
+- 受控消费。
+- 追溯与一致性保护。
+- 关系与分发语义。
+- 外部摘要与引用。
+- 后台维护与收敛。
+- 外围包与方法集组织。
 
-只作为实现分层或支撑主体出现,不作为业务主要组成部分的名称：
+实现分层名称:
 
-```text
-Inbound / Operations
-Application Services
-Domain Model / Domain Policies
-Ports
-Persistence / Projection / Outbound Adapters
-Command API
-Query API
-Repository
-UnitOfWork
-PostgreSQL adapter
-L0-bus adapter
-Object storage adapter
-```
+- Inbound / Operations。
+- Application Services。
+- Domain Model。
+- Ports。
+- Persistence。
+- Projection / Material。
+- Collaboration / External Adapters。
 
-判断理由：
+必须避免混用的原因:
 
-```text
-业务主要组成部分回答“method-library 对平台提供什么结构性能力”。
-实现分层回答“这些能力在代码中如何被入口、编排、领域、端口和适配器承载”。
-二者不是同一条轴,不能在正式概要设计中混成同级列表。
-```
+- 业务主要组成部分决定 Step 5 的职责边界和 Step 6 的对象发现范围。
+- 实现分层只是安放代码主体的方式,不能变成业务职责来源。
+- 相邻仓、外部系统、技术产品和旧实现机制不能被伪装成本仓内部主体。
+
+### 4.8 旧材料差异审计
+
+| 旧材料口径 | 本轮处理 | 原因 |
+|---|---|---|
+| 旧 Step 4 的 7 类 P0 MethodContent 代码主体 | 不继承为当前主体。 | 新版 00 / 01 未把旧七类对象清单重新闭口为当前核心对象全集。 |
+| `FingerprintPolicy`、`RecalculateFingerprintJob` 等旧主体 | 不继承为当前主体。 | 当前只确认版本稳定和显式变化,未授权 fingerprint 算法或复算 job。 |
+| `OutboxRelayWorker`、`OutboxPort` 等旧主体 | 不继承为当前主体。 | 当前只确认变化可感知和异步协作,未授权 outbox 实现机制。 |
+| `SnapshotExportService`、`DefinitionSnapshot` 等旧主体 | 不继承为当前主体。 | 当前只确认读取 / 消费 / 追溯材料,未授权 snapshot 作为固定机制。 |
+| PostgreSQL、object storage、cache、L0-bus adapter 作为内部主体 | 不继承。 | 新版 01 明确不固定具体存储、缓存、消息或对象存储技术;`L0-bus` 是运行对接边界,不是内部业务主体。 |
+| 旧 A-H 把入口、应用、领域、基础设施当成同级主要组成部分 | 不继承。 | 当前区分业务主要组成部分与实现分层,防止 Step 5 串层。 |
 
 ---
 
-## 8. 回填草稿
+## 5. 结构化中间产物
 
-以下内容可回填到新版 `02-概要设计.md` §4。
+### 5.1 架构模块到代码主体映射图
+
+```text
+L3-method-library
+│
+├─ 1. 方法资产定义与目录
+│   ├─ MethodAssetDefinitionService
+│   ├─ MethodAssetCatalogService
+│   ├─ MethodAssetDefinition
+│   └─ MethodAssetCatalogEntry
+│
+├─ 2. 正式化与版本
+│   ├─ MethodAssetFormalizationService
+│   ├─ MethodAssetVersionService
+│   ├─ FormalMethodAssetVersion
+│   └─ FormalizationBasisSummary
+│
+├─ 3. 受控消费
+│   ├─ MethodAssetConsumptionService
+│   ├─ MethodAssetConsumptionMaterial
+│   ├─ MethodAssetAvailabilityView
+│   └─ DownstreamConsumptionBoundary
+│
+├─ 4. 追溯与一致性保护
+│   ├─ MethodAssetTraceService
+│   ├─ MethodAssetConsistencyService
+│   ├─ MethodAssetTraceMaterial
+│   └─ ConsumptionImpactSummary
+│
+├─ 5. 关系与分发语义
+│   ├─ MethodAssetRelationService
+│   ├─ MethodAssetDistributionService
+│   ├─ MethodAssetRelation
+│   └─ MethodAssetDistributionRef
+│
+├─ 6. 外部摘要与引用
+│   ├─ ExternalBasisAcceptanceService
+│   ├─ ExternalSourceSummary
+│   ├─ ExternalSourceRef
+│   └─ ArtifactArchiveRef
+│
+├─ 7. 后台维护与收敛
+│   ├─ MethodAssetMaintenanceService
+│   ├─ ReadMaterialRefreshTask
+│   ├─ TraceMaterialRefreshTask
+│   └─ ConsistencyRecoveryTask
+│
+└─ 8. 外围包与方法集组织
+    ├─ MethodPackageService
+    ├─ MethodSetAssemblyService
+    ├─ MethodPackage
+    └─ MethodSetAssembly
+```
+
+### 5.2 实现分层视图
+
+```text
+外部调用 / 外部事件 / 运维任务
+        │
+        ▼
+┌────────────────────────────────────────┐
+│ Inbound / Operations                   │
+└──────────────────┬─────────────────────┘
+                   ▼
+┌────────────────────────────────────────┐
+│ Application Services                   │
+└──────────────────┬─────────────────────┘
+                   ▼
+┌────────────────────────────────────────┐
+│ Domain Model                           │
+└──────────────────┬─────────────────────┘
+                   ▼
+┌────────────────────────────────────────┐
+│ Ports                                  │
+└──────────────┬───────────────┬─────────┘
+               ▼               ▼
+┌──────────────────────┐ ┌──────────────────────┐
+│ Persistence           │ │ Projection / Material │
+└──────────────┬───────┘ └──────────────┬───────┘
+               ▼                        ▼
+┌────────────────────────────────────────┐
+│ Collaboration / External Adapters      │
+└────────────────────────────────────────┘
+```
+
+### 5.3 业务主要组成部分与实现分层关系说明
+
+| 项 | 说明 |
+|---|---|
+| 业务主要组成部分 | 方法资产定义与目录、正式化与版本、受控消费、追溯与一致性保护、关系与分发、外部摘要与引用、后台维护与收敛、外围包与方法集组织。 |
+| 实现分层 | Inbound / Operations、Application Services、Domain Model、Ports、Persistence、Projection / Material、Collaboration / External Adapters。 |
+| 关系 | 业务组成部分说明“做什么”,实现分层说明“代码如何安放这些主体”。 |
+| 后续使用 | Step 5 按业务主要组成部分展开职责边界;Step 6~9 从业务部分中提取对象、接口、流程和状态。 |
+
+---
+
+## 6. 回填草稿
+
+以下内容供 Step 14 装配正式 `02-概要设计.md` 时回填到 §4,当前不直接修改正式文档。
 
 ````md
 ## 4. 代码主体框架总览
 
-本章把架构设计中已经收稳的模块、边界和主线,转译为后续详细设计可以继续展开的代码主体框架。
+> 校准来源:
+> - `design-calibration/02_hld_step_04_code_subject_framework.md`
 
 ### 4.1 架构模块到代码主体映射图
 
 ```text
 L3-method-library
-|
-+-- 1. 方法定义生命周期与发布治理
-|   +-- Command API                         接收写请求
-|   +-- MethodContentCommandService         编排草稿/审核/发布/废弃/退役/supersede
-|   +-- PublishGovernanceService            编排 gate_ref、actor_ref、audit、outbox
-|   +-- MethodContentLifecycle              维护生命周期状态规则
-|   +-- PublishPolicy                       维护发布与 published 不可变规则
-|
-+-- 2. 方法定义真相与规则
-|   +-- MethodContent                       P0 定义资产共同聚合轮廓
-|   +-- Qualification                       胜任力定义
-|   +-- RoleDefinition                      角色定义
-|   +-- TaskDefinition                      任务定义
-|   +-- WorkProductDefinition               制品定义
-|   +-- ProcessTemplateDef                  流程模板定义
-|   +-- ViewProfile                         视图策略定义
-|   +-- AIPolicyDef                         AI Policy 定义
-|
-+-- 3. 关系校验与边界保护
-|   +-- ReferenceValidationPolicy           校验 definition 间引用
-|   +-- DefinitionUseBoundaryGuard          阻止下游 Use truth 写入
-|   +-- FingerprintPolicy                   约束 canonical fingerprint
-|   +-- ViewProfileMatchPolicy              约束视图匹配与默认 deny
-|
-+-- 4. 定义同步与快照供给
-|   +-- DefinitionSyncService               编排 outbox、event、replay
-|   +-- SnapshotExportService               导出 Definition Snapshot
-|   +-- OutboxEvent                         可靠事件记录
-|   +-- OutboxRelayWorker                   从 outbox 发布到 L0-bus
-|   +-- DefinitionSnapshot                  下游同步快照
-|
-+-- 5. 查询解析与审计追溯
-|   +-- Query API                           接收只读查询
-|   +-- ViewProfileResolveService           解析 active ViewProfile
-|   +-- DefinitionTraceQueryService         查询版本/fingerprint/audit/event/snapshot
-|   +-- DefinitionReadModel                 支撑列表与详情查询
-|   +-- DefinitionTraceProjection           支撑审计追溯查询
-|
-+-- 6. 基线初始化与恢复运维
-|   +-- Operations Trigger                  接收运维触发
-|   +-- MethodOperationsService             编排 seed/replay/rebuild/recalculate
-|   +-- SeedInitialMethodAssetsJob          初始化基础方法资产
-|   +-- ReplayDefinitionEventsJob           重放定义事件
-|   +-- RebuildDefinitionIndexJob           重建查询投影
-|   +-- RecalculateFingerprintJob           复算 fingerprint
-|
-+-- 7. P1 资产打包与配置组装
-|   +-- MethodPluginService                 P1 方法资产包发布编排
-|   +-- MethodConfigurationService          P1 组织方法集激活编排
-|   +-- PluginCompositionPolicy             P1 plugin/config 组合规则
-|   +-- MethodPlugin                        P1 方法资产包对象
-|   +-- MethodConfiguration                 P1 方法配置对象
-|
-+-- 8. 端口、持久化与外部适配
-    +-- MethodContentRepository             读写定义真相
-    +-- UnitOfWork                          承接发布事务边界
-    +-- AuditLogPort                        写审计记录
-    +-- OutboxPort                          写 outbox 事件
-    +-- GateDecisionPort                    读取/校验 gate 结果
-    +-- BlobRefPort                         校验 blob 引用
-    +-- EventPublisherPort                  发布事件到 L0-bus
-    +-- ReadProjection / SnapshotProjection 支撑查询和 snapshot
+│
+├─ 1. 方法资产定义与目录
+│   ├─ MethodAssetDefinitionService
+│   ├─ MethodAssetCatalogService
+│   ├─ MethodAssetDefinition
+│   └─ MethodAssetCatalogEntry
+│
+├─ 2. 正式化与版本
+│   ├─ MethodAssetFormalizationService
+│   ├─ MethodAssetVersionService
+│   ├─ FormalMethodAssetVersion
+│   └─ FormalizationBasisSummary
+│
+├─ 3. 受控消费
+│   ├─ MethodAssetConsumptionService
+│   ├─ MethodAssetConsumptionMaterial
+│   ├─ MethodAssetAvailabilityView
+│   └─ DownstreamConsumptionBoundary
+│
+├─ 4. 追溯与一致性保护
+│   ├─ MethodAssetTraceService
+│   ├─ MethodAssetConsistencyService
+│   ├─ MethodAssetTraceMaterial
+│   └─ ConsumptionImpactSummary
+│
+├─ 5. 关系与分发语义
+│   ├─ MethodAssetRelationService
+│   ├─ MethodAssetDistributionService
+│   ├─ MethodAssetRelation
+│   └─ MethodAssetDistributionRef
+│
+├─ 6. 外部摘要与引用
+│   ├─ ExternalBasisAcceptanceService
+│   ├─ ExternalSourceSummary
+│   ├─ ExternalSourceRef
+│   └─ ArtifactArchiveRef
+│
+├─ 7. 后台维护与收敛
+│   ├─ MethodAssetMaintenanceService
+│   ├─ ReadMaterialRefreshTask
+│   ├─ TraceMaterialRefreshTask
+│   └─ ConsistencyRecoveryTask
+│
+└─ 8. 外围包与方法集组织
+    ├─ MethodPackageService
+    ├─ MethodSetAssemblyService
+    ├─ MethodPackage
+    └─ MethodSetAssembly
 ```
 
-关键说明：
+关键说明:
 
-- 该图表达的是“架构模块与机制在概要设计层落成哪些代码主体主语”,不是目录树。
-- `1~7` 是业务主要组成部分候选,第 `8` 是实现支撑主体集合,不应在 Step 5 中当成业务主要组成部分。
-- `Command API`、`Query API`、`Operations Trigger` 是入口代码主体,不是业务部分本身。
-- P1 主体只保留位置和边界,不作为 P0 详细展开前置条件。
+- 该图表达当前架构子域和能力主线在概要层可落成的代码主体主语,不是代码目录树。
+- `1~7` 是当前核心闭环和支撑边界的代码主体候选;`8` 是外围增强位置,不作为核心闭环前置。
+- 外部系统、下游仓、artifact 正文、治理执行、marketplace 交易和 UI 状态不作为本仓内部代码主体。
 
 ### 4.2 实现分层视图
 
 ```text
 外部调用 / 外部事件 / 运维任务
-        |
-        v
-+--------------------------------------------------------------+
-| Inbound / Operations                                         |
-| Command API / Query API / Event Handler / Operations Trigger |
-+-------------------------------+------------------------------+
-                                |
-                                v
-+--------------------------------------------------------------+
-| Application Services                                          |
-| MethodContentCommandService / PublishGovernanceService        |
-| DefinitionSyncService / SnapshotExportService                 |
-| ViewProfileResolveService / DefinitionTraceQueryService       |
-| MethodOperationsService / P1 PluginConfigurationService       |
-+-------------------------------+------------------------------+
-                                |
-                                v
-+--------------------------------------------------------------+
-| Domain Model / Domain Policies                               |
-| MethodContent + 7 definitions                                 |
-| Lifecycle / Publish / Reference / Boundary / Fingerprint      |
-| ViewProfileMatch / P1 Composition                             |
-+-------------------------------+------------------------------+
-                                |
-                                v
-+--------------------------------------------------------------+
-| Ports                                                         |
-| Repository / UnitOfWork / AuditLog / Outbox / GateDecision    |
-| BlobRef / EventPublisher / Clock / IdGenerator / Cache        |
-+-------------------------------+------------------------------+
-                                |
-                                v
-+--------------------------------------------------------------+
-| Persistence / Projection / Outbound Adapters                  |
-| PostgreSQL write model / version store / audit store / outbox |
-| read model / trace projection / snapshot projection           |
-| L0-bus adapter / object storage adapter / governance adapter  |
-+--------------------------------------------------------------+
+        │
+        ▼
+┌────────────────────────────────────────┐
+│ Inbound / Operations                   │
+└──────────────────┬─────────────────────┘
+                   ▼
+┌────────────────────────────────────────┐
+│ Application Services                   │
+└──────────────────┬─────────────────────┘
+                   ▼
+┌────────────────────────────────────────┐
+│ Domain Model                           │
+└──────────────────┬─────────────────────┘
+                   ▼
+┌────────────────────────────────────────┐
+│ Ports                                  │
+└──────────────┬───────────────┬─────────┘
+               ▼               ▼
+┌──────────────────────┐ ┌──────────────────────┐
+│ Persistence           │ │ Projection / Material │
+└──────────────┬───────┘ └──────────────┬───────┘
+               ▼                        ▼
+┌────────────────────────────────────────┐
+│ Collaboration / External Adapters      │
+└────────────────────────────────────────┘
 ```
 
-关键说明：
+关键说明:
 
-- 该图表达请求、事件和运维触发如何进入实现分层,不表达部署拓扑或具体进程拆分。
-- 业务主要组成部分可以跨多个实现层;实现层也会承载多个业务组成部分。
-- Domain 不依赖 HTTP、PostgreSQL、L0-bus、object storage 或下游系统。
-- Ports 是抽象接缝,完整 trait 与函数签名留给 `03-详细设计.md`。
+- 该图表达代码主体如何安放到实现分层,不表达 crate、目录、进程或部署拓扑。
+- `Domain Model` 是核心定义 truth 和规则的落点,不依赖 projection、adapter 或外部仓运行状态。
+- `Persistence` 保存正式状态和引用;`Projection / Material` 支撑读取、消费和追溯,不得成为第二 truth。
 
 ### 4.3 业务主要组成部分与实现分层关系说明
 
 | 项 | 说明 |
 |---|---|
-| 业务主要组成部分 | 表达 method-library 在业务上承担哪些职责主线,例如方法定义生命周期、定义真相、关系校验、定义同步、查询追溯、恢复运维、P1 打包组装 |
-| 实现分层 | 表达代码如何安放这些主体,例如 Inbound / Operations、Application Services、Domain Model / Policies、Ports、Persistence / Projection / Outbound Adapters |
-| 二者关系 | 一个业务组成部分通常会跨多个实现层;一个实现层也会承接多个业务组成部分 |
-| 不能混用的原因 | 如果把 Inbound / Persistence 当业务主要组成部分,Step 5 会退化成技术分层;如果把业务部分当代码层,Step 6 / 7 / 8 会缺少清晰落点 |
-| 本步边界 | 本步只收稳代码主体框架,不决定文件目录、完整接口契约、数据库表或具体框架实现 |
-
-### 4.4 关键判断
-
-业务主要组成部分回答“method-library 对平台提供什么结构性能力”。
-
-实现分层回答“这些能力在代码中如何被入口、编排、领域、端口和适配器承载”。
-
-因此 `Inbound / Operations`、`Application Services`、`Domain Model / Policies`、`Ports`、`Persistence / Projection / Outbound Adapters` 不作为业务主要组成部分,而作为承载业务主体的实现组织轴。
+| 业务主要组成部分 | 方法资产定义与目录、正式化与版本、受控消费、追溯与一致性保护、关系与分发、外部摘要与引用、后台维护与收敛、外围包与方法集组织。 |
+| 实现分层 | Inbound / Operations、Application Services、Domain Model、Ports、Persistence、Projection / Material、Collaboration / External Adapters。 |
+| 关系 | 业务组成部分说明“做什么”,实现分层说明“代码如何安放这些主体”。 |
+| 后续使用 | Step 5 按业务主要组成部分展开职责边界;Step 6~9 从业务部分中提取对象、接口、流程和状态。 |
 ````
 
 ---
 
-## 9. 待确认事项
+## 7. 待确认事项
 
-| 问题 | 当前建议 | 是否阻塞 Step 4 |
-|---|---|---|
-| 是否同意旧 A-H 中 A / H 不再作为业务主要组成部分 | 建议 A 归入 Inbound / Operations,H 归入 Persistence / Outbound Adapters | 阻塞 |
-| 是否同意 Step 5 按 7 个业务主要组成部分继续展开 | 建议采用 7 个业务主线,不按技术层展开 | 阻塞 |
-| 是否同意 Step 4 点名这些服务、策略、端口和 worker 名称 | 建议作为 03 的稳定主语,但不在 02 写完整签名 | 不阻塞 |
-| 是否同意 P1 只保留位置和边界 | 建议不把 P1 作为 P0 详细展开前置条件 | 不阻塞 |
+| 待确认事项 | 当前处理 |
+|---|---|
+| `MethodAssetDefinitionService` 等概要名称是否最终作为 03 service 名 | 当前只是 02 代码主体主语;03 可在不改变职责边界的前提下细化命名。 |
+| 外围包与方法集组织是否进入核心 Step 5 小循环 | 当前保留为外围增强组成部分,不得阻塞核心闭环。 |
+| 下游消费影响摘要是否成为 P0 一致性保护主体 | 当前保留 `ConsumptionImpactSummary` 候选,具体机制留给后续 Step / 03。 |
+| 外部治理结论摘要保存为 summary 还是 ref-only | 当前同时保留 summary/ref 主体类别,不得迁入治理执行正文。 |
 
 ---
 
-## 10. 进入下一步条件
+## 8. 自检与停审
 
-进入 Step 5 前需要确认：
-
-- [x] 是否同意新版 §4 用“业务主要组成部分 + 实现分层”两条轴表达代码主体框架
-- [x] 是否同意 `对外入口与访问`、`基础设施适配` 不再作为业务主要组成部分
-- [x] 是否同意 Step 5 按 7 个业务主要组成部分逐一展开职责与边界
-- [x] 是否同意本步不展开目录、完整 trait、struct、协议 schema 和 DDL
+| 检查项 | 结论 | 说明 |
+|---|---|---|
+| 是否输出两张 ASCII 图 | pass | 已输出架构模块到代码主体映射图和实现分层视图。 |
+| 是否区分业务组成部分与实现分层 | pass | 已用关系说明表和关键判断固定二者边界。 |
+| 是否避免代码目录 / 文件路径 / 完整 contract | pass | 未写 crate、目录、文件、trait 签名、字段全集、DDL、event payload 或 HTTP path。 |
+| 是否承接新版 00 / 01 | pass | 主体来自当前核心能力、子域、数据归属和交互承载。 |
+| 是否排除旧材料污染 | pass | 旧七类 P0、fingerprint、snapshot、outbox、PostgreSQL/object storage 仅在差异审计或非继承语境出现。 |
+| 是否允许进入 Step 5 | pass | Step 4 已完成,等待用户确认后进入 Step 5。 |

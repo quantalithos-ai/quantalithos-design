@@ -1,269 +1,264 @@
-# Step 1. 确认上游输入边界
+# L3-method-library 02 概要 Step 1: 确认上游输入边界
 
-## 1. Step 状态
-
-- 状态：[x] 已确认
-- 对应 SOP：`standards/document/概要设计讨论流程_SOP.md` Step 1
-- 回填章节：`projects/L3-method-library/02-概要设计.md` §1 与上游文档的关系声明
+> 创建日期: 2026-06-15
+> 状态: completed
+> 当前模式: full-restart
+> 文档级 flow: `design-calibration/02_hld_calibration_flow.md`
+> 项目级台账: `design-calibration/project_execution_ledger.md`
+> 正式文档目标: `projects/L3-method-library/02-概要设计.md`
+> 本轮口径: 只确认新版 `00-需求文档.md` 与 `01-架构设计.md` 能为概要设计提供哪些输入;旧 02 只作差异审计。
 
 ---
 
-## 2. 本步输入
+## 0. Step 开工确认
 
-| 输入 | 路径 | 本步使用方式 |
+| 项目 | 记录 |
+|---|---|
+| Step | Step 1 确认上游输入边界 |
+| 输出文件 | `design-calibration/02_hld_step_01_upstream_boundary.md` |
+| 已读取项目级台账 | yes:`design-calibration/project_execution_ledger.md` |
+| 已读取文档级 flow | yes:`design-calibration/02_hld_calibration_flow.md` |
+| 已读取 SOP / 书写规范 | yes:`概要设计讨论流程_SOP.md` Step 1;`概要设计书写规范.md` 4.1 |
+| 已读取正式输入 | yes:`00-需求文档.md`;`01-架构设计.md` |
+| 旧材料处理 | 旧 `02-概要设计.md` 与旧 `02_hld_step_01_upstream_boundary.md` 只作后置差异审计 |
+| 进入条件 | pass |
+| next_allowed_action | Step 1 已完成,等待用户确认后进入 Step 2。 |
+
+---
+
+## 1. Step 内计划
+
+| 模块 | 状态 | 产物 | gate_status | next_allowed_action |
+|---|---|---|---|---|
+| 必读文档读取 | done | 必读文档摘要 | pass | 进入整体模块骨架。 |
+| 整体模块搭建 | done | Step 1 输出结构 | pass | 进入上游关系思考。 |
+| 上游关系:先思考 | done | 上游输入判断 | pass | 进入上游关系写入。 |
+| 上游关系:再写入 | done | 上游关系映射表 | pass | 进入不再回答清单。 |
+| 不再回答:先思考 | done | 已由上游收稳问题 | pass | 进入不再回答写入。 |
+| 不再回答:再写入 | done | 本文不再回答清单 | pass | 进入必须回答清单。 |
+| 必须回答:先思考 | done | 概要必须收口问题 | pass | 进入必须回答写入。 |
+| 必须回答:再写入 | done | 本文必须回答清单 | pass | 进入旧材料差异审计。 |
+| 旧材料差异审计 | done | 差异审计表 | pass | 进入自检与停审。 |
+| 自检与停审 | done | 完成门禁 | pass | 等待用户确认 Step 2。 |
+
+---
+
+## 2. 必读文档
+
+| 文档 | 读取结论 | 对 Step 1 的影响 |
 |---|---|---|
-| 需求文档 | `projects/L3-method-library/00-需求文档.md` | 承接目标、非目标、P0/P1 范围、用户故事、功能需求、接口需求和验收口径 |
-| 架构设计 | `projects/L3-method-library/01-架构设计.md` | 承接系统边界、上下游交互、数据所有权、架构约束、技术选型和 P0/P1 架构口径 |
-| 当前概要设计 | `projects/L3-method-library/02-概要设计.md` | 作为被校准对象,识别旧结构与最新规范之间的差距 |
-| 概要设计书写规范 | `standards/document/概要设计书写规范.md` | 作为最终 `02` 的结果结构约束 |
-| 概要设计讨论 SOP | `standards/document/概要设计讨论流程_SOP.md` | 作为本轮 Step 生成流程 |
-| 中间产物规范 | `standards/document/设计文档讨论中间产物规范.md` | 作为本文件结构和回填门禁 |
-
-已确认结论:
-
-```text
-L3-method-library 是方法定义资产中心。
-它拥有 7 类 P0 MethodContent 的 Definition truth。
-它不拥有 identity / process / work / artifact / governance / UI 的 Use truth。
-P0 主线是定义资产 draft -> review -> publish -> fingerprint -> audit -> outbox -> snapshot -> downstream sync。
-P1 MethodPlugin / MethodConfiguration 属于方法资产组装与分发能力,不得阻塞 P0 主链。
-```
-
-依赖的前序 Step:
-
-```text
-无。Step 1 是本轮 02 概要设计校准的入口。
-```
+| `standards/document/概要设计讨论流程_SOP.md` Step 1 | Step 1 只确认概要设计承接哪些需求与架构结论,输出上游关系映射、本文不再回答、本文必须回答。 | 本 Step 不收口设计目标、范围、约束、代码主体、对象、接口、处理流或状态。 |
+| `standards/document/概要设计书写规范.md` 4.1 | 正式 §1 必须使用上游关系映射表,禁止重写需求目标、架构取舍或提前展开对象字段、接口表和处理流。 | 回填草稿只保留上游承接关系和回答边界。 |
+| `projects/L3-method-library/00-需求文档.md` | 新版 00 已明确本仓定位、核心能力闭环、功能需求、业务规则、数据归属、接口依赖、验收和风险。 | 作为概要设计的需求输入,但不把需求原文复制成概要正文。 |
+| `projects/L3-method-library/01-架构设计.md` | 新版 01 已明确职责边界、上下文、子域、运行承载、依赖方向、数据所有权、一致性、交互方式、技术机制和风险。 | 作为概要设计的架构输入,但不重新讨论架构取舍。 |
+| `projects/L3-method-library/design-calibration/00_requirements_calibration_flow.md` | 需求线已完成 Step 1~17。 | 允许把新版 00 作为已完成输入。 |
+| `projects/L3-method-library/design-calibration/01_architecture_calibration_flow.md` | 架构线已完成 Step 1~16。 | 允许把新版 01 作为已完成输入。 |
+| 旧 `projects/L3-method-library/02-概要设计.md` | 旧 02 含旧 P0 七类 MethodContent、fingerprint、snapshot、outbox、PostgreSQL/object storage 等旧口径。 | 只能用于差异审计,不得作为本轮上游结论。 |
 
 ---
 
-## 3. SOP 问题回答
+## 3. 整体模块骨架
 
-### 3.1 当前概要设计要承接哪些需求结论？
-
-回答：
-
-当前概要设计必须承接 `00-需求文档.md` 中已经收稳的以下结论:
-
-| 需求结论 | 内容 |
-|---|---|
-| 仓定位 | L3 方法能力层中的方法资产中心 |
-| P0 MethodContent | Qualification / RoleDefinition / TaskDefinition / WorkProductDefinition / ProcessTemplateDef / ViewProfile / AIPolicyDef |
-| P0 主链路 | Draft MethodContent -> Publish Gate Approved -> Publish MethodContent -> Generate Fingerprint -> Emit Definition Event / Snapshot -> Downstream Sync |
-| P0 下游同步 | Qualification -> identity / capability-hub; RoleDefinition -> identity; TaskDefinition -> process; WorkProductDefinition -> artifact; ProcessTemplateDef -> process; ViewProfile -> UI / console; AIPolicyDef -> governance |
-| TaskDefinition 下游口径 | process 是 P0 消费方; work 是否直接消费保持 P1 / 待确认 |
-| 非目标 | 不管理 QualificationProfile / QualificationBinding / ProcessInstance / WorkItem / Artifact 实例 / Policy enforce result / Marketplace 交易 |
-| Command 需求 | Create / Update / Submit / Publish / Deprecate / Retire / Supersede / SeedInitialMethodAssets |
-| Query 需求 | Get / List / Version / ExportSnapshot / ResolveViewProfile / Trace / CompareFingerprint |
-| Event 需求 | content / qualification / role / task / work product / process template / view profile / ai policy 发布与变更事件 |
-| Operations Job | seed、index rebuild、event replay、fingerprint recalculate、snapshot export、drift detect |
-
-### 3.2 当前概要设计要承接哪些架构结论？
-
-回答：
-
-当前概要设计必须承接 `01-架构设计.md` 中已经收稳的以下结论:
-
-| 架构结论 | 内容 |
-|---|---|
-| Definition vs Use | method-library 只拥有 Definition truth,下游拥有 Use truth |
-| 上下文边界 | 方法作者 / Admin / Console / Auditor 通过 Command / Query 访问; governance 提供 gate; L0-bus 承载 outbox/replay; object storage 保存 guidance/blob/package blob |
-| 下游关系 | identity / process / capability-hub / artifact / governance / UI / console / marketplace 通过 Event + Snapshot / Query 消费 |
-| 数据所有权 | 本仓拥有 MethodContent 定义正文、版本、fingerprint、生命周期、audit、outbox、snapshot; 只保存外部事实引用 |
-| 一致性策略 | MethodContent 聚合内强一致; 下游同步最终一致; outbox + snapshot + fingerprint 支撑恢复和 drift 防护 |
-| 技术方向 | PostgreSQL 存定义真相; object storage 存大 blob; outbox + L0-bus 发事件; canonical fingerprint 做漂移识别 |
-| P0/P1 分界 | P0 先跑通 7 类定义资产发布闭环; P1 plugin/configuration/marketplace 后置 |
-| 硬约束 | published 核心字段不可改,变更必须 supersede; publish 必经 Gate; fingerprint 变化必发事件 |
-
-### 3.3 这些结论里，哪些已经足够稳定，可以直接作为概要设计输入？
-
-回答：
-
-以下结论可以直接作为概要设计输入:
-
-```text
-1. 7 类 P0 MethodContent
-2. Definition truth / Use truth 边界
-3. P0 发布同步主链
-4. P0 下游消费方
-5. P0 / P1 范围分界
-6. Command / Query / Event / Operations Job 接口族
-7. fingerprint / snapshot / outbox / audit 的发布一致性主线
-8. QualificationProfile 和 QualificationBinding 不归 method-library
-9. TaskDefinition P0 下游是 process,work 保持 P1 / 待确认
-```
-
-### 3.4 哪些结论虽然相关，但仍未收稳，因此当前不能直接往下展开？
-
-回答：
-
-以下结论相关但不能在本轮概要设计中当作已收稳实现结论:
-
-| 未收稳结论 | 当前处理 |
-|---|---|
-| work 是否直接消费 TaskDefinition 作为 WorkItem 模板 | 保持 P1 / 待确认,不进入 P0 设计主链 |
-| MethodPlugin / MethodConfiguration 的完整实现细节 | 只保留 P1 位置和边界,不阻塞 P0 |
-| Variability / Plugin dependency DAG 的具体算法 | P1 后置,不在 02 P0 关键对象和流程中展开 |
-| AIPolicyDef 与 governance runtime Policy DSL 的完整映射 | 02 只表达 source/ref 和同步边界,详细 DSL 留给 governance / 后续 ADR |
-| Marketplace package listing / transaction / install record | 不进入本仓 P0,只保留 P1 metadata 输出边界 |
-| 完整数据库表结构、索引、DDL、HTTP JSON / proto schema | 留给 `03-详细设计.md` |
-
-### 3.5 哪些边界、非目标和约束会直接决定概要设计当前不该展开到哪里？
-
-回答：
-
-当前概要设计不应展开到以下范围:
-
-```text
-1. 不重新定义需求目标、用户故事、功能编号和验收标准
-2. 不重新讨论架构选型和上下游系统边界
-3. 不展开完整 Rust struct 字段全集、trait 签名和函数实现
-4. 不展开完整 HTTP / RPC / Event schema
-5. 不展开 DDL、索引和事务实现细节
-6. 不把 P1 MethodPlugin / MethodConfiguration 写成 P0 前置依赖
-7. 不把下游 Use truth 误写成本仓拥有的对象
-```
-
----
-
-## 4. 当前文档问题诊断
-
-| 位置 | 当前问题 | 影响 |
+| 模块 | 本 Step 要做 | 本 Step 不做 |
 |---|---|---|
-| 文档头部 | 仍引用旧口径“14 节结构”,且前置/关联口径混入旧通则 | 与最新概要设计 13 章主链不一致 |
-| §1 先用人话理解本仓 | 作为说明材料有价值,但占据正式主链入口 | 概要设计没有先给出上游关系映射和本文回答边界 |
-| §1.4 需求与架构基线 | 已包含部分上游承接内容,但混入旧文档自指和后续章节说明 | 可以抽取到新 §1,但需要按规范重写 |
-| §8 总体架构设计 | 大量架构风格、总体架构、技术选型内容重复 `01-架构设计.md` | 02 回滑到架构设计,削弱代码主体框架和主要组成部分 |
-| §9 关键技术选型 | 技术选型属于架构设计,不应作为新版 02 主章节 | 与概要设计职责边界冲突 |
-| §10 备选方案与取舍 | 方案取舍属于架构设计或 ADR,不应在 02 重新展开 | 使 02 变成缩小版架构设计 |
-| §11~§13 | 接口、数据流、数据所有权内容有价值,但章节位置和粒度不符合最新规范 | 需要重排到 §7 / §8 / §11,并降低过细内容 |
+| 上游关系确认 | 判断新版 00 / 01 哪些结论可承接到概要层。 | 不重新证明本仓为什么成立。 |
+| 不再回答清单 | 列出需求线、架构线已经收稳的问题。 | 不把这些问题再写成概要设计章节目标。 |
+| 必须回答清单 | 列出概要设计必须继续下沉的结构问题。 | 不直接给出对象、接口、处理流和状态答案。 |
+| 未收稳输入处理 | 标明哪些相关项只能作为待确认、外围或后续输入。 | 不为了推进 Step 2 而把 open question 写成定论。 |
+| 旧材料差异审计 | 识别旧材料不能继承的口径。 | 不从旧 02 反推新版 00 / 01。 |
 
 ---
 
-## 5. 改动前后对比
+## 4. 模块思考记录
 
-| 项 | 改动前 | 改动后 | 原因 |
-|---|---|---|---|
-| 文档入口 | 先用人话解释仓定位 | 先声明与上游文档的关系、本文不再回答、本文必须回答 | 最新概要设计规范要求先承接,再展开 |
-| 上游承接 | 分散在 §1.4、§5、§8 等章节 | 集中到新 §1 上游关系映射表 | 避免同一边界反复解释 |
-| 架构内容 | 在 02 中重复系统上下文、架构风格、技术选型、备选方案 | 只承接 01 结论,不重写架构取舍 | 02 不是缩小版架构设计 |
-| 设计深度 | 同时包含概要、架构和详细设计粒度 | 停在代码主体骨架、对象轮廓、接口骨架、处理流和状态机 | 支撑 03,但不提前写 03 |
-| P1 内容 | MethodPlugin / Configuration 章节较重 | 保留 P1 位置、边界和承接清单,不进入 P0 主链 | 避免 P1 污染 P0 实现路径 |
+### 4.1 上游关系:先思考
 
----
+问题回答:
 
-## 6. 设计取舍
+- 当前概要设计要承接的是新版 00 已收稳的需求边界和新版 01 已收稳的架构边界。
+- 00 给出“做什么、为什么、验收到什么程度”;01 给出“系统边界、职责、数据、依赖和交互怎么约束”。
+- 02 应继续把这些输入转译为代码主体框架、主要组成部分、关键对象轮廓、接口骨架、处理流、状态和配置影响轮廓。
 
-| 方案 | 优点 | 缺点 | 结论 |
-|---|---|---|---|
-| 保留当前 02 结构,只做局部修补 | 改动小 | 仍不符合最新 13 章主链,架构/概要/详细边界继续混杂 | 不采用 |
-| 完全重写 02,只保留少量旧内容 | 最干净 | 容易丢失已经讨论过的有效边界和接口口径 | 不采用 |
-| 按最新 13 章主链重排,从旧文档抽取有效结论 | 能保留有效材料,又能修正结构问题 | 需要逐 Step 校准和回填 | 采用 |
+诊断:
 
----
+- 旧 Step 1 将旧 `MethodContent` 七类资产、fingerprint、outbox、snapshot、PostgreSQL/object storage 当作已收稳输入。
+- 新版 00 / 01 已经调整为“独立方法资产定义 truth + Definition vs Use + 正式版本 + 受控消费 + 追溯一致性”的主线。
+- 因此旧 Step 1 的旧 P0 对象清单和实现机制不能继续作为本轮 02 输入。
 
-## 7. 结构化中间产物
+取舍:
 
-### 7.1 上游关系映射表
+- 采用新版 00 / 01 作为唯一上游输入。
+- 旧 02 和旧 Step 1 只用于发现污染项,不用于产生本轮概要结论。
+
+### 4.2 上游关系:再写入
 
 | 来源文档 | 承接内容 | 本文继续展开什么 |
 |---|---|---|
-| `00-需求文档.md` | 仓定位、P0/P1 范围、7 类 MethodContent、用户故事、功能需求、接口需求、非目标、验收口径 | 转译成代码主体框架、主要组成部分、关键对象、接口骨架和关键处理流 |
-| `01-架构设计.md` | 系统边界、上下游交互、Definition / Use 边界、数据所有权、一致性策略、技术选型、P0/P1 架构口径 | 转译成主要组成部分边界、对象归属、接口协作、状态流转和详细设计承接清单 |
-| `概要设计书写规范.md` | 13 章主链、图表输出规则、关键对象字段/函数骨架要求 | 约束新 `02-概要设计.md` 的最终章节结构和输出格式 |
-| `概要设计讨论流程_SOP.md` | Step 1~13 的讨论流程 | 约束本轮校准的讨论顺序和进入下一步门禁 |
-| `设计文档讨论中间产物规范.md` | Step 中间产物结构和回填门禁 | 约束 `design-calibration/` 下每个 Step 文件的格式 |
+| `projects/L3-method-library/00-需求文档.md` | 本仓定位为方法资产定义、版本发布与分发语义真相仓;核心闭环为统一定义与识别、稳定版本进入正式使用语境、下游按边界消费、变化可追溯并保护消费一致性。 | 转译为代码主体框架、主要组成部分、关键对象候选、接口类别、关键处理流和状态轮廓。 |
+| `projects/L3-method-library/00-需求文档.md` | 非目标和边界:不拥有流程执行、成员状态、治理执行、外部能力注册、marketplace 交易、UI 渲染、artifact/archive 正文、认证鉴权。 | 在组成部分、对象、接口和处理流中持续排除边界外 truth 和正文。 |
+| `projects/L3-method-library/00-需求文档.md` | 数据归属:本仓拥有方法资产定义、身份目录、正式化版本、关系、分发、追溯和证据线索等需求层 truth;外部事实只以摘要或引用承接。 | 转译为 truth / read material / summary / reference / forbidden body 的概要对象发现线索。 |
+| `projects/L3-method-library/00-需求文档.md` | 接口与依赖:定义建立与调整、正式化与版本变化、目录与正式定义读取、追溯查看、变化可感知输出、治理结论输入、下游影响回报、后台维护。 | 转译为 Command / Query / Event / Consumer / Operations 等概要接口骨架入口。 |
+| `projects/L3-method-library/01-架构设计.md` | 架构职责:方法资产定义 truth、正式版本语义、受控消费、追溯一致性、外部依据摘要 / 引用、后台延后承接。 | 转译为主要组成部分及其职责边界。 |
+| `projects/L3-method-library/01-架构设计.md` | 上下文:核心主链消费对象为 `L1-process`、`L1-identity`、`L2-runtime`、`L2-member-images`;`L0-core` 为共享契约来源;`L0-bus` 为事件协作边界。 | 转译为概要层关键接缝和外部协作边界。 |
+| `projects/L3-method-library/01-架构设计.md` | 数据与一致性:核心 truth 强一致;读取 / 投影 / 摘要最终一致;外部正文只保存引用;下游状态不归本仓。 | 转译为处理流和状态传播的概要规则。 |
+| `projects/L3-method-library/01-架构设计.md` | 交互方式:定义 / 正式化 / 读取走同步裁定;变化传播、治理结论和下游影响走异步承接;读取追溯材料由后台维护。 | 转译为关键处理流分组和接口通信方式。 |
 
-### 7.2 本文不再回答
+### 4.3 不再回答:先思考
 
-```text
+问题回答:
+
+- 需求和架构已经回答“本仓为什么存在”“边界在哪里”“核心能力是什么”“为什么不能保存外部正文”。
+- 02 不应再证明这些结论,否则会变成需求和架构的重复文档。
+- 02 也不应继续继承旧实现机制,因为这些机制未从新版 00 / 01 重新闭口到概要层。
+
+### 4.4 不再回答:再写入
+
 本文不再回答:
-- 为什么 L3-method-library 必须独立成仓
-- 为什么 7 类 P0 MethodContent 是当前 P0 范围
-- 为什么 QualificationProfile 归 identity
-- 为什么 QualificationBinding 归 capability-hub
-- 为什么 process 是 TaskDefinition / ProcessTemplateDef 的 P0 下游
-- 为什么 published 内容不可直接改写
-- 为什么采用 fingerprint / snapshot / outbox 组合做发布同步和 drift 防护
-- PostgreSQL / object storage / L0-bus 的架构选型理由
-- MethodPlugin / MethodConfiguration 为什么后置为 P1
-```
 
-### 7.3 本文必须回答
+- 为什么 `L3-method-library` 必须作为独立方法资产定义真相仓存在。
+- 为什么 Definition vs Use 必须分离。
+- 为什么 process、identity、runtime、member-images 只能按边界消费方法资产语义,不能拥有定义 truth。
+- 为什么 governance、artifact、marketplace、UI、capability-hub 等职责不得反向迁入本仓。
+- 为什么外部正文、artifact/archive 正文、治理执行正文、marketplace 交易正文和下游运行状态不得保存为本仓 truth。
+- 为什么正式版本语义不能静默变化,未正式化资产不能作为正式消费依据。
+- 为什么外围增强不能成为核心闭环成立前置。
+- 为什么数据库、缓存、对象存储、事件 schema、fingerprint 算法、outbox 实现和部署平台不能从旧材料直接继承。
 
-```text
+### 4.5 必须回答:先思考
+
+问题回答:
+
+- 02 的任务是从 00 / 01 继续下沉到“可实现结构骨架”。
+- 这种骨架必须能交给 03 继续做对象契约、port、protocol、flow、state、persistence 和 test cuts。
+- 因此 02 必须回答结构、组成部分、对象轮廓、接口骨架、流程、状态、异常、配置影响和详细设计承接。
+
+### 4.6 必须回答:再写入
+
 本文必须回答:
-- L3-method-library 的代码主体框架如何组织
-- 本仓按哪些主要组成部分展开,每部分职责和边界是什么
-- 关键对象有哪些,它们分别属于哪个主要组成部分
-- 关键对象的字段骨架、成员函数骨架、工厂函数骨架和状态集合是什么
-- Command / Query / Event / Operations Job 的接口骨架是什么
-- P0 发布同步主链如何在概要层表达为关键处理流
-- MethodContent 生命周期状态如何定义和流转
-- 哪些内容必须交给 03-详细设计继续展开
-```
+
+- `L3-method-library` 的代码主体框架如何从方法资产定义 truth、正式承接层、读取材料、异步协作和后台维护转译而来。
+- 本仓有哪些主要组成部分,每个组成部分承担什么、不承担什么、包含哪些概要层代码主体。
+- 每个主要组成部分有哪些对象发现线索,哪些对象应进入关键对象轮廓,哪些只是字段类型、接口、port、repository 或详细设计对象。
+- 方法资产定义、正式化版本、受控消费、追溯依据、摘要 / 引用、读取材料和外部协作如何形成关键对象轮廓。
+- Command / Query / Event / Consumer / Operations 等接口骨架如何按正式边界分类。
+- 定义建立与调整、正式化与版本变化、读取与追溯、变化传播、外部结论承接、下游影响回报、后台维护等关键处理流如何在概要层表达。
+- 哪些对象具有状态,状态如何流转,状态触发如何回指接口或处理流。
+- 哪些异常和边界场景需要概要层先点名,哪些错误码、恢复脚本和重试参数留给详细设计。
+- 哪些主要部分、接缝、入口、adapter 或 job 可能受配置影响,哪些边界禁止配置化。
+- 03 详细设计需要继续展开哪些对象、接口、流程、状态、配置影响和风险。
+
+### 4.7 旧材料差异审计
+
+| 旧材料口径 | 本轮处理 | 原因 |
+|---|---|---|
+| 旧 Step 1 的“7 类 P0 MethodContent” | 不继承为本轮概要输入。 | 新版 00 / 01 未以旧七类清单作为本轮核心闭口;Qualification / CapabilityDefinition 等仍有待确认边界。 |
+| 旧 Step 1 的 fingerprint / snapshot / outbox / drift 防护主线 | 不继承为上游输入。 | 新版 01 明确不固定 fingerprint 算法、事件格式、outbox 实现或旧实现机制。 |
+| 旧 Step 1 的 PostgreSQL / object storage / L0-bus 技术方向 | 只保留 `L0-bus` 事件协作边界;其余不继承。 | 概要阶段不得把旧技术选型和存储实现当作已闭口上游输入。 |
+| 旧正式 `02-概要设计.md` 的大量旧对象和旧流程 | 只作污染检查。 | 正式 02 将在 Step 14 基于本轮 Step 1~13 重新装配。 |
 
 ---
 
-## 8. 回填草稿
+## 5. 结构化中间产物
 
-以下内容可回填到新版 `02-概要设计.md` §1。
+### 5.1 上游关系映射表
+
+| 来源文档 | 承接内容 | 本文继续展开什么 |
+|---|---|---|
+| `projects/L3-method-library/00-需求文档.md` | 方法资产定义 truth、正式版本、受控消费、追溯一致性、数据归属、接口与依赖、验收和风险。 | 概要层代码主体框架、主要组成部分、关键对象、接口骨架、处理流、状态、配置影响和详细设计承接。 |
+| `projects/L3-method-library/01-架构设计.md` | 职责边界、系统上下文、限界上下文、运行承载、依赖方向、数据所有权、一致性策略、交互方式、技术机制和架构风险。 | 概要层主要组成部分边界、关键接缝、对象归属、状态传播和跨边界协作轮廓。 |
+| `standards/document/概要设计讨论流程_SOP.md` | 14 Step 生成流程、Step 5~9 主要组成部分小循环、Step 1 输出要求。 | 约束本轮 02 按 Step 逐步生成,不得合并重 Step。 |
+| `standards/document/概要设计书写规范.md` | 正式 02 的 14 章主链、校准来源、图表和禁止下沉规则。 | 约束正式文档最终章节和本 Step 回填草稿。 |
+
+### 5.2 本文不再回答
+
+本文不再回答:
+
+- 本仓定位、目标、非目标、核心能力闭环和验收口径。
+- 方法资产定义 truth 的归属和 Definition vs Use 分离理由。
+- 上下游系统边界、依赖方向和数据所有权原则。
+- 核心 truth、读取材料、摘要、引用和禁止正文的架构分层理由。
+- 外围增强、候选依赖和待确认事项为什么不能作为当前核心前置。
+- 旧实现机制为什么不能直接继承为新版概要结论。
+
+### 5.3 本文必须回答
+
+本文必须回答:
+
+- 代码主体框架总览。
+- 主要组成部分、职责与边界。
+- 关键对象轮廓。
+- API / 接口骨架。
+- 关键处理流 / 重要函数数据流。
+- 状态定义与状态流转。
+- 异常与边界场景轮廓。
+- 配置影响轮廓。
+- 详细设计承接清单。
+- 概要层风险与待确认事项。
+
+---
+
+## 6. 回填草稿
+
+以下内容供 Step 14 装配正式 `02-概要设计.md` 时回填到 §1,当前不直接修改正式文档。
 
 ```md
 ## 1. 与上游文档的关系声明
+
+> 校准来源:
+> - `design-calibration/02_hld_step_01_upstream_boundary.md`
+>
+> 延伸阅读:
+> - 建议继续阅读 `design-calibration/02_hld_step_01_upstream_boundary.md` 的“结构化中间产物”“回填草稿”和“旧材料差异审计”小节,了解概要设计输入边界如何收敛。
 
 ### 1.1 上游关系映射
 
 | 来源文档 | 承接内容 | 本文继续展开什么 |
 |---|---|---|
-| `00-需求文档.md` | 仓定位、P0/P1 范围、7 类 MethodContent、用户故事、功能需求、接口需求、非目标、验收口径 | 转译成代码主体框架、主要组成部分、关键对象、接口骨架和关键处理流 |
-| `01-架构设计.md` | 系统边界、上下游交互、Definition / Use 边界、数据所有权、一致性策略、技术选型、P0/P1 架构口径 | 转译成主要组成部分边界、对象归属、接口协作、状态流转和详细设计承接清单 |
-| `standards/document/概要设计书写规范.md` | 13 章主链、图表输出规则、关键对象字段 / 函数骨架要求 | 约束本文最终章节结构和输出格式 |
-| `standards/document/概要设计讨论流程_SOP.md` | Step 1~13 的讨论流程 | 约束本轮校准的讨论顺序和进入下一步门禁 |
+| `projects/L3-method-library/00-需求文档.md` | 方法资产定义 truth、正式版本、受控消费、追溯一致性、数据归属、接口与依赖、验收和风险。 | 概要层代码主体框架、主要组成部分、关键对象、接口骨架、处理流、状态、配置影响和详细设计承接。 |
+| `projects/L3-method-library/01-架构设计.md` | 职责边界、系统上下文、限界上下文、运行承载、依赖方向、数据所有权、一致性策略、交互方式、技术机制和架构风险。 | 概要层主要组成部分边界、关键接缝、对象归属、状态传播和跨边界协作轮廓。 |
 
-### 1.2 本文不再回答
+本文不再回答:
 
-本文不再回答：
-- 为什么 L3-method-library 必须独立成仓
-- 为什么 7 类 P0 MethodContent 是当前 P0 范围
-- 为什么 QualificationProfile 归 identity
-- 为什么 QualificationBinding 归 capability-hub
-- 为什么 process 是 TaskDefinition / ProcessTemplateDef 的 P0 下游
-- 为什么 published 内容不可直接改写
-- 为什么采用 fingerprint / snapshot / outbox 组合做发布同步和 drift 防护
-- PostgreSQL / object storage / L0-bus 的架构选型理由
-- MethodPlugin / MethodConfiguration 为什么后置为 P1
+- 本仓定位、目标、非目标、核心能力闭环和验收口径。
+- 方法资产定义 truth 的归属和 Definition vs Use 分离理由。
+- 上下游系统边界、依赖方向和数据所有权原则。
+- 核心 truth、读取材料、摘要、引用和禁止正文的架构分层理由。
+- 外围增强、候选依赖和待确认事项为什么不能作为当前核心前置。
 
-### 1.3 本文必须回答
+本文必须回答:
 
-本文必须回答：
-- L3-method-library 的代码主体框架如何组织
-- 本仓按哪些主要组成部分展开,每部分职责和边界是什么
-- 关键对象有哪些,它们分别属于哪个主要组成部分
-- 关键对象的字段骨架、成员函数骨架、工厂函数骨架和状态集合是什么
-- Command / Query / Event / Operations Job 的接口骨架是什么
-- P0 发布同步主链如何在概要层表达为关键处理流
-- MethodContent 生命周期状态如何定义和流转
-- 哪些内容必须交给 03-详细设计继续展开
+- 代码主体框架总览。
+- 主要组成部分、职责与边界。
+- 关键对象轮廓。
+- API / 接口骨架。
+- 关键处理流 / 重要函数数据流。
+- 状态定义与状态流转。
+- 异常与边界场景轮廓。
+- 配置影响轮廓。
+- 详细设计承接清单。
+- 概要层风险与待确认事项。
 ```
 
 ---
 
-## 9. 待确认事项
+## 7. 待确认事项
 
-| 问题 | 当前建议 | 是否阻塞 Step 1 |
-|---|---|---|
-| 是否在新版 02 中保留“先用人话理解本仓”章节 | 不作为正式主章节保留,可将必要解释压缩到 §2 或术语说明 | 不阻塞 |
-| 是否把旧 §9 技术选型完整删除 | 不完整保留;只在约束条件中引用架构结论 | 不阻塞 |
-| 是否在 §1 引入 `domain/method-library/README.md` | 可作为参考,但不作为主输入;主输入是 00/01 | 不阻塞 |
+| 待确认事项 | 当前处理 |
+|---|---|
+| Qualification / CapabilityDefinition 是否进入核心概要对象主线 | Step 1 不闭口;后续 Step 若需要纳入,必须回指新版 00 / 01 的待确认事项并保持风险标记。 |
+| MethodPlugin / MethodConfiguration 是否进入当前主线 | Step 1 不闭口;当前只按外围增强和后续演进输入处理。 |
+| governance 强前置、artifact 核心下游、下游消费影响回报摘要是否进入 P0 主线 | Step 1 不闭口;后续 Step 按 00 / 01 当前处理口径保守承接。 |
 
 ---
 
-## 10. 进入下一步条件
+## 8. 自检与停审
 
-进入 Step 2 前需要确认:
+| 检查项 | 结论 | 说明 |
+|---|---|---|
+| 是否只确认上游输入边界 | pass | 未展开 Step 2 范围、Step 4 代码主体、Step 6 对象、Step 7 接口或 Step 8 流程。 |
+| 是否使用新版 00 / 01 作为唯一结论来源 | pass | 旧 02 和旧 Step 1 只用于差异审计。 |
+| 是否输出 SOP 要求的三类产物 | pass | 已输出上游关系映射、本文不再回答、本文必须回答。 |
+| 是否避免旧实现机制污染 | pass | 未继承旧 fingerprint / snapshot / outbox / PostgreSQL / object storage 作为当前结论。 |
+| 是否可进入 Step 2 | pass | 已明确概要设计承接输入和回答边界。 |
 
-- [ ] 上游关系映射表是否准确
-- [ ] `本文不再回答` 是否覆盖了需求与架构中已经收稳的问题
-- [ ] `本文必须回答` 是否准确限定了新版 02 的职责
-- [ ] 是否同意后续按最新 13 章主链重排正式 `02-概要设计.md`
+Step 1 已完成。等待用户确认后,可进入 Step 2 `02_hld_step_02_scope.md`。

@@ -1,253 +1,317 @@
-# Step 3. 收稳约束条件
+# L3-method-library 02 概要 Step 3: 收稳约束条件
 
-## 1. Step 状态
-
-- 状态：[x] 已确认
-- 对应 SOP：`standards/document/概要设计讨论流程_SOP.md` Step 3
-- 回填章节：`projects/L3-method-library/02-概要设计.md` §3 约束条件
-
----
-
-## 2. 本步输入
-
-| 输入 | 内容 |
-|---|---|
-| Step 1 上游边界 | 02 只承接 `00-需求文档.md` 和 `01-架构设计.md`,不重写需求、架构选型和 ADR 取舍 |
-| Step 1 必须回答 | 代码主体框架、主要组成部分、关键对象、接口骨架、处理流、状态流转和详细设计承接 |
-| Step 2 设计目标 | 本轮概要设计停在代码主体骨架层,为 `03-详细设计.md` 提供可展开输入 |
-| Step 2 非范围 | 完整 Rust 类型、协议 schema、DDL、错误码、测试、验收、实施计划不在本章展开 |
-| 当前 02 §4 | 已有大量约束,但混合了技术约束、资源约束、时间约束、容量假设和一致性策略 |
-| 需求业务规则 | BR-LC、BR-PUB、BR-QUAL、BR-REL、BR-SYNC、BR-VIEW、BR-P1 |
-| 架构约束 | Definition / Use 分离、P0 / P1 分离、下游同步最终一致、发布链可审计、边界红线可验证 |
-
-已确认结论：
-
-```text
-本步只收敛会影响概要设计结构的硬约束。
-不把上游架构全文复述为约束。
-不把数据库、部署、索引和完整协议实现提前写入本章。
-```
-
-依赖的前序 Step：
-
-```text
-Step 1 已确认上游输入边界。
-Step 2 已确认设计目标、非范围和当前设计深度。
-```
+> 创建日期: 2026-06-15
+> 状态: completed
+> 当前模式: full-restart
+> 文档级 flow: `design-calibration/02_hld_calibration_flow.md`
+> 项目级台账: `design-calibration/project_execution_ledger.md`
+> 正式文档目标: `projects/L3-method-library/02-概要设计.md`
+> 本轮口径: 只收稳会影响概要结构判断的硬约束;不继承旧 Step 3 的对象清单、具体算法、outbox、snapshot 或存储实现。
 
 ---
 
-## 3. SOP 问题回答
+## 0. Step 开工确认
 
-### 3.1 哪些约束会直接影响本仓对象、接口、处理流或状态机设计？
-
-回答：
-
-会直接影响概要设计结构的约束主要有 12 类。
-
-| 约束 | 影响对象 / 接口 / 处理流 / 状态机的方式 |
+| 项目 | 记录 |
 |---|---|
-| Definition / Use 必须分离 | 对象只能承载定义真相,不能把 QualificationProfile、QualificationBinding、ProcessInstance、WorkItem、Artifact instance 放入本仓模型 |
-| P0 / P1 必须分离 | 主要组成部分必须先围绕 7 类 P0 MethodContent 发布同步闭环组织,Plugin / Configuration 只能作为后置边界出现 |
-| P0 MethodContent 固定为 7 类 | 关键对象和接口骨架必须覆盖 Qualification / RoleDefinition / TaskDefinition / WorkProductDefinition / ProcessTemplateDef / ViewProfile / AIPolicyDef |
-| published 核心字段不可原地修改 | 状态机必须支持 supersede / deprecated / retired;处理流必须保留 version、fingerprint 和 audit trace |
-| publish 必须经过 approved gate | Publish 处理流必须接收 approved_gate_ref,不能出现绕过治理的直接发布路径 |
-| fingerprint 必须由 canonical 内容生成 | 发布、重算、漂移对比和事件输出都必须围绕 fingerprint 设计 |
-| 发布成功必须写 audit 与 outbox | 发布主流程必须包含 audit record 和 outbox event,不能只改内容状态 |
-| 下游同步最终一致 | 接口骨架必须包含 event、snapshot query、replay / resync 入口 |
-| 下游不得反向改写定义真相 | 对外接口只能提供消费、查询、同步和新增定义请求入口,不能提供下游直接写定义正文的入口 |
-| ViewProfile 必须服务端解析 | 必须保留 ResolveViewProfile 查询接口和匹配状态,不能把长期视图规则下放给 UI 本地拼装 |
-| 关系引用必须指向已发布定义 | 发布校验必须覆盖 Qualification、TaskDefinition、WorkProductDefinition、ProcessTemplateDef 等定义间引用 |
-| P1 不得污染 P0 | MethodPlugin、MethodConfiguration、marketplace metadata 不得成为 P0 发布同步闭环的前置条件 |
+| Step | Step 3 收稳约束条件 |
+| 输出文件 | `design-calibration/02_hld_step_03_constraints.md` |
+| 已读取项目级台账 | yes:`design-calibration/project_execution_ledger.md` |
+| 已读取文档级 flow | yes:`design-calibration/02_hld_calibration_flow.md` |
+| 已读取前序 Step | yes:`design-calibration/02_hld_step_02_scope.md` |
+| 已读取 SOP / 书写规范 | yes:`概要设计讨论流程_SOP.md` Step 3;`概要设计书写规范.md` 4.3 |
+| 已读取正式输入 | yes:`00-需求文档.md`;`01-架构设计.md` |
+| 旧材料处理 | 旧 `02_hld_step_03_constraints.md` 只作后置差异审计 |
+| 进入条件 | pass |
+| next_allowed_action | Step 3 已完成,等待用户确认后进入 Step 4。 |
 
-### 3.2 哪些约束来自需求文档，哪些约束来自架构设计或全局设计？
+---
 
-回答：
+## 1. Step 内计划
 
-| 来源 | 约束来源示例 | 本步吸收方式 |
+| 模块 | 状态 | 产物 | gate_status | next_allowed_action |
+|---|---|---|---|---|
+| 必读文档读取 | done | 必读文档摘要 | pass | 进入整体模块骨架。 |
+| 整体模块搭建 | done | Step 3 输出结构 | pass | 进入上游承接约束思考。 |
+| 上游承接约束:先思考 | done | 需求 / 架构已收稳边界判断 | pass | 进入上游承接约束写入。 |
+| 上游承接约束:再写入 | done | 上游承接约束表 | pass | 进入数据归属约束思考。 |
+| 数据归属约束:先思考 | done | truth / read / summary / ref / forbidden body 判断 | pass | 进入数据归属约束写入。 |
+| 数据归属约束:再写入 | done | 数据归属与跨仓边界约束表 | pass | 进入交互一致性约束思考。 |
+| 交互一致性约束:先思考 | done | 同步 / 异步 / 后台与一致性关系判断 | pass | 进入交互一致性约束写入。 |
+| 交互一致性约束:再写入 | done | 交互与一致性约束表 | pass | 进入外围与待确认约束思考。 |
+| 外围与待确认约束:先思考 | done | open / peripheral / candidate 处理口径 | pass | 进入外围与待确认约束写入。 |
+| 外围与待确认约束:再写入 | done | 外围与待确认约束表 | pass | 进入表达深度约束思考。 |
+| 表达深度约束:先思考 | done | 概要层不得下沉边界判断 | pass | 进入表达深度约束写入。 |
+| 表达深度约束:再写入 | done | 表达深度约束表 | pass | 进入旧材料差异审计。 |
+| 旧材料差异审计 | done | 差异审计表 | pass | 进入自检与停审。 |
+| 自检与停审 | done | 完成门禁 | pass | 等待用户确认 Step 4。 |
+
+---
+
+## 2. 必读文档
+
+| 文档 | 读取结论 | 对 Step 3 的影响 |
 |---|---|---|
-| 需求文档 | G-1 / G-8、P0 最小闭环、NG-6~NG-8、BR-LC、BR-PUB、BR-QUAL、BR-REL、BR-SYNC、BR-VIEW、BR-P1 | 转成对象、接口、处理流和状态机必须遵守的结构性约束 |
-| 架构设计 | Definition / Use 分离、P0 / P1 分离、Qualification 三仓边界、发布一致性、outbox + L0-bus、snapshot 兜底、ViewProfile 归属 | 作为概要设计的边界输入,不在 02 中重新论证 |
-| 全局设计 / 标准对齐 | SPEM Definition / Use 口径、ISO/IEC/IEEE 24748、ISO/IEC 29110、ISO/IEC 42001 的责任与审计线索 | 只保留影响命名、职责边界、审计和裁剪性的约束 |
-
-### 3.3 哪些边界如果不先写清，后续最容易串到相邻仓或详细设计？
-
-回答：
-
-最容易串仓的边界如下。
-
-| 边界 | 如果不写清会怎样 |
-|---|---|
-| Qualification vs QualificationProfile vs QualificationBinding | 会把定义、个人画像、工具绑定混成一个对象,导致 method-library、identity、capability-hub 三仓职责污染 |
-| TaskDefinition vs WorkItem | 会把方法任务定义误认为项目协作任务,导致 method-library 过早绑定 work |
-| ProcessTemplateDef vs ProcessInstance | 会把模板定义误认为运行流程实例,导致 method-library 保存 process runtime 真相 |
-| WorkProductDefinition vs Artifact instance | 会把制品定义误认为实际制品正文或证据文件,导致 artifact 数据归属错误 |
-| AIPolicyDef vs policy enforce result | 会把 policy source 和治理执行结果混淆,导致 governance runtime 被塞进 method-library |
-| ViewProfile vs UI session state | 会把长期视图策略和前端临时状态混淆 |
-| MethodPlugin / MethodConfiguration vs P0 MethodContent | 会让 P1 打包和组织级组装能力反向拖慢 P0 定义发布闭环 |
-
-最容易提前写进详细设计的边界如下。
-
-| 边界 | 本步处理方式 |
-|---|---|
-| 数据库表、索引、事务实现 | 只保留“发布链必须一致”和“event / snapshot 必须可恢复”的约束,不写 DDL |
-| 完整协议 schema | 只保留 Command / Query / Event / Job 的接口骨架约束,不写 JSON / proto 细节 |
-| 错误码和重试算法 | 只保留必须有拒绝、重放、补偿、默认 deny 等结构位置,不写完整错误表 |
-| 容量规划数值 | 不作为概要设计主约束,只作为后续非功能或风险输入 |
-
-### 3.4 哪些约束只是泛化工程原则，不应进入本章？
-
-回答：
-
-以下内容不应进入新版 §3 主约束表。
-
-| 不进入本章的内容 | 原因 |
-|---|---|
-| “要高可用”“要高性能”“要可扩展”这类泛化原则 | 不能直接指导对象、接口、处理流或状态机设计 |
-| 具体数据库索引、分区、锁策略 | 属于详细设计实现契约 |
-| 具体缓存、搜索引擎、读模型选型 | 属于详细设计或架构可变实现策略 |
-| 具体 QPS / 记录数容量目标 | 当前不是 P0 首批实现承诺,可放非功能、风险或详细设计容量假设 |
-| 完整部署拓扑和资源配额 | 属于部署 / 实施计划 |
-| P1 plugin dependency DAG 算法 | P1 后置,不应影响 P0 约束主表 |
-
-### 3.5 每条约束是否能指导后续章节的设计判断？
-
-回答：
-
-可以。保留下来的约束必须能至少影响下列一类后续章节。
-
-| 约束类型 | 后续影响 |
-|---|---|
-| 定义归属约束 | 影响 §4 代码主体框架、§5 主要组成部分、§6 关键对象 |
-| 生命周期与发布约束 | 影响 §6 关键对象、§8 处理流、§9 状态机 |
-| 同步与一致性约束 | 影响 §7 接口骨架、§8 处理流、§10 边界场景 |
-| 查询与视图约束 | 影响 §7 Query、§8 ResolveViewProfile 流程、§9 ViewProfile active 状态 |
-| P0 / P1 边界约束 | 影响 §2 范围、§5 组成部分、§11 详细设计承接 |
+| `standards/document/概要设计讨论流程_SOP.md` Step 3 | Step 3 只收稳直接影响对象、接口、处理流或状态机的硬约束。 | 本 Step 不重写需求、架构,不写数据库、部署、完整协议或泛化工程口号。 |
+| `standards/document/概要设计书写规范.md` 4.3 | 正式约束表推荐列出约束、作用范围、当前要求;约束必须作用于结构面。 | 本 Step 采用“约束 / 作用范围 / 当前要求”的主表,并保留 Step 14 回填草稿。 |
+| `design-calibration/02_hld_step_02_scope.md` | Step 2 已明确 02 收敛到可实现结构骨架,不展开完整 schema、port、DDL、事务和测试。 | Step 3 必须保护这个深度,防止后续 Step 4~9 串层。 |
+| `projects/L3-method-library/00-需求文档.md` | 业务规则强调定义 truth 归属、Definition vs Use、正式版本稳定、下游不得替代定义、边界外职责不得入仓。 | 转成概要层必须持续守住的上游承接约束。 |
+| `projects/L3-method-library/01-架构设计.md` | 数据归属区分正式 truth、读取 / 投影、摘要、引用和明确不拥有正文;交互区分同步裁定、异步协作和后台维护。 | 转成数据归属、交互一致性和恢复收敛类约束。 |
+| 旧 `02_hld_step_03_constraints.md` | 旧文件把旧七类 P0、fingerprint、snapshot、outbox、approved gate 和具体恢复入口写成约束。 | 这些未由新版 00 / 01 重新闭口,不得作为本轮 Step 3 结论。 |
 
 ---
 
-## 4. 当前文档问题诊断
+## 3. 整体模块骨架
 
-| 位置 | 当前问题 | 影响 |
+| 模块 | 本 Step 要做 | 本 Step 不做 |
 |---|---|---|
-| §4.1 技术约束 | 多数约束有效,但有些是架构结论复述 | 新版 §3 应转成“对概要设计的影响”,而不是重新论证架构 |
-| §4.2 资源约束 | 混入资源增长、object storage、查询读取、同步补偿等不同层次 | 其中一部分是结构约束,一部分应下沉到详细设计或风险 |
-| §4.3 时间约束 | P0 / P1 节奏表达有效,但章节名偏项目计划 | 新版 §3 应表达“阶段边界约束”,不是实施计划 |
-| §4.4 合规与审计约束 | publish gate、actor_ref、audit trace 有效 | 应并入发布一致性和审计链约束,避免单独拉大章节 |
-| §4.5 一致性与降级约束 | 方向正确,但部分内容已经接近详细设计策略 | 新版 §3 只保留强一致 / 最终一致 / 可重放 / snapshot 兜底这些结构判断 |
-| §4.6 容量规划假设 | 对未来架构有参考,但不是当前概要设计主约束 | 建议不放入新版 §3 主表,转入风险、非功能承接或详细设计容量假设 |
+| 上游承接约束 | 把 00 / 01 已收稳的不变量、边界和非目标转成概要结构约束。 | 不重新论证需求目标或架构取舍。 |
+| 数据归属约束 | 固定 truth、读取材料、摘要、引用和禁止正文的概要边界。 | 不定义对象字段、仓储表、索引或持久化 schema。 |
+| 交互一致性约束 | 固定同步裁定、异步协作、后台维护和一致性边界。 | 不定义事件名、payload、outbox、retry 或 job schema。 |
+| 外围与待确认约束 | 保护外围增强和 open question 不反向污染核心闭环。 | 不把候选项升格为核心对象或核心流程。 |
+| 表达深度约束 | 固定 02 与 03/04/05/06/07 的层次边界。 | 不写完整 contract、配置项、测试证据或 commit 计划。 |
+| 旧材料差异 | 标记旧约束不得继承的具体原因。 | 不从旧材料补当前缺口。 |
 
 ---
 
-## 5. 改动前后对比
+## 4. 模块思考记录
 
-| 项 | 改动前 | 改动后 | 原因 |
-|---|---|---|---|
-| 章节位置 | 旧 §4 约束条件 | 新 §3 约束条件 | 按新版概要设计主链,约束应在目标范围后、代码主体框架前收稳 |
-| 表达方式 | 技术 / 资源 / 时间 / 合规 / 一致性 / 容量六类分散展开 | 收敛成结构性约束表 | 概要设计约束应服务后续对象、接口、处理流和状态机判断 |
-| 架构结论 | 部分重复说明 Definition / Use、P0 / P1、outbox 等架构判断 | 只继承结论并说明设计影响 | 02 不应重新论证 01 的架构取舍 |
-| 容量规划 | 独立列出 2000w、QPS 等假设 | 不放入主约束表,转为后续非功能或风险输入 | 容量数值不能直接决定当前概要对象与接口骨架 |
-| P1 表达 | P1 Plugin / Configuration 出现在多处约束 | 只表达“P1 不得污染 P0” | 避免 P1 看起来是 P0 首批完成门槛 |
-| 输出格式 | 多张不同列名的表 | 统一为“约束 / 说明”主表,另保留来源与影响追踪 | 便于正式文档阅读和后续 Step 引用 |
+### 4.1 上游承接约束:先思考
 
----
+问题回答:
 
-## 6. 设计取舍
+- 本 Step 需要收稳会直接影响后续结构判断的不变量:定义 truth 归属、Definition vs Use、正式版本稳定、非正式资产不可作为正式消费依据、下游不得替代本仓定义。
+- 这些约束来自需求和架构已经收稳的结论,02 只承接并转译,不再重新证明。
+- 后续 Step 4~9 一旦出现对象、接口或流程想吸收相邻仓运行状态,就必须被这些约束拦住。
 
-| 方案 | 优点 | 缺点 | 结论 |
-|---|---|---|---|
-| 保留旧 §4 六类约束结构 | 信息完整,迁移成本低 | 层次混杂,容易把概要设计写成架构复述或详细设计预案 | 不采用 |
-| 只保留最短约束表 | 正式文档简洁 | 难以追踪来源,后续 Step 容易误解为什么有这些约束 | 不单独采用 |
-| 正式文档用“约束 / 说明”主表,中间产物保留来源与影响追踪 | 正式文档清爽,中间产物可审计 | 需要维护两层表达 | 采用 |
+诊断:
 
----
+- 旧 Step 3 把旧对象清单和具体发布机制写成约束,会让后续概要结构被旧实现方案牵引。
+- 新版 00 / 01 的硬约束更抽象,但更稳定:保护定义源、版本语义、受控消费和追溯一致性。
 
-## 7. 结构化中间产物
+取舍:
 
-### 7.1 约束条件主表
+- 约束写成“保护什么边界、作用到哪些结构面”,不写具体对象全集或技术实现。
 
-| 约束 | 说明 |
-|---|---|
-| Definition / Use 必须分离 | 本仓只拥有方法定义真相,不得保存下游使用真相或运行实例真相 |
-| P0 / P1 必须分离 | P0 先完成 7 类 MethodContent 的发布、版本、fingerprint、audit、outbox、snapshot 和下游同步闭环;P1 不得成为 P0 前置条件 |
-| P0 MethodContent 固定为 7 类 | 概要设计对象、接口和流程必须覆盖 Qualification、RoleDefinition、TaskDefinition、WorkProductDefinition、ProcessTemplateDef、ViewProfile、AIPolicyDef |
-| Qualification 三仓边界必须稳定 | method-library 拥有 Qualification 定义;identity 拥有 QualificationProfile;capability-hub 拥有 QualificationBinding |
-| 下游 Use truth 不得写入本仓 | ProcessInstance、WorkItem、Artifact instance、policy enforce result、UI session state 等只能由对应下游仓拥有 |
-| published 核心字段不可原地修改 | 已发布内容变更必须通过新版本、supersede、version、fingerprint 和 audit trace 表达 |
-| publish 必须经过 approved gate | Publish 处理流必须携带 approved_gate_ref,并记录 actor_ref、时间、原因和 gate 结果 |
-| fingerprint 必须由 canonical 内容生成 | fingerprint 是 drift、幂等、snapshot 和事件消费的核心语义标识,不得由下游猜测或自然语言描述替代 |
-| 发布成功必须写 audit 与 outbox | content state、version、fingerprint、audit record、outbox event 必须在发布主链中一起成立 |
-| 跨仓同步采用最终一致 | 下游通过 event、snapshot query、replay / resync 恢复索引,不得要求跨仓强事务 |
-| Snapshot 是下游恢复兜底入口 | 下游错过事件、重建索引或校验 fingerprint 时,必须能拉取 Definition Snapshot |
-| ViewProfile 必须服务端解析 | UI / console 通过 ResolveViewProfile 获取 active ViewProfile 和 fingerprint,生产环境未匹配默认 deny |
-| 定义间引用必须可校验 | RoleDefinition、TaskDefinition、WorkProductDefinition、ProcessTemplateDef 等引用关系在发布前必须指向允许引用的定义版本 |
-| P1 能力不得污染 P0 主链 | MethodPlugin、MethodConfiguration、marketplace metadata、variability、dependency DAG 只保留位置和边界,不展开为 P0 核心对象和主流程 |
+### 4.2 上游承接约束:再写入
 
-### 7.2 来源与影响追踪表
-
-| 约束 | 主要来源 | 影响章节 |
+| 约束 | 作用范围 | 当前要求 |
 |---|---|---|
-| Definition / Use 必须分离 | 需求 NG-6~NG-8、架构 §2、SPEM Definition / Use 口径 | §4 / §5 / §6 / §7 |
-| P0 / P1 必须分离 | 需求 §3.1.1、架构 §2.0 / §2.2 | §2 / §4 / §5 / §11 |
-| P0 MethodContent 固定为 7 类 | 需求 G-1 / G-8、P0 覆盖清单 | §4 / §5 / §6 / §7 |
-| Qualification 三仓边界必须稳定 | 需求 BR-QUAL、架构 §2.1 | §5 / §6 / §7 / §10 |
-| 下游 Use truth 不得写入本仓 | 需求 NG-6~NG-8、BR-SYNC-007、架构边界红线 | §5 / §7 / §10 |
-| published 核心字段不可原地修改 | BR-LC-004、INV-ML-3、架构 §2.1 | §6 / §8 / §9 |
-| publish 必须经过 approved gate | BR-LC-003、BR-PUB-003、架构 §2.1 | §7 / §8 / §9 |
-| fingerprint 必须由 canonical 内容生成 | G-7、BR-PUB-001~002、架构 §2.1 | §6 / §7 / §8 |
-| 发布成功必须写 audit 与 outbox | BR-PUB-001~003、NFR 一致性、架构 §2.3 | §7 / §8 / §10 |
-| 跨仓同步采用最终一致 | BR-SYNC、架构 §2.3 | §7 / §8 / §10 |
-| Snapshot 是下游恢复兜底入口 | BR-PUB-004、BR-SYNC-008、架构 §2.3 | §7 / §8 / §10 |
-| ViewProfile 必须服务端解析 | G-4、F-007、BR-VIEW | §6 / §7 / §8 / §9 |
-| 定义间引用必须可校验 | F-003、BR-REL | §6 / §8 / §10 |
-| P1 能力不得污染 P0 主链 | 需求 P1 后置、BR-P1、架构 §2.2 | §5 / §6 / §11 |
+| 方法资产定义 truth 必须归属本仓 | 主要组成部分、关键对象、处理流、状态轮廓 | 后续只能把方法资产定义、身份、目录、正式化、版本、关系、分发和追溯语义作为本仓 truth;不能把定义源下放到消费仓或散落文档。 |
+| Definition vs Use 必须持续分离 | 组成部分边界、对象轮廓、接口骨架 | 本仓描述定义;相邻仓只能使用、执行、索引或展示。后续对象和接口不得吸收运行期使用状态。 |
+| 正式版本语义必须稳定 | 正式化 / 版本组成部分、处理流、状态轮廓 | 正式方法资产语义不得被静默覆盖;涉及版本语义变化时必须在概要层保留显式变化和追溯位置。 |
+| 非正式资产不得作为正式消费依据 | 受控消费接口、读取材料、状态轮廓 | 未正式化或仍在调整语境的方法资产只能被表达为非正式或不可正式消费,不能成为下游正式引用基础。 |
+| 下游不得创建、修改或替代本仓定义 truth | 对外接口、consumer / collaboration 边界 | 下游输入可以是引用、摘要、回报或请求,不得成为直接改写定义正文的通道。 |
+| 边界外职责不得成为本仓成立条件 | 主要组成部分、非范围检查、风险检查 | 流程执行、成员状态、治理执行、外部能力注册、交易、UI 渲染和 artifact 正文不能成为核心结构前置。 |
+
+### 4.3 数据归属约束:先思考
+
+问题回答:
+
+- 01 已经将本仓数据分为正式 truth、读取 / 投影、摘要、引用和明确不拥有正文。
+- 这类约束会直接影响关键对象轮廓和状态流转:后续不能把摘要当 truth,不能把引用当正文,不能让读取材料反写定义。
+- 数据归属约束必须在概要层先写清,否则 Step 6 对象轮廓很容易膨胀成跨仓大对象。
+
+诊断:
+
+- 旧 Step 3 的 snapshot / fingerprint / storage 口径把具体实现当成一致性基础。
+- 新版架构只授权“truth 与读取材料分层”“摘要 / 引用不形成第二 truth”“外部正文禁止入仓”等结构边界。
+
+取舍:
+
+- 保留数据类别和归属边界,不命名具体持久化结构。
+
+### 4.4 数据归属约束:再写入
+
+| 约束 | 作用范围 | 当前要求 |
+|---|---|---|
+| 核心 truth 与读取材料必须分层 | 关键对象、查询接口、后台维护 | 正式 truth 可以派生读取 / 追溯材料,但读取材料不得成为第二 truth,也不得反向改写核心定义。 |
+| 外部结论只能作为摘要或引用承接 | 正式化、外部协作、关键对象 | governance、标准、ADR、下游影响等外部事实只能以正式摘要或引用参与本仓判断,不得复制外部执行正文。 |
+| 外部正文和运行真相禁止入仓 | 对象轮廓、接口骨架、边界场景 | artifact/archive 正文、治理执行正文、marketplace 交易正文、UI 会话、流程实例、成员状态和能力运行状态不得进入本仓数据生命周期。 |
+| 方法资产关系与分发语义属于定义性边界 | 关系 / 分发组成部分、处理流 | 本仓可表达方法资产之间的定义性关系和分发语义,但不得把 marketplace 交易、安装或履约事实写成分发 truth。 |
+| 下游消费影响只可作为摘要候选 | 一致性保护、后台维护、风险台账 | 下游影响回报当前只作为摘要候选和一致性保护输入,不得被具体化为强制同步机制、事件 schema 或私有 repository。 |
+| 外围包 / 方法集组织不得形成第二定义源 | 外围增强边界、对象轮廓 | 若 MethodPlugin / MethodConfiguration 后续进入,也只能组织或引用核心定义,不能独立替代方法资产定义 truth。 |
+
+### 4.5 交互一致性约束:先思考
+
+问题回答:
+
+- 01 已收稳同步、异步、后台三类交互:定义 / 正式化 / 读取需要明确裁定;变化传播、外部结论、下游摘要可异步;读取材料和追溯材料由后台维护收敛。
+- 这些约束会影响接口骨架、处理流和状态轮廓,但不能提前变成 event schema、job schema 或 outbox 实现。
+- 一致性约束应描述“哪些关系强一致、哪些最终一致、失败时保持什么口径”,而不是落到数据库事务或重试算法。
+
+诊断:
+
+- 旧 Step 3 将 outbox、snapshot query、replay/resync、fingerprint drift 等写成硬约束,这已经越过当前概要深度。
+- 新版 00 / 01 要的是可感知、可追溯、可恢复和不反写 truth 的结构位置。
+
+取舍:
+
+- 使用“同步裁定 / 异步协作 / 后台收敛”作为概要交互约束。
+- 不使用旧 event/outbox/snapshot 术语作为当前结论。
+
+### 4.6 交互一致性约束:再写入
+
+| 约束 | 作用范围 | 当前要求 |
+|---|---|---|
+| 定义建立与调整必须有明确裁定 | Command 类接口、处理流、状态轮廓 | 直接影响核心 truth 的入口必须返回明确成功、失败或不可成立口径,不得形成部分完成的正式定义变化。 |
+| 正式化与版本变化必须保护强一致边界 | 正式化处理流、版本状态、追溯对象 | 正式使用语境和版本语义建立必须在本仓内部保持一致;外部结论缺失时只能挂起、拒绝或保持非正式口径。 |
+| 读取接口必须表达可读、不可见、不可用或待收敛 | Query 类接口、读取材料、边界场景 | 读取材料可以最终一致,但对调用方的结果口径必须明确,不能让调用方猜测 truth 状态。 |
+| 变化传播不阻塞核心 truth 成立 | Event / collaboration 边界、处理流 | 本仓 truth 成立后可异步传播变化感知信号;下游未及时感知不得回滚本仓 truth。 |
+| 外部结论送达必须走正式承接边界 | Consumer / collaboration 边界、正式化前置 | 外部治理结论或依据引用只能通过正式承接入口进入,不能由 service 私下读取治理执行过程。 |
+| 后台维护只能推进派生材料收敛 | Operations、读取材料、追溯材料 | 后台任务可以修复读取材料、追溯材料、引用可用性和协作收敛,不得成为改写核心定义 truth 的旁路。 |
+| 恢复与补偿不得发明新 truth | 异常边界、状态轮廓、维护流 | 恢复动作只能基于正式 truth、正式摘要或正式引用重建派生材料,不能根据下游状态反推定义。 |
+
+### 4.7 外围与待确认约束:先思考
+
+问题回答:
+
+- 当前 00 / 01 对若干事项给出保守口径:Qualification / CapabilityDefinition 不作为核心独立资产;MethodPlugin / MethodConfiguration 是外围增强;governance 是条件型结论来源;artifact 核心消费未闭口;下游影响回报摘要机制未定义。
+- Step 3 必须把这些口径转成约束,防止后续 Step 5~9 为了结构完整把它们升格为核心主线。
+
+诊断:
+
+- 旧 Step 3 把部分外围能力、具体恢复机制和旧对象范围写成 P0 约束,会破坏当前重启后的范围纪律。
+
+取舍:
+
+- 对未闭口项只允许保守承接,不允许局部补结论。
+
+### 4.8 外围与待确认约束:再写入
+
+| 约束 | 作用范围 | 当前要求 |
+|---|---|---|
+| Qualification / CapabilityDefinition 不进入当前核心独立资产范围 | 对象轮廓、组成部分、风险台账 | 后续若需要纳入,必须先回写 00 / 01,不能在 02 局部补入。 |
+| MethodPlugin / MethodConfiguration 不得成为核心闭环前置 | 组成部分、对象轮廓、配置影响 | 当前只可作为外围增强边界出现;不得阻塞定义 truth、正式化、受控消费和追溯一致性主线。 |
+| governance 正式化不得写成强制运行前置 | 正式化流程、外部承接、状态轮廓 | governance 只作为条件型结论或依据引用来源;治理执行、Gate 流程和 policy enforce 正文不得迁入本仓。 |
+| artifact 核心消费关系不提前闭口 | 关系 / 分发、对象轮廓、非范围 | 本仓可保留 work product 定义语义和 artifact 引用边界,不得保存 artifact 正文、证据文件或生命周期。 |
+| 下游消费影响回报机制不得被提前实现化 | 一致性保护、接口骨架、后台维护 | 当前只保留摘要候选和一致性保护需求,不定义具体回报协议、事件字段或持久化结构。 |
+| 高级 ViewProfile 匹配与 AIPolicy override 不做深 | 读取策略、外围增强、风险台账 | 当前只保留定义主题和外围增强承接,不得把 UI 匹配实现或组织级运行配置写成核心结构。 |
+
+### 4.9 表达深度约束:先思考
+
+问题回答:
+
+- Step 2 已明确 02 停在可实现结构骨架。Step 3 要把这个深度变成后续章节的硬约束。
+- 后续可以命名代码主体、组成部分、对象候选、接口类别、流程阶段和状态族,但不能落到完整 contract。
+- 这类约束保护 02 不写成 03/04/05/06/07。
+
+诊断:
+
+- 旧 Step 3 把具体 fingerprint、outbox、snapshot、replay、DDL 候选和容量假设混入约束,导致层次下沉。
+
+取舍:
+
+- 用“可影响概要结构但不定义实现契约”作为所有后续 Step 的写入边界。
+
+### 4.10 表达深度约束:再写入
+
+| 约束 | 作用范围 | 当前要求 |
+|---|---|---|
+| 概要层不得写完整契约 | 对象、接口、处理流、状态 | 后续只写轮廓和结构判断,不得写字段全集、Rust 签名、protocol DTO、event payload、DDL 或事务脚本。 |
+| 技术产品和实现机制不得作为约束来源 | 代码主体、接口、后台维护 | PostgreSQL、cache、object storage、outbox、snapshot、fingerprint 算法、P95 指标等不能从旧材料直接继承。 |
+| 配置影响只识别结构影响 | 配置影响章节、adapter / job 边界 | 02 只识别哪些结构受配置影响和哪些边界禁止配置化;不写配置 key、profile schema 或文件格式。 |
+| 测试、验收和实施内容不得提前进入 02 | 风险、承接清单、正式装配 | 测试矩阵、证据 schema、acceptance gate、commit boundary 和代码实施台账留给 05/06/07。 |
+| 旧材料只能作污染检查 | 全文恢复流程、差异审计 | 历史 02/03 calibration 不能反推当前概要结论;到达对应 Step 后只能在独立结论形成后审计。 |
+
+### 4.11 旧材料差异审计
+
+| 旧材料口径 | 本轮处理 | 原因 |
+|---|---|---|
+| 旧 Step 3 的“P0 MethodContent 固定为 7 类” | 不继承为 Step 3 约束。 | 新版 00 / 01 当前未把旧七类对象清单作为核心对象全集。 |
+| 旧 Step 3 的 approved gate / publish gate 硬约束 | 不继承为强前置。 | governance 当前是条件型结论或依据引用,不能写成强制治理执行主链。 |
+| 旧 Step 3 的 fingerprint / snapshot / outbox 约束 | 不继承。 | 当前只保留版本稳定、变化可感知、读取材料和恢复收敛的结构位置。 |
+| 旧 Step 3 的 replay / resync / Definition Snapshot 具体入口 | 不继承具体入口。 | 后台维护和恢复可保留结构边界,具体 job / query / event 留给 03。 |
+| 旧 Step 3 的具体容量规划和 QPS 假设 | 不进入 Step 3。 | 容量和指标不直接决定当前概要结构,后续如需采用需在非功能、测试或实施中重新闭口。 |
 
 ---
 
-## 8. 回填草稿
+## 5. 结构化中间产物
 
-以下内容可回填到新版 `02-概要设计.md` §3。
+### 5.1 约束清单表
+
+| 约束 | 作用范围 | 当前要求 |
+|---|---|---|
+| 方法资产定义 truth 必须归属本仓 | 组成部分、对象、流程、状态 | 本仓拥有定义、身份、目录、正式化、版本、关系、分发和追溯语义。 |
+| Definition vs Use 必须持续分离 | 组成部分、对象、接口 | 本仓只描述定义,不吸收相邻仓运行期使用状态。 |
+| 正式版本语义必须稳定 | 正式化、版本、追溯 | 正式语义变化必须显式表达,不能静默覆盖。 |
+| 非正式资产不得作为正式消费依据 | 受控消费、读取、状态 | 未正式化资产不能成为正式下游引用基础。 |
+| 核心 truth 与读取材料必须分层 | 对象、查询、后台维护 | 读取材料不得成为第二 truth 或反写核心定义。 |
+| 外部结论只能作为摘要或引用承接 | 外部协作、正式化、对象 | 不复制治理、标准、ADR、下游或 artifact 正文。 |
+| 同步裁定、异步协作、后台收敛必须分层 | 接口、处理流、状态 | 定义 / 正式化 / 读取有明确结果;传播和维护可最终一致。 |
+| 后台维护不得改写核心 truth | Operations、恢复、异常 | 维护只推进派生材料和协作收敛。 |
+| 外围增强不得成为核心前置 | 组成部分、对象、配置影响 | MethodPlugin / MethodConfiguration 等外围能力不阻塞核心闭环。 |
+| 未闭口项不得局部升格 | 风险、待确认、对象轮廓 | Qualification / CapabilityDefinition、artifact 核心消费、下游影响机制等必须保守承接。 |
+| 概要层不得写完整契约 | 全部后续 Step | 不写完整字段、签名、协议、DDL、错误码、测试、证据或实施 commit。 |
+| 旧实现机制不得直接继承 | 全部后续 Step | 旧 fingerprint、snapshot、outbox、PostgreSQL、cache、object storage 等必须重新闭口后才能采用。 |
+
+### 5.2 约束边界说明短文
+
+概要设计是在已收稳的需求与架构边界下继续向可实现结构展开,因此必须先守住定义 truth、Definition vs Use、数据归属、一致性分层和表达深度。若这些约束不先写清,后续组成部分、对象、接口、流程和状态会继续在需求、架构、详细设计和相邻仓职责之间串层漂移。
+
+### 5.3 来源与影响追踪表
+
+| 约束组 | 主要来源 | 主要影响后续章节 |
+|---|---|---|
+| 上游承接约束 | `00-需求文档.md` 目标 / 非目标 / 业务规则;`01-架构设计.md` 不变量 | Step 4 / 5 / 6 / 8 / 9 |
+| 数据归属约束 | `00-需求文档.md` 数据需求;`01-架构设计.md` 数据所有权与一致性策略 | Step 5 / 6 / 7 / 8 / 10 |
+| 交互一致性约束 | `00-需求文档.md` 接口与依赖;`01-架构设计.md` 关键交互与通信方式 | Step 7 / 8 / 9 / 10 |
+| 外围与待确认约束 | `00-需求文档.md` 风险与待确认;`01-架构设计.md` 当前可接受取舍 | Step 5 / 6 / 11 / 13 |
+| 表达深度约束 | Step 2 设计深度口径;概要 SOP / 书写规范 | Step 4~14 |
+
+---
+
+## 6. 回填草稿
+
+以下内容供 Step 14 装配正式 `02-概要设计.md` 时回填到 §3,当前不直接修改正式文档。
 
 ```md
 ## 3. 约束条件
 
-本章只收录会直接影响本仓代码主体、主要组成部分、对象、接口、处理流或状态机设计的硬约束。
+> 校准来源:
+> - `design-calibration/02_hld_step_03_constraints.md`
 
-| 约束 | 说明 |
-|---|---|
-| Definition / Use 必须分离 | 本仓只拥有方法定义真相,不得保存下游使用真相或运行实例真相 |
-| P0 / P1 必须分离 | P0 先完成 7 类 MethodContent 的发布、版本、fingerprint、audit、outbox、snapshot 和下游同步闭环;P1 不得成为 P0 前置条件 |
-| P0 MethodContent 固定为 7 类 | 概要设计对象、接口和流程必须覆盖 Qualification、RoleDefinition、TaskDefinition、WorkProductDefinition、ProcessTemplateDef、ViewProfile、AIPolicyDef |
-| Qualification 三仓边界必须稳定 | method-library 拥有 Qualification 定义;identity 拥有 QualificationProfile;capability-hub 拥有 QualificationBinding |
-| 下游 Use truth 不得写入本仓 | ProcessInstance、WorkItem、Artifact instance、policy enforce result、UI session state 等只能由对应下游仓拥有 |
-| published 核心字段不可原地修改 | 已发布内容变更必须通过新版本、supersede、version、fingerprint 和 audit trace 表达 |
-| publish 必须经过 approved gate | Publish 处理流必须携带 approved_gate_ref,并记录 actor_ref、时间、原因和 gate 结果 |
-| fingerprint 必须由 canonical 内容生成 | fingerprint 是 drift、幂等、snapshot 和事件消费的核心语义标识,不得由下游猜测或自然语言描述替代 |
-| 发布成功必须写 audit 与 outbox | content state、version、fingerprint、audit record、outbox event 必须在发布主链中一起成立 |
-| 跨仓同步采用最终一致 | 下游通过 event、snapshot query、replay / resync 恢复索引,不得要求跨仓强事务 |
-| Snapshot 是下游恢复兜底入口 | 下游错过事件、重建索引或校验 fingerprint 时,必须能拉取 Definition Snapshot |
-| ViewProfile 必须服务端解析 | UI / console 通过 ResolveViewProfile 获取 active ViewProfile 和 fingerprint,生产环境未匹配默认 deny |
-| 定义间引用必须可校验 | RoleDefinition、TaskDefinition、WorkProductDefinition、ProcessTemplateDef 等引用关系在发布前必须指向允许引用的定义版本 |
-| P1 能力不得污染 P0 主链 | MethodPlugin、MethodConfiguration、marketplace metadata、variability、dependency DAG 只保留位置和边界,不展开为 P0 核心对象和主流程 |
+### 3.1 约束清单
+
+| 约束 | 作用范围 | 当前要求 |
+|---|---|---|
+| 方法资产定义 truth 必须归属本仓 | 组成部分、对象、流程、状态 | 本仓拥有定义、身份、目录、正式化、版本、关系、分发和追溯语义。 |
+| Definition vs Use 必须持续分离 | 组成部分、对象、接口 | 本仓只描述定义,不吸收相邻仓运行期使用状态。 |
+| 正式版本语义必须稳定 | 正式化、版本、追溯 | 正式语义变化必须显式表达,不能静默覆盖。 |
+| 非正式资产不得作为正式消费依据 | 受控消费、读取、状态 | 未正式化资产不能成为正式下游引用基础。 |
+| 核心 truth 与读取材料必须分层 | 对象、查询、后台维护 | 读取材料不得成为第二 truth 或反写核心定义。 |
+| 外部结论只能作为摘要或引用承接 | 外部协作、正式化、对象 | 不复制治理、标准、ADR、下游或 artifact 正文。 |
+| 同步裁定、异步协作、后台收敛必须分层 | 接口、处理流、状态 | 定义 / 正式化 / 读取有明确结果;传播和维护可最终一致。 |
+| 后台维护不得改写核心 truth | Operations、恢复、异常 | 维护只推进派生材料和协作收敛。 |
+| 外围增强不得成为核心前置 | 组成部分、对象、配置影响 | MethodPlugin / MethodConfiguration 等外围能力不阻塞核心闭环。 |
+| 未闭口项不得局部升格 | 风险、待确认、对象轮廓 | Qualification / CapabilityDefinition、artifact 核心消费、下游影响机制等必须保守承接。 |
+| 概要层不得写完整契约 | 全部后续 Step | 不写完整字段、签名、协议、DDL、错误码、测试、证据或实施 commit。 |
+| 旧实现机制不得直接继承 | 全部后续 Step | 旧 fingerprint、snapshot、outbox、PostgreSQL、cache、object storage 等必须重新闭口后才能采用。 |
+
+### 3.2 约束边界说明
+
+概要设计是在已收稳的需求与架构边界下继续向可实现结构展开,因此必须先守住定义 truth、Definition vs Use、数据归属、一致性分层和表达深度。若这些约束不先写清,后续组成部分、对象、接口、流程和状态会继续在需求、架构、详细设计和相邻仓职责之间串层漂移。
 ```
 
 ---
 
-## 9. 待确认事项
+## 7. 待确认事项
 
-| 问题 | 当前建议 | 是否阻塞 Step 3 |
-|---|---|---|
-| 是否同意新版 §3 只保留结构性硬约束 | 同意后删除旧 §4 的技术 / 资源 / 时间 / 合规 / 一致性 / 容量多分组结构 | 阻塞 |
-| 容量规划假设是否移出 §3 主约束表 | 建议移入后续风险、非功能承接或详细设计容量假设 | 不阻塞 |
-| P1 Plugin / Configuration 是否只表达“不污染 P0” | 建议只保留边界,不在 §3 展开算法和完整状态 | 不阻塞 |
+| 待确认事项 | 当前处理 |
+|---|---|
+| 旧七类对象清单是否回归为核心范围 | 当前不回归;若需要纳入,必须由 00 / 01 重新闭口。 |
+| governance formalization 是否成为强制主链 | 当前不作为强制运行前置;只保留条件型结论 / 引用边界。 |
+| 下游消费影响摘要是否形成具体机制 | 当前只作为摘要候选和一致性保护输入,不定义具体机制。 |
+| 旧 fingerprint / snapshot / outbox 是否作为正式机制 | 当前不继承;如后续需要,在 03 或更后文档中正式闭口。 |
 
 ---
 
-## 10. 进入下一步条件
+## 8. 自检与停审
 
-进入 Step 4 前需要确认：
-
-- [x] 是否同意新版 §3 只保留会影响概要设计结构的硬约束
-- [x] 是否同意旧 §4.2 / §4.6 中资源和容量类内容不进入新版 §3 主表
-- [x] 是否同意 P1 约束只表达边界,不展开 Plugin / Configuration 的实现细节
-- [x] 是否同意以上约束足以作为 Step 4 代码主体框架映射的输入
+| 检查项 | 结论 | 说明 |
+|---|---|---|
+| 是否只收稳结构性硬约束 | pass | 约束均作用于组成部分、对象、接口、处理流、状态或表达深度。 |
+| 是否避免重写需求和架构 | pass | 仅承接 00 / 01 结论,未重新论证上游取舍。 |
+| 是否避免详细设计下沉 | pass | 未写完整字段、签名、协议、DDL、事务、错误码、测试或实施计划。 |
+| 是否排除旧材料污染 | pass | 旧对象清单和旧实现机制仅在差异审计、非继承语境出现。 |
+| 是否允许进入 Step 4 | pass | Step 3 已完成,等待用户确认后进入 Step 4。 |

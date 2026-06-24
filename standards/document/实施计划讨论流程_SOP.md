@@ -20,6 +20,8 @@
 | v0.16 | 2026-06-09 | Commit boundary 经验复核讨论规则 | 要求 Step 6 为每个 commit boundary 从可落码性标准 §九选择适用经验项,逐项给出通过 / 不适用 / blocker 结论 |
 | v0.17 | 2026-06-09 | 设计者复核责任讨论规则 | 明确 Step 6 的经验复核由设计者在移交实现前完成,blocker 必须回写设计并重复核;实现者只做二次校验和阻塞回报 |
 | v0.18 | 2026-06-14 | 继续任务恢复门禁 | 要求每次 Step 开工、继续或上下文恢复时先读取实施计划校准 flow 状态台账,再确认当前 Step、模块和下一动作 |
+| v0.19 | 2026-06-15 | 项目级台账恢复顺序 | 要求继续实施计划讨论时先读取 `project_execution_ledger.md`,再读取实施计划 flow 和当前 Step 文件 |
+| v0.20 | 2026-06-15 | 代码实施台账讨论规则 | 要求实施计划讨论阶段收敛 implementation ledger 路径、boundary 台账、gate matrix、Commit Gate、Handoff Gate 和 blocker 回流口径 |
 | v0.9 | 2026-05-29 | 测试证据、报告生成与脚本目录讨论规则 | 在 Step 3 / 7 / 11 / 12 补充 scripts、artifacts/test/<run_id>、reports/runs/<run_id> 和 reports/acceptance 的输入输出 |
 | v0.8 | 2026-05-29 | 代码仓目录与命名前置讨论规则 | 在 Step 3 补充实现仓目录、workspace member、Cargo package、Rust crate 和 binary 命名检查 |
 | v0.7 | 2026-05-29 | 本地多仓依赖实施讨论规则 | 在 Step 3 / Step 8 补充 `/home/aris/Projects` sibling repo、编译期 path dependency、依赖检查和不可用时处理的输入输出 |
@@ -185,13 +187,14 @@ ASCII 图正文
 
 - 严格按 Step 独立执行，不得合并 Step。
 - 本 SOP 只定义实施计划的 Step 顺序和应问问题;Step 内小阶段、模块级先思考后写入、重启模式、旧材料后置差异审计和写入批次规则,统一以 `设计文档讨论中间产物规范.md` 为准。
-- Step 开工、用户只说“继续 / 同意 / 开始下一步”、上下文压缩或 agent 切换时,必须先按 `设计文档讨论中间产物规范.md` 的状态台账和上下文恢复门禁读取 `07_implementation_plan_calibration_flow.md`,确认当前 Step、当前模块和下一动作。
+- Step 开工、用户只说“继续 / 同意 / 开始下一步”、上下文压缩或 agent 切换时,必须先按 `设计文档讨论中间产物规范.md` 的三层台账和上下文恢复门禁读取 `project_execution_ledger.md`,再读取 `07_implementation_plan_calibration_flow.md` 和当前 Step 文件,确认当前文档、当前 Step、当前模块和下一动作。
 - 明确要求重写 / 重建 / 替换旧文件时，先删除旧文件，再按新文件标准创建。
 - 正式 `07-实施计划.md` 的章节必须能追溯到具体 `design-calibration/...` 中间产物。
 - 长文档先建骨架，再按 Step 或章节分批写入。
 - 单次写入以 100~300 行为宜；预计超过 300 行应拆分；预计超过 500 行必须拆分。
 - 100~300 行只约束单次写入批次,不是正式文档、Step 文件或章节最终长度上限。
 - 项目级 `/tmp` 计划只能裁剪本项目的必读文档、Step 模块和输出路径,不得重新定义本 SOP 或中间产物规范中的通用流程。
+- 正式 `07-实施计划.md` 必须承接 `代码实施台账与门禁规范.md`,在讨论阶段收敛项目级实施台账、boundary 台账和提交 / handoff 门禁;不得把实施台账留给实现 agent 自行发挥。
 - 实施输入、前置条件、实施对象、阶段顺序、提交边界、测试验收门禁和提交纪律等 Step 必须分别收敛。
 
 正确示例：
@@ -498,12 +501,18 @@ Step 13. 整理正式实施计划文档
 18. 这些脚本是否必须支持 `--run-id`、`--artifact-root`、`--config-profile`？
 19. 是否明确禁止 `artifacts/test/<project>/<run_id>`、`reports/<project>` 和正式引用 `latest`？
 20. 哪些规则必须由实现 agent 在项目永久记忆中保存,以便后续每个编码回合先遵守？
-21. 永久记忆种子是否只写执行规则和规范索引,没有复制详细设计字段 schema、状态矩阵或业务规则正文？
-22. 每条永久记忆是否有稳定 ID、适用范围、来源文档、来源章节、刷新触发和冲突处理口径？
-23. 当前 boundary 的语言 / 技术栈规范路径是否来自阅读清单,而不是在永久记忆中写死某一种语言？
-24. 如果项目 owner 有临时执行约束,是否明确它是临时规则、失效条件是什么,且没有混入通用永久记忆默认项？
-25. 永久记忆种子是否包含“交付实现前按 phase / commit boundary 审计正式 `03/05/06/07`”这一执行规则？
-26. 永久记忆种子是否包含“修复设计文档后必须显式检查是否需要总结可复用经验,需要时连同项目改动补标准 / SOP / 项目记忆并添加示例”的执行规则？
+21. 当前项目的项目级实施台账路径是什么？
+22. 每个 commit boundary 的 boundary 级实施台账如何命名和生成？
+23. 实现仓是否需要 `.codex/implementation_ledger.md` scratch 台账？
+24. 实现 agent 开始修改代码前,哪些 Design Gate / Scope Gate 字段必须为 `pass`？
+25. 实现 agent 提交前,Commit Gate 必须检查哪些 staged files、commit message、whitespace、required checks？
+26. 实现 agent 提交后,Handoff Gate 必须回写哪些 commit hash、next boundary、remaining blocker 和未跑测试？
+27. 永久记忆种子是否只写执行规则和规范索引,没有复制详细设计字段 schema、状态矩阵或业务规则正文？
+28. 每条永久记忆是否有稳定 ID、适用范围、来源文档、来源章节、刷新触发和冲突处理口径？
+29. 当前 boundary 的语言 / 技术栈规范路径是否来自阅读清单,而不是在永久记忆中写死某一种语言？
+30. 如果项目 owner 有临时执行约束,是否明确它是临时规则、失效条件是什么,且没有混入通用永久记忆默认项？
+31. 永久记忆种子是否包含“交付实现前按 phase / commit boundary 审计正式 `03/05/06/07`”这一执行规则？
+32. 永久记忆种子是否包含“修复设计文档后必须显式检查是否需要总结可复用经验,需要时连同项目改动补标准 / SOP / 项目记忆并添加示例”的执行规则？
 
 #### 期望产出
 
@@ -518,6 +527,20 @@ Step 13. 整理正式实施计划文档
 | 阶段 / commit boundary | 必读正式章节 | 必读 `design-calibration` | 读取目的 | 开工门禁 |
 |---|---|---|---|---|
 | PH-xx / commit-xx-a | `<repo>/03-详细设计.md` §x | `design-calibration/<step-file>.md` | <该文件影响的实现判断> | <可审查的开工前确认方式> |
+
+实施台账入口表：
+
+| 台账 | 路径 | 创建时机 | 读取时机 | 缺失处理 |
+|---|---|---|---|---|
+| 项目级实施台账 | `projects/<project>/design-calibration/implementation_execution_ledger.md` | 首个 boundary 开工前 | 每次继续 / 换 agent / design baseline 变化 | 先创建,不得改代码 |
+| boundary 级实施台账 | `projects/<project>/design-calibration/implementation-boundaries/<boundary_id>.md` | 每个 commit boundary 开工前 | 修改代码前 / 跑门禁前 / 提交前 / handoff 前 | 先创建,不得改代码 |
+| scratch 台账 | `<implementation_repo>/.codex/implementation_ledger.md` | 项目要求时 | 本地恢复工作区状态 | 按项目规则创建或标 not_applicable |
+
+Boundary Gate Matrix 模板：
+
+| Commit boundary | Design Gate | Scope Gate | Build Gate | Test Gate | Evidence Gate | Commit Gate | Handoff Gate |
+|---|---|---|---|---|---|---|---|
+| commit-xx-a | <baseline + design closure> | <allowed / forbidden scope> | <fmt/check/build> | <targeted tests> | <artifact/report 或 N/A> | <staged scope + message + diff check> | <hash + next action> |
 
 Agent 启动与永久记忆种子表：
 
@@ -534,6 +557,8 @@ Agent 永久记忆生成门禁：
 | 来源完整 | 每条记忆有来源文档、来源章节、刷新触发和冲突处理 | 不写入该条记忆 |
 | 交付实现前审计 | 种子表包含实现移交前按 phase / commit boundary 审计正式 `03/05/06/07` 的规则 | 暂停并补种子表 |
 | 设计修复后经验检查 | 种子表包含设计修复后判断项目归属、提交合并方式、是否需要总结可复用经验、需要时添加示例的规则 | 暂停并补种子表 |
+| 实施台账入口 | 项目级实施台账、boundary 台账和可选 scratch 台账路径明确 | 暂停并补实施台账入口表 |
+| Boundary Gate Matrix | 每个 commit boundary 的 Design / Scope / Build / Test / Evidence / Commit / Handoff Gate 明确 | 暂停并补 boundary 门禁矩阵 |
 | 技术栈不硬编码 | 语言 / 框架 / 目录规范路径来自阅读清单 | 暂停并补阅读清单 |
 | 不复制设计 truth | 不写 DTO 字段表、状态矩阵、业务规则正文 | 删除该内容,改为索引正式文档 |
 | 临时规则有失效条件 | owner 临时约束必须标注 `失效条件` | 不写入永久记忆 |
@@ -586,6 +611,7 @@ git config user.email
 - 必须要求阅读语言编码规范。
 - 必须要求阅读 `子项目目录与代码文件组织规范.md`。
 - 必须输出 Agent 启动与永久记忆种子表;没有种子表时,实现 agent 不得自行总结或生成项目永久记忆。
+- 必须输出实施台账入口表和 Boundary Gate Matrix;没有项目级实施台账 / boundary 台账规则时,不得移交实现 agent。
 - 永久记忆种子表必须是可机械投影的规则表,不得要求 agent 自由概括、改写或扩写。
 - 永久记忆中的语言、框架、目录和提交规范路径必须来自本章阅读清单;不得在通用标准里硬编码 Rust、Python、TypeScript 或其他单一语言。
 - 永久记忆只保存执行规则、规范索引、刷新触发和冲突处理,不得复制详细设计字段 schema、状态矩阵、DTO 表或业务规则正文。
@@ -812,8 +838,11 @@ git config user.email
 25. 经验复核中是否存在 blocker,是否必须先回写设计真相源并固定新 baseline。
 26. 经验复核是否由设计者完成,是否需要在设计修复后重复核同一 boundary。
 27. 实现 agent 后续只需二次校验哪些 baseline / 文档 / 实现仓条件,发现不符时如何阻塞回报。
-28. 每个 commit boundary 完成后是否通过停审。
-29. 所有 boundary 完成后,是否存在过细拆分、过粗合并、跨 phase 混入、测试门禁缺失或提交时机不清。
+28. 每个 commit boundary 的实施台账文件路径是什么。
+29. 每个 commit boundary 的 allowed scope / forbidden scope 如何写入 boundary 台账。
+30. 每个 commit boundary 的 required checks、Commit Gate 和 Handoff Gate 分别需要哪些证据。
+31. 每个 commit boundary 完成后是否通过停审。
+32. 所有 boundary 完成后,是否存在过细拆分、过粗合并、跨 phase 混入、测试门禁缺失或提交时机不清。
 
 #### 期望产出
 
@@ -837,6 +866,12 @@ git config user.email
 | 提交边界 | commit 时机 | 包含内容 | 不包含内容 | 提交前门禁 |
 |---|---|---|---|---|
 | commit-02-a | <何时提交> | <包含> | <不包含> | GATE-xx |
+
+#### Commit boundary 实施台账规则
+
+| Commit boundary | ledger file | allowed scope | forbidden scope | required checks | Commit Gate | Handoff Gate |
+|---|---|---|---|---|---|---|
+| commit-02-a | `design-calibration/implementation-boundaries/commit-02-a.md` | <允许修改路径 / 模块> | <禁止提前实现内容> | <fmt/check/test/evidence> | <staged scope + message + diff check> | <hash + next boundary + blockers> |
 
 #### Commit boundary 子功能分组
 
@@ -903,6 +938,7 @@ git config user.email
 - 提交边界必须说明 commit 时机。
 - 每个 commit boundary 必须写子功能分组表,说明各子功能为什么共同构成同一个可验证增量。
 - 每个 commit boundary 必须明确不包含内容,防止提前实现后续 boundary。
+- 每个 commit boundary 必须写实施台账规则,至少包含 ledger file、allowed scope、forbidden scope、required checks、Commit Gate 和 Handoff Gate。
 - 不允许以单个函数作为默认提交边界。
 - 不允许以单个文件、单个 struct 或当天工作量作为默认提交边界。
 - 不允许把多个无关功能合并成一笔提交。
@@ -916,7 +952,7 @@ git config user.email
 - 每个阶段都有代码实现批次表，且批次规模、验证门禁和提交关系清楚。
 - 每个阶段或 commit boundary 都有字段、DTO、状态和 phase boundary 开工前复核口径。
 - 每个 commit boundary 都有由设计者完成的经验复核表,且无未处理 blocker。
-- 每个提交边界都有提交前门禁。
+- 每个提交边界都有提交前门禁和实施台账规则。
 - 每个 commit boundary 已完成停审,跨 boundary 审计没有 unresolved 冲突。
 
 ### Step 7. 嵌入测试与验收门禁

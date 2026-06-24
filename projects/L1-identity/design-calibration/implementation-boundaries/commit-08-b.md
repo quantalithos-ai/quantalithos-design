@@ -7,9 +7,9 @@
 | phase | PH-08 Entry / config / scripts / evidence release closure |
 | design_baseline | `current-design-with-commit-08-b-active-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | active gate/report/check scripts and run-scoped artifact/report writer boundary after `commit-08-a` implementation handoff; excludes release smoke, final evidence index, acceptance handoff and final veto checklist |
+| status | implemented |
+| next_allowed_action | handoff_closed |
+| current_recovery_point | implementation agent reported gate/report/check scripts and run-scoped artifact/report writer boundary complete at commits `22cfd6b`, `0d2911e` and `9cb3823`; project ledger has advanced to `commit-08-c` |
 
 ---
 
@@ -100,13 +100,14 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after commit. |
-| committed_message | pending | Fill after commit. |
-| gates_run | pending | List exact commands and reports. |
-| tests_not_run | pending | Must state none or explain. |
-| remaining_blockers | pending | Must reference blocker table. |
-| next_boundary | pending | Expected next boundary: `commit-08-c`. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation agent reported commits `22cfd6b`, `0d2911e` and `9cb3823`. |
+| committed_message | not_recorded | Commit subjects were not supplied in the blocker handoff; this design ledger does not fabricate them. |
+| implementation_commits | pass | Implementation agent reported commits `22cfd6b`, `0d2911e` and `9cb3823`. |
+| gates_run | not_recorded | Exact commands and reports were not supplied in the blocker handoff; this design ledger does not fabricate them. |
+| tests_not_run | not_recorded | Not supplied in the blocker handoff. |
+| remaining_blockers | pass | The only reported blocker is project ledger still pointing at `commit-08-b`; closed by advancing project ledger to `commit-08-c`. |
+| next_boundary | pass | Next boundary is `commit-08-c`. |
+| user_owned_changes_untouched | not_recorded | Implementation agent reported implementation worktree only had user-owned untracked `.codex/` and `target/`; this design ledger does not inspect or modify implementation worktree. |
 
 ---
 
@@ -123,3 +124,4 @@
 | item | conclusion | action |
 |---|---|---|
 | BLK-ID-08B-LEDGER-001 | existing reusable memory applies | `MEM-ID-012` applies. This fix opens report/evidence tooling after `commit-08-a` completed at `95ee4c6` / `db3b895` / `2f01025`; final acceptance still waits for `commit-08-c` actual run evidence, so no new standard rule is needed. |
+| BLK-ID-08C-HANDOFF-001 | existing reusable memory applies | `MEM-ID-012` covers this handoff closure. `commit-08-b` is now recorded as implemented from reported commits `22cfd6b`, `0d2911e` and `9cb3823`; project-level current boundary moved to `commit-08-c`. |

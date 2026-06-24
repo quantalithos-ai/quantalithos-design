@@ -14,14 +14,14 @@
 | project | L1-identity |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-identity` |
-| current_design_baseline | `current-design-with-commit-08-b-active-ledger` |
-| current_boundary | `commit-08-b` |
+| current_design_baseline | `current-design-with-commit-08-c-active-ledger` |
+| current_boundary | `commit-08-c` |
 | gate_status | ready_for_design_gate |
-| gate_reason | implementation agent reported `commit-08-a` complete with entry wiring commit `95ee4c6`, config redline coverage commit `db3b895` and run evidence commit `2f01025`; this handoff closes the entry wiring and runtime config boundary and advances the project ledger to `commit-08-b`; the gate scripts and artifact/report writer boundary is ready for Design Gate; future `commit-08-c` ledger remains not current |
+| gate_reason | implementation agent reported `commit-08-b` complete with commits `22cfd6b`, `0d2911e` and `9cb3823`; this handoff closes the gate scripts and run-scoped artifact/report writer boundary and advances the project ledger to `commit-08-c`; release smoke, evidence index, acceptance handoff and final audit are ready for Design Gate |
 | next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | `commit-08-b` opening boundary / PH-08 gate, report and check scripts plus run-scoped artifact/report writer; excludes release smoke, final evidence index, acceptance handoff and final veto checklist |
+| current_recovery_point | `commit-08-c` opening boundary / PH-08 release smoke, evidence index, acceptance handoff, final veto checklist and final audit; excludes business semantic changes and P1/P2 production claims |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-19 00:08:22 +0800 |
+| last_updated_at | 2026-06-19 03:03:18 +0800 |
 
 ---
 
@@ -41,8 +41,8 @@
 | `commit-07-b` | `current-design-with-commit-07-b-reference-refresh-selection-key-closure` | implemented | handoff_gate | advance_to_commit_07_c | Implementation repo reports `commit-07-b` code completed at `9c0a5ca` and run-scoped evidence committed at `0475d1a`; maintenance job family handoff is closed. |
 | `commit-07-c` | `current-design-with-commit-07-c-active-ledger` | implemented | handoff_gate | advance_to_commit_08_a | Implementation repo reports `commit-07-c` code completed at `9bd5dc0` and run-scoped evidence committed at `75ca2ee`; propagation job family handoff is closed. |
 | `commit-08-a` | `current-design-with-commit-08-a-active-ledger` | implemented | handoff_gate | advance_to_commit_08_b | Implementation repo reports `commit-08-a` entry wiring completed at `95ee4c6`, config redline coverage at `db3b895` and run-scoped evidence at `2f01025`; entry/config handoff is closed. |
-| `commit-08-b` | `current-design-with-commit-08-b-active-ledger` | ready | design_gate | read_docs | Gate scripts and artifact/report writer; project ledger now points here; read `implementation-boundaries/commit-08-b.md` before implementation. |
-| `commit-08-c` | `current-design-with-precreated-commit-08-c-ledger` | planned | design_gate | wait_until_current | Release evidence and acceptance handoff; boundary ledger is precreated and must become current only after `commit-08-b` handoff. |
+| `commit-08-b` | `current-design-with-commit-08-b-active-ledger` | implemented | handoff_gate | advance_to_commit_08_c | Implementation repo reports `commit-08-b` completed at `22cfd6b`, `0d2911e` and `9cb3823`; exact gate output details were not supplied in the blocker handoff, so this ledger records only the reported commits and does not fabricate report status. |
+| `commit-08-c` | `current-design-with-commit-08-c-active-ledger` | ready | design_gate | read_docs | Release smoke, evidence index, acceptance handoff and final audit boundary; project ledger now points here; read `implementation-boundaries/commit-08-c.md` before implementation. |
 
 ---
 
@@ -71,7 +71,8 @@
 | BLK-ID-07C-LEDGER-001 | `commit-07-c` | implementation | resolved | `current-design-with-commit-07-c-active-ledger` | `implementation-boundaries/commit-07-c.md` now exists and the project ledger advances to `commit-07-c`; implementation agent must continue from `read_current_boundary_ledger` and advance gates before code changes. |
 | BLK-ID-08A-LEDGER-001 | `commit-08-a` | implementation | resolved | `current-design-with-commit-08-a-active-ledger` | `implementation-boundaries/commit-08-a.md` now exists and the project ledger advances to `commit-08-a`; implementation agent must continue from `read_current_boundary_ledger` and advance gates before code changes. |
 | BLK-ID-08B-LEDGER-001 | `commit-08-b` | implementation | resolved | `current-design-with-commit-08-b-active-ledger` | `implementation-boundaries/commit-08-b.md` now exists and the project ledger advances to `commit-08-b`; implementation agent must continue from `read_current_boundary_ledger` and advance gates before code changes. |
-| BLK-ID-08C-LEDGER-001 | `commit-08-c` | implementation | resolved | `current-design-with-precreated-commit-08-c-ledger` | `implementation-boundaries/commit-08-c.md` now exists as a planned future boundary. It must not be implemented until the project ledger advances from `commit-08-b` after handoff. |
+| BLK-ID-08C-LEDGER-001 | `commit-08-c` | implementation | resolved | `current-design-with-commit-08-c-active-ledger` | `implementation-boundaries/commit-08-c.md` now exists and project ledger has advanced from `commit-08-b` after implementation handoff; implementation agent must continue from `read_current_boundary_ledger` and advance gates before code changes. |
+| BLK-ID-08C-HANDOFF-001 | `commit-08-c` | implementation | resolved | `current-design-with-commit-08-c-active-ledger` | Implementation reported `commit-08-b` complete at `22cfd6b`, `0d2911e` and `9cb3823`; the design handoff closure now marks `commit-08-b` implemented and makes `commit-08-c` current. |
 
 ---
 
@@ -80,7 +81,7 @@
 Any implementation agent resuming `L1-identity` must read files in this order:
 
 1. `projects/L1-identity/design-calibration/implementation_execution_ledger.md`
-2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-08-b.md`
+2. `projects/L1-identity/design-calibration/implementation-boundaries/commit-08-c.md`
 3. `projects/L1-identity/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-identity/.codex/implementation_ledger.md`
@@ -96,5 +97,5 @@ If any required design source is missing or contradicts the current boundary, se
 | `commit-01-a`~`commit-04-a` | historical before implementation ledger adoption | Do not fabricate per-boundary execution ledgers or implementation hashes retroactively. If a future audit requires these files, create explicit retrospective ledgers marked `historical`, not current execution gates. |
 | `commit-07-c` | implemented handoff closed | Implementation handoff recorded code commit `9bd5dc0` and evidence commit `75ca2ee`; this boundary is no longer current. |
 | `commit-08-a` | implemented handoff closed | Implementation handoff recorded entry wiring commit `95ee4c6`, config redline coverage commit `db3b895` and evidence commit `2f01025`; this boundary is no longer current. |
-| `commit-08-b` | active current boundary | This boundary became actionable after the `commit-08-a` implementation handoff; implementation must start by reading `implementation-boundaries/commit-08-b.md`. |
-| `commit-08-c` | planned future boundary | Boundary ledger file is precreated to remove the same missing-file blocker class. It becomes actionable only when `current_boundary` is advanced by the project ledger after the `commit-08-b` implementation handoff. |
+| `commit-08-b` | implemented handoff closed | Implementation handoff recorded commits `22cfd6b`, `0d2911e` and `9cb3823`; exact gate output details were not supplied in the blocker handoff, so this boundary is marked implemented without invented report status. |
+| `commit-08-c` | active current boundary | This boundary became actionable after the `commit-08-b` implementation handoff; implementation must start by reading `implementation-boundaries/commit-08-c.md`. |

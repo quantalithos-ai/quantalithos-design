@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-06-28
-> 当前任务: `07-实施计划.md` full-restart Step 13 completed;正式 `07-实施计划.md` 已按 Step 1~12 中间产物完成装配,等待用户审阅或提交指令。
+> 当前任务: `07-实施计划.md` full-restart Step 13 completed;正式 `07-实施计划.md` 已提交;implementation handoff 台账已创建,等待实现 agent 从 `read_docs` 开工门禁恢复。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | Step 13 整理正式实施计划文档 | `R13.1 formal document assembly:正式装配` | completed | Step 12 已确认;正式 `07-实施计划.md` 已替换旧方向并完成 full-restart 装配。 | 等待用户审阅或提交指令;不得创建真实 implementation ledger / boundary ledger,除非用户要求进入实现移交准备。 | `design-calibration/07_implementation_plan_calibration_flow.md`;`design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation handoff opening | `commit-01-a implementation ledger:read_docs` | completed | Step 13 已确认并提交;真实 implementation ledger 与 `commit-01-a` boundary ledger 已创建。 | 实现 agent 必须先读 `implementation_execution_ledger.md` 与 `implementation-boundaries/commit-01-a.md`;未过 Design/Scope/Worktree Gate 不得改实现仓代码。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-01-a.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | completed | Step 13 completed | pass | 正式 `07-实施计划.md` 已按 Step 1~12 中间产物完成 full-restart 装配。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | completed | Step 13 completed + implementation handoff opened | pass | 正式 `07-实施计划.md` 已按 Step 1~12 中间产物完成 full-restart 装配;implementation ledger 与 `commit-01-a` boundary ledger 已创建。 |
 
 ---
 
@@ -57,7 +57,7 @@
 | `projects/L3-method-library/04-配置设计.md` | formal_completed | R15.18 已完成 §1~§15 正文装配、final self-check 和 Step 15 completed stop-review。 |
 | `projects/L3-method-library/05-测试方案.md` | formal_completed | 已完成 full-restart 装配,使用当前 `TC-ML-*` / `EV-ML-*` 口径,可作为新版 `06` 输入。 |
 | `projects/L3-method-library/06-验收标准.md` | formal_completed | 已按当前 `00`~`05` 和 `06_acceptance_step_01`~`15` 完成 full-restart 装配;旧主语、旧同步路径、旧基础设施和旧硬阈值口径已隔离。 |
-| `projects/L3-method-library/07-实施计划.md` | old_direction_input | 不作为 phase / commit / config key / implementation ledger / evidence 真相源;Step 13 前不得修改。 |
+| `projects/L3-method-library/07-实施计划.md` | formal_completed | 已按 Step 1~13 完成 full-restart 装配并提交;旧版 MethodContent / publish / snapshot / outbox / PostgreSQL 方向只作为历史污染样本隔离。 |
 | `projects/L1-governance/design-calibration/06_acceptance_*` | framework_reference | 只参考流程、表格和门禁深度,不得复制 governance 领域事实。 |
 
 ---
@@ -80,9 +80,11 @@
 1. 读取本文件 `project_execution_ledger.md`
 2. 读取 `design-calibration/07_implementation_plan_calibration_flow.md`
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
-4. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-5. 确认 next_allowed_action = 等待用户审阅或提交指令
-6. 未经用户明确要求,不得创建真实 implementation boundary、implementation ledger 实例、CI、脚本、代码或 evidence
+4. 读取 `design-calibration/implementation_execution_ledger.md`
+5. 读取 `design-calibration/implementation-boundaries/commit-01-a.md`
+6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
+7. 确认 implementation ledger 的 next_allowed_action = `read_docs`
+8. 未通过 `commit-01-a` Design/Scope/Worktree Gate 前,不得修改实现仓代码、CI、脚本或 evidence
 ```
 
 ---
@@ -90,8 +92,9 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`07-实施计划.md` full-restart Step 13 completed;
-正式 `projects/L3-method-library/07-实施计划.md` 已完成装配;
-等待用户审阅或提交指令;
-不得创建 CI YAML、脚本实现、真实 implementation ledger 实例、真实执行结论或 implementation code,除非用户明确要求进入实现移交准备.
+`07-实施计划.md` full-restart Step 13 completed and committed;
+`projects/L3-method-library/design-calibration/implementation_execution_ledger.md` 已创建;
+`projects/L3-method-library/design-calibration/implementation-boundaries/commit-01-a.md` 已创建;
+下一步只允许实现 agent 从 `read_docs` 读取项目级台账、boundary 台账和 required_reads;
+未通过门禁前不得创建 CI YAML、脚本实现、真实执行结论、evidence 或 implementation code.
 ```

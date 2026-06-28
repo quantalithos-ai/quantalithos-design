@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-06-28
-> 当前任务: `06-验收标准.md` full-restart Step 15 `R15.2 formal document assembly:再写入` completed;正式 `06-验收标准.md` 已完成装配,等待用户确认进入 `07-实施计划.md` full-restart。
+> 当前任务: `07-实施计划.md` full-restart Step 13 completed;正式 `07-实施计划.md` 已按 Step 1~12 中间产物完成装配,等待用户审阅或提交指令。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `06-验收标准.md` | Step 15 整理正式验收标准文档 | `R15.2 formal document assembly:再写入` | completed_wait_user_confirm_to_07 | 已完成正式 `06-验收标准.md` 15 章装配、Step 15 回写、跨门禁裁决总审计和 completed stop-review。 | 等待用户确认后进入 `07-实施计划.md` full-restart;不得自动开始 `07`。 | `design-calibration/06_acceptance_calibration_flow.md`;`design-calibration/06_acceptance_step_15_formal_document_assembly.md` |
+| `07-实施计划.md` | Step 13 整理正式实施计划文档 | `R13.1 formal document assembly:正式装配` | completed | Step 12 已确认;正式 `07-实施计划.md` 已替换旧方向并完成 full-restart 装配。 | 等待用户审阅或提交指令;不得创建真实 implementation ledger / boundary ledger,除非用户要求进入实现移交准备。 | `design-calibration/07_implementation_plan_calibration_flow.md`;`design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -25,8 +25,8 @@
 | `03-详细设计.md` | `design-calibration/03_ddd_calibration_flow.md` | completed | completed | R19.26_completed_wait_user_confirm_to_04 | 正式 `03-详细设计.md` 可作为配置设计输入。 |
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
-| `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | R15.2_completed_wait_user_confirm_to_07 | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配。 |
-| `07-实施计划.md` | not_restarted | waiting_user_confirm | not_started | blocked_until_user_confirm_to_07 | 等待用户确认后才能开始 full-restart。 |
+| `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | completed | Step 13 completed | pass | 正式 `07-实施计划.md` 已按 Step 1~12 中间产物完成 full-restart 装配。 |
 
 ---
 
@@ -40,8 +40,9 @@
 | 旧 `03-详细设计.md` 不作为本轮详细设计结论 | completed | 正式 03 已完成 full-restart 装配。 |
 | `04-配置设计.md` 不得直接跳写正式正文 | completed | 已按 `04_config_*` 中间产物完成 Step 15 装配。 |
 | `05-测试方案.md` 不得直接跳写正式正文 | completed | 已按 `05_test_plan_*` 中间产物完成 Step 15 装配。 |
-| `06-验收标准.md` 不得直接跳写正式正文 | active | 必须先走 `06_acceptance_*` 中间产物,Step 15 才能装配正式 06。 |
-| 旧 `05/06/07` 不作为测试真相源 | active | 旧 `05` 已被 full-restart 正式文档替换;旧 `06/07` 只作方向输入,不得反向定义 evidence、验收门禁或实施边界。 |
+| `06-验收标准.md` 不得直接跳写正式正文 | completed | 已按 `06_acceptance_*` 中间产物完成 Step 15 装配。 |
+| 旧 `05/06/07` 不作为测试真相源 | active | 旧 `05/06` 已被 full-restart 正式文档替换;旧 `07` 只作方向输入,不得反向定义 evidence、验收门禁或实施边界。 |
+| `07-实施计划.md` 不得直接跳写正式正文 | active | 必须先走 `07_implementation_plan_*` 中间产物,Step 13 才能装配正式 07。 |
 | 每个 Step 先列必读文档 | active | 必读文档摘要必须写入当前 Step 文件。 |
 | 每个 Step 先搭整体模块,再逐模块先思考后写入 | active | 模块思考和写入记录在当前 Step 文件内。 |
 | 每次用户确认只推进一个当前模块 | active | 不得把多个模块一次性自动推进。 |
@@ -56,7 +57,7 @@
 | `projects/L3-method-library/04-配置设计.md` | formal_completed | R15.18 已完成 §1~§15 正文装配、final self-check 和 Step 15 completed stop-review。 |
 | `projects/L3-method-library/05-测试方案.md` | formal_completed | 已完成 full-restart 装配,使用当前 `TC-ML-*` / `EV-ML-*` 口径,可作为新版 `06` 输入。 |
 | `projects/L3-method-library/06-验收标准.md` | formal_completed | 已按当前 `00`~`05` 和 `06_acceptance_step_01`~`15` 完成 full-restart 装配;旧主语、旧同步路径、旧基础设施和旧硬阈值口径已隔离。 |
-| `projects/L3-method-library/07-实施计划.md` | old_direction_input | 不作为 phase / commit / config key 真相源。 |
+| `projects/L3-method-library/07-实施计划.md` | old_direction_input | 不作为 phase / commit / config key / implementation ledger / evidence 真相源;Step 13 前不得修改。 |
 | `projects/L1-governance/design-calibration/06_acceptance_*` | framework_reference | 只参考流程、表格和门禁深度,不得复制 governance 领域事实。 |
 
 ---
@@ -77,12 +78,11 @@
 
 ```text
 1. 读取本文件 `project_execution_ledger.md`
-2. 读取 `design-calibration/06_acceptance_calibration_flow.md`
-3. 读取当前 Step 文件 `design-calibration/06_acceptance_step_15_formal_document_assembly.md`
-4. 确认当前模块 = Step 15 `R15.2 formal document assembly:再写入` completed
-5. 确认正式 `06-验收标准.md` 已完成 full-restart 装配
-6. 确认 next_allowed_action = 等待用户确认后进入 `07-实施计划.md` full-restart
-7. 用户未确认前,不得写 `07-实施计划.md`、CI、脚本、implementation boundary 或 implementation code
+2. 读取 `design-calibration/07_implementation_plan_calibration_flow.md`
+3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
+4. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
+5. 确认 next_allowed_action = 等待用户审阅或提交指令
+6. 未经用户明确要求,不得创建真实 implementation boundary、implementation ledger 实例、CI、脚本、代码或 evidence
 ```
 
 ---
@@ -90,8 +90,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`06-验收标准.md` full-restart Step 15 `R15.2 formal document assembly:再写入` completed;
-正式 `06-验收标准.md` 已完成 full-restart 装配;
-等待用户确认后进入 `07-实施计划.md` full-restart;
-不得写实施计划、CI YAML、脚本实现、真实执行结论或 implementation code.
+`07-实施计划.md` full-restart Step 13 completed;
+正式 `projects/L3-method-library/07-实施计划.md` 已完成装配;
+等待用户审阅或提交指令;
+不得创建 CI YAML、脚本实现、真实 implementation ledger 实例、真实执行结论或 implementation code,除非用户明确要求进入实现移交准备.
 ```

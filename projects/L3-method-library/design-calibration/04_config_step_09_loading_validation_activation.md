@@ -401,7 +401,7 @@ next_allowed_action: 等待用户确认后进入 Step 9 `R9.4 开工与必读文
 |---|---|---|---|---|
 | 严格 JSON,JSONC 仅用于文档示例 | 否 | 配置格式规则 | 不适用 | 无回写 |
 | source merge -> parse -> type validate -> cross-field validate -> assemble | 否 | 承接 Step 14 builder 顺序 | 不适用 | 无回写 |
-| startup / job-run-start / entry-local / test harness / unsupported reload | 否 | ��接 P0 生效方式 | 不适用 | 无回写 |
+| startup / job-run-start / entry-local / test harness / unsupported reload | 否 | 承接 P0 生效方式 | 不适用 | 无回写 |
 | builder Ready 前不得暴露 facade | 否 | 承接 `GovernanceRuntimeBuilderState` | 不适用 | 无回写 |
 | config validation issue surface 只输出 redacted issue refs | 否 | 承接 Step 8 / observability | 不适用 | 无回写 |
 | 若后续要求 runtime reload、last-known-good config、secret provider resolution、product-specific adapter constructor 或 config center | 是 | runtime config / builder / rollback / adapter constructor / error model contract | `03` §13 / Step 14 / Step 12 error recovery | 阻塞待确认 |
@@ -450,4 +450,3 @@ next_allowed_action: 等待用户确认后进入 Step 9 `R9.4 开工与必读文
 | 可进入 Step 10 | pass | 下一步定义配置变更、审计与回滚 |
 
 next_allowed_action: 等待用户确认后进入 Step 10 `R10.1 开工与必读文档:先思考`;只允许思考 Step 10 变更、审计与回滚的开工边界、必读文档、Step 9 / Step 10 交界、L1-governance 框架参考、watch / redline 和 R10.2 写入计划;不得创建正式 `04-配置设计.md`;不得写最终变更流程、最终审计流程、最终回滚流程、审计 / 回滚代码、测试方案、验收标准、实施计划或代码。
-

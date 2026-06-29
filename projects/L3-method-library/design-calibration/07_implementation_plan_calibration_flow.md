@@ -85,7 +85,7 @@
 | Step 12 中间产物 | completed_confirmed | 已形成实施完成判定思考稿,并经用户确认。 |
 | Step 13 中间产物 | completed | 已形成正式文档装配记录。 |
 | 正式 `07` | completed | 已按 Step 1~12 中间产物完成 full-restart 装配。 |
-| 下一步 | `commit-02-b` read_docs recovery | `commit-02-a` implementation handoff 已关闭;当前 boundary 推进到 `commit-02-b`;实现侧必须从 `read_docs` 恢复并重跑 Design Gate,通过前不得自动创建实现代码、tests 或 evidence。 |
+| 下一步 | `commit-02-b` design gate blocker | `commit-02-a` implementation handoff 已关闭,但当前 formal `03` / Step 6 / Step 10 / Step 12 / Step 16 没有唯一收窄 `commit-02-b` 的 shared domain foundation set;必须先回写设计闭口,实现侧不得创建代码、tests 或 evidence。 |
 
 ## 6. 恢复顺序
 
@@ -98,9 +98,9 @@
 4. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
 5. 读取 `design-calibration/implementation_execution_ledger.md`
 6. 读取 `design-calibration/implementation-boundaries/commit-02-b.md`
-7. 确认当前 implementation next_allowed_action = `read_docs`
+7. 确认当前 implementation ledger 已转入 `blocked / wait_design`,并读取 blocker 闭口说明
 8. 不得用旧 `07` 的 MethodContent / publish / snapshot / outbox / PostgreSQL / GATE-T 口径定义当前实施计划
-9. 未通过当前 boundary 门禁前,不得创建 CI、脚本、代码或 evidence
+9. 未完成设计侧闭口前,不得创建 CI、脚本、代码或 evidence
 ```
 
 ## 7. 当前 next_allowed_action
@@ -113,6 +113,7 @@ implementation handoff 台账已推进:
 - `design-calibration/implementation-boundaries/commit-02-a.md`
 - `design-calibration/implementation-boundaries/commit-02-b.md`
 `commit-02-a` implementation handoff 已关闭并推进 `commit-02-b` 为 current boundary;
-下一步只允许实现侧从 `read_docs` 恢复并重跑 `commit-02-b` Design Gate;
-不得创建超出 `commit-02-b` allowed scope 的代码、tests 或 evidence,除非当前 boundary 门禁重新推进到对应动作.
+当前 `commit-02-b` Design Gate 已因 shared domain foundation 闭口不足阻塞;
+下一步必须先回写设计侧,补齐当前 boundary 的 domain foundation object/state/error/test-support 精确集合;
+未补前不得创建超出 `commit-02-b` allowed scope 的代码、tests 或 evidence,也不得在实现仓私补 schema / state / guard / error / test-support.
 ```

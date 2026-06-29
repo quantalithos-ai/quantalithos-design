@@ -7,9 +7,9 @@
 | phase | PH-01 layout / tooling / evidence baseline |
 | design_baseline | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | pending |
-| next_allowed_action | read_docs |
-| current_recovery_point | active workspace layout migration boundary; implementation agent must run Design Gate before changing files |
+| status | implemented |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | workspace layout migration boundary completed by implementation commit `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`; project ledger advances to `commit-01-b` for config/script/root baseline work |
 
 ---
 
@@ -107,13 +107,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after implementation repo commit. |
-| committed_message | pending | Fill after implementation repo commit. |
-| gates_run | pending | List exact commands and outputs/reports. |
-| tests_not_run | pending | Must state none or explain. |
-| remaining_blockers | pending | Must reference blocker table; any blocking design gap prevents handoff. |
-| final_conclusion | pending | Must be one of pass / fail / cannot_decide with exact evidence source. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation handoff records workspace layout migration commit `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`. |
+| committed_message | pass | `chore(workspace): migrate method library workspace layout`. |
+| gates_run | pass | Implementation handoff records `git status --short`, local git identity correction, `cargo fmt --all`, `cargo check`, `git diff --check` and `git diff --cached --check`; current workspace still passes `cargo fmt --all --check`, `cargo check` and `git diff --check`. |
+| tests_not_run | pass | No behavioral suite was required or reported for `commit-01-a`; this boundary is limited to workspace layout, crate skeleton and dependency boundary checks. |
+| remaining_blockers | pass | No remaining layout/dependency design blocker was reported in the handoff; next action is project ledger advancement to `commit-01-b`. |
+| final_conclusion | pass | `commit-01-a` allowed scope is implemented and handoff is closed by implementation commit `1a7137f9adcefc76796c6e896a0ec4d15c2b4241` plus successful workspace/dependency checks. |
+| user_owned_changes_untouched | pass | Implementation handoff preserved user-owned untracked `.gitignore`; `.codex/` and `target/` were excluded from staging. |
 
 ---
 
@@ -131,3 +131,4 @@
 |---|---|---|
 | implementation ledger creation | existing reusable rule applies | The general rule from `代码实施台账与门禁规范.md` applies: missing implementation ledger blocks code changes; no new standards update is required. |
 | old implementation layout | existing L3 memory applies | `MEM-ML-002` already records the formal seven-crate layout and old `crates/method_library_*` exclusion. |
+| commit-01-a handoff to commit-01-b | existing reusable memory applies | The implementation handoff closed `commit-01-a` at `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`; the project ledger must advance immediately so future planned boundaries are not used before they become current. |

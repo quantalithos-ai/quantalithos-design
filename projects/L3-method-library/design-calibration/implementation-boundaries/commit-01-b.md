@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-01-b |
 | phase | PH-01 layout / tooling / evidence baseline |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future config/script/artifact/report baseline boundary; cannot start until `commit-01-a` is implemented and project ledger advances |
+| status | blocked |
+| next_allowed_action | wait_design |
+| current_recovery_point | design gate blocked before `commit-01-b` implementation: formal sources still do not close config skeleton file format, directory and CLI parameter names required by `OQ-ML-003` |
 
 ---
 
@@ -17,9 +17,9 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-01-b` | planned | If project ledger still points to `commit-01-a`, implementation agent must not use this file to modify code. |
-| `commit-01-a` handoff must be closed | planned | Workspace layout, crate/package naming and core dependency boundary must be implemented before config/script roots. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-01-b` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-01-b` | pass | Project ledger now points to `commit-01-b`; implementation agent may use this file only within the current boundary scope. |
+| `commit-01-a` handoff must be closed | pass | Workspace layout, crate/package naming and core dependency boundary were implemented at `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`. |
+| project ledger must set `next_allowed_action = read_docs` for `commit-01-b` | pass | This boundary is now current and begins from `read_docs`. |
 
 ---
 
@@ -27,9 +27,9 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This future boundary cannot be executed until it becomes current. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This boundary is current, but implementation is blocked until Design Gate closes `OQ-ML-003`. |
 | `standards/document/设计真相源闭环与可落码性标准.md` | no invented config key, schema, script evidence or report surface | pending | Config/profile/script/evidence gaps must return to design. |
-| `standards/coding/rust.md` | formatting and workspace conventions | pending | Run only after this boundary becomes current and implementation files change. |
+| `standards/coding/rust.md` | formatting and workspace conventions | pending | Run only after Design Gate is unblocked and implementation files change. |
 | `projects/L3-method-library/03-详细设计.md` | config dependencies, observability and implementation handoff | pending | Defines runtime/config/report seams but does not authorize business behavior in this boundary. |
 | `projects/L3-method-library/04-配置设计.md` | profiles, config source, validation, redaction and downstream handoff | pending | Source of config skeleton/profile direction; implementation must not invent key names beyond formal config. |
 | `projects/L3-method-library/05-测试方案.md` | automation gates, artifact/report paths and evidence rules | pending | Path dry-run and script checks may be targeted; no static evidence. |
@@ -70,8 +70,8 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-01-b` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-01-a` implementation commit and handoff recorded | pending | This boundary depends on formal workspace layout. |
+| activation guard | project ledger shows `current_boundary = commit-01-b` and `next_allowed_action = wait_design` due Design Gate blocker | pass | Boundary is current but not allowed to implement until design closes `OQ-ML-003`. |
+| prior handoff | `commit-01-a` implementation commit and handoff recorded | pass | Workspace layout handoff is recorded at `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` if Rust files or workspace manifests require formatting | pending | Mark `not_applicable` only if no Rust/Cargo formatting input changed. |
@@ -89,8 +89,8 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-01-a` to `commit-01-b`. | wait_until_current |
-| design_gate | pending | Implementation agent must reread Required Reads and confirm config/script/path scope is closed. | wait_design |
+| activation_gate | pass | Project ledger has advanced from `commit-01-a` to `commit-01-b`; this boundary is now current and starts from `read_docs`. | wait_design |
+| design_gate | blocked | Required Reads still leave `OQ-ML-003` open: formal `04/07` sources do not fix config skeleton file format, directory and CLI parameter names, so `commit-01-b` scope is not closed for implementation. | wait_design |
 | scope_gate | pending | Planned changes must be limited to config skeleton, script shell, artifact/report roots and path checks. | fix_gate_failure |
 | worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
 | build_gate | pending | Workspace check and relevant format checks pass or failure is recorded. | fix_gate_failure |
@@ -132,7 +132,8 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-01B-ACTIVATION-001 | activation_gate | planned | Project ledger still points to `commit-01-a`; this future boundary must not be used for implementation yet. | After `commit-01-a` handoff, update project ledger to `commit-01-b` and set this boundary to current. | wait_until_current |
+| BLK-ML-01B-ACTIVATION-001 | activation_gate | resolved | Project ledger previously pointed to `commit-01-a`, so this future boundary could not be used for implementation. | `commit-01-a` handoff is now closed, project ledger advances to `commit-01-b`, and this boundary becomes current from `read_docs`. | read_docs |
+| BLK-ML-01B-DESIGN-001 | design_gate | open | `OQ-ML-003` requires config skeleton file format, directory and CLI parameter names to be closed before `commit-01-b` starts, but current formal `04-配置设计.md` / `07-实施计划.md` still leave those implementation details unspecified. | Update formal design to close the config skeleton file format, directory and CLI parameter names, then rerun the `commit-01-b` design gate. | wait_design |
 
 ---
 
@@ -142,3 +143,4 @@
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
 | config and evidence roots | existing L3 memory applies | `MEM-ML-006` fixes run-scoped artifact/report roots and forbids `latest`; this boundary prepares roots only and does not create formal evidence. |
+| commit-01-b config skeleton closure | reusable blocker pattern applies | If config/profile/script baseline work depends on file format, directory or CLI naming that remains only in open-question status, implementation must block in design gate and return closure to `04/07` rather than invent local conventions. |

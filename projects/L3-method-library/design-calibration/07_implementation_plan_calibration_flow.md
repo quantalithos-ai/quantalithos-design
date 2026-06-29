@@ -85,7 +85,7 @@
 | Step 12 中间产物 | completed_confirmed | 已形成实施完成判定思考稿,并经用户确认。 |
 | Step 13 中间产物 | completed | 已形成正式文档装配记录。 |
 | 正式 `07` | completed | 已按 Step 1~12 中间产物完成 full-restart 装配。 |
-| 下一步 | implementation handoff `read_docs` | 真实 implementation ledger 与 `commit-01-a` boundary ledger 已创建;不得自动创建 CI、脚本、代码或 evidence。 |
+| 下一步 | `commit-01-b` Design Gate blocked | `commit-01-a` implementation handoff 已关闭;当前 boundary 推进到 `commit-01-b`,但 `OQ-ML-003` 未闭合,不得自动创建 CI、脚本、代码或 evidence。 |
 
 ## 6. 恢复顺序
 
@@ -97,8 +97,8 @@
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
 5. 读取 `design-calibration/implementation_execution_ledger.md`
-6. 读取 `design-calibration/implementation-boundaries/commit-01-a.md`
-7. 确认当前 implementation next_allowed_action = `read_docs`
+6. 读取 `design-calibration/implementation-boundaries/commit-01-b.md`
+7. 确认当前 implementation next_allowed_action = `wait_design`
 8. 不得用旧 `07` 的 MethodContent / publish / snapshot / outbox / PostgreSQL / GATE-T 口径定义当前实施计划
 9. 未通过当前 boundary 门禁前,不得创建 CI、脚本、代码或 evidence
 ```
@@ -108,9 +108,10 @@
 ```text
 Step 13 `R13.1 formal document assembly:正式装配` completed;
 正式 `07-实施计划.md` 已完成 full-restart 装配并提交;
-implementation handoff 台账已创建:
+implementation handoff 台账已推进:
 - `design-calibration/implementation_execution_ledger.md`
-- `design-calibration/implementation-boundaries/commit-01-a.md`
-下一步只允许从 `read_docs` 执行当前 boundary 的 Design Gate;
-不得创建 CI、脚本、代码或 evidence,除非当前 boundary 门禁推进到对应动作.
+- `design-calibration/implementation-boundaries/commit-01-b.md`
+当前 `commit-01-b` Design Gate blocked by `OQ-ML-003`;
+下一步只允许设计侧闭合 config skeleton file format、directory 和 CLI parameter names;
+不得创建 CI、脚本、代码或 evidence,除非当前 boundary 门禁重新推进到对应动作.
 ```

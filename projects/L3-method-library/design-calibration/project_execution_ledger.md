@@ -1,8 +1,8 @@
 # L3-method-library 项目设计讨论执行台账
 
 > 创建日期: 2026-06-15
-> 最近更新: 2026-06-28
-> 当前任务: `07-实施计划.md` full-restart Step 13 completed;正式 `07-实施计划.md` 已提交;implementation handoff 台账已创建,等待实现 agent 从 `read_docs` 开工门禁恢复。
+> 最近更新: 2026-06-29
+> 当前任务: `commit-01-a` implementation handoff 已关闭;当前推进到 `commit-01-b`,但 Design Gate 因 `OQ-ML-003` 未闭合而 blocked,等待设计侧补齐 config skeleton file format、directory 和 CLI parameter names。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation handoff opening | `commit-01-a implementation ledger:read_docs` | completed | Step 13 已确认并提交;真实 implementation ledger 与 `commit-01-a` boundary ledger 已创建。 | 实现 agent 必须先读 `implementation_execution_ledger.md` 与 `implementation-boundaries/commit-01-a.md`;未过 Design/Scope/Worktree Gate 不得改实现仓代码。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-01-a.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-01-b design_gate:blocked` | blocked | `commit-01-a` 已由实现仓提交 `1a7137f9adcefc76796c6e896a0ec4d15c2b4241` 关闭;`commit-01-b` Design Gate 发现 `OQ-ML-003` 未闭合。 | 先回设计侧闭合 config skeleton file format、directory 和 CLI parameter names;未闭合前实现 agent 不得改实现仓代码。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-01-b.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | completed | Step 13 completed + implementation handoff opened | pass | 正式 `07-实施计划.md` 已按 Step 1~12 中间产物完成 full-restart 装配;implementation ledger 与 `commit-01-a` boundary ledger 已创建。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_blocked | Step 13 completed + `commit-01-b` blocked | blocked | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-01-a` handoff 已关闭;`commit-01-b` 等待 `OQ-ML-003` 设计闭口。 |
 
 ---
 
@@ -81,10 +81,10 @@
 2. 读取 `design-calibration/07_implementation_plan_calibration_flow.md`
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 读取 `design-calibration/implementation_execution_ledger.md`
-5. 读取 `design-calibration/implementation-boundaries/commit-01-a.md`
+5. 读取 `design-calibration/implementation-boundaries/commit-01-b.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 的 next_allowed_action = `read_docs`
-8. 未通过 `commit-01-a` Design/Scope/Worktree Gate 前,不得修改实现仓代码、CI、脚本或 evidence
+7. 确认 implementation ledger 的 next_allowed_action = `wait_design`
+8. 先闭合 `OQ-ML-003`;未通过 `commit-01-b` Design Gate 前,不得修改实现仓代码、CI、脚本或 evidence
 ```
 
 ---
@@ -92,9 +92,9 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`07-实施计划.md` full-restart Step 13 completed and committed;
-`projects/L3-method-library/design-calibration/implementation_execution_ledger.md` 已创建;
-`projects/L3-method-library/design-calibration/implementation-boundaries/commit-01-a.md` 已创建;
-下一步只允许实现 agent 从 `read_docs` 读取项目级台账、boundary 台账和 required_reads;
-未通过门禁前不得创建 CI YAML、脚本实现、真实执行结论、evidence 或 implementation code.
+`commit-01-a` implementation handoff 已关闭,实现仓提交为 `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`;
+当前 boundary 已推进到 `commit-01-b`;
+`commit-01-b` Design Gate blocked by `OQ-ML-003`;
+下一步只允许设计侧闭合 config skeleton file format、directory 和 CLI parameter names;
+闭合前不得创建 CI YAML、脚本实现、真实执行结论、evidence 或 implementation code.
 ```

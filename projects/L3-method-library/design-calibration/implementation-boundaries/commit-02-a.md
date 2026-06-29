@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-02-a |
 | phase | PH-02 contracts / domain foundation |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `eab95f616eb191c06d3065cf6bb1d93149698253` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future public contract foundation boundary; cannot start until `commit-01-b` is implemented and project ledger advances |
+| status | pending |
+| next_allowed_action | read_docs |
+| current_recovery_point | public contract foundation boundary is now current; resume from required reads, then rerun the boundary Design Gate before implementation edits |
 
 ---
 
@@ -17,9 +17,9 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-02-a` | planned | If project ledger still points to an earlier boundary, implementation agent must not use this file to modify code. |
-| `commit-01-b` handoff must be closed | planned | Formal workspace layout, config skeleton, script shell and artifact/report roots must exist before contract foundation work starts. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-02-a` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-02-a` | pass | Project ledger now points to `commit-02-a`; implementation agent may use this file only within the current boundary scope. |
+| `commit-01-b` handoff must be closed | pass | Config/profile skeletons, dry-run shells and artifact/report root markers were implemented at `181604262bded9cc402f918383117ddf56222e54`. |
+| project ledger must set `next_allowed_action = read_docs` for `commit-02-a` | pass | This boundary is now current and begins from `read_docs`. |
 
 ---
 
@@ -73,8 +73,8 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-02-a` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-01-b` implementation commit and handoff recorded | pending | PH-01 layout/config/script/path baselines must exist. |
+| activation guard | project ledger shows `current_boundary = commit-02-a` and `next_allowed_action = read_docs` | pass | Boundary is current and must restart from required reads before implementation edits. |
+| prior handoff | `commit-01-b` implementation commit and handoff recorded | pass | PH-01 layout/config/script/path baselines are recorded at `181604262bded9cc402f918383117ddf56222e54`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
@@ -93,7 +93,7 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-01-b` to `commit-02-a`. | wait_until_current |
+| activation_gate | pass | Project ledger has advanced from `commit-01-b` to `commit-02-a`; this boundary is now current and starts from `read_docs`. | read_docs |
 | design_gate | pending | Implementation agent must reread Required Reads and confirm public contract field/DTO/marker closure. | wait_design |
 | scope_gate | pending | Planned changes must be limited to contract foundation and fixture tests. | fix_gate_failure |
 | worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
@@ -136,7 +136,7 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-02A-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced through `commit-01-b`; this future boundary must not be used for implementation yet. | After `commit-01-b` handoff, update project ledger to `commit-02-a` and set this boundary to current. | wait_until_current |
+| BLK-ML-02A-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-01-b`, so this future boundary could not be used for implementation yet. | `commit-01-b` handoff is now closed, project ledger advances to `commit-02-a`, and this boundary becomes current from `read_docs`. | read_docs |
 
 ---
 

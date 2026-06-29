@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `1956ecd12fc344fd3947c33d3bea70e7763ffe0a` |
-| current_boundary | `commit-01-b` |
+| current_design_baseline | `eab95f616eb191c06d3065cf6bb1d93149698253` |
+| current_boundary | `commit-02-a` |
 | gate_status | pending |
-| gate_reason | Formal `04-配置设计.md` §9 and `07-实施计划.md` §3 / §6 / §8 now close `OQ-ML-003` for `commit-01-b`: config skeleton file format is strict JSON, directory is `config/profiles/`, required files are the four P0 profiles, and current boundary CLI names are fixed. |
+| gate_reason | Implementation repo reported `commit-01-b` completed at `181604262bded9cc402f918383117ddf56222e54`; config/profile skeletons, dry-run shells and artifact/report root markers are now in place, so the project ledger advances to `commit-02-a` for public contract foundation work. |
 | next_allowed_action | read_docs |
-| current_recovery_point | `commit-01-b` may resume from required reads and rerun its boundary Design Gate before implementation edits |
+| current_recovery_point | `commit-02-a` may resume from required reads and rerun its boundary Design Gate before implementation edits |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-29 09:10:43 +0800 |
+| last_updated_at | 2026-06-29 11:36:51 +0800 |
 
 ---
 
@@ -30,7 +30,8 @@
 | boundary | design_baseline | status | last_gate | next_allowed_action | notes |
 |---|---|---|---|---|---|
 | `commit-01-a` | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-01-a` completed at `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`; seven-crate workspace layout and core dependency boundary handoff are closed. |
-| `commit-01-b` | `1956ecd12fc344fd3947c33d3bea70e7763ffe0a` | pending | design_gate | read_docs | Formal `04/07` now close config skeleton file format, directory and CLI parameter names for `commit-01-b`; implementation must restart from required reads, rerun the boundary Design Gate, and only then proceed within scope. |
+| `commit-01-b` | `eab95f616eb191c06d3065cf6bb1d93149698253` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-01-b` completed at `181604262bded9cc402f918383117ddf56222e54`; config/profile skeletons, dry-run shells and artifact/report root baseline handoff are closed. |
+| `commit-02-a` | `eab95f616eb191c06d3065cf6bb1d93149698253` | pending | activation_gate | read_docs | Public contract foundation boundary is now current after the `commit-01-b` implementation handoff; implementation must restart from required reads, rerun the boundary Design Gate, and only then proceed within scope. |
 
 ---
 
@@ -40,7 +41,8 @@
 |---|---|---|---|---|---|
 | BLK-ML-01A-LEDGER-001 | `commit-01-a` | design handoff | resolved | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | Project implementation ledger and current boundary ledger now exist; implementation agent must continue from `read_docs`. |
 | BLK-ML-01B-ACTIVATION-001 | `commit-01-b` | implementation | resolved | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | `commit-01-a` handoff is now closed and the project ledger advances to `commit-01-b`; current next action is governed by `BLK-ML-01B-DESIGN-001`. |
-| BLK-ML-01B-DESIGN-001 | `commit-01-b` | implementation | resolved | `1956ecd12fc344fd3947c33d3bea70e7763ffe0a` | Formal `04-配置设计.md` §9 and `07-实施计划.md` §3 / §6 / §8 now fix `commit-01-b` config skeleton file format, directory, required files and CLI parameter names; implementation may resume from `read_docs`. |
+| BLK-ML-01B-DESIGN-001 | `commit-01-b` | implementation | resolved | `eab95f616eb191c06d3065cf6bb1d93149698253` | Formal `04-配置设计.md` §9 and `07-实施计划.md` §3 / §6 / §8 now fix `commit-01-b` config skeleton file format, directory, required files and CLI parameter names; implementation may resume from `read_docs`. |
+| BLK-ML-02A-ACTIVATION-001 | `commit-02-a` | implementation | resolved | `eab95f616eb191c06d3065cf6bb1d93149698253` | `commit-01-b` handoff is now closed and the project ledger advances to `commit-02-a`; implementation agent must continue from `read_docs` and rerun the current boundary Design Gate before editing code. |
 
 ---
 
@@ -49,7 +51,7 @@
 Any implementation agent resuming `L3-method-library` must read files in this order:
 
 1. `projects/L3-method-library/design-calibration/implementation_execution_ledger.md`
-2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-01-b.md`
+2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-02-a.md`
 3. `projects/L3-method-library/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
@@ -75,4 +77,5 @@ If any required design source is missing, contradicts the current boundary, or d
 |---|---|---|
 | pre-implementation | design complete | `00`~`07` have been full-restart assembled and committed before implementation handoff. |
 | `commit-01-a` | implemented handoff closed | Implementation handoff records workspace layout migration commit `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`; this boundary is no longer current. |
-| `commit-01-b` | current boundary ready for read_docs | This boundary became current after the `commit-01-a` implementation handoff. Formal `04/07` have now closed `OQ-ML-003`, so implementation must resume from required reads and rerun the boundary Design Gate before editing the implementation repo. |
+| `commit-01-b` | implemented handoff closed | Implementation handoff records config/profile, dry-run shell and artifact/report root baseline commit `181604262bded9cc402f918383117ddf56222e54`; this boundary is no longer current. |
+| `commit-02-a` | current boundary ready for read_docs | This boundary became current after the `commit-01-b` implementation handoff; implementation must resume from required reads and rerun the boundary Design Gate before editing the implementation repo. |

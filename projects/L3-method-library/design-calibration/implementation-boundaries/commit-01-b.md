@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-01-b |
 | phase | PH-01 layout / tooling / evidence baseline |
-| design_baseline | `1956ecd12fc344fd3947c33d3bea70e7763ffe0a` |
+| design_baseline | `eab95f616eb191c06d3065cf6bb1d93149698253` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | pending |
-| next_allowed_action | read_docs |
-| current_recovery_point | formal `04/07` now close config skeleton file format, directory, required files and CLI parameter names; resume from required reads, then rerun the boundary Design Gate before implementation edits |
+| status | implemented |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | config/profile skeleton, dry-run shell and artifact/report root baseline completed by implementation commit `181604262bded9cc402f918383117ddf56222e54`; project ledger advances to `commit-02-a` for public contract foundation work |
 
 ---
 
@@ -118,13 +118,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after implementation repo commit. |
-| committed_message | pending | Fill after implementation repo commit. |
-| gates_run | pending | List exact commands and dry-run outputs/reports. |
-| tests_not_run | pending | Must state none or explain; no formal suite pass may be invented. |
-| remaining_blockers | pending | Must reference blocker table; any blocking design gap prevents handoff. |
-| final_conclusion | pending | Must be one of pass / fail / cannot_decide with exact evidence source. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation handoff records config/profile and evidence-root baseline commit `181604262bded9cc402f918383117ddf56222e54`. |
+| committed_message | pass | `chore(config): add method library config and evidence roots`. |
+| gates_run | pass | Implementation handoff records `git status --short`, `git config user.name`, `git config user.email`, `cargo fmt --all`, `cargo check`, `scripts/checks/check_config_profiles.sh --config-profile local-dev`, `--config-profile ci-test`, `--config-profile integration-like`, `--config-profile operations-replay`, the invalid-profile negative check, `scripts/gates/run_ci_gate.sh --run-id 20260629T000000+0800 --artifact-root artifacts/test/20260629T000000+0800 --config-profile local-dev`, `scripts/reports/generate_reports.sh --run-id 20260629T000000+0800 --artifact-root artifacts/test/20260629T000000+0800 --report-root reports/runs/20260629T000000+0800`, `scripts/checks/check_paths.sh --run-id 20260629T000000+0800 --artifact-root artifacts/test/20260629T000000+0800 --report-root reports/runs/20260629T000000+0800`, `git diff --check`, `git diff --cached --check` and staged-scope review. |
+| tests_not_run | pass | No behavioral suite or formal run-scoped evidence was generated for `commit-01-b`; this boundary is limited to config/profile skeletons, dry-run shells and path/root checks. |
+| remaining_blockers | pass | No remaining design blocker was reported in the handoff; next action is project ledger advancement to `commit-02-a`. |
+| final_conclusion | pass | `commit-01-b` allowed scope is implemented and handoff is closed by implementation commit `181604262bded9cc402f918383117ddf56222e54` plus successful config smoke, dry-run and path checks. |
+| user_owned_changes_untouched | pass | Implementation handoff preserved user-owned untracked `.gitignore`; `.codex/` and `target/` were excluded from staging. |
 
 ---
 

@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-06-29
-> 当前任务: `commit-01-b` implementation handoff 已关闭;当前推进到 `commit-02-a`,实现侧下一步必须从 `read_docs` 恢复并重跑当前 boundary Design Gate。
+> 当前任务: `commit-02-a` implementation handoff 已关闭;当前推进到 `commit-02-b`,实现侧下一步必须从 `read_docs` 恢复并重跑当前 boundary Design Gate。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-02-a read_docs recovery` | ready_for_design_gate | `commit-01-b` 已由实现仓提交 `181604262bded9cc402f918383117ddf56222e54` 关闭;PH-01 的 config/profile、dry-run shell 和 artifact/report root baseline 已到位。 | 实现 agent 必须先重读 project ledger、current boundary ledger、formal `07` 和 required reads,然后重跑 `commit-02-a` Design Gate;通过前不得改实现仓代码。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-02-a.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-02-b read_docs recovery` | ready_for_design_gate | `commit-02-a` 已由实现仓提交 `25876559520691bda2dfd45a0af53bcd38c2f1a9` 关闭;PH-02 的 public contract foundation、shared shell fixtures 和 roundtrip tests 已到位。 | 实现 agent 必须先重读 project ledger、current boundary ledger、formal `07` 和 required reads,然后重跑 `commit-02-b` Design Gate;通过前不得改实现仓代码。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-02-b.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-02-a` read_docs recovery | ready_for_design_gate | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-01-b` handoff 已关闭,当前等待实现侧重读台账并重跑 `commit-02-a` Design Gate。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-02-b` read_docs recovery | ready_for_design_gate | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-02-a` handoff 已关闭,当前等待实现侧重读台账并重跑 `commit-02-b` Design Gate。 |
 
 ---
 
@@ -81,10 +81,10 @@
 2. 读取 `design-calibration/07_implementation_plan_calibration_flow.md`
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 读取 `design-calibration/implementation_execution_ledger.md`
-5. 读取 `design-calibration/implementation-boundaries/commit-02-a.md`
+5. 读取 `design-calibration/implementation-boundaries/commit-02-b.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
 7. 确认 implementation ledger 的 next_allowed_action = `read_docs`
-8. 重读 formal `00/01/02/03/04/05/06/07` 与当前 boundary required reads 中关于 typed refs、metadata、safe markers、DTO shells 和 contract-domain-fast foundation 的闭口后,再重跑 `commit-02-a` Design Gate;未通过前不得修改实现仓代码、tests 或 evidence
+8. 重读 formal `00/01/02/03/04/05/06/07` 与当前 boundary required reads 中关于 domain state、policy、error、invariant 和 domain test support 的闭口后,再重跑 `commit-02-b` Design Gate;未通过前不得修改实现仓代码、tests 或 evidence
 ```
 
 ---
@@ -92,8 +92,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`commit-01-b` implementation handoff 已关闭,实现仓提交为 `181604262bded9cc402f918383117ddf56222e54`;
-当前 boundary 已推进到 `commit-02-a`;
-下一步只允许实现侧从 `read_docs` 恢复并重跑 `commit-02-a` Design Gate;
-在当前 boundary Design Gate 真正通过前,仍不得实现 domain/application/infra 行为、生成 formal evidence 或跨越 `commit-02-a` allowed scope.
+`commit-02-a` implementation handoff 已关闭,实现仓提交为 `25876559520691bda2dfd45a0af53bcd38c2f1a9`;
+当前 boundary 已推进到 `commit-02-b`;
+下一步只允许实现侧从 `read_docs` 恢复并重跑 `commit-02-b` Design Gate;
+在当前 boundary Design Gate 真正通过前,仍不得实现 application/infra 行为、生成 formal evidence 或跨越 `commit-02-b` allowed scope.
 ```

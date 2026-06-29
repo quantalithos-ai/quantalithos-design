@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-02-b |
 | phase | PH-02 contracts / domain foundation |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `aaf47faac292315900f153ebb30d5086e0a4c997` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future domain foundation and test support boundary; cannot start until `commit-02-a` is implemented and project ledger advances |
+| status | pending |
+| next_allowed_action | read_docs |
+| current_recovery_point | public contract foundation completed by implementation commit `25876559520691bda2dfd45a0af53bcd38c2f1a9`; resume from required reads, then rerun the boundary Design Gate before domain foundation edits |
 
 ---
 
@@ -17,9 +17,9 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-02-b` | planned | If project ledger still points to an earlier boundary, implementation agent must not use this file to modify code. |
-| `commit-02-a` handoff must be closed | planned | Public contract refs, metadata, safe markers, shared shells and fixtures must exist before domain foundation work starts. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-02-b` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-02-b` | pass | Project ledger now points to `commit-02-b`; implementation agent may use this file only within the current boundary scope. |
+| `commit-02-a` handoff must be closed | pass | Public contract refs, metadata, safe markers, shared shells and fixtures were implemented at `25876559520691bda2dfd45a0af53bcd38c2f1a9`. |
+| project ledger must set `next_allowed_action = read_docs` for `commit-02-b` | pass | This boundary is now current and begins from `read_docs`. |
 
 ---
 
@@ -27,7 +27,7 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This future boundary cannot be executed until it becomes current. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This boundary is current and must restart from required reads before any implementation edit. |
 | `standards/document/设计真相源闭环与可落码性标准.md` | no invented domain state, transition, policy, error, marker or test evidence | pending | Any missing state/policy/error/test cut must return to design. |
 | `standards/coding/rust.md` | Rust domain module, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
 | `projects/L3-method-library/00-需求文档.md` | P0 requirements and business rules seed | pending | Domain foundation must remain generic/base and not implement later business slices. |
@@ -74,8 +74,8 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-02-b` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-02-a` implementation commit and handoff recorded | pending | Public contract foundation must exist. |
+| activation guard | project ledger shows `current_boundary = commit-02-b` and `next_allowed_action = read_docs` | pass | Boundary is current and must restart from required reads before implementation edits. |
+| prior handoff | `commit-02-a` implementation commit and handoff recorded | pass | Public contract foundation handoff is recorded at `25876559520691bda2dfd45a0af53bcd38c2f1a9`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
@@ -94,7 +94,7 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-02-a` to `commit-02-b`. | wait_until_current |
+| activation_gate | pass | Project ledger has advanced from `commit-02-a` to `commit-02-b`; this boundary is now current and starts from `read_docs`. | read_docs |
 | design_gate | pending | Implementation agent must reread Required Reads and confirm domain state/policy/error/test closure. | wait_design |
 | scope_gate | pending | Planned changes must be limited to domain foundation and test support. | fix_gate_failure |
 | worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
@@ -137,7 +137,7 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-02B-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced through `commit-02-a`; this future boundary must not be used for implementation yet. | After `commit-02-a` handoff, update project ledger to `commit-02-b` and set this boundary to current. | wait_until_current |
+| BLK-ML-02B-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-02-a`, so this future boundary could not be used for implementation yet. | `commit-02-a` handoff is now closed, project ledger advances to `commit-02-b`, and this boundary becomes current from `read_docs`. | read_docs |
 
 ---
 
@@ -146,4 +146,4 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| domain foundation | existing design-closure rule applies | Domain state/policy/error gaps must be fixed in `03/05/06/07` before code; implementation must not invent behavior in `crates/domain`. |
+| domain foundation | current handoff prerequisite satisfied | Public contract foundation handoff is now closed at `25876559520691bda2dfd45a0af53bcd38c2f1a9`; implementation must still reread current boundary sources and stop again if domain state/policy/error closure is incomplete. |

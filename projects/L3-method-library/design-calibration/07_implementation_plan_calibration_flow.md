@@ -15,7 +15,7 @@
 | 当前模块 | `R13.1 formal document assembly:正式装配` |
 | 当前状态 | completed |
 | 正式文档状态 | full-restart formal assembly completed |
-| 当前设计基线 | `eab95f616eb191c06d3065cf6bb1d93149698253` |
+| 当前设计基线 | `aaf47faac292315900f153ebb30d5086e0a4c997` |
 | 当前输入形态 | `00`~`06` 已完成 full-restart 装配并可作为新版 `07` 输入 |
 | 目标实现仓 | `/home/aris/Projects/quantalithos-method-library`;Step 3 已确认存在、干净且 git config 正确,但当前 layout 属旧实现形态,需在 PH-01 / 首个 boundary 迁移 |
 
@@ -85,7 +85,7 @@
 | Step 12 中间产物 | completed_confirmed | 已形成实施完成判定思考稿,并经用户确认。 |
 | Step 13 中间产物 | completed | 已形成正式文档装配记录。 |
 | 正式 `07` | completed | 已按 Step 1~12 中间产物完成 full-restart 装配。 |
-| 下一步 | `commit-02-a` read_docs recovery | `commit-01-b` implementation handoff 已关闭;当前 boundary 推进到 `commit-02-a`;实现侧必须从 `read_docs` 恢复并重跑 Design Gate,通过前不得自动创建实现代码、tests 或 evidence。 |
+| 下一步 | `commit-02-b` read_docs recovery | `commit-02-a` implementation handoff 已关闭;当前 boundary 推进到 `commit-02-b`;实现侧必须从 `read_docs` 恢复并重跑 Design Gate,通过前不得自动创建实现代码、tests 或 evidence。 |
 
 ## 6. 恢复顺序
 
@@ -97,7 +97,7 @@
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
 5. 读取 `design-calibration/implementation_execution_ledger.md`
-6. 读取 `design-calibration/implementation-boundaries/commit-02-a.md`
+6. 读取 `design-calibration/implementation-boundaries/commit-02-b.md`
 7. 确认当前 implementation next_allowed_action = `read_docs`
 8. 不得用旧 `07` 的 MethodContent / publish / snapshot / outbox / PostgreSQL / GATE-T 口径定义当前实施计划
 9. 未通过当前 boundary 门禁前,不得创建 CI、脚本、代码或 evidence
@@ -111,7 +111,8 @@ Step 13 `R13.1 formal document assembly:正式装配` completed;
 implementation handoff 台账已推进:
 - `design-calibration/implementation_execution_ledger.md`
 - `design-calibration/implementation-boundaries/commit-02-a.md`
-`commit-01-b` implementation handoff 已关闭并推进 `commit-02-a` 为 current boundary;
-下一步只允许实现侧从 `read_docs` 恢复并重跑 `commit-02-a` Design Gate;
-不得创建超出 `commit-02-a` allowed scope 的代码、tests 或 evidence,除非当前 boundary 门禁重新推进到对应动作.
+- `design-calibration/implementation-boundaries/commit-02-b.md`
+`commit-02-a` implementation handoff 已关闭并推进 `commit-02-b` 为 current boundary;
+下一步只允许实现侧从 `read_docs` 恢复并重跑 `commit-02-b` Design Gate;
+不得创建超出 `commit-02-b` allowed scope 的代码、tests 或 evidence,除非当前 boundary 门禁重新推进到对应动作.
 ```

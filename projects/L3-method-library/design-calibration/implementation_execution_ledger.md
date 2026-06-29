@@ -14,7 +14,7 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `149c2dc277b8dd36efd885e152fcb421a99a0fd4` |
+| current_design_baseline | `1956ecd12fc344fd3947c33d3bea70e7763ffe0a` |
 | current_boundary | `commit-01-b` |
 | gate_status | pending |
 | gate_reason | Formal `04-配置设计.md` §9 and `07-实施计划.md` §3 / §6 / §8 now close `OQ-ML-003` for `commit-01-b`: config skeleton file format is strict JSON, directory is `config/profiles/`, required files are the four P0 profiles, and current boundary CLI names are fixed. |
@@ -30,7 +30,7 @@
 | boundary | design_baseline | status | last_gate | next_allowed_action | notes |
 |---|---|---|---|---|---|
 | `commit-01-a` | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-01-a` completed at `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`; seven-crate workspace layout and core dependency boundary handoff are closed. |
-| `commit-01-b` | `149c2dc277b8dd36efd885e152fcb421a99a0fd4` | pending | design_gate | read_docs | Formal `04/07` now close config skeleton file format, directory and CLI parameter names for `commit-01-b`; implementation must restart from required reads, rerun the boundary Design Gate, and only then proceed within scope. |
+| `commit-01-b` | `1956ecd12fc344fd3947c33d3bea70e7763ffe0a` | pending | design_gate | read_docs | Formal `04/07` now close config skeleton file format, directory and CLI parameter names for `commit-01-b`; implementation must restart from required reads, rerun the boundary Design Gate, and only then proceed within scope. |
 
 ---
 
@@ -40,7 +40,7 @@
 |---|---|---|---|---|---|
 | BLK-ML-01A-LEDGER-001 | `commit-01-a` | design handoff | resolved | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | Project implementation ledger and current boundary ledger now exist; implementation agent must continue from `read_docs`. |
 | BLK-ML-01B-ACTIVATION-001 | `commit-01-b` | implementation | resolved | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | `commit-01-a` handoff is now closed and the project ledger advances to `commit-01-b`; current next action is governed by `BLK-ML-01B-DESIGN-001`. |
-| BLK-ML-01B-DESIGN-001 | `commit-01-b` | implementation | resolved | `149c2dc277b8dd36efd885e152fcb421a99a0fd4` | Formal `04-配置设计.md` §9 and `07-实施计划.md` §3 / §6 / §8 now fix `commit-01-b` config skeleton file format, directory, required files and CLI parameter names; implementation may resume from `read_docs`. |
+| BLK-ML-01B-DESIGN-001 | `commit-01-b` | implementation | resolved | `1956ecd12fc344fd3947c33d3bea70e7763ffe0a` | Formal `04-配置设计.md` §9 and `07-实施计划.md` §3 / §6 / §8 now fix `commit-01-b` config skeleton file format, directory, required files and CLI parameter names; implementation may resume from `read_docs`. |
 
 ---
 

@@ -22,6 +22,7 @@
 | v0.18 | 2026-06-14 | 继续任务恢复门禁 | 要求每次 Step 开工、继续或上下文恢复时先读取实施计划校准 flow 状态台账,再确认当前 Step、模块和下一动作 |
 | v0.19 | 2026-06-15 | 项目级台账恢复顺序 | 要求继续实施计划讨论时先读取 `project_execution_ledger.md`,再读取实施计划 flow 和当前 Step 文件 |
 | v0.20 | 2026-06-15 | 代码实施台账讨论规则 | 要求实施计划讨论阶段收敛 implementation ledger 路径、boundary 台账、gate matrix、Commit Gate、Handoff Gate 和 blocker 回流口径 |
+| v0.21 | 2026-06-29 | Planned boundary 预创建讨论规则 | 要求实现移交前预创建全部 planned boundary 台账骨架,未来 boundary 使用 `planned / wait_until_current`,避免实现推进时反复因缺台账回设计侧补文件 |
 | v0.9 | 2026-05-29 | 测试证据、报告生成与脚本目录讨论规则 | 在 Step 3 / 7 / 11 / 12 补充 scripts、artifacts/test/<run_id>、reports/runs/<run_id> 和 reports/acceptance 的输入输出 |
 | v0.8 | 2026-05-29 | 代码仓目录与命名前置讨论规则 | 在 Step 3 补充实现仓目录、workspace member、Cargo package、Rust crate 和 binary 命名检查 |
 | v0.7 | 2026-05-29 | 本地多仓依赖实施讨论规则 | 在 Step 3 / Step 8 补充 `/home/aris/Projects` sibling repo、编译期 path dependency、依赖检查和不可用时处理的输入输出 |
@@ -533,7 +534,7 @@ Step 13. 整理正式实施计划文档
 | 台账 | 路径 | 创建时机 | 读取时机 | 缺失处理 |
 |---|---|---|---|---|
 | 项目级实施台账 | `projects/<project>/design-calibration/implementation_execution_ledger.md` | 首个 boundary 开工前 | 每次继续 / 换 agent / design baseline 变化 | 先创建,不得改代码 |
-| boundary 级实施台账 | `projects/<project>/design-calibration/implementation-boundaries/<boundary_id>.md` | 每个 commit boundary 开工前 | 修改代码前 / 跑门禁前 / 提交前 / handoff 前 | 先创建,不得改代码 |
+| boundary 级实施台账 | `projects/<project>/design-calibration/implementation-boundaries/<boundary_id>.md` | 实现移交前按 Boundary Gate Matrix 预创建全部 planned skeleton;当前 boundary 激活为 `read_docs` | 修改代码前 / 跑门禁前 / 提交前 / handoff 前 | 缺当前台账不得改代码;缺未来 planned skeleton 不得移交实现 |
 | scratch 台账 | `<implementation_repo>/.codex/implementation_ledger.md` | 项目要求时 | 本地恢复工作区状态 | 按项目规则创建或标 not_applicable |
 
 Boundary Gate Matrix 模板：
@@ -541,6 +542,15 @@ Boundary Gate Matrix 模板：
 | Commit boundary | Design Gate | Scope Gate | Build Gate | Test Gate | Evidence Gate | Commit Gate | Handoff Gate |
 |---|---|---|---|---|---|---|---|
 | commit-xx-a | <baseline + design closure> | <allowed / forbidden scope> | <fmt/check/build> | <targeted tests> | <artifact/report 或 N/A> | <staged scope + message + diff check> | <hash + next action> |
+
+Planned boundary 预创建门禁：
+
+| 检查项 | 通过标准 | 失败处理 |
+|---|---|---|
+| 全量 skeleton | Boundary Gate Matrix 中每个 commit boundary 都有 `implementation-boundaries/<boundary_id>.md` | 暂停实现移交,先补 planned skeleton |
+| 当前唯一 | 项目级实施台账只激活一个 `current_boundary` | 暂停并修正台账 |
+| 未来不授权 | 非当前 boundary 均为 `status = planned` 且 `next_allowed_action = wait_until_current` | 暂停并改回 planned 状态 |
+| 内容不空壳 | planned skeleton 至少有 required_reads、allowed_scope、forbidden_scope、required_checks、Commit Gate、Handoff Gate 的 planned 口径 | 暂停并补齐 |
 
 Agent 启动与永久记忆种子表：
 
@@ -612,6 +622,8 @@ git config user.email
 - 必须要求阅读 `子项目目录与代码文件组织规范.md`。
 - 必须输出 Agent 启动与永久记忆种子表;没有种子表时,实现 agent 不得自行总结或生成项目永久记忆。
 - 必须输出实施台账入口表和 Boundary Gate Matrix;没有项目级实施台账 / boundary 台账规则时,不得移交实现 agent。
+- 必须在实现移交前按 Boundary Gate Matrix 预创建全部 planned boundary 台账骨架;不得只创建当前 boundary,导致实现 agent 每完成一个 boundary 后反复回设计侧索要下一份台账。
+- 未来 boundary 台账只能是 `planned / wait_until_current`;项目级实施台账推进前不得授权实现。
 - 永久记忆种子表必须是可机械投影的规则表,不得要求 agent 自由概括、改写或扩写。
 - 永久记忆中的语言、框架、目录和提交规范路径必须来自本章阅读清单;不得在通用标准里硬编码 Rust、Python、TypeScript 或其他单一语言。
 - 永久记忆只保存执行规则、规范索引、刷新触发和冲突处理,不得复制详细设计字段 schema、状态矩阵、DTO 表或业务规则正文。

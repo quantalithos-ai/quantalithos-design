@@ -15,7 +15,7 @@
 | 当前模块 | `R13.1 formal document assembly:正式装配` |
 | 当前状态 | completed |
 | 正式文档状态 | full-restart formal assembly completed |
-| 当前设计基线 | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` |
+| 当前设计基线 | `3220f2ee2f10a9889bc10535969e3fae989c236d` |
 | 当前输入形态 | `00`~`06` 已完成 full-restart 装配并可作为新版 `07` 输入 |
 | 目标实现仓 | `/home/aris/Projects/quantalithos-method-library`;Step 3 已确认存在、干净且 git config 正确,但当前 layout 属旧实现形态,需在 PH-01 / 首个 boundary 迁移 |
 
@@ -85,7 +85,7 @@
 | Step 12 中间产物 | completed_confirmed | 已形成实施完成判定思考稿,并经用户确认。 |
 | Step 13 中间产物 | completed | 已形成正式文档装配记录。 |
 | 正式 `07` | completed | 已按 Step 1~12 中间产物完成 full-restart 装配。 |
-| 下一步 | `commit-02-b` ready_for_design_gate | `commit-02-b` shared domain foundation 闭口已在基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 收敛;实现侧必须从当前 boundary ledger 重新开始并重跑 required reads / Design Gate / Scope Gate,然后才允许修改 `crates/domain`。 |
+| 下一步 | `commit-02-c` ready_for_design_gate | `commit-02-b` implementation handoff 已关闭,`commit-02-c` application foundation shell 闭口已在基线 `3220f2ee2f10a9889bc10535969e3fae989c236d` 收敛;实现侧必须从当前 boundary ledger 重新开始并重跑 required reads / Design Gate / Scope Gate,然后才允许修改 `crates/application`。 |
 
 ## 6. 恢复顺序
 
@@ -97,8 +97,8 @@
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
 5. 读取 `design-calibration/implementation_execution_ledger.md`
-6. 读取 `design-calibration/implementation-boundaries/commit-02-b.md`
-7. 确认当前 implementation ledger 已转入 `ready_for_design_gate`,并读取最新 `commit-02-b` boundary ledger
+6. 读取 `design-calibration/implementation-boundaries/commit-02-c.md`
+7. 确认当前 implementation ledger 已转入 `ready_for_design_gate`,并读取最新 `commit-02-c` boundary ledger
 8. 不得用旧 `07` 的 MethodContent / publish / snapshot / outbox / PostgreSQL / GATE-T 口径定义当前实施计划
 9. 若当前 boundary ledger 任何 required source 再次不闭合,立即回到 `blocked / wait_design`;未通过前不得创建代码、tests 或 evidence
 ```
@@ -110,10 +110,10 @@ Step 13 `R13.1 formal document assembly:正式装配` completed;
 正式 `07-实施计划.md` 已完成 full-restart 装配并提交;
 implementation handoff 台账已推进:
 - `design-calibration/implementation_execution_ledger.md`
-- `design-calibration/implementation-boundaries/commit-02-a.md`
 - `design-calibration/implementation-boundaries/commit-02-b.md`
-`commit-02-a` implementation handoff 已关闭并推进 `commit-02-b` 为 current boundary;
-当前 `commit-02-b` shared domain foundation 闭口已在基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 收敛;
-下一步必须由实现侧读取项目级 implementation ledger 和 `commit-02-b` boundary ledger,重跑 required reads / Design Gate / Scope Gate;
-未通过前不得创建超出 `commit-02-b` allowed scope 的代码、tests 或 evidence,也不得在实现仓私补 schema / state / guard / error / test-support.
+- `design-calibration/implementation-boundaries/commit-02-c.md`
+`commit-02-b` implementation handoff 已关闭并推进 `commit-02-c` 为 current boundary;
+当前 `commit-02-c` application foundation shell 闭口已在基线 `3220f2ee2f10a9889bc10535969e3fae989c236d` 收敛;
+下一步必须由实现侧读取项目级 implementation ledger 和 `commit-02-c` boundary ledger,重跑 required reads / Design Gate / Scope Gate;
+未通过前不得创建超出 `commit-02-c` allowed scope 的代码、tests 或 evidence,也不得在实现仓私补 method signature / field / ref family / error family / evidence.
 ```

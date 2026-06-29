@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-06-29
-> 当前任务: `commit-02-b` shared domain foundation 设计闭口已在基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 收敛;实现侧必须从当前 boundary ledger 重新开始并重跑 Design Gate / Scope Gate。
+> 当前任务: `commit-02-b` implementation handoff 已关闭,`commit-02-c` application foundation shell 设计闭口已在基线 `3220f2ee2f10a9889bc10535969e3fae989c236d` 收敛;实现侧必须从当前 boundary ledger 重新开始并重跑 Design Gate / Scope Gate。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-02-b design closure ready` | ready_for_implementation_design_gate | 基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 已把 `commit-02-b` 收窄到 shared domain error foundation、五个 pure policy shell、exact judgement-state enums 和 pure-domain tests。 | 实现侧必须先读取项目级 implementation ledger 与 `commit-02-b` boundary ledger,然后重跑当前 boundary Design Gate / Scope Gate;若再发现缺口,立即回阻塞。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-02-b.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-02-c design closure ready` | ready_for_implementation_design_gate | 基线 `3220f2ee2f10a9889bc10535969e3fae989c236d` 已把 `commit-02-c` 收窄到 shell-only application ports、shell `UnitOfWork` / `Clock` / `IdGenerator` carriers、exact idempotency shell carriers 和 shell-focused unit tests。 | 实现侧必须先读取项目级 implementation ledger 与 `commit-02-c` boundary ledger,然后重跑当前 boundary Design Gate / Scope Gate;若再发现缺口,立即回阻塞。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-02-c.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-02-b` ready_for_design_gate | ready_for_implementation_design_gate | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-02-b` 的 shared domain foundation 闭口已在基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 收敛,实现侧必须从当前 boundary ledger 重新开始并重跑门禁。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-02-c` ready_for_design_gate | ready_for_implementation_design_gate | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-02-b` implementation handoff 已关闭,`commit-02-c` 的 application foundation shell 闭口已在基线 `3220f2ee2f10a9889bc10535969e3fae989c236d` 收敛,实现侧必须从当前 boundary ledger 重新开始并重跑门禁。 |
 
 ---
 
@@ -81,9 +81,9 @@
 2. 读取 `design-calibration/07_implementation_plan_calibration_flow.md`
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 读取 `design-calibration/implementation_execution_ledger.md`
-5. 读取 `design-calibration/implementation-boundaries/commit-02-b.md`
+5. 读取 `design-calibration/implementation-boundaries/commit-02-c.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前已推进到 `ready_for_design_gate`,并读取 `commit-02-b` 最新 boundary ledger
+7. 确认 implementation ledger 当前已推进到 `ready_for_design_gate`,并读取 `commit-02-c` 最新 boundary ledger
 8. 按 boundary ledger 重新执行 required reads / Design Gate / Scope Gate;若任何 source、state、error、marker 或 test-support 再次不闭合,立即回到 `blocked / wait_design`
 ```
 
@@ -92,8 +92,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`commit-02-a` implementation handoff 已关闭,实现仓提交为 `25876559520691bda2dfd45a0af53bcd38c2f1a9`;
-当前 boundary 为 `commit-02-b`,其 shared domain foundation 闭口已在基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 收敛;
-下一步只允许实现侧从项目级 implementation ledger 与 `commit-02-b` boundary ledger 重新开始,重跑 required reads / Design Gate / Scope Gate,并仅在通过后修改 `crates/domain`;
-若实现过程中再次暴露 schema / state / error / marker / test-support 缺口,必须立即回阻塞而不是在实现仓私补.
+`commit-02-b` implementation handoff 已关闭,实现仓提交为 `9f876697e0487f0c4cf4966928895a24e6559f5d`;
+当前 boundary 为 `commit-02-c`,其 application foundation shell 闭口已在基线 `3220f2ee2f10a9889bc10535969e3fae989c236d` 收敛;
+下一步只允许实现侧从项目级 implementation ledger 与 `commit-02-c` boundary ledger 重新开始,重跑 required reads / Design Gate / Scope Gate,并仅在通过后修改 `crates/application`;
+若实现过程中再次暴露 method signature / field / ref family / error family / evidence 缺口,必须立即回阻塞而不是在实现仓私补.
 ```

@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` |
+| current_design_baseline | `current-design-with-commit-01-b-config-skeleton-closure` |
 | current_boundary | `commit-01-b` |
-| gate_status | blocked |
-| gate_reason | `commit-01-b` design gate found an unclosed config/CLI blocker: `07_implementation_plan_step_09_spikes_risks_open_questions.md` marks `OQ-ML-003` (`config skeleton` file format, directory and CLI parameter names) as required to close before `commit-01-b` starts, but current formal `04/07` sources still do not fix those implementation details |
-| next_allowed_action | wait_design |
-| current_recovery_point | `commit-01-b` design gate blocked before implementation edits; wait for `04-配置设计.md` / `07-实施计划.md` closure of config skeleton file format, directory and CLI parameter names |
+| gate_status | ready_for_design_gate |
+| gate_reason | Formal `04-配置设计.md` §9 and `07-实施计划.md` §3 / §6 / §8 now close `OQ-ML-003` for `commit-01-b`: config skeleton file format is strict JSON, directory is `config/profiles/`, required files are the four P0 profiles, and current boundary CLI names are fixed. |
+| next_allowed_action | read_docs |
+| current_recovery_point | `commit-01-b` may resume from required reads and rerun its boundary Design Gate before implementation edits |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-29 08:48:58 +0800 |
+| last_updated_at | 2026-06-29 09:10:43 +0800 |
 
 ---
 
@@ -30,7 +30,7 @@
 | boundary | design_baseline | status | last_gate | next_allowed_action | notes |
 |---|---|---|---|---|---|
 | `commit-01-a` | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-01-a` completed at `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`; seven-crate workspace layout and core dependency boundary handoff are closed. |
-| `commit-01-b` | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | blocked | design_gate | wait_design | Design gate blocked: `OQ-ML-003` leaves config skeleton file format, directory and CLI parameter names unclosed, so `commit-01-b` cannot start implementation. |
+| `commit-01-b` | `current-design-with-commit-01-b-config-skeleton-closure` | pending | design_gate | read_docs | Formal `04/07` now close config skeleton file format, directory and CLI parameter names for `commit-01-b`; implementation must restart from required reads, rerun the boundary Design Gate, and only then proceed within scope. |
 
 ---
 
@@ -40,7 +40,7 @@
 |---|---|---|---|---|---|
 | BLK-ML-01A-LEDGER-001 | `commit-01-a` | design handoff | resolved | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | Project implementation ledger and current boundary ledger now exist; implementation agent must continue from `read_docs`. |
 | BLK-ML-01B-ACTIVATION-001 | `commit-01-b` | implementation | resolved | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | `commit-01-a` handoff is now closed and the project ledger advances to `commit-01-b`; current next action is governed by `BLK-ML-01B-DESIGN-001`. |
-| BLK-ML-01B-DESIGN-001 | `commit-01-b` | implementation | open | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` | Close `OQ-ML-003` in formal `04-配置设计.md` / `07-实施计划.md`: fix config skeleton file format, directory and CLI parameter names before resuming `commit-01-b`. |
+| BLK-ML-01B-DESIGN-001 | `commit-01-b` | implementation | resolved | `current-design-with-commit-01-b-config-skeleton-closure` | Formal `04-配置设计.md` §9 and `07-实施计划.md` §3 / §6 / §8 now fix `commit-01-b` config skeleton file format, directory, required files and CLI parameter names; implementation may resume from `read_docs`. |
 
 ---
 
@@ -75,4 +75,4 @@ If any required design source is missing, contradicts the current boundary, or d
 |---|---|---|
 | pre-implementation | design complete | `00`~`07` have been full-restart assembled and committed before implementation handoff. |
 | `commit-01-a` | implemented handoff closed | Implementation handoff records workspace layout migration commit `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`; this boundary is no longer current. |
-| `commit-01-b` | current boundary blocked in design gate | This boundary became current after the `commit-01-a` implementation handoff, but implementation is paused until formal design closes `OQ-ML-003` for config skeleton file format, directory and CLI parameter names. |
+| `commit-01-b` | current boundary ready for read_docs | This boundary became current after the `commit-01-a` implementation handoff. Formal `04/07` have now closed `OQ-ML-003`, so implementation must resume from required reads and rerun the boundary Design Gate before editing the implementation repo. |

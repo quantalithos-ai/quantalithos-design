@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-01-b |
 | phase | PH-01 layout / tooling / evidence baseline |
-| design_baseline | `3965cdc74da0fc3c0d38d7746108d42b4a58f6ca` |
+| design_baseline | `current-design-with-commit-01-b-config-skeleton-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | blocked |
-| next_allowed_action | wait_design |
-| current_recovery_point | design gate blocked before `commit-01-b` implementation: formal sources still do not close config skeleton file format, directory and CLI parameter names required by `OQ-ML-003` |
+| status | pending |
+| next_allowed_action | read_docs |
+| current_recovery_point | formal `04/07` now close config skeleton file format, directory, required files and CLI parameter names; resume from required reads, then rerun the boundary Design Gate before implementation edits |
 
 ---
 
@@ -27,11 +27,11 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This boundary is current, but implementation is blocked until Design Gate closes `OQ-ML-003`. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This boundary is current and must restart from required reads before any implementation edit. |
 | `standards/document/设计真相源闭环与可落码性标准.md` | no invented config key, schema, script evidence or report surface | pending | Config/profile/script/evidence gaps must return to design. |
 | `standards/coding/rust.md` | formatting and workspace conventions | pending | Run only after Design Gate is unblocked and implementation files change. |
 | `projects/L3-method-library/03-详细设计.md` | config dependencies, observability and implementation handoff | pending | Defines runtime/config/report seams but does not authorize business behavior in this boundary. |
-| `projects/L3-method-library/04-配置设计.md` | profiles, config source, validation, redaction and downstream handoff | pending | Source of config skeleton/profile direction; implementation must not invent key names beyond formal config. |
+| `projects/L3-method-library/04-配置设计.md` | profiles, config source, validation, redaction and downstream handoff | pending | Formal §9 now fixes `config/profiles/` strict JSON skeleton files and current boundary CLI names; implementation must not invent config keys beyond formal config. |
 | `projects/L3-method-library/05-测试方案.md` | automation gates, artifact/report paths and evidence rules | pending | Path dry-run and script checks may be targeted; no static evidence. |
 | `projects/L3-method-library/06-验收标准.md` | `VETO-ML-014`, evidence integrity and config redline | pending | Invalid P0 config fallback or P0 profile unavailable marked passed is blocking. |
 | `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Current source for phase, boundary, checks, config preparation and commit discipline. |
@@ -70,7 +70,7 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-01-b` and `next_allowed_action = wait_design` due Design Gate blocker | pass | Boundary is current but not allowed to implement until design closes `OQ-ML-003`. |
+| activation guard | project ledger shows `current_boundary = commit-01-b` and `next_allowed_action = read_docs` | pass | Boundary is current and must restart from required reads before implementation edits. |
 | prior handoff | `commit-01-a` implementation commit and handoff recorded | pass | Workspace layout handoff is recorded at `1a7137f9adcefc76796c6e896a0ec4d15c2b4241`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
@@ -89,8 +89,8 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pass | Project ledger has advanced from `commit-01-a` to `commit-01-b`; this boundary is now current and starts from `read_docs`. | wait_design |
-| design_gate | blocked | Required Reads still leave `OQ-ML-003` open: formal `04/07` sources do not fix config skeleton file format, directory and CLI parameter names, so `commit-01-b` scope is not closed for implementation. | wait_design |
+| activation_gate | pass | Project ledger has advanced from `commit-01-a` to `commit-01-b`; this boundary is now current and starts from `read_docs`. | read_docs |
+| design_gate | pending | Formal `04/07` now close config skeleton file format, directory, required files and CLI parameter names. Implementation must complete Required Reads and then rerun this gate against the formal sources before editing the implementation repo. | fix_gate_failure |
 | scope_gate | pending | Planned changes must be limited to config skeleton, script shell, artifact/report roots and path checks. | fix_gate_failure |
 | worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
 | build_gate | pending | Workspace check and relevant format checks pass or failure is recorded. | fix_gate_failure |
@@ -133,7 +133,7 @@
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
 | BLK-ML-01B-ACTIVATION-001 | activation_gate | resolved | Project ledger previously pointed to `commit-01-a`, so this future boundary could not be used for implementation. | `commit-01-a` handoff is now closed, project ledger advances to `commit-01-b`, and this boundary becomes current from `read_docs`. | read_docs |
-| BLK-ML-01B-DESIGN-001 | design_gate | open | `OQ-ML-003` requires config skeleton file format, directory and CLI parameter names to be closed before `commit-01-b` starts, but current formal `04-配置设计.md` / `07-实施计划.md` still leave those implementation details unspecified. | Update formal design to close the config skeleton file format, directory and CLI parameter names, then rerun the `commit-01-b` design gate. | wait_design |
+| BLK-ML-01B-DESIGN-001 | design_gate | resolved | `OQ-ML-003` is now closed by formal `04-配置设计.md` §9 and formal `07-实施计划.md` §3 / §6 / §8, which fix the `commit-01-b` config skeleton file format, directory, required files and CLI parameter names. | Resume from `read_docs`, rerun the `commit-01-b` Design Gate, and stop again if any other required source is still unclosed. | read_docs |
 
 ---
 

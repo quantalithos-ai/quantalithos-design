@@ -125,7 +125,7 @@
 |---|---|---|---|---|---|
 | OQ-ML-001 | open-question | `core-contracts` 实际 package 名和 lib crate 名是否与 path dependency 一致 | PH-01 | commit-01-a 开工前实测并记录 | commit-01-a 开工前 |
 | OQ-ML-002 | open-question | 旧实现仓 `sqlx`、旧 reports、旧 README 语义是否保留、移除或后置 | PH-01 | dependency-boundary and layout audit | commit-01-a 提交前 |
-| OQ-ML-003 | open-question | config skeleton 的文件格式、目录和 CLI 参数名称 | PH-01 | Step 11 固定提交纪律前确认;缺口回 `04` | commit-01-b 开工前 |
+| OQ-ML-003 | resolved | config skeleton 的文件格式、目录和 CLI 参数名称 | PH-01 | 已由正式 `04-配置设计.md` §9 和正式 `07-实施计划.md` §3 / §6 / §8 闭口: `config/profiles/` 下四个 strict JSON 文件,CLI 固定为 `--config-profile`、`--run-id`、`--artifact-root`、`--report-root` | resolved at 2026-06-29 |
 | OQ-ML-004 | open-question | report/audit script CLI 名称和 dry-run 参数 | PH-11 | Step 11 固定命令口径;Step 12 固定完成判定 | commit-11-a 开工前 |
 | OQ-ML-005 | open-question | release run_id 命名和 baseline 记录格式 | PH-11 | Step 12 固定占位规则,执行期填真实 run_id | commit-11-a 开工前 |
 | OQ-ML-006 | open-question | `reports/acceptance/handoff.md`、VETO、risk、open issues 的审查责任人 / Agent | PH-11 | Step 11/12 固定审查入口;执行期记录 reviewer | commit-11-b 提交前 |
@@ -193,7 +193,7 @@ P1 real-like selected-run、durable store、real bus、external provider、produ
 |---|---|---|
 | `core-contracts` package/lib 名 | 开工前实测 | commit-01-a |
 | 旧实现仓依赖和 README 清理 | PH-01 审计 | commit-01-a |
-| config skeleton / CLI 名 | Step 11 固定纪律前确认 | commit-01-b / Step 11 |
+| config skeleton / CLI 名 | 已由正式 `04/07` 闭口并转为 `commit-01-b` formal input | closed |
 | report/audit script CLI | Step 11 / Step 12 收口 | commit-11-a |
 | release run_id | Step 12 固定占位规则 | PH-11 |
 | acceptance reports 审查责任 | Step 11/12 收口 | commit-11-b |

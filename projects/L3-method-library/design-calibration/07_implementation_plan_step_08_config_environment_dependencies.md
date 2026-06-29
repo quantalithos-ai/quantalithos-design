@@ -233,7 +233,7 @@ fake / in-memory / controlled / disabled seam 是 P0 正式测试手段,但不�
 |---|---|---|
 | `core-contracts` package / lib 名是否与目标路径一致 | 影响 commit-01-a | 实现期开工前复核 |
 | 旧实现仓 `sqlx` 等依赖是否保留 | 影响 dependency-boundary | commit-01-a 审计后决定,不得驱动设计 |
-| config skeleton 的文件格式和 CLI 名称 | 影响 commit-01-b / Step 11 | 本 Step 只定义逻辑准备,Step 11 固定纪律 |
+| config skeleton 的文件格式、目录和 CLI 名称 | 已由正式 `04-配置设计.md` §9 与正式 `07-实施计划.md` §3 / §6 / §8 闭口: `config/profiles/` 下四个 strict JSON 文件,CLI 固定为 `--config-profile`、`--run-id`、`--artifact-root`、`--report-root` | `commit-01-b` 可按 formal 口径实施,本 Step 不再保留 open question |
 | release run_id 格式 | 影响 PH-11 evidence | Step 12 固定占位规则,执行期填真实 run_id |
 | P1 real-like selected-run 范围 | 影响 residual | Step 9 风险与待确认事项记录 |
 

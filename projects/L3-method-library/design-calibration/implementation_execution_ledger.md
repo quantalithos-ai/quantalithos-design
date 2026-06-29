@@ -16,12 +16,12 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `3220f2ee2f10a9889bc10535969e3fae989c236d` |
 | current_boundary | `commit-02-c` |
-| gate_status | ready_for_design_gate |
-| gate_reason | Formal `03` §4 / §6 / §7 / §9 / §10 / §11 / §12 / §15 plus Step 6 / Step 7 / Step 10 / Step 11 / Step 12 / Step 13 / Step 16 and formal `07` now uniquely narrow `commit-02-c` to shell-only application ports, shell `UnitOfWork` / `Clock` / `IdGenerator` carriers, exact idempotency shell carriers and shell-focused tests only; implementation must reread the current boundary ledger and rerun Design / Scope Gate before editing `crates/application`. |
-| next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | `commit-02-c` application foundation shell boundary reopened at design baseline `3220f2ee2f10a9889bc10535969e3fae989c236d`; current allowed scope is `crates/application` shell port families, shell UoW carriers, exact idempotency shell carriers and shell tests only |
+| gate_status | blocked |
+| gate_reason | Implementation handoff for `commit-02-c` is closed at `d1b36632172b0fec8a6b5e196ac41c85c92328d0`, but future `commit-03-a` still carries placeholder design baseline `planned-after-d3faf90-handoff-ledger`; do not activate later definition/catalog work until design audit pins a formal baseline and advances the project ledger. |
+| next_allowed_action | wait_design |
+| current_recovery_point | `commit-02-c` application shell handoff is closed; wait design-side `commit-03-a` activation audit before any new implementation work |
 | last_updated_by | design agent |
-| last_updated_at | 2026-06-29 17:28:55 +0800 |
+| last_updated_at | 2026-06-29 17:52:44 +0800 |
 
 ---
 
@@ -33,7 +33,8 @@
 | `commit-01-b` | `eab95f616eb191c06d3065cf6bb1d93149698253` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-01-b` completed at `181604262bded9cc402f918383117ddf56222e54`; config/profile skeletons, dry-run shells and artifact/report root baseline handoff are closed. |
 | `commit-02-a` | `aaf47faac292315900f153ebb30d5086e0a4c997` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-a` completed at `25876559520691bda2dfd45a0af53bcd38c2f1a9`; public contract foundation, shared shell fixtures and roundtrip tests handoff are closed. |
 | `commit-02-b` | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-b` completed at `9f876697e0487f0c4cf4966928895a24e6559f5d`; shared domain error foundation, five pure policy shells, exact judgement-state enums and pure-domain tests handoff are closed. |
-| `commit-02-c` | `3220f2ee2f10a9889bc10535969e3fae989c236d` | ready | design_gate | read_docs | Formal `03` §4 / §6 / §7 / §9 / §10 / §11 / §12 / §15 plus Step 6 / Step 7 / Step 10 / Step 11 / Step 12 / Step 13 / Step 16 and formal `07` now close `commit-02-c` to shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests; implementation must restart from the current boundary ledger and keep all method signatures, local ref families, application error families, repository/runtime behavior and later service slices deferred. |
+| `commit-02-c` | `3220f2ee2f10a9889bc10535969e3fae989c236d` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-c` completed at `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests handoff are closed. |
+| `commit-03-a` | `planned-after-d3faf90-handoff-ledger` | planned | activation_gate | wait_until_current | Future definition/catalog contracts and domain truth state boundary still carries a placeholder baseline and must not be activated until design audit pins a formal baseline after `commit-02-c` handoff. |
 
 ---
 
@@ -49,7 +50,8 @@
 | BLK-ML-02B-ACTIVATION-001 | `commit-02-b` | implementation | resolved | `aaf47faac292315900f153ebb30d5086e0a4c997` | `commit-02-a` handoff is now closed and the project ledger advances to `commit-02-b`; implementation agent must continue from `read_docs` and rerun the current boundary Design Gate before editing code. |
 | BLK-ML-02B-DESIGN-001 | `commit-02-b` | implementation | resolved | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` | Formal `03` §6 / §9 / §11 / §15 plus Step 6 / Step 10 / Step 12 / Step 16 and formal `07` now narrow `commit-02-b` to shared domain error foundation, five current-boundary policy shells, exact judgement-state enums and pure-domain tests only; implementation completed inside that exact subset. |
 | BLK-ML-02C-ACTIVATION-001 | `commit-02-c` | implementation | resolved | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` | `commit-02-b` handoff is now closed and the project ledger advances to `commit-02-c`; implementation agent must continue from `read_docs` and rerun the current boundary Design Gate before editing `crates/application`. |
-| BLK-ML-02C-DESIGN-001 | `commit-02-c` | implementation | resolved | `3220f2ee2f10a9889bc10535969e3fae989c236d` | Formal `03` §4 / §6 / §7 / §9 / §10 / §11 / §12 / §15 plus Step 6 / Step 7 / Step 10 / Step 11 / Step 12 / Step 13 / Step 16 and formal `07` now narrow `commit-02-c` to shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests only; implementation may resume from `read_docs` and must re-block if any extra method, field, ref family or error family becomes necessary. |
+| BLK-ML-02C-DESIGN-001 | `commit-02-c` | implementation | resolved | `3220f2ee2f10a9889bc10535969e3fae989c236d` | Formal `03` §4 / §6 / §7 / §9 / §10 / §11 / §12 / §15 plus Step 6 / Step 7 / Step 10 / Step 11 / Step 12 / Step 13 / Step 16 and formal `07` now narrow `commit-02-c` to shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests only; implementation completed inside that exact subset. |
+| BLK-ML-03A-ACTIVATION-001 | `commit-03-a` | design handoff | blocked | `planned-after-d3faf90-handoff-ledger` | Pin a formal `commit-03-a` design baseline and update the project ledger before any new implementation work starts. |
 
 ---
 
@@ -63,7 +65,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. `commit-02-c` is currently reopened at baseline `3220f2ee2f10a9889bc10535969e3fae989c236d`; implementation may now rerun the boundary ledger Design Gate, but it must remain inside the shell-only application foundation subset and re-block immediately if any missing field/source reappears.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. `commit-02-c` handoff is now closed by implementation commit `d1b36632172b0fec8a6b5e196ac41c85c92328d0`, but future `commit-03-a` still carries placeholder baseline `planned-after-d3faf90-handoff-ledger`; implementation must stay blocked at `wait_design` until design audit replaces that placeholder and formally advances the next current boundary.
 
 ---
 
@@ -87,4 +89,5 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-01-b` | implemented handoff closed | Implementation handoff records config/profile, dry-run shell and artifact/report root baseline commit `181604262bded9cc402f918383117ddf56222e54`; this boundary is no longer current. |
 | `commit-02-a` | implemented handoff closed | Implementation handoff records public contract foundation commit `25876559520691bda2dfd45a0af53bcd38c2f1a9`; typed refs, metadata/error re-exports, shared shells and roundtrip fixtures are closed. |
 | `commit-02-b` | implemented handoff closed | Implementation handoff records shared domain foundation commit `9f876697e0487f0c4cf4966928895a24e6559f5d`; exact pure-domain error kinds, current-boundary policy shells, judgement-state enums and pure-domain tests are closed. |
-| `commit-02-c` | design closure active | Design baseline `3220f2ee2f10a9889bc10535969e3fae989c236d` now narrows the current boundary to shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused tests; implementation must rerun the current boundary ledger gates before editing `crates/application`. |
+| `commit-02-c` | implemented handoff closed | Implementation handoff records application shell foundation commit `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests are closed. |
+| `commit-03-a` | future boundary waiting design activation | Boundary file exists, but its design baseline remains placeholder `planned-after-d3faf90-handoff-ledger`; implementation must wait for design audit before activation. |

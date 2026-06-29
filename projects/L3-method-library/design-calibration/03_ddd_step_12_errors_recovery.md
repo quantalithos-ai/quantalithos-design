@@ -441,6 +441,27 @@ next_allowed_action: 等待用户确认后进入 Step 12 `R12.4 错误层级与�
 | job partial / checkpoint / report defect | Step 6 job assembly/progress,Step 8 job result/report,Step 10 job state,Step 11 checkpoint/report rule. | Missing report/checkpoint surface -> manual consistency failure or Step 13 blocker. |
 | consistency defect | Step 6~11 source closure and design standard. | Pause,record blocker,and return to owning Step;do not hide as dependency unavailable. |
 
+### 5.1 `commit-02-b` current-boundary error closure supplement
+
+当前 implementation boundary `commit-02-b` 只允许把 `domain error` layer 收窄为 pure domain foundation。实现端当前只允许在 `crates/domain/src/errors.rs` 落码以下 exact error kind:
+
+| current-boundary domain error kind | source backref | current implementation rule |
+|---|---|---|
+| `MissingRequiredTypedInput` | Step 6 policy shell required typed carrier | 只用于 pure domain constructor / helper 缺少 formal typed carrier;不得包装 DTO、route、config 或 adapter raw input。 |
+| `InvariantViolation` | Step 6 object invariant | 只用于 pure domain invariant failure;不得替代 version conflict、stored replay、checkpoint 或 dependency failure。 |
+| `InvalidTransition` | Step 10 current-boundary judgement transition | 只用于 allowed judgement-state illegal transition;不得扩成 business truth lifecycle or runtime state conflict。 |
+| `PolicyRejected` | Step 6 policy/guard rejection + Step 10 judgement branch | 只用于 current policy shell reject branch;safe reason 复制 formal marker。 |
+| `BodyFreeBoundaryViolation` | Step 6 `ExternalBodyBoundaryRule` + Step 10 no-body judgement | 只用于 raw body would cross boundary;不得保存 raw body 作为错误详情。 |
+
+以下错误家族在 `commit-02-b` 明确后移:
+
+| deferred error family | defer reason |
+|---|---|
+| version / optimistic conflict、idempotency conflict、duplicate replay surface issue、commit / UoW unknown | application / replay / UoW owning boundary 在 `commit-02-c`+。 |
+| dependency / adapter unavailable、publisher / handoff failed | port / infra / worker owning boundary later。 |
+| not found / safe absent、not visible / context limited、stale / degraded / unavailable | query / material / mapper owning boundary later。 |
+| job partial / checkpoint / report defect、consistency defect | jobs / replay / later consistency closure。 |
+
 ### 6. R12.4 watch / blocker closure
 
 | id | closure in R12.4 | remaining handoff |

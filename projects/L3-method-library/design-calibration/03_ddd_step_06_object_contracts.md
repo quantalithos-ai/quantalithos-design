@@ -2475,6 +2475,26 @@ pub struct PackageCompositionRule;
 | no_marketplace_transaction | listing、价格、订单、购买、安装和履约属于 `L6-marketplace`。 |
 | no_authorization_expansion | 外围组织不能绕过 `DownstreamConsumptionBoundary` 或正式版本要求。 |
 
+### 8.1 `commit-02-b` current-boundary closure supplement
+
+`R6.14` 已关闭七个 policy / guard / boundary 对象的正式命名,但当前 implementation boundary `commit-02-b` 只允许实现其中可由现有 contracts foundation 直接承载的 shared domain foundation 子集,不得在 `crates/domain` 抢写 later business truth owner 或 later typed wrapper family。
+
+| current-boundary object shell | current Rust-facing closure | current implementation rule |
+|---|---|---|
+| `DefinitionUseBoundaryGuard` | `{ guard_ref, protected_definition_ref, protected_formal_version_ref, consumption_context_ref, boundary_ref }: MethodLibraryTypedBoundaryRef` + `guard_reason_marker: MethodLibrarySafeMarker` + `state: DefinitionUseBoundaryGuardState` | 允许作为 pure guard shell 落码;不得 materialize local `DefinitionUseBoundaryGuardRef` / `DefinitionUseGuardReasonRef` wrapper family。 |
+| `DownstreamConsumptionBoundary` | `{ boundary_ref, consumption_context_ref }: MethodLibraryTypedBoundaryRef` + `boundary_reason_marker: MethodLibrarySafeMarker` + `state: DownstreamConsumptionBoundaryState` | 允许作为 pure boundary shell 落码;`FormalVersionRequirement`、`MethodAssetAllowedUseKindSet`、`DownstreamForbiddenWriteKindSet`、`MethodAssetConsumptionMaterialScopeRef` 后移 `commit-05-a`。 |
+| `ConsistencyProtectionPolicy` | `{ policy_ref, protected_version_ref }: MethodLibraryTypedBoundaryRef` + `{ impact_summary_ref, trace_material_ref }: Option<MethodLibraryTypedBoundaryRef>` + `decision_marker: MethodLibrarySafeMarker` + `state: ConsistencyProtectionJudgement` | 允许作为 pure protection judgement shell 落码;`ConsumptionContextRefSet` 等 later set family 后移 owning slice。 |
+| `RelationIntegrityRule` | `{ rule_ref, relation_ref, source_definition_ref, target_definition_ref }: MethodLibraryTypedBoundaryRef` + `distribution_boundary_ref: Option<MethodLibraryTypedBoundaryRef>` + `decision_marker: MethodLibrarySafeMarker` + `state: RelationIntegrityJudgement` | 允许作为 pure integrity judgement shell 落码;`RelationFormalizationRequirement` 后移 relation/distribution owning slice。 |
+| `ExternalBodyBoundaryRule` | `{ rule_ref }: MethodLibraryTypedBoundaryRef` + `{ external_source_ref, artifact_archive_ref, lineage_marker_ref }: Option<MethodLibraryTypedBoundaryRef>` + `boundary_reason_marker: MethodLibrarySafeMarker` + `state: ExternalBodyBoundaryState` | 允许作为 pure no-body rule shell 落码;`ForbiddenExternalBodyKindSet` 与 `ExternalSummaryKindSet` 细分后移 external owning slice。 |
+
+以下对象虽在 Step 6 正式存在,但当前 boundary 明确后移:
+
+| deferred object | defer reason |
+|---|---|
+| `FormalizationEligibilityRule` | Step 10 只闭为 precondition / marker-only;当前 boundary 不闭 local decision carrier。 |
+| `PackageCompositionRule` | peripheral-only rule 依赖 `*RefSet` / distribution family,当前 boundary 不闭 local carrier。 |
+| `MethodAssetDefinition`;`MethodAssetCatalogEntry`;`FormalizationBasisSummary`;`FormalizationState`;`FormalMethodAssetVersion`;`MethodAssetConsumptionMaterial`;`ExternalSourceSummary`;`MethodAssetTraceMaterial`;`ConsumptionImpactSummary`;`MethodAssetAuditTrail`;`MethodAssetEvidenceLineage`;`MethodAssetRelation`;`MethodPackage`;`MethodSetAssembly` | business truth / source / trace / peripheral owner 全部后移 `commit-03-a`+。 |
+
 ### 9. 状态主语预筛
 
 | 状态主语候选 | 当前对象 / 对象组 | Step 10 承接 | 禁止事项 |

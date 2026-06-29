@@ -1444,6 +1444,27 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.10 source/referenc
 | audit / trace candidate | definition-use violation or body rejection | R10.11/R10.12;Step 15 |
 | stored result / receipt | command / inbound duplicate replay | R10.17/R10.18;Step 13 |
 
+### 8.1 `commit-02-b` current-boundary state closure supplement
+
+当前 implementation boundary `commit-02-b` 只允许把 source/reference/body-boundary 与 trace/relation protection family 中的 judgement state 收窄为 shared domain foundation。实现端当前只允许落码以下 exact labels:
+
+| current-boundary state carrier | exact labels | current implementation rule |
+|---|---|---|
+| `DefinitionUseBoundaryGuardState` | `Monitoring`;`ViolationRecorded`;`RejectedCandidate` | 只表达 guard judgement,不 materialize definition truth / formal version lifecycle。 |
+| `DownstreamConsumptionBoundaryState` | `Registered`;`Constrained`;`Unavailable` | 只表达 boundary judgement,不 materialize durable owner / material lifecycle / auth matrix。 |
+| `ConsistencyProtectionJudgement` | `ProtectionEstablished`;`UnknownImpactPending`;`ProtectionConstrained`;`InputRejected` | 只表达 protection judgement,不执行 recovery 或 report progression。 |
+| `RelationIntegrityJudgement` | `IntegritySatisfied`;`IntegrityPending`;`ViolationMarked`;`IntegrityRejected` | 只表达 integrity judgement,不重写 relation truth lifecycle or runtime graph state。 |
+| `ExternalBodyBoundaryState` | `AssertedBodyFree`;`BodyCandidateRejected`;`InvalidCandidate` | 只表达 no-body judgement,不保存 provider body / archive path / payload excerpt。 |
+
+以下 state owner 在 `commit-02-b` 明确后移:
+
+| deferred state owner / family | defer reason |
+|---|---|
+| `FormalizationState`;`FormalMethodAssetVersion`;`MethodAssetConsumptionMaterial` | business truth / material owner 归 `commit-04-a` / `commit-05-a`+。 |
+| `MethodAssetDefinition`;`MethodAssetCatalogEntry`;`MethodAssetRelation`;`MethodPackage`;`MethodSetAssembly` | truth lifecycle later;当前 boundary 不得抢写。 |
+| `FormalizationBasisSummary`;`ExternalSourceSummary`;`MethodAssetTraceMaterial`;`ConsumptionImpactSummary`;`MethodAssetAuditTrail`;`MethodAssetEvidenceLineage` | source / trace / support owner later;当前 boundary 只允许 judgement shell。 |
+| read/material、maintenance/job、replay/runtime、outbound/handoff families | application / infra / worker / jobs owning boundary later。 |
+
 ### 9. R10.10 stop-review
 
 | 检查项 | 结果 |

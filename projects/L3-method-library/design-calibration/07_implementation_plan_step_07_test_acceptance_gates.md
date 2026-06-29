@@ -139,7 +139,7 @@
 | commit-01-a | fmt;check;dependency-boundary seed | EV-ML-DEPENDENCY-001;ML-RL-006;VETO-ML-012 | dependency targeted artifact/report optional | 不提交;修 workspace/dependency |
 | commit-01-b | config smoke;script dry-run;path check | EV-ML-CONFIG-001 seed;AC-ML-EV path seed;VETO-ML-014 | config/script dry-run artifact optional | 不提交;修 config/script |
 | commit-02-a | contracts check;contract-domain-fast foundation | EV-ML-CONTRACT-001 seed;ML-SYNC-001 seed | contract foundation report optional | DTO/shell 缺口回写设计 |
-| commit-02-b | domain check;domain tests | EV-ML-CONTRACT-001 seed;ML-STATE-001/002 | domain foundation artifact | state/policy 缺口阻断 |
+| commit-02-b | domain check;domain tests | EV-ML-CONTRACT-001 seed;ML-STATE-001/002 | domain foundation artifact | shared policy shell / judgement state / domain error / body-free test support 缺口阻断 |
 | commit-02-c | application check;UoW/idempotency unit tests | EV-ML-SERVICE-001 seed;ML-TX-001;ML-IDEMP-001 seed | application foundation artifact | UoW/replay 缺口阻断 |
 | commit-03-a | contract-domain-fast definition/catalog slice | EV-ML-CONTRACT-001;ML-FG-001/005;VETO-ML-001 | definition/catalog report | truth owner 缺口阻断 |
 | commit-03-b | service-flow-fast definition/catalog;infra-runtime-fake slice | EV-ML-SERVICE-001;EV-ML-INFRA-001;ML-TX-001 | service/infra targeted reports | accepted flow 或 repo fake 缺口阻断 |

@@ -1075,6 +1075,26 @@ next_allowed_action: 等待用户确认后进入 Step 16 `R16.12 state machine t
 | outbound / publication / handoff state cut | Step 6;Step 8;Step 9;Step 10;Step 11;Step 12;Step 15 | 验证 event candidate、target registry、publisher binding、publication outcome、handoff binding/outcome 的 assembled、published、failed、blocked、unavailable、prepared、delivered 状态。 | Candidate、publication outcome、handoff outcome 分层;published/delivered 只表示 local safe port outcome/receipt marker;失败不回滚 accepted truth。 | 不把 topic、transport payload、subscriber ack、delivery receipt body、external system state 或 old outbox relay 当状态真相源。 |
 | cross-state forbidden transition cut | Step 10;Step 11;Step 12;Step 13;Step 15 | 验证 query writes truth、marker synthesis、old-state resurrection、raw body as state source、publication rollback、checkpoint-as-version 等跨状态机禁区。 | 每个 forbidden class 应有 safe no-side-effect / rejected / degraded / manual direction;无正式 source/mapper/port/schema 时停审回设计。 | 不用测试 fixture、fake private state、日志、metric、transport status、SQL/HTTP code 或 exception text 补正式来源。 |
 
+### 2.1 `commit-02-b` current-boundary test closure supplement
+
+当前 implementation boundary `commit-02-b` 只允许把 Step 16 测试切口落成 pure domain foundation tests。实现端当前只允许覆盖以下入口:
+
+| current-boundary test cut | source Step | minimum assertion direction | forbidden shortcut |
+|---|---|---|---|
+| shared policy shell invariant cut | Step 6;Step 12 | `DefinitionUseBoundaryGuard`、`DownstreamConsumptionBoundary`、`ConsistencyProtectionPolicy`、`RelationIntegrityRule`、`ExternalBodyBoundaryRule` 只接受 formal typed ref / marker carrier;missing carrier 返回 current-boundary domain error。 | 为测试便利补 local `*Ref` wrapper、request DTO、config/env、repository 或 runtime state。 |
+| judgement legal transition cut | Step 10;Step 12 | `DefinitionUseBoundaryGuardState`、`DownstreamConsumptionBoundaryState`、`ConsistencyProtectionJudgement`、`RelationIntegrityJudgement`、`ExternalBodyBoundaryState` 的 legal transition 与 Step 10 supplement 一致。 | 通过 query marker、job checkpoint、publisher outcome、old lifecycle 或 fake private map 证明 transition。 |
+| judgement illegal transition cut | Step 10;Step 12 | 非法转换返回 `InvalidTransition` 或 `PolicyRejected`,且无 truth write、no side effect。 | 把 illegal transition 伪装成 dependency unavailable、stored replay missing、commit unknown 或 runtime blocked。 |
+| body-free redline cut | Step 6;Step 10;Step 12;Step 15 | raw body / archive body / payload excerpt candidate 只返回 `BodyFreeBoundaryViolation` 或 rejected judgement,不保存正文。 | fixture 内携带 provider body、archive body、payload excerpt、URL/path、stack trace。 |
+| domain error foundation cut | Step 12 | `MissingRequiredTypedInput`、`InvariantViolation`、`InvalidTransition`、`PolicyRejected`、`BodyFreeBoundaryViolation` 都有纯域断言入口。 | 直接断言 application error、query degraded surface、stored replay、checkpoint defect 或 worker outcome。 |
+
+以下测试家族在 `commit-02-b` 明确后移:
+
+| deferred test family | defer reason |
+|---|---|
+| business truth transition、accepted flow、service-flow-fast、repo fake | `commit-03-a`+ owning slice。 |
+| query no-write、material freshness、replay、checkpoint、publication retry、job partial | `commit-05-a` / `commit-08-b` / `commit-09-b` / `commit-10-b`+。 |
+| artifact/report generation、EV / acceptance evidence、report audit | `05/06/07` and PH-11。 |
+
 ### 3. 状态机切口使用规则
 
 | 规则 | 说明 |

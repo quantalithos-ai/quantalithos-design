@@ -1058,6 +1058,34 @@ pub struct MethodLibraryPublicShell;
 | shell_not_payload_schema | shell 不固定 Step 8 DTO / event / job payload 字段。 |
 | shell_body_free | shell 不保存外部正文、artifact/archive 包体、raw audit log、report body。 |
 
+### 6A. `commit-02-a` contracts metadata / safe error foundation normalization
+
+`commit-02-a` 只允许建立 public contract foundation。为了避免实现仓在 `crates/contracts` 私造 metadata/context wrapper,当前 boundary 对 metadata、page 和 safe error 的 owning truth 明确如下:
+
+| item | current owning truth | `commit-02-a` implementation rule |
+|---|---|---|
+| actor foundation | `core-contracts::actor::{ActorContext, ActorRef, ActorKind, RequestOrigin}` | `crates/contracts/src/metadata.rs` 直接 re-export;不得新增本仓 local `*ActorContextRef` wrapper。 |
+| request / command / query metadata foundation | `core-contracts::metadata::{RequestMetadata, CommandMetadata, QueryMetadata, PageRequest, PageToken, RequestId, TraceId, IdempotencyKey, Timestamp, QueryConsistency, ChangeReason}` | `crates/contracts/src/metadata.rs` 直接 re-export;不得为当前 boundary 再造 `*MetadataRef` / `*TraceContextRef` / `*IdempotencyContextRef`。 |
+| safe error foundation | `core-contracts::errors::{ErrorCode, ErrorDetail, ErrorResponse}` | `crates/contracts/src/errors.rs` 直接 re-export safe error foundation;L3-specific rejected / degraded code system后移 Step 12。 |
+| legacy placeholder normalization | Step 6 / Step 8 中出现的 `ActorContextRef`、`MethodAssetActorContextRef`、`CommandMetadataRef`、`MethodAssetRequestMetadataRef`、`MethodAssetTraceContextRef`、`MethodAssetIdempotencyContextRef` | 在 `commit-02-a` 一律理解为“contracts-provided body-free metadata carrier”,当前落码只能使用上表 core-contracts foundation,不得据此发明额外 local wrapper/ref type。 |
+| excluded from current boundary | `MethodAssetSourceEventMetadataRef`、`MethodAssetInfraSafeDiagnosticRefSet`、`MethodAssetProtocolResponseShellRef`、`MethodAssetProtocolRejectionShellRef` 等 | 这些是 Step 8 family-specific 或 Step 12+ internal closure,不属于 `commit-02-a` foundation;当前 boundary 不得私补。 |
+
+### 6B. `commit-02-a` concrete shared shell foundation
+
+在不进入 business DTO schema 的前提下,`commit-02-a` 允许并且只允许把 shared shell foundation 收敛为下面这组 concrete contracts struct / enum:
+
+| foundation type | required fields | closure rule |
+|---|---|---|
+| `MethodLibraryCapabilityKind` | `DefinitionCatalog`;`FormalizationVersion`;`ControlledConsumption`;`TraceConsistency`;`RelationDistribution`;`ExternalReference`;`MaintenanceConvergence`;`PeripheralPackageSet` | 只表达八组件 capability group,不表达具体 command / query name。 |
+| `MethodLibraryOperationsJobKind` | `RefreshCatalogDefinitionReadMaterials`;`RefreshFormalVersionReadMaterials`;`RefreshConsumptionReadMaterials`;`RefreshRelationDistributionMaterials`;`RefreshExternalSummaryReadMaterials`;`RefreshTraceAuditImpactMaterials`;`RunConsistencyRecoveryConvergence`;`RefreshPeripheralReadMaterials` | 只表达八个 operations job family,不写 job input body。 |
+| `MethodLibraryCommandShell` | `capability_kind: MethodLibraryCapabilityKind`;`actor_context: ActorContext`;`metadata: CommandMetadata`;`boundary_ref: MethodLibraryTypedBoundaryRef`;`typed_refs: Vec<MethodLibraryTypedBoundaryRef>`;`safe_markers: Vec<MethodLibrarySafeMarker>` | 只承载 shared actor/metadata/boundary/ref/marker foundation,不写 request intent body。 |
+| `MethodLibraryQueryShell` | `capability_kind: MethodLibraryCapabilityKind`;`actor_context: ActorContext`;`metadata: QueryMetadata`;`boundary_ref: MethodLibraryTypedBoundaryRef`;`typed_refs: Vec<MethodLibraryTypedBoundaryRef>`;`safe_markers: Vec<MethodLibrarySafeMarker>` | 只承载 shared actor/metadata/page/ref/marker foundation,不写 selector schema。 |
+| `MethodLibraryEventShell` | `capability_kind: MethodLibraryCapabilityKind`;`request_metadata: RequestMetadata`;`trace_id: TraceId`;`typed_refs: Vec<MethodLibraryTypedBoundaryRef>`;`safe_markers: Vec<MethodLibrarySafeMarker>` | 只承载 body-free fact/event foundation,不写 payload / topic / delivery state。 |
+| `MethodLibraryJobShell` | `job_kind: MethodLibraryOperationsJobKind`;`request_metadata: RequestMetadata`;`typed_refs: Vec<MethodLibraryTypedBoundaryRef>`;`safe_markers: Vec<MethodLibrarySafeMarker>` | 只承载 job family / metadata / ref / marker foundation,不写 checkpoint/report body。 |
+| `MethodLibraryViewShell` | `capability_kind: MethodLibraryCapabilityKind`;`typed_refs: Vec<MethodLibraryTypedBoundaryRef>`;`safe_markers: Vec<MethodLibrarySafeMarker>` | 只承载 body-free public view/material/summary foundation,不写 concrete view fields。 |
+
+上表是 `commit-02-a` 唯一允许实现的 concrete shell set。任何 command intent、query selector、rejection code、receipt/report detail、inbound source envelope 或 payload field schema 都必须回到 Step 8 family-specific closure,不得在当前 boundary 抢写。
+
 ### 7. contracts 禁止事项
 
 | 禁止事项 | 原因 | 正确承接 |
@@ -1778,7 +1806,7 @@ pub struct MethodAssetAuditTrail;
 | `audit_trail_ref` | `MethodAssetAuditTrailRef` | domain 创建的审计轨迹稳定引用。 |
 | `audit_subject_ref` | `MethodAssetAuditSubjectRef` | 当前被审计对象的 typed subject ref。 |
 | `trace_material_refs` | `MethodAssetTraceMaterialRefSet` | 与审计轨迹关联的追溯材料 refs。 |
-| `actor_context_ref` | `ActorContextRef` | command / inbound / job metadata 中的安全 actor context。 |
+| `actor_context_ref` | `ActorContextRef` | command / inbound / job metadata 中的安全 actor context;`commit-02-a` 仅按 `6A` 归一化为 `core-contracts::actor::ActorContext`,不得据此新增 local wrapper。 |
 | `safe_reason_ref` | `MethodAssetSafeReasonRef` | 安全原因引用,不保存原始错误或请求正文。 |
 | `audit_entry_refs` | `MethodAssetAuditEntryRefSet` | append-only 审计条目引用集合。 |
 | `source_cursor_ref` | `MethodAssetAuditCursorRef` | 审计条目对应的提交位置或来源 cursor。 |
@@ -2641,8 +2669,8 @@ pub struct MethodAssetOperationContext;
 | 字段骨架 | 类型 | 字段来源 |
 |---|---|---|
 | `operation_context_ref` | `MethodAssetOperationContextRef` | application 创建的本次操作语境引用。 |
-| `actor_context_ref` | `ActorContextRef` | entry-injected actor context;不得从 raw auth header 直接拼接。 |
-| `command_metadata_ref` | `Option<CommandMetadataRef>` | command / consumer / job 注入的安全 metadata 引用。 |
+| `actor_context_ref` | `ActorContextRef` | entry-injected actor context;不得从 raw auth header 直接拼接。`commit-02-a` 仅按 `6A` 归一化为 `core-contracts::actor::ActorContext` foundation。 |
+| `command_metadata_ref` | `Option<CommandMetadataRef>` | command / consumer / job 注入的安全 metadata 引用;`commit-02-a` 仅按 `6A` 归一化为 `core-contracts::metadata::CommandMetadata` foundation。 |
 | `operation_source_kind` | `MethodAssetOperationSourceKind` | 同步 command、query、inbound consumer 或 operations job 的来源类别。 |
 | `correlation_ref` | `MethodAssetCorrelationRef` | entry / runner 注入的 correlation typed ref。 |
 | `request_boundary_ref` | `MethodAssetRequestBoundaryRef` | 当前入口或 runner 的 body-free boundary 引用。 |
@@ -3758,10 +3786,10 @@ pub struct MethodAssetApiEntryContext;
 | 字段骨架 | 类型 | 字段来源 |
 |---|---|---|
 | `api_entry_context_ref` | `MethodAssetApiEntryContextRef` | api entry factory 为一次同步入口处理创建的 typed ref。 |
-| `actor_context_ref` | `MethodAssetActorContextRef` | contracts metadata shell 中已转译的 actor context ref。 |
-| `request_metadata_ref` | `MethodAssetRequestMetadataRef` | contracts command / query metadata shell。 |
-| `trace_context_ref` | `MethodAssetTraceContextRef` | 上游入口或 runtime context 注入的 trace typed ref。 |
-| `idempotency_context_ref` | `Option<MethodAssetIdempotencyContextRef>` | command metadata 或 application idempotency precheck 输入;query 可为空。 |
+| `actor_context_ref` | `MethodAssetActorContextRef` | contracts metadata shell 中已转译的 actor context ref;`commit-02-a` 仅按 `6A` 归一化为 `ActorContext` foundation,不得新增本仓 local wrapper。 |
+| `request_metadata_ref` | `MethodAssetRequestMetadataRef` | contracts command / query metadata shell;`commit-02-a` 仅按 `6A` 归一化为 `RequestMetadata` / `CommandMetadata` / `QueryMetadata` foundation。 |
+| `trace_context_ref` | `MethodAssetTraceContextRef` | 上游入口或 runtime context 注入的 trace typed ref;`commit-02-a` 仅按 `6A` 归一化为 `TraceId` foundation。 |
+| `idempotency_context_ref` | `Option<MethodAssetIdempotencyContextRef>` | command metadata 或 application idempotency precheck 输入;query 可为空。`commit-02-a` 仅按 `6A` 归一化为 `IdempotencyKey` foundation。 |
 | `runtime_assembly_state_ref` | `MethodAssetRuntimeAssemblyStateRef` | infra runtime builder 输出的 assembly state ref。 |
 | `entry_safe_context_ref` | `MethodAssetEntrySafeContextRef` | api handler precheck 输出的 safe local context ref。 |
 | `safe_diagnostic_refs` | `MethodAssetInfraSafeDiagnosticRefSet` | entry precheck / runtime assembly 的 redacted diagnostics。 |

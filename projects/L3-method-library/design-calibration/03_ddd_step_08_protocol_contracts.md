@@ -781,14 +781,26 @@ next_allowed_action: 等待用户确认后进入 Step 8 `R8.8 shared protocol he
 
 | shared helper | 统一责任 | 正式来源 | 后续协议族使用方式 |
 |---|---|---|---|
-| protocol metadata shell | 表达 body-free metadata、schema/version hint、correlation 和 request boundary。 | HLD 五类接口共性输入;`MethodAssetOperationContext`;Clock / IdGenerator helper。 | Command / Query / Inbound / Job request shell 复制;Outbound event 只复制 fact source 和 trace context。 |
-| actor / source shell | 区分 actor-driven、source-driven、job-driven 和 fact-driven 协议来源。 | `ActorContextRef`;operation source kind;source summary ref;request boundary ref;entry restriction。 | Command / Query 使用 actor;Inbound 使用 source;Job 使用 run/task source;Outbound 使用事实来源。 |
+| protocol metadata shell | 表达 body-free metadata、schema/version hint、correlation 和 request boundary。 | HLD 五类接口共性输入;Step 6 `commit-02-a` metadata foundation normalization;`MethodAssetOperationContext`;Clock / IdGenerator helper。 | Command / Query / Inbound / Job request shell 复制;Outbound event 只复制 fact source 和 trace context。 |
+| actor / source shell | 区分 actor-driven、source-driven、job-driven 和 fact-driven 协议来源。 | `core-contracts::actor::ActorContext`;operation source kind;source summary ref;request boundary ref;entry restriction。 | Command / Query 使用 actor;Inbound 使用 source;Job 使用 run/task source;Outbound 使用事实来源。 |
 | idempotency shell | 承载 dedup、operation digest、stored result replay 和 conflict 判断边界。 | `MethodAssetIdempotencyGuard`;stored result / replay helper。 | Command / Inbound / Job 必须判断;Query 默认 no-write 不强制;Outbound 不自行 dedup。 |
 | operation result shell | 表达 accepted、rejected、ignored、conflict、duplicate replay 的安全结果壳。 | `MethodAssetStoredOperationResult`;safe reason refs;effect summary refs;replay marker。 | Command / Inbound / Job response 或 receipt 复用;Query 仅使用 read surface。 |
 | page / cursor shell | 表达 opaque page request、page result、ordering、cursor 和 version 分离。 | page / version helper;`MethodAssetReadDecision`;maintenance progress helper。 | Query / trace / relation / progress / job report 使用;不得替代 optimistic version。 |
 | public marker shell | 表达 no-body、freshness、availability、boundary、lineage、visibility、material marker。 | `MethodLibrarySafeMarker`;resolver / mapper / material summary;read / degraded decision。 | 所有 public surface 只能复制正式 marker,不得由 service 合成。 |
-| rejection / degraded shell | 表达 rejected、not visible、unavailable、partial、stale、invalid safe material 的公共安全壳。 | `MethodAssetDegradedDecision`;safe diagnostic ref;unavailable reason ref;partiality marker。 | Query degraded、Command rejection、Inbound quarantine、Job partial/blocked 均复用。 |
+| rejection / degraded shell | 表达 rejected、not visible、unavailable、partial、stale、invalid safe material 的公共安全壳。 | Step 6 `commit-02-a` safe error foundation normalization;`MethodAssetDegradedDecision`;safe diagnostic ref;unavailable reason ref;partiality marker。 | Query degraded、Command rejection、Inbound quarantine、Job partial/blocked 均复用。 |
 | receipt / report shell | 表达 inbound receipt、publication candidate outcome、job progress/report 的 body-free 壳。 | inbound intake decision;event candidate assembly;job assembly context;checkpoint / progress helper。 | Inbound / Outbound / Job 使用;不携带 topic、payload body、scheduler、queue 或 delivery state。 |
+
+### 2A. `commit-02-a` implementation-facing shared foundation closure
+
+`commit-02-a` 只实现 shared protocol helper 的 public contract foundation,不得越过本模块去抢写 family-specific DTO schema。当前 boundary 的 implementation-facing closure 明确如下:
+
+| item | current concrete closure | `commit-02-a` implementation rule |
+|---|---|---|
+| actor foundation | `core-contracts::actor::{ActorContext, ActorRef, ActorKind, RequestOrigin}` | `crates/contracts/src/metadata.rs` 直接 re-export;不得新增本仓 local `*ActorContextRef` wrapper。 |
+| request / command / query metadata foundation | `core-contracts::metadata::{RequestMetadata, CommandMetadata, QueryMetadata, PageRequest, PageToken, RequestId, TraceId, IdempotencyKey, Timestamp, QueryConsistency, ChangeReason}` | `crates/contracts/src/metadata.rs` 直接 re-export;不得新增本仓 local `*MetadataRef` / `*TraceContextRef` / `*IdempotencyContextRef`。 |
+| safe error foundation | `core-contracts::errors::{ErrorCode, ErrorDetail, ErrorResponse}` | `crates/contracts/src/errors.rs` 直接 re-export;L3-specific rejection / degraded code family后移 Step 12。 |
+| concrete shared shell set | `MethodLibraryCapabilityKind`;`MethodLibraryOperationsJobKind`;`MethodLibraryCommandShell`;`MethodLibraryQueryShell`;`MethodLibraryEventShell`;`MethodLibraryJobShell`;`MethodLibraryViewShell` | 这是当前 boundary 唯一允许落码的 shared protocol shell set;字段以 Step 6 `6B` 为准,不得补 request intent、selector、payload、receipt/report detail。 |
+| legacy placeholder normalization | `ActorContextRef`;`MethodAssetActorContextRef`;`CommandMetadataRef`;`MethodAssetRequestMetadataRef`;`MethodAssetTraceContextRef`;`MethodAssetIdempotencyContextRef` | 在 `commit-02-a` 一律视为“contracts-provided body-free metadata/context carrier”的占位名;当前落码只能用上表 foundation 或延后到 family-specific Step 8 / Step 12 闭口。 |
 
 ### 3. 协议族适用矩阵
 
@@ -2353,6 +2365,16 @@ shared helper 是所有协议族的公共 public surface 约束,用于避免各�
 | page / cursor | Query、Job、report | page cursor、checkpoint cursor、optimistic version 必须分离。 |
 | public marker | Query、Outbound、Job、rejection | degraded / unavailable / stale / not-visible / blocked marker 只能复制正式 mapper / resolver / availability 输出。 |
 | receipt / report | Inbound、Outbound、Job | 只承载 typed refs、safe summary、marker,不得承载 raw body。 |
+
+当前 implementation boundary `commit-02-a` 对 shared helper 的 concrete contracts closure 只允许以下 foundation set:
+
+| concrete foundation | exact carrier | closure rule |
+|---|---|---|
+| actor / metadata / page foundation | `ActorContext`;`RequestMetadata`;`CommandMetadata`;`QueryMetadata`;`PageRequest`;`PageToken`;`TraceId`;`IdempotencyKey` | 直接复用 `core-contracts`;不得新增本仓 local metadata/context wrapper。 |
+| safe error foundation | `ErrorCode`;`ErrorDetail`;`ErrorResponse` | 只复用 `core-contracts` safe error carrier;L3-specific code family后移 Step 12。 |
+| capability / job kind shell | `MethodLibraryCapabilityKind`;`MethodLibraryOperationsJobKind` | 只表达 capability / operations job family,不表达具体 command / query / job body。 |
+| protocol shell set | `MethodLibraryCommandShell`;`MethodLibraryQueryShell`;`MethodLibraryEventShell`;`MethodLibraryJobShell`;`MethodLibraryViewShell` | 字段以 Step 6 `6B` 的 concrete shell set 为准;不得在 Step 8 抢写 request intent、selector、payload、receipt/report detail。 |
+| placeholder normalization | `ActorContextRef`;`MethodAssetActorContextRef`;`CommandMetadataRef`;`MethodAssetRequestMetadataRef`;`MethodAssetTraceContextRef`;`MethodAssetIdempotencyContextRef` | 这些在 `commit-02-a` 只作为 legacy placeholder 理解,实现只能落到上述 foundation,不得继续扩成 local wrapper family。 |
 
 #### §8.3 Command protocol family
 

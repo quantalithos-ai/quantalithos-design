@@ -16,7 +16,7 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `149c2dc277b8dd36efd885e152fcb421a99a0fd4` |
 | current_boundary | `commit-01-b` |
-| gate_status | ready_for_design_gate |
+| gate_status | pending |
 | gate_reason | Formal `04-配置设计.md` §9 and `07-实施计划.md` §3 / §6 / §8 now close `OQ-ML-003` for `commit-01-b`: config skeleton file format is strict JSON, directory is `config/profiles/`, required files are the four P0 profiles, and current boundary CLI names are fixed. |
 | next_allowed_action | read_docs |
 | current_recovery_point | `commit-01-b` may resume from required reads and rerun its boundary Design Gate before implementation edits |

@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-03-a |
 | phase | PH-03 method asset definition and catalog truth |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future method asset definition/catalog contracts and domain truth state boundary; cannot start until `commit-02-c` is implemented and project ledger advances |
+| status | ready |
+| next_allowed_action | read_docs |
+| current_recovery_point | active definition/catalog boundary after design baseline `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b`; implementation may edit only `crates/contracts` and `crates/domain` definition/catalog contracts, truth state, exact state/policy and focused tests after rerunning Design / Scope Gate |
 
 ---
 
@@ -17,9 +17,9 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-03-a` | planned | If project ledger still points to an earlier boundary, implementation agent must not use this file to modify code. |
-| `commit-02-c` handoff must be closed | planned | PH-02 contract/domain/application foundations must exist before definition/catalog truth work starts. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-03-a` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-03-a` | pass | Project ledger now points to `commit-03-a`; implementation may use this file only within the current boundary scope. |
+| `commit-02-c` handoff must be closed | pass | Application shell foundation was implemented at `d1b36632172b0fec8a6b5e196ac41c85c92328d0`. |
+| project ledger must set `next_allowed_action = read_docs` for `commit-03-a` | pass | This boundary is now current and begins from `read_docs`. |
 
 ---
 
@@ -27,7 +27,7 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This future boundary cannot be executed until it becomes current. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This boundary is now current and must restart from required reads before implementation edits. |
 | `standards/document/设计真相源闭环与可落码性标准.md` | no invented definition/catalog DTO, truth state, policy, marker or evidence schema | pending | Any missing definition/catalog field or truth-owner rule must return to design. |
 | `standards/coding/rust.md` | Rust contract/domain module, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
 | `projects/L3-method-library/00-需求文档.md` | FR-ML definition/catalog scope and non-goals | pending | Do not restore old MethodContent/publish/snapshot/outbox semantics. |
@@ -77,8 +77,8 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-03-a` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-02-c` implementation commit and handoff recorded | pending | PH-02 contract/domain/application foundations must exist. |
+| activation guard | project ledger shows `current_boundary = commit-03-a` and `next_allowed_action = read_docs` | pass | Boundary is current and must restart from required reads before implementation edits. |
+| prior handoff | `commit-02-c` implementation commit and handoff recorded | pass | Application shell foundation handoff is recorded at `d1b36632172b0fec8a6b5e196ac41c85c92328d0`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
@@ -98,9 +98,9 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-02-c` to `commit-03-a`. | wait_until_current |
-| design_gate | pending | Implementation agent must reread Required Reads and confirm definition/catalog DTO/truth/state/policy closure. | wait_design |
-| scope_gate | pending | Planned changes must be limited to definition/catalog contracts and domain truth state. | fix_gate_failure |
+| activation_gate | pass | Project ledger has advanced from `commit-02-c` to `commit-03-a`; this boundary is now current and starts from `read_docs`. | read_docs |
+| design_gate | pending | Definition/catalog closure must be re-read and implementation must confirm that no extra DTO field, truth-owner rule, state/policy outcome or error family needs to be invented. | wait_design |
+| scope_gate | pending | Planned changes must stay inside contracts/domain definition/catalog DTO shells, truth state, exact policy/guard and focused tests only. | fix_gate_failure |
 | worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/contract/domain checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
 | test_gate | pending | Contract-domain-fast definition/catalog slice and VETO-ML-001 targeted checks pass after activation. | fix_gate_failure |
@@ -141,7 +141,7 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-03A-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced through `commit-02-c`; this future boundary must not be used for implementation yet. | After `commit-02-c` handoff, update project ledger to `commit-03-a` and set this boundary to current. | wait_until_current |
+| BLK-ML-03A-ACTIVATION-001 | activation_gate | resolved | Project ledger had not yet advanced through `commit-02-c`, so this future boundary could not be used for implementation yet. | `commit-02-c` handoff is now closed, project ledger advances to `commit-03-a`, and this boundary becomes current from `read_docs`. | read_docs |
 
 ---
 
@@ -150,4 +150,4 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| definition/catalog truth owner | existing design-closure rule applies | Truth owner, DTO, state and policy gaps must be fixed in `03/05/06/07` before code; implementation must not invent definition/catalog truth semantics. |
+| definition/catalog truth owner | exact current closure is definition/catalog foundation only | Current boundary may materialize definition/catalog DTO shells, domain truth objects, exact state/policy and focused tests, but it must defer accepted service flow, repository/runtime behavior and later phase slices. |

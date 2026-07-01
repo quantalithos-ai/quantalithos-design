@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-03-b |
 | phase | PH-03 method asset definition and catalog truth |
-| design_baseline | `current-design-with-commit-03-b-exact-schema-closure` |
+| design_baseline | `current-design-with-commit-03-b-selector-scope-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready_for_design_gate |
+| status | ready |
 | next_allowed_action | read_docs |
-| current_recovery_point | Design closure now fixes exact dispatch/service input carriers, application-owned replay/idempotency refs, stored result carriers and repository error surface. Resume from `read_docs`, reread every required source, then rerun Design Gate before code edits. |
+| current_recovery_point | Design closure now resolves `BLK-ML-03B-DESIGN-004` and `BLK-ML-03B-DESIGN-005`: Step 6 `3B.1A`, Step 7 `R7.10A` §1B, Step 9 definition/catalog flow notes and formal `03` §6.3A define exact command selector intent labels and one-to-one service input dispatch; Allowed Scope now includes the minimal contracts ref-kind registry/export change required by those labels. Implementation must restart from `read_docs`, reread required sources and rerun Design Gate / Scope Gate before editing code. |
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | project ledger current_boundary must equal `commit-03-b` | pass | Project ledger now points to `commit-03-b`; implementation may use this file only within the accepted service vertical-slice scope. |
 | `commit-03-a` handoff must be closed | pass | Definition/catalog contracts and domain truth state were implemented at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-03-b` | pass | This boundary is now current and begins from `read_docs`. |
+| `commit-03-b` activation had already reached `read_docs` before the current blocker was recorded | pass | Boundary activation is complete; the selector/scope blockers are now closed, so implementation resumes from `read_docs` and must rerun gates against the latest baseline. |
 
 ---
 
@@ -60,6 +60,8 @@ Exact-schema design closure reactivated this boundary. Any `pass` value below re
 |---|---|---|
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/application/src/**` for definition/catalog accepted service, formal ports usage, UoW orchestration, mapper shell and stored result integration assigned to `commit-03-b` | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/application/tests/**` for definition/catalog service-flow-fast tests | planned |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/contracts/src/**` only for Step 6 `3B.1` / `3B.1A` `MethodLibraryTypedBoundaryRefKind` labels, named wrapper/export plumbing and selector fixture support required by current-boundary application refs and command intent labels | planned |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/contracts/tests/**` only for targeted typed-ref kind / selector shell fixture tests if required by the existing test layout | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/infra/src/**` for definition/catalog in-memory/fake repository and runtime fake support assigned to `commit-03-b` | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/infra/tests/**` for infra-runtime-fake definition/catalog tests | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/api/src/**` for minimal definition/catalog API handler that only calls application facade | planned |
@@ -71,6 +73,7 @@ Exact-schema design closure reactivated this boundary. Any `pass` value below re
 | allowed_rule | Implement definition/catalog accepted service vertical slice, UoW/stored result integration, fake repository, rollback/version checks and minimal API entry explicitly defined by formal design. | planned |
 | allowed_rule | Add targeted tests for accepted path, rejection path, rollback, duplicate replay, old material pollution prevention and fake version semantics within definition/catalog only. | planned |
 | forbidden_rule | Do not implement formalization/version, consumption/distribution, trace/audit/impact, external/peripheral, query/material, event/publisher or job behavior. | active |
+| forbidden_rule | Do not use the newly opened contracts scope to add public command DTO body, route/RPC binding, protocol payload fields, future command intent labels outside Step 6 `3B.1A`, or unrelated contracts helpers. | active |
 | forbidden_rule | Do not add outbound publisher, worker, job runner, read material projection, report generator, release evidence, acceptance handoff or VETO checklist. | active |
 | forbidden_rule | Do not broaden minimal API handler beyond definition/catalog entry or allow entry to bypass application facade. | active |
 | forbidden_rule | Do not invent repository methods, UoW fields, stored result schema, idempotency keys, config keys, marker values, error variants or evidence schema not closed by formal `03/05/06/07`. | active |
@@ -84,12 +87,13 @@ Exact-schema design closure reactivated this boundary. Any `pass` value below re
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-03-b` and `next_allowed_action = read_docs` | pass | Boundary is current and must restart from required reads before implementation edits. |
+| activation guard | project ledger shows `current_boundary = commit-03-b` and `next_allowed_action = read_docs` at baseline `current-design-with-commit-03-b-selector-scope-closure` | pass | Boundary activation completed; implementation must restart from `read_docs` and rerun Design Gate / Scope Gate before edits. |
 | prior handoff | `commit-03-a` implementation commit and handoff recorded | pass | Definition/catalog contracts/domain truth are recorded at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded `?? .gitignore`; no implementation files were edited and the user-owned file remains untouched. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
 | workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
+| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Required if contracts ref kind registry/export changed for Step 6 `3B.1` / `3B.1A`. |
 | application check | `cargo check -p method-library-application` or the formal application package check | pending | Use actual package name from formal workspace once activated. |
 | infra check | `cargo check -p method-library-infra` or the formal infra package check | pending | Fake repository and runtime support must compile. |
 | api check | `cargo check -p method-library-api` or the formal API package check if API files changed | pending | Minimal handler must compile and call application facade only. |
@@ -107,9 +111,9 @@ Exact-schema design closure reactivated this boundary. Any `pass` value below re
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pass | `commit-03-a` handoff is closed and the project ledger has advanced to `commit-03-b`; this boundary now starts from `read_docs`. | read_docs |
-| design_gate | pending_reread | Formal `03` §6.3A, Step 6 `3B` and Step 7 `R7.10A` now close exact facade I/O, six service input carriers, application-owned replay/idempotency refs, stored-result carriers and `MethodAssetRepositoryError`; implementation must reread Required Reads and verify the closure before edits. | wait_design |
-| scope_gate | pending | Planned changes must be limited to definition/catalog accepted service vertical slice. | fix_gate_failure |
+| activation_gate | pass | `commit-03-a` handoff is closed and the project ledger has advanced to `commit-03-b`; activation completed before the design blockers were recorded, and the latest design closure resumes this boundary from `read_docs`. | read_docs |
+| design_gate | ready | Formal `03` §6.3A, Step 6 `3B.1A`, Step 7 `R7.10A` §1B and Step 9 definition/catalog flow notes now close how `MethodLibraryCommandShell.boundary_ref.kind` selects exactly one of the six current-boundary service inputs, with safe rejection for unsupported/unknown/missing selector. Implementation must rerun this gate before code edits. | read_docs |
+| scope_gate | ready | Allowed Scope now includes minimal `crates/contracts/src/**` / `crates/contracts/tests/**` access for `MethodLibraryTypedBoundaryRefKind` labels and export plumbing required by Step 6 `3B.1` / `3B.1A`, while forbidding unrelated contracts DTO/payload changes. Implementation must verify staged scope before commit. | read_docs |
 | worktree_gate | pass | Recorded `?? .gitignore` before any edit; no implementation files changed and the user-owned file remains protected. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/application/infra/API checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
 | test_gate | pending | Service-flow-fast and infra-runtime-fake definition/catalog slices pass after activation. | fix_gate_failure |
@@ -154,6 +158,8 @@ Exact-schema design closure reactivated this boundary. Any `pass` value below re
 | BLK-ML-03B-DESIGN-001 | design_gate | resolved | `MethodAssetApiCommandHandlerEntry` previously depended on `MethodAssetCommandFamilyKind` and `MethodAssetApplicationDispatchRef` without a formal application dispatch/service boundary. | Formal `03` §6.3A and Step 7 `R7.10A` now close `MethodAssetCommandFamilyKind` as `MethodLibraryCapabilityKind::DefinitionCatalog`, `MethodAssetApplicationDispatchRef` as an application-owned opaque dispatch marker, and `MethodAssetDefinitionCatalogCommandFacade.dispatch_definition_catalog_command(input)` as the current-boundary facade. | read_docs |
 | BLK-ML-03B-DESIGN-002 | design_gate | resolved | Repository/UoW/stored-result semantics previously stopped at family-level exact-read / lookup / versioned-save semantics. | Formal `03` §6.3A / §10.2A, Step 7 `R7.10A` and Step 11 §3A/§3B now close `Versioned<T>`, `VersionedRef<TRef>`, `MethodAssetRepositoryVersion`, `MethodAssetExpectedVersion`, exact definition/catalog repository methods, stored-result repository methods, UoW transaction order, fake parity and duplicate replay. | read_docs |
 | BLK-ML-03B-DESIGN-003 | design_gate | resolved | `03_ddd_step_07_trait_port_adapter.md` named `MethodAssetDefinitionCatalogCommandDispatchInput` / `Output`, six `*Input` carriers and stored-result repository signatures, but did not close the exact Rust-facing shapes of those carriers or the referenced application-owned replay/idempotency refs and `MethodAssetRepositoryError`; `03_ddd_step_06_object_contracts.md` only listed those support refs by name. | Formal `03` §6.3A, Step 6 `3B` and Step 7 `R7.10A` now close the exact struct/newtype/enum schema for facade I/O, six service input carriers, `MethodAssetOperationContextRef` / `MethodAssetIdempotencyKeyRef` / `MethodAssetOperationDigestRef` / `MethodAssetDedupScopeRef` / `MethodAssetStoredOperationResultRef`, accepted/rejected/effect/replay result refs, stored result carriers and the `MethodAssetRepositoryError` variant surface used by current-boundary repositories. | read_docs |
+| BLK-ML-03B-DESIGN-004 | design_gate | resolved | Step 6 `3B.1` requires exact application-owned `MethodLibraryTypedBoundaryRefKind` labels for `MethodAssetOperationContextRef`, replay/idempotency refs, `MethodAssetApplicationDispatchRef` and `MethodAssetApiEntryContextRef`, but the owning kind registry is `crates/contracts`. | Allowed Scope now includes minimal `/crates/contracts/src/**` and `/crates/contracts/tests/**` changes only for Step 6 `3B.1` / `3B.1A` ref kind labels, named wrapper/export plumbing and selector fixtures; unrelated contracts DTO/payload work remains forbidden. | read_docs |
+| BLK-ML-03B-DESIGN-005 | design_gate | resolved | `MethodLibraryCommandShell` was shell-only and Step 7 / Step 9 needed dispatch into six exact service inputs without a formal selector source. | Step 6 `3B.1A`, Step 7 `R7.10A` §1B and Step 9 definition/catalog notes now define `command_shell.boundary_ref.kind` as the only selector source, list six exact intent labels, map them 1:1 to selector variants/service inputs/methods, and require safe rejection for unsupported/unknown/missing selector. | read_docs |
 
 ---
 
@@ -164,3 +170,5 @@ Exact-schema design closure reactivated this boundary. Any `pass` value below re
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
 | accepted service vertical slice | existing design-closure rule applies | Accepted flow, repository fake, UoW and stored result gaps must be fixed in `03/05/06/07` before code; implementation must not invent service semantics. |
 | facade/service input exact schema | new closure applies | Naming a dispatch input/output or service `*Input` carrier is insufficient; current boundary must close every field, optionality, source, forbidden fallback and repository error variant before implementation resumes. |
+| typed-ref owner scope | new closure applies | When a boundary introduces exact typed-ref kind labels, the allowed scope must include the owning registry/export file or the design must reuse an existing kind; otherwise implementation is forced to越界 or invent local aliases. |
+| shared shell selector | new closure applies | A shared shell feeding multiple service inputs must have a formal selector source and 1:1 mapping; selector cannot be inferred from routes, typed_refs ordering, marker text, config or fake maps. |

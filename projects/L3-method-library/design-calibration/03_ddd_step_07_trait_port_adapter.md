@@ -929,6 +929,49 @@ pub struct MethodAssetDefinitionCatalogCommandDispatchOutput {
 
 `MethodAssetDefinitionCatalogCommandDispatchOutput` is assembled only by copying the stored result safe surface. The facade must not rebuild response surface from current truth, raw repository rows, transport status or public DTO body.
 
+### 1B. Command shell selector and input dispatch closure
+
+The facade must select exactly one definition/catalog service input before mutation. Selection is application-owned and uses only the already-closed `MethodLibraryCommandShell` public shell plus Step 6 `3B.1A` intent labels; it must not inspect route names, transport paths, raw request body, DTO type names, marker text, config keys, fake runtime maps or service locator strings.
+
+```rust
+pub enum MethodAssetDefinitionCatalogCommandSelector {
+    EstablishDefinition,
+    AdjustDefinition,
+    RetireDefinition,
+    RegisterCatalogEntry,
+    ReclassifyCatalogEntry,
+    RetireCatalogEntry,
+}
+
+pub enum MethodAssetDefinitionCatalogServiceInput {
+    EstablishDefinition(EstablishMethodAssetDefinitionInput),
+    AdjustDefinition(AdjustMethodAssetDefinitionInput),
+    RetireDefinition(RetireMethodAssetDefinitionInput),
+    RegisterCatalogEntry(RegisterMethodAssetCatalogEntryInput),
+    ReclassifyCatalogEntry(ReclassifyMethodAssetCatalogEntryInput),
+    RetireCatalogEntry(RetireMethodAssetCatalogEntryInput),
+}
+```
+
+Selector source and mapping:
+
+| shell condition | selector | service input | service method |
+|---|---|---|---|
+| `capability_kind == DefinitionCatalog` and `boundary_ref.kind == MethodAssetDefinitionEstablishIntent` | `EstablishDefinition` | `EstablishMethodAssetDefinitionInput` | `establish_definition` |
+| `capability_kind == DefinitionCatalog` and `boundary_ref.kind == MethodAssetDefinitionAdjustIntent` | `AdjustDefinition` | `AdjustMethodAssetDefinitionInput` | `adjust_definition` |
+| `capability_kind == DefinitionCatalog` and `boundary_ref.kind == MethodAssetDefinitionRetireIntent` | `RetireDefinition` | `RetireMethodAssetDefinitionInput` | `retire_definition` |
+| `capability_kind == DefinitionCatalog` and `boundary_ref.kind == MethodAssetCatalogEntryRegisterIntent` | `RegisterCatalogEntry` | `RegisterMethodAssetCatalogEntryInput` | `register_catalog_entry` |
+| `capability_kind == DefinitionCatalog` and `boundary_ref.kind == MethodAssetCatalogEntryReclassifyIntent` | `ReclassifyCatalogEntry` | `ReclassifyMethodAssetCatalogEntryInput` | `reclassify_catalog_entry` |
+| `capability_kind == DefinitionCatalog` and `boundary_ref.kind == MethodAssetCatalogEntryRetireIntent` | `RetireCatalogEntry` | `RetireMethodAssetCatalogEntryInput` | `retire_catalog_entry` |
+
+Dispatch rules:
+
+- Non-`DefinitionCatalog` command family maps to safe unsupported-family rejection and stored rejected result.
+- Unknown, missing, future or wrong `boundary_ref.kind` maps to safe unsupported-intent rejection and stored rejected result.
+- The selected intent label is part of the canonical body-free digest input together with shell typed refs, safe markers and metadata idempotency key; duplicate replay must not reinterpret a stored result under a different selector.
+- After selector choice, input assembly validates only the refs / markers required by that selected carrier. Missing or wrong-kind inputs produce safe rejection for the same selector; facade must not attempt another selector as fallback.
+- API entry may create `MethodAssetApiEntryContextRef` and pass the shell to the facade, but it must not construct `MethodAssetDefinitionCatalogServiceInput` directly.
+
 ### 2. Current-boundary command service callable surface
 
 `commit-03-b` 只闭合 Step 9 中 definition/catalog 6 条 accepted command flow。下列 service input 是 application-internal Rust-facing carrier,不是 public protocol DTO。API handler 不得从 route/query/header/raw body 填充它;只能从 `MethodLibraryCommandShell` 的 closed typed refs / safe markers、already-closed domain carriers 和 application mapper 复制。

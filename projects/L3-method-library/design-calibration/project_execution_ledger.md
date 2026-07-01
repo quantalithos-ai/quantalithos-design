@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-07-01
-> 当前任务: `commit-03-a` implementation handoff 已关闭,实现仓提交为 `5376349eded0e277258c32d0b32b07a7c5aa2fe6`;`commit-03-b` definition/catalog accepted service boundary 的 dispatch facade、repository/UoW/stored-result surface、exact schema carriers、fake parity 与 duplicate replay 口径已由设计侧闭口并重新激活;实现侧必须从 `read_docs` 重读当前台账和 required sources,重新执行 Design Gate 后再恢复当前 boundary。
+> 当前任务: `commit-03-a` implementation handoff 已关闭,实现仓提交为 `5376349eded0e277258c32d0b32b07a7c5aa2fe6`;`commit-03-b` definition/catalog accepted service boundary 的 contracts ref-kind owner scope、command shell selector、dispatch facade、repository/UoW/stored-result surface、exact schema carriers、fake parity 与 duplicate replay 口径已由设计侧闭口并重新激活;实现侧必须从 `read_docs` 重读当前台账和 required sources,重新执行 Design Gate 后再恢复当前 boundary。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-03-b design gate reactivated` | ready_for_implementation_design_gate | formal `03` §6.3A / §10.2A、Step 6 `3B`、Step 7 `R7.10A`、Step 9 definition/catalog carve-out 和 Step 11 §3A/§3B 已闭合 definition/catalog accepted service 的 dispatch facade、6 个 service input carriers、repository/UoW/stored-result、repository error surface、fake parity 和 duplicate replay 口径。 | 实现侧必须读取最新 implementation ledger / boundary ledger,从 `read_docs` 重跑 required reads / Design Gate / Scope Gate;若仍有缺口再回到 `blocked / wait_design`。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-03-b.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-03-b design gate reactivated` | ready_for_implementation_design_gate | formal `03` §6.3A / §10.2A、Step 6 `3B` / `3B.1A`、Step 7 `R7.10A`、Step 9 definition/catalog carve-out 和 Step 11 §3A/§3B 已闭合 definition/catalog accepted service 的 contracts ref-kind owner scope、command shell selector、dispatch facade、6 个 service input carriers、repository/UoW/stored-result、repository error surface、fake parity 和 duplicate replay 口径。 | 实现侧必须读取最新 implementation ledger / boundary ledger,从 `read_docs` 重跑 required reads / Design Gate / Scope Gate;若仍有缺口再回到 `blocked / wait_design`。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-03-b.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-03-b` ready_for_design_gate | ready_for_implementation_design_gate | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-03-b` 的 definition/catalog accepted service boundary 已在基线 `current-design-with-commit-03-b-exact-schema-closure` 重新激活,实现侧必须从当前 boundary ledger 重新开始并重跑门禁。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-03-b` ready_for_design_gate | ready_for_implementation_design_gate | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-03-b` 的 definition/catalog accepted service boundary 已在基线 `current-design-with-commit-03-b-selector-scope-closure` 重新激活,实现侧必须从当前 boundary ledger 重新开始并重跑门禁。 |
 
 ---
 
@@ -75,6 +75,8 @@
 | BLK-ML-03B-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-03-b.md` | resolved | `MethodAssetApiCommandHandlerEntry` 曾缺少 current-boundary application dispatch/service boundary。 | formal `03` §6.3A 和 Step 7 `R7.10A` 已闭合 command family carrier、application dispatch marker 和 `MethodAssetDefinitionCatalogCommandFacade.dispatch_definition_catalog_command(input)`。 |
 | BLK-ML-03B-DESIGN-002 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-03-b.md` | resolved | definition/catalog accepted service 曾缺 exact Rust-facing repository/UoW/stored-result callable surface。 | formal `03` §6.3A / §10.2A、Step 7 `R7.10A` 和 Step 11 §3A/§3B 已闭合 exact repository methods、version carriers、UoW order、stored-result repository、fake parity 和 duplicate replay。 |
 | BLK-ML-03B-DESIGN-003 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-03-b.md` | resolved | facade I/O、6 个 service `*Input` carrier、application-owned replay/idempotency refs、stored result carriers 和 `MethodAssetRepositoryError` 曾只有名称或字段方向,没有 exact Rust-facing schema。 | formal `03` §6.3A、Step 6 `3B` 和 Step 7 `R7.10A` 已闭合这些 struct/newtype/enum 字段、来源、禁止替代和 error variant surface;implementation ledger / boundary ledger 已重新激活到 `read_docs`。 |
+| BLK-ML-03B-DESIGN-004 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-03-b.md` | resolved | Step 6 `3B.1` exact typed-ref labels owned by contracts,但 boundary allowed scope 曾只打开 application/infra/api。 | commit-03-b allowed scope 已打开最小 `crates/contracts/src/**` / `crates/contracts/tests/**`,仅用于 Step 6 `3B.1` / `3B.1A` ref kind registry/export 和 selector fixture;public DTO body / payload / route 仍禁止。 |
+| BLK-ML-03B-DESIGN-005 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-03-b.md` | resolved | `MethodLibraryCommandShell` 到六个 service input 曾缺唯一 selector source。 | Step 6 `3B.1A`、Step 7 `R7.10A` §1B、Step 9 definition/catalog notes 和 formal `03` §6.3A 已将 `command_shell.boundary_ref.kind` 闭合为 selector source,六个 intent label 1:1 映射到 service input / method。 |
 
 ---
 
@@ -91,7 +93,7 @@
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
 7. 确认 implementation ledger 当前已推进到 `commit-03-b` / `read_docs`,并读取 `commit-03-b` 最新 boundary ledger
 8. 按 boundary ledger 重新执行 required reads / Design Gate / Scope Gate;若任何 source、state、error、marker 或 test-support 再次不闭合,立即回到 `blocked / wait_design`
-9. 当前 `commit-03-b` 已由设计侧补齐 dispatch facade、service input carriers、repository/UoW/stored-result、repository error surface、fake parity 和 duplicate replay closure;恢复实现前必须使用最新台账和 required reads,不得沿用旧 blocked gate 结论
+9. 当前 `commit-03-b` 已由设计侧补齐 contracts ref-kind owner scope、command shell selector、dispatch facade、service input carriers、repository/UoW/stored-result、repository error surface、fake parity 和 duplicate replay closure;恢复实现前必须使用最新台账和 required reads,不得沿用旧 blocked gate 结论
 ```
 
 ---
@@ -100,7 +102,7 @@
 
 ```text
 `commit-03-a` implementation handoff 已关闭,实现仓提交为 `5376349eded0e277258c32d0b32b07a7c5aa2fe6`;
-当前 boundary 是 `commit-03-b`,其 definition/catalog accepted service design baseline 已更新为 `current-design-with-commit-03-b-exact-schema-closure`;
+当前 boundary 是 `commit-03-b`,其 definition/catalog accepted service design baseline 已更新为 `current-design-with-commit-03-b-selector-scope-closure`;
 下一步允许实现侧从 `read_docs` 重读 implementation ledger、boundary ledger 和 required sources,重新执行 Design Gate / Scope Gate 后恢复当前 boundary;
 实现侧仍不得私补 DTO field、truth-owner rule、state/policy outcome、error family、support carrier 或 evidence;若重跑门禁发现新缺口,必须重新回到 `blocked / wait_design`.
 ```

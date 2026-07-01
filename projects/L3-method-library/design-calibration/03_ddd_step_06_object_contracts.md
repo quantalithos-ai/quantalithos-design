@@ -1393,6 +1393,29 @@ domain tests 必须覆盖 `mark_deprecated` 需要显式 safe marker、不能接
 | `MethodAssetApplicationDispatchRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetApplicationDispatch` | API -> application facade dispatch marker。 | `commit-03-b` 唯一合法 target marker value is `DefinitionCatalogCommandService`。 |
 | `MethodAssetApiEntryContextRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetApiEntryContext` | API entry safe context anchor。 | 只能由 API entry context factory 创建,不得由 route / transport request id 拼接。 |
 
+#### 3B.1A current-boundary command selector intent labels
+
+`commit-03-b` 不新增 public command DTO 字段,但必须让 `MethodLibraryCommandShell` 能被 application facade 唯一派发到六个 definition/catalog service input。当前 boundary 的唯一正式选择源是 `MethodLibraryCommandShell.boundary_ref` 的 `MethodLibraryTypedBoundaryRefKind`。该 `boundary_ref` 表达 body-free request-intent boundary,不是 route、RPC method、transport path、DTO body snapshot、handler name 或 config key。
+
+下列六个 exact kind label 必须加入 `MethodLibraryTypedBoundaryRefKind` owner registry。由于该 registry 位于 contracts crate,`commit-03-b` implementation boundary 必须允许 contracts ref kind registry / export 的最小变更;除此之外不得在 contracts 中新增 command DTO body、payload field、route binding 或 public request struct。
+
+| `command_shell.boundary_ref` exact kind | selector variant | service input carrier | service method |
+|---|---|---|---|
+| `MethodAssetDefinitionEstablishIntent` | `EstablishDefinition` | `EstablishMethodAssetDefinitionInput` | `establish_definition` |
+| `MethodAssetDefinitionAdjustIntent` | `AdjustDefinition` | `AdjustMethodAssetDefinitionInput` | `adjust_definition` |
+| `MethodAssetDefinitionRetireIntent` | `RetireDefinition` | `RetireMethodAssetDefinitionInput` | `retire_definition` |
+| `MethodAssetCatalogEntryRegisterIntent` | `RegisterCatalogEntry` | `RegisterMethodAssetCatalogEntryInput` | `register_catalog_entry` |
+| `MethodAssetCatalogEntryReclassifyIntent` | `ReclassifyCatalogEntry` | `ReclassifyMethodAssetCatalogEntryInput` | `reclassify_catalog_entry` |
+| `MethodAssetCatalogEntryRetireIntent` | `RetireCatalogEntry` | `RetireMethodAssetCatalogEntryInput` | `retire_catalog_entry` |
+
+Selector rules:
+
+- `command_shell.capability_kind` must be `MethodLibraryCapabilityKind::DefinitionCatalog`; any other family is safe rejected before mutation.
+- `command_shell.boundary_ref.kind` must be exactly one of the six labels above; wrong kind / missing kind / future kind is safe rejected and stored as rejected result.
+- `typed_refs` and `safe_markers` may supply typed inputs to the selected carrier, but they must not select the service method by list order, count, marker text, raw string, route, config, fake map or handler branch.
+- The selector chooses exactly one service input carrier. If required typed refs / safe markers for that selected input are missing or wrong-kind, the branch returns a safe rejection; it must not fall through to another service input.
+- Duplicate replay digest must include the selected intent label; two commands with the same idempotency key but different intent labels are digest conflicts, not alternate interpretations.
+
 #### 3B.2 set and result support carriers
 
 | carrier | Rust-facing shape | exact labels / fields | implementation rule |

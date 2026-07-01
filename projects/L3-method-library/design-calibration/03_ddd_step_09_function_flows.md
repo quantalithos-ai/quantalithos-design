@@ -290,6 +290,8 @@ next_allowed_action: 等待用户确认后进入 Step 9 `R9.28 Command shared te
 
 ### 2. 方法资产定义与目录 Command flows
 
+`commit-03-b` 只允许下列六条 definition/catalog flows 由 Step 7 `R7.10A` selector 触发。`MethodLibraryCommandShell.capability_kind` 必须为 `DefinitionCatalog`;`command_shell.boundary_ref.kind` 必须是 Step 6 `3B.1A` 六个 intent label 之一。该 label 唯一选择一个 flow / service input。flow 不得从 route、RPC method、DTO type name、typed_refs 顺序、safe marker 文本、config key、fake private map 或 handler branch 推断目标 flow。
+
 | Flow / entry | Protocol / target | Ports | Main path | Branches | Side effects | Test cut |
 |---|---|---|---|---|---|---|
 | `EstablishMethodAssetDefinitionFlow` / `MethodAssetCommandService.establish_definition` | Command shell -> `MethodAssetDefinition` | definition repository;external summary repository;id / UoW / stored result | validate identity key;load accepted external summary refs;create definition;versioned save;stored accepted result | duplicate replays stored result;invalid external refs rejected with safe reason | definition history;definition changed event candidate;trace/audit candidate | accepted creates definition ref;duplicate does not create second definition |
@@ -300,6 +302,13 @@ next_allowed_action: 等待用户确认后进入 Step 9 `R9.28 Command shared te
 | `RetireMethodAssetCatalogEntryFlow` / `MethodAssetCommandService.retire_catalog_entry` | Command shell -> `MethodAssetCatalogEntry` retirement | catalog repository;definition repository;UoW / stored result | load catalog entry;mark retired;save;assemble result | missing entry rejected;duplicate replay | catalog retired history;catalog event candidate | catalog retirement does not retire definition |
 
 `commit-03-b` implementation carve-out: in the first two definition flows, "load accepted external summary refs" is limited to validating the already-closed `ExternalSourceSummaryRef` named wrappers carried by `ExternalSourceSummaryRefSet`. Durable `ExternalSourceSummaryRepository` reads, external source adapter calls, provider body checks, URL/path resolution and artifact/archive dereference remain `commit-07-a`. If `commit-03-b` implementation needs more than named-ref kind validation for external summaries, it must pause and return to design.
+
+Selector failure branches for all six flows:
+
+- Non-`DefinitionCatalog` command family returns safe unsupported-family rejected result and must not start UoW mutation.
+- Unknown / missing / future `boundary_ref.kind` returns safe unsupported-intent rejected result and must not start UoW mutation.
+- Missing required typed refs / safe markers for the selected input returns safe invalid-intent rejected result for that same selector; it must not fall through to another flow.
+- Duplicate replay uses stored result for the same `(idempotency_key_ref,dedup_scope_ref,operation_digest_ref)` and selected intent label; digest mismatch returns stored safe conflict/rejection and never reruns mutation.
 
 ### 3. 正式化与版本 Command flows
 

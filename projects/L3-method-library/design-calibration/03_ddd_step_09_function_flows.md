@@ -299,6 +299,8 @@ next_allowed_action: 等待用户确认后进入 Step 9 `R9.28 Command shared te
 | `ReclassifyMethodAssetCatalogEntryFlow` / `MethodAssetCommandService.reclassify_catalog_entry` | Command shell -> `MethodAssetCatalogEntry` | catalog repository;policy diagnostic builder;UoW / stored result | load catalog entry;apply scope / applicability change;save expected version | invalid scope rejected;duplicate replay | catalog history;catalog changed event candidate | reclassification preserves definition ref |
 | `RetireMethodAssetCatalogEntryFlow` / `MethodAssetCommandService.retire_catalog_entry` | Command shell -> `MethodAssetCatalogEntry` retirement | catalog repository;definition repository;UoW / stored result | load catalog entry;mark retired;save;assemble result | missing entry rejected;duplicate replay | catalog retired history;catalog event candidate | catalog retirement does not retire definition |
 
+`commit-03-b` implementation carve-out: in the first two definition flows, "load accepted external summary refs" is limited to validating the already-closed `ExternalSourceSummaryRef` named wrappers carried by `ExternalSourceSummaryRefSet`. Durable `ExternalSourceSummaryRepository` reads, external source adapter calls, provider body checks, URL/path resolution and artifact/archive dereference remain `commit-07-a`. If `commit-03-b` implementation needs more than named-ref kind validation for external summaries, it must pause and return to design.
+
 ### 3. 正式化与版本 Command flows
 
 | Flow / entry | Protocol / target | Ports | Main path | Branches | Side effects | Test cut |

@@ -965,6 +965,7 @@ pub struct MethodLibraryTypedBoundaryRef;
 | ref | capability | 来源边界 | R6.8 处理 |
 |---|---|---|---|
 | `MethodAssetDefinitionRef` | 方法资产定义与目录 | definition truth 创建后暴露的稳定 ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
+| `MethodAssetCatalogEntryRef` | 方法资产定义与目录 | catalog entry truth 创建后暴露的稳定 ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族, exact kind 为 `MethodAssetCatalogEntry`。 |
 | `CatalogScopeRef` | 方法资产定义与目录 | catalog read scope / applicability scope。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `GovernanceBasisRef` | 正式化与版本 | governance / basis 的 body-free typed ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `ConsumptionContextRef` | 受控消费 | 下游消费语境的 typed boundary。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
@@ -974,12 +975,31 @@ pub struct MethodLibraryTypedBoundaryRef;
 | `MethodAssetDistributionRef` | 关系与分发语义 | 分发语义边界 ref,非 marketplace 交易。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `DistributionContextRef` | 关系与分发语义 | 分发上下文 ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `ExternalSourceRef` | 外部摘要与引用 | 外部来源 ref,不含外部正文。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
+| `ExternalSourceSummaryRef` | 外部摘要与引用 | external summary truth 创建后暴露的 body-free safe summary ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族, exact kind 为 `ExternalSourceSummary`。 |
 | `ArtifactArchiveRef` | 外部摘要与引用 | artifact / archive 的 safe ref,不含包体。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `MaintenanceRunRef` | 后台维护与收敛 | maintenance run identity。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `RefreshScopeRef` | 后台维护与收敛 | refresh scope identity。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `MethodPackageRef` | 外围包与方法集组织 | peripheral package ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `MethodSetAssemblyRef` | 外围包与方法集组织 | method set assembly ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `MarketplaceContextRef` | 外围包与方法集组织 | marketplace context boundary ref,非交易履约。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
+
+### 4A. `commit-03-a` current-boundary exact typed ref kind closure
+
+本节闭合 `commit-03-a` 当前 Rust-facing ref family/kind。下列 named ref 均属于 `MethodLibraryTypedBoundaryRef` 家族,实现侧必须以 named newtype wrapper 承载同一 opaque typed boundary ref,并固定 exact `MethodLibraryTypedBoundaryRefKind` 标签。不得把成员 ref alias 到其他 kind,不得使用 raw string、route、catalog view、search result、fake private map 或 test-only wrapper 反推。
+
+| named ref | Rust-facing owner | exact `MethodLibraryTypedBoundaryRefKind` | current-boundary use | implementation rule |
+|---|---|---|---|---|
+| `MethodAssetDefinitionRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetDefinition` | `MethodAssetDefinition.definition_ref`;definition lookup / catalog binding。 | 只能来自 definition truth 创建或正式 loaded definition identity。 |
+| `MethodAssetCatalogEntryRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetCatalogEntry` | `MethodAssetCatalogEntry.catalog_entry_ref`;`MethodAssetCatalogEntryRefSet.refs`;formalization / catalog context optional ref。 | 只能来自 catalog entry truth 创建或正式 loaded catalog entry identity;不得由 catalog view/search material 生成。 |
+| `CatalogScopeRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `CatalogScope` | catalog scope、applicability scope、identity key。 | 只能来自 catalog command intent、policy-safe scope input 或正式 resolver summary。 |
+| `ExternalSourceSummaryRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `ExternalSourceSummary` | `ExternalSourceSummary.external_summary_ref`;`ExternalSourceSummaryRefSet.refs`;basis / relation safe external summary input。 | 只能来自 external summary truth 创建或 accepted body-free external summary;不得由 external body、URL/path、provider response、archive body 或 digest detail 生成。 |
+
+`ExternalSourceSummaryRefSet` 与 `MethodAssetCatalogEntryRefSet` 只有在上述成员 ref kind 同时闭合时才算完整闭口。contracts/domain tests 必须断言:
+
+- ref-set 只接受对应 named ref wrapper。
+- wrong-kind `MethodLibraryTypedBoundaryRef` 不能进入对应 named ref / ref-set。
+- ref-set 去重排序不得解析 opaque ref body。
+- fake/test fixture 不得用字符串 prefix 或私有 map 构造成员 ref。
 
 ### 5. 对象族卡片: `MethodLibrarySafeMarker`
 
@@ -1311,7 +1331,7 @@ pub struct MethodAssetCatalogEntry;
 | `assert_for_definition(definition_ref)` | 校验目录条目仍绑定原定义。 |
 | `covers_scope(catalog_scope_ref)` | 判断目录条目是否覆盖指定目录范围。 |
 | `update_classification(classification)` | 更新分类语义,不生成 catalog view。 |
-| `mark_deprecated(reason_ref)` | 标记目录条目弃用线索,不删除 definition truth。 |
+| `mark_deprecated(reason_ref: MethodLibrarySafeMarker)` | 标记目录条目弃用线索,不删除 definition truth。 |
 
 | 工厂边界 | 作用 |
 |---|---|
@@ -1340,7 +1360,60 @@ pub struct MethodAssetCatalogEntry;
 | `MethodAssetApplicabilitySummary` | body-free struct | `applicability_scope_ref: CatalogScopeRef`;`applicability_marker_ref: MethodLibrarySafeMarker`;`applicable_context_refs: Vec<MethodLibraryTypedBoundaryRef>`;ordered by insertion after canonical dedup;empty means scope-only applicability | 只表达适用语境摘要和 typed refs;不得保存下游 runtime truth、authorization matrix、organization config、marketplace transaction 或 UI state。 |
 | `MethodAssetCatalogEntryStatus` | closed enum | `Pending`;`Visible`;`Hidden`;`Deprecated`;`Retired` | 当前 boundary 的 catalog public/truth summary status;完整转换仍以 Step 10 lifecycle matrix 为准;不得用 HTTP status、search visibility、feature flag、cache state 或 string status 替代。 |
 
-上述 8 个 carrier 是 `commit-03-a` 当前唯一允许实现的 definition/catalog support schema。若实现还需要新的字段、state、policy outcome、error variant、mapper、config key 或 evidence schema,必须暂停并回到设计真相源闭口。
+`commit-03-a` catalog member parameter closure:
+
+| member capability | parameter | Rust-facing carrier | source rule | forbidden workaround |
+|---|---|---|---|---|
+| `MethodAssetCatalogEntry.mark_deprecated(reason_ref)` | `reason_ref` | `MethodLibrarySafeMarker` | 只能复制 catalog command intent、policy-safe marker 或正式 diagnostic marker 中已可公开的 safe marker;当前 boundary 不新增 `MethodAssetCatalogDeprecationReasonRef` / `*ReasonRef` family。 | 不得使用 raw string、UI label、HTTP status、error text、config value、fake private map、provider body 或 test-only marker;不得把该能力改成无参数 status toggle。 |
+
+domain tests 必须覆盖 `mark_deprecated` 需要显式 safe marker、不能接受 raw reason payload、不能省略参数直接切换 `Deprecated`、且不会删除或重写 `definition_ref` / `catalog_entry_ref`。
+
+上述 8 个 carrier 与 `mark_deprecated(reason_ref: MethodLibrarySafeMarker)` 参数闭口是 `commit-03-a` 当前唯一允许实现的 definition/catalog support schema。若实现还需要新的字段、state、policy outcome、error variant、mapper、config key 或 evidence schema,必须暂停并回到设计真相源闭口。
+
+### 3B. `commit-03-b` application support carrier / ref exact schema closure
+
+本节为 `commit-03-b` accepted service vertical slice 补齐 application-facing carrier/schema 闭口。它只服务 definition/catalog accepted command service、UoW、stored result 和 duplicate replay,不新增 public command DTO 字段,不实现 query/material/job/publisher,不读取 external body。
+
+#### 3B.1 application-owned support refs
+
+下列 named ref 均为 application-owned Rust-facing newtype wrapper over `MethodLibraryTypedBoundaryRef`。实现侧必须保留 opaque、typed、body-free 语义,并固定 exact `MethodLibraryTypedBoundaryRefKind` 标签。不得使用 raw string、route、config key、timestamp、digest body、HTTP status、fake private enum 或 test-only id 替代。
+
+| named ref | Rust-facing shape | exact `MethodLibraryTypedBoundaryRefKind` | current-boundary use | source rule |
+|---|---|---|---|---|
+| `MethodAssetOperationContextRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetOperationContext` | `MethodAssetOperationContext.operation_context_ref`;stored result operation source。 | 只能由 application operation context factory 创建。 |
+| `MethodAssetIdempotencyKeyRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetIdempotencyKey` | command idempotency lookup key。 | 只能从 `CommandMetadata.idempotency_key` 或正式 application mapper output 复制。 |
+| `MethodAssetOperationDigestRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetOperationDigest` | duplicate digest comparison and stored result digest。 | 只能由 canonical body-free command shell / typed refs / safe markers digest builder 输出;不得包含 raw body。 |
+| `MethodAssetDedupScopeRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetDedupScope` | `(idempotency_key_ref,dedup_scope_ref)` stored result lookup scope。 | 只能由 command family、subject ref、source kind 和 boundary scope 的 typed inputs 生成。 |
+| `MethodAssetStoredOperationResultRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetStoredOperationResult` | stored replay result identity。 | 只能由 stored-result repository save 或 loaded stored result 返回。 |
+| `MethodAssetAcceptedOperationSummaryRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetAcceptedOperationSummary` | accepted branch safe summary。 | 只能由 accepted service branch after domain/repository success 组装。 |
+| `MethodAssetSafeRejectReasonRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetSafeRejectReason` | rejected / conflict branch safe reason。 | 只能由 safe rejection mapper / policy diagnostic / repository conflict mapping 输出。 |
+| `MethodAssetSafeIgnoreReasonRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetSafeIgnoreReason` | ignored / no-op branch safe reason。 | 当前 `commit-03-b` 只允许 duplicate/no-op support 使用;不得由 raw error text 生成。 |
+| `MethodAssetEffectSummaryRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetEffectSummary` | body-free effect summary refs。 | 只能来自 history / trace / audit / lineage / event-candidate / maintenance-hint safe assembly。 |
+| `MethodAssetReplayMarkerRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetReplayMarker` | duplicate replay safe marker。 | 只能由 stored-result creation or duplicate replay mapper 输出;不得由 service 重读 truth 合成。 |
+| `MethodAssetApplicationDispatchRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetApplicationDispatch` | API -> application facade dispatch marker。 | `commit-03-b` 唯一合法 target marker value is `DefinitionCatalogCommandService`。 |
+| `MethodAssetApiEntryContextRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetApiEntryContext` | API entry safe context anchor。 | 只能由 API entry context factory 创建,不得由 route / transport request id 拼接。 |
+
+#### 3B.2 set and result support carriers
+
+| carrier | Rust-facing shape | exact labels / fields | implementation rule |
+|---|---|---|---|
+| `MethodAssetEffectSummaryRefSet` | deterministic ref-set struct | `refs: Vec<MethodAssetEffectSummaryRef>`;ordered by insertion after canonical dedup;empty allowed | 只保存 body-free effect summary refs;不得保存 event payload、audit log body、report body、provider body 或 transport status。 |
+| `MethodAssetStoredOperationResultKind` | closed enum | `Accepted`;`Rejected`;`Ignored`;`Conflict` | 只表达 replay-safe result branch;不得加入 HTTP / broker / DB / panic / transport status。 |
+| `MethodAssetStoredOperationResult` | body-free struct | `stored_result_ref: MethodAssetStoredOperationResultRef`;`operation_context_ref: MethodAssetOperationContextRef`;`operation_digest_ref: MethodAssetOperationDigestRef`;`result_kind: MethodAssetStoredOperationResultKind`;`accepted_summary_ref: Option<MethodAssetAcceptedOperationSummaryRef>`;`rejected_reason_ref: Option<MethodAssetSafeRejectReasonRef>`;`ignored_reason_ref: Option<MethodAssetSafeIgnoreReasonRef>`;`effect_summary_refs: MethodAssetEffectSummaryRefSet`;`replay_marker_ref: MethodAssetReplayMarkerRef` | 可持久化的 replay-safe shell;不得保存 public DTO body、raw command shell body、raw error、DB row body snapshot、provider payload、event payload、report body、HTTP/RPC status 或 config value。 |
+
+#### 3B.3 current-boundary repository error surface
+
+`MethodAssetRepositoryError` 在 `commit-03-b` 的 exact Rust-facing surface 是下列表达。所有字段必须是 opaque version token、stored result ref 或 safe marker;不得暴露 SQL error、stack trace、HTTP status、panic string、adapter body、config/env value 或 raw duplicate payload。
+
+| enum variant | exact fields | application mapping |
+|---|---|---|
+| `VersionConflict` | `expected_version: Option<MethodAssetExpectedVersion>`;`actual_version: MethodAssetRepositoryVersion`;`conflict_marker_ref: MethodLibrarySafeMarker` | map to replay-safe rejection and store rejected result。 |
+| `DuplicateKeyConflict` | `conflict_marker_ref: MethodLibrarySafeMarker` | map to safe duplicate/scoped-entry conflict rejection。 |
+| `TransactionNotActive` | `failure_marker_ref: MethodLibrarySafeMarker` | rollback and return safe infrastructure rejection;do not partial commit。 |
+| `StorageUnavailable` | `unavailable_marker_ref: MethodLibrarySafeMarker` | rollback and return safe unavailable rejection;do not retry inside domain service。 |
+| `StoredResultIntegrityViolation` | `stored_result_ref: Option<MethodAssetStoredOperationResultRef>`;`violation_marker_ref: MethodLibrarySafeMarker` | return replay consistency failure;do not rerun mutation or rebuild response from truth。 |
+
+This resolves `BLK-ML-03B-DESIGN-003` Step 6 support carrier half. Step 7 `R7.10A` owns the exact facade I/O and six service input carriers that consume these types.
 
 ### 4. 对象卡片: `FormalizationBasisSummary`
 

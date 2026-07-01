@@ -697,6 +697,35 @@ next_allowed_action: 等待用户确认后进入 Step 11 `R11.8 core business tr
 | `MethodPackageRepository` | load / save package truth | `Versioned<MethodPackage>` | create / update in same UoW | `MethodPackageRef` | package summary cannot become runtime config |
 | `MethodSetAssemblyRepository` | load / save assembly truth | `Versioned<MethodSetAssembly>` | create / update in same UoW | `MethodSetAssemblyRef` | assembly summary cannot broaden consumption authority |
 
+### 3A. `commit-03-b` repository / UoW / stored-result persistence closure
+
+本节闭合 `commit-03-b` 当前 accepted service 所需的 exact persistence semantics。它只适用于 definition/catalog accepted service vertical slice,不提前实现 formalization/version、query/read material、publisher、job 或 external summary durable dereference。
+
+| Step 7 callable | logical store | read key | write key / unique key | version source | UoW rule | missing/conflict rule |
+|---|---|---|---|---|---|---|
+| `get_definition_with_version(definition_ref)` | `method_asset_definitions` | `definition_ref` | none | stored row version -> `Versioned<MethodAssetDefinition>` | read before command UoW mutation | missing returns `None`,not implicit create。 |
+| `find_definition_by_identity_key(identity_key)` | `method_asset_definitions` | `identity_key` unique index | none | stored row version -> `Versioned<MethodAssetDefinition>` | read before create decision | duplicate create becomes safe stored rejection/conflict,not second row。 |
+| `save_definition(definition, expected_version, uow)` | `method_asset_definitions` | none | `definition_ref`;unique `identity_key` | create `None` -> new version;update expected loaded version -> next version | staged in supplied command UoW | version mismatch maps to safe rejection;rollback leaves no row/version advance。 |
+| `get_catalog_entry_with_version(catalog_entry_ref)` | `method_asset_catalog_entries` | `catalog_entry_ref` | none | stored row version -> `Versioned<MethodAssetCatalogEntry>` | read before command UoW mutation | missing returns `None`,not implicit create。 |
+| `find_catalog_entry_by_definition_scope(definition_ref,catalog_scope_ref)` | `method_asset_catalog_entries` | `(definition_ref,catalog_scope_ref)` unique index | none | stored row version -> `Versioned<MethodAssetCatalogEntry>` | read before create/reclassify decision | duplicate register becomes safe stored rejection/conflict。 |
+| `save_catalog_entry(catalog_entry, expected_version, uow)` | `method_asset_catalog_entries` | none | `catalog_entry_ref`;unique `(definition_ref,catalog_scope_ref)` | create `None` -> new version;update expected loaded version -> next version | staged in supplied command UoW | stale expected version maps to safe rejection;rollback leaves no row/version advance。 |
+| `find_command_result_by_idempotency(idempotency_key_ref,dedup_scope_ref)` | `method_asset_stored_operation_results` + idempotency index | `(idempotency_key_ref,dedup_scope_ref)` | none | stored result immutable once committed | read before domain mutation | missing means fresh candidate;digest mismatch creates safe conflict surface。 |
+| `get_stored_operation_result(stored_result_ref)` | `method_asset_stored_operation_results` | `stored_result_ref` | none | immutable stored result row | replay read only | missing stored result is replay consistency failure,not mutation rerun。 |
+| `save_command_result_for_idempotency(...,stored_result,uow)` | `method_asset_stored_operation_results` | none | `stored_result_ref`;unique `(idempotency_key_ref,dedup_scope_ref)` | immutable append for replay surface | same command UoW as accepted/rejected mutation | rollback leaves no replay surface;unique conflict maps to duplicate/conflict resolution,not partial accepted state。 |
+
+`method_asset_stored_operation_results` in `commit-03-b` stores only replay-safe refs and markers: `stored_result_ref`, `operation_context_ref`, `operation_digest_ref`, `result_kind`, `accepted_summary_ref`, `rejected_reason_ref`, `ignored_reason_ref`, `effect_summary_refs`, `replay_marker_ref`, `idempotency_key_ref`, and `dedup_scope_ref`. It must not store command DTO body, raw command shell body, raw error, repository row body snapshot, event payload, external provider body, report body, HTTP/RPC status or config value。
+
+### 3B. `commit-03-b` transaction sequence
+
+| branch | required sequence | rollback rule |
+|---|---|---|
+| fresh accepted definition/catalog command | begin command UoW -> read idempotency/stored result -> read required truth -> create/update domain object -> repository save with expected version -> create stored accepted result -> save command result for idempotency -> commit。 | If any save or stored-result write fails before commit, rollback all staged truth/result/effect writes。 |
+| safe rejected command | begin minimal command UoW -> create stored rejected/conflict result with safe reason -> save command result for idempotency -> commit。 | If rejected result cannot be saved, return replay consistency failure and leave no partial idempotency row。 |
+| duplicate replay | read stored result by idempotency key/scope -> compare digest -> return stored safe surface。 | No UoW mutation and no domain/repository save。 |
+| digest conflict | read stored result by key/scope -> detect digest mismatch -> return stored safe conflict if present or save conflict result in minimal UoW。 | Must not mutate definition/catalog truth。 |
+
+The accepted branch must commit truth and stored result in the same logical atomic boundary or a formally equivalent fake atomic boundary. A fake repository that exposes truth before stored result commit,or leaves stored result after truth rollback,violates `commit-03-b`。
+
 ### 4. created vs updated vs append-only 边界
 
 | family | create boundary | update boundary | append-only boundary | notes |

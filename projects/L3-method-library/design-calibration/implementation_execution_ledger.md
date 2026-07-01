@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `current-design-with-commit-03-a-carrier-closure` |
-| current_boundary | `commit-03-a` |
+| current_design_baseline | `current-design-with-commit-03-b-exact-schema-closure` |
+| current_boundary | `commit-03-b` |
 | gate_status | ready_for_design_gate |
-| gate_reason | Design side added current-boundary carrier/schema closure in formal `03` §6, Step 6 object contracts and Step 10 catalog status notes for `MethodAssetDefinitionKind`, `MethodAssetIdentityKey`, `MethodAssetDefinitionSummary`, `ExternalSourceSummaryRefSet`, `MethodAssetCatalogEntryRefSet`, `MethodAssetCatalogClassification`, `MethodAssetApplicabilitySummary` and `MethodAssetCatalogEntryStatus`; implementation must restart required reads and rerun Design Gate before editing code. |
+| gate_reason | `commit-03-b` design closure now fixes the exact Rust-facing schema for Step 6 application-owned support refs / stored result / repository error surface and Step 7 facade I/O plus six service input carriers. Implementation must restart from `read_docs`, reread every required source, and rerun Design Gate before editing `crates/application`, `crates/infra` or `crates/api`. |
 | next_allowed_action | read_docs |
-| current_recovery_point | `commit-03-a` reactivated after definition/catalog support carrier closure; implementation must reread project ledger, boundary ledger and required sources, then rerun Design Gate before editing `crates/contracts` or `crates/domain` |
+| current_recovery_point | `commit-03-b` reactivated after exact dispatch/service input carrier, replay ref and repository error schema closure; implementation must reread the current ledger and boundary ledger, then rerun Design Gate and Scope Gate before code edits. |
 | last_updated_by | design agent |
-| last_updated_at | 2026-07-01 00:00:00 +0800 |
+| last_updated_at | 2026-07-01 17:23:01 +0800 |
 
 ---
 
@@ -34,7 +34,8 @@
 | `commit-02-a` | `aaf47faac292315900f153ebb30d5086e0a4c997` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-a` completed at `25876559520691bda2dfd45a0af53bcd38c2f1a9`; public contract foundation, shared shell fixtures and roundtrip tests handoff are closed. |
 | `commit-02-b` | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-b` completed at `9f876697e0487f0c4cf4966928895a24e6559f5d`; shared domain error foundation, five pure policy shells, exact judgement-state enums and pure-domain tests handoff are closed. |
 | `commit-02-c` | `3220f2ee2f10a9889bc10535969e3fae989c236d` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-c` completed at `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests handoff are closed. |
-| `commit-03-a` | `current-design-with-commit-03-a-carrier-closure` | ready_for_design_gate | design_gate | read_docs | Design-side closure now defines the Rust-facing support carriers/schema needed by `MethodAssetDefinition` / `MethodAssetCatalogEntry`; implementation must reread required sources and rerun Design Gate before code changes. |
+| `commit-03-a` | `current-design-with-commit-03-a-reason-marker-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-a` completed at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; definition/catalog carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
+| `commit-03-b` | `current-design-with-commit-03-b-exact-schema-closure` | ready_for_design_gate | design_gate | read_docs | Design-side closure now fixes exact facade I/O, six service input carriers, application-owned replay/idempotency refs, stored-result support and `MethodAssetRepositoryError`; implementation must restart from `read_docs` and rerun Design Gate. |
 
 ---
 
@@ -53,6 +54,12 @@
 | BLK-ML-02C-DESIGN-001 | `commit-02-c` | implementation | resolved | `3220f2ee2f10a9889bc10535969e3fae989c236d` | Formal `03` §4 / §6 / §7 / §9 / §10 / §11 / §12 / §15 plus Step 6 / Step 7 / Step 10 / Step 11 / Step 12 / Step 13 / Step 16 and formal `07` now narrow `commit-02-c` to shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests only; implementation completed inside that exact subset. |
 | BLK-ML-03A-ACTIVATION-001 | `commit-03-a` | design handoff | resolved | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` | `commit-02-c` handoff is now closed, the project ledger advances to `commit-03-a`, and implementation must continue from `read_docs` and rerun the current boundary Design Gate before editing `crates/contracts` or `crates/domain`. |
 | BLK-ML-03A-DESIGN-001 | `commit-03-a` | implementation | resolved | `current-design-with-commit-03-a-carrier-closure` | Formal `03` §6, Step 6 and Step 10 now close the exact current-boundary Rust-facing carrier/schema for the eight definition/catalog support types; implementation must resume from `read_docs` and rerun Design Gate. |
+| BLK-ML-03A-DESIGN-002 | `commit-03-a` | implementation | resolved | `current-design-with-commit-03-a-ref-kind-closure` | Formal `03` §6 and Step 6 now close `ExternalSourceSummaryRef` and `MethodAssetCatalogEntryRef` as named wrappers over `MethodLibraryTypedBoundaryRef` with exact kinds `ExternalSourceSummary` and `MethodAssetCatalogEntry`; implementation must resume from `read_docs` and rerun Design Gate. |
+| BLK-ML-03A-DESIGN-003 | `commit-03-a` | implementation | resolved | `current-design-with-commit-03-a-reason-marker-closure` | Formal `03` §6 and Step 6 now close `MethodAssetCatalogEntry.mark_deprecated(reason_ref)` as `reason_ref: MethodLibrarySafeMarker`; implementation must resume from `read_docs`, rerun Design Gate, and must not invent local `*ReasonRef`, raw string reason or parameterless status toggle. |
+| BLK-ML-03B-ACTIVATION-001 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-a-reason-marker-closure` | `commit-03-a` handoff is now closed and the project ledger advances to `commit-03-b`; implementation must continue from `read_docs` and rerun the new current-boundary Design Gate before editing `crates/application`, `crates/infra` or `crates/api`. |
+| BLK-ML-03B-DESIGN-001 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-service-port-closure` | Formal `03` §6.3A and Step 7 `R7.10A` now close the current-boundary minimal API application dispatch/service boundary; implementation must rerun `commit-03-b` from `read_docs`. |
+| BLK-ML-03B-DESIGN-002 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-service-port-closure` | Formal `03` §6.3A / §10.2A, Step 7 `R7.10A` and Step 11 §3A/§3B now close exact Rust-facing repository/UoW/stored-result ports, fake parity and duplicate replay for definition/catalog accepted service; implementation must rerun `commit-03-b` from `read_docs`. |
+| BLK-ML-03B-DESIGN-003 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-exact-schema-closure` | Formal `03` §6.3A, Step 6 `3B` and Step 7 `R7.10A` now close exact Rust-facing schemas for `MethodAssetDefinitionCatalogCommandDispatchInput` / `Output`, the six `*Input` carriers, application-owned replay/idempotency refs, stored-result body-free carriers and `MethodAssetRepositoryError`; implementation must resume from `read_docs` and must not invent local carrier fields, error variants or fake-only refs. |
 
 ---
 
@@ -61,12 +68,12 @@
 Any implementation agent resuming `L3-method-library` must read files in this order:
 
 1. `projects/L3-method-library/design-calibration/implementation_execution_ledger.md`
-2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-03-a.md`
+2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-03-b.md`
 3. `projects/L3-method-library/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. `commit-03-a` is reactivated at baseline `current-design-with-commit-03-a-carrier-closure`; implementation must reread the current boundary and rerun the boundary gates before editing code.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. `commit-03-b` is current at baseline `current-design-with-commit-03-b-exact-schema-closure`; implementation must reread the current boundary and rerun the boundary gates before editing code.
 
 ---
 
@@ -91,4 +98,5 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-02-a` | implemented handoff closed | Implementation handoff records public contract foundation commit `25876559520691bda2dfd45a0af53bcd38c2f1a9`; typed refs, metadata/error re-exports, shared shells and roundtrip fixtures are closed. |
 | `commit-02-b` | implemented handoff closed | Implementation handoff records shared domain foundation commit `9f876697e0487f0c4cf4966928895a24e6559f5d`; exact pure-domain error kinds, current-boundary policy shells, judgement-state enums and pure-domain tests are closed. |
 | `commit-02-c` | implemented handoff closed | Implementation handoff records application shell foundation commit `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests are closed. |
-| `commit-03-a` | reactivated for design gate rerun | Design baseline `current-design-with-commit-03-a-carrier-closure` closes the current Rust-facing definition/catalog support carriers; implementation must restart from `read_docs`, rerun Design Gate and only then edit allowed `crates/contracts` / `crates/domain` scope. |
+| `commit-03-a` | implemented handoff closed | Implementation handoff records definition/catalog contracts and domain truth commit `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; support carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
+| `commit-03-b` | reactivated for design gate rerun | Design baseline `current-design-with-commit-03-b-exact-schema-closure` closes exact facade I/O, service input carriers, replay/idempotency refs, stored result carriers and repository error surface; implementation must restart from `read_docs`, rerun Design Gate and only then edit allowed service/fake/minimal-entry scope. |

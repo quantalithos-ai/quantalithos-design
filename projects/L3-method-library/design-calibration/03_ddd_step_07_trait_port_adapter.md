@@ -890,6 +890,266 @@ next_allowed_action: 等待用户确认后进入 Step 7 `R7.11 support / trace /
 
 ---
 
+## R7.10A commit-03-b implementation-facing closure
+
+### 1. Design patch scope
+
+本节是 `commit-03-b` Design Gate blocker closure。它只把 already-defined definition/catalog accepted service vertical slice 补成 Rust-facing port / facade / repository / UoW / stored-result surface。它不新增 public Command DTO 字段,不实现 formalization/version,不读取 external body,不进入 query/material/job/publisher。
+
+| closure item | current-boundary decision |
+|---|---|
+| command family carrier | `MethodAssetCommandFamilyKind` 在 `commit-03-b` 的 exact Rust-facing carrier 是 `method_library_contracts::MethodLibraryCapabilityKind`;本 boundary 只接受 `DefinitionCatalog`,其他 capability 必须 safe rejected as unsupported command family。 |
+| command shell input | API entry passes `method_library_contracts::MethodLibraryCommandShell` plus `MethodAssetApiEntryContextRef`;entry 不展开 public DTO body,不创建 domain object。 |
+| application dispatch ref | `MethodAssetApplicationDispatchRef` 是 application-owned opaque dispatch marker;`commit-03-b` 唯一合法值是 `DefinitionCatalogCommandService`;它不得是 route string、type-name string、service locator key、config key 或 fake private enum。 |
+| application facade | API 只调用 `MethodAssetDefinitionCatalogCommandFacade.dispatch_definition_catalog_command(input)`;facade 再调用 current-boundary service methods。 |
+| facade input | `MethodAssetDefinitionCatalogCommandDispatchInput { command_shell, api_entry_context_ref, application_dispatch_ref }`;字段只能复制 contracts shell / Step 6 entry context / runtime precheck result。 |
+| facade output | `MethodAssetDefinitionCatalogCommandDispatchOutput { stored_result_ref, result_kind, replay_marker_ref, accepted_summary_ref, rejected_reason_ref, ignored_reason_ref, effect_summary_refs }`;输出只能复制 `MethodAssetStoredOperationResult` 的 safe surface。 |
+
+### 1A. Facade I/O exact Rust-facing schema
+
+The facade I/O carriers are application-owned structs. They are not public DTOs and must not be filled from route/query/header/raw body directly.
+
+```rust
+pub struct MethodAssetDefinitionCatalogCommandDispatchInput {
+    pub command_shell: MethodLibraryCommandShell,
+    pub api_entry_context_ref: MethodAssetApiEntryContextRef,
+    pub application_dispatch_ref: MethodAssetApplicationDispatchRef,
+}
+
+pub struct MethodAssetDefinitionCatalogCommandDispatchOutput {
+    pub stored_result_ref: MethodAssetStoredOperationResultRef,
+    pub result_kind: MethodAssetStoredOperationResultKind,
+    pub replay_marker_ref: MethodAssetReplayMarkerRef,
+    pub accepted_summary_ref: Option<MethodAssetAcceptedOperationSummaryRef>,
+    pub rejected_reason_ref: Option<MethodAssetSafeRejectReasonRef>,
+    pub ignored_reason_ref: Option<MethodAssetSafeIgnoreReasonRef>,
+    pub effect_summary_refs: MethodAssetEffectSummaryRefSet,
+}
+```
+
+`MethodAssetDefinitionCatalogCommandDispatchOutput` is assembled only by copying the stored result safe surface. The facade must not rebuild response surface from current truth, raw repository rows, transport status or public DTO body.
+
+### 2. Current-boundary command service callable surface
+
+`commit-03-b` 只闭合 Step 9 中 definition/catalog 6 条 accepted command flow。下列 service input 是 application-internal Rust-facing carrier,不是 public protocol DTO。API handler 不得从 route/query/header/raw body 填充它;只能从 `MethodLibraryCommandShell` 的 closed typed refs / safe markers、already-closed domain carriers 和 application mapper 复制。
+
+| service method | input carrier | required closed inputs | accepted output | rejected output |
+|---|---|---|---|---|
+| `establish_definition(input, uow)` | `EstablishMethodAssetDefinitionInput` | `MethodAssetDefinitionKind`;`MethodAssetIdentityKey`;`MethodAssetDefinitionSummary`;`ExternalSourceSummaryRefSet`;idempotency key/digest/scope;optional preaccepted catalog refs | `MethodAssetDefinitionRef`;accepted summary ref;effect summary refs | safe reject reason ref + stored rejected result |
+| `adjust_definition(input, uow)` | `AdjustMethodAssetDefinitionInput` | `MethodAssetDefinitionRef`;expected version from loaded definition;replacement body-free summary/source refs;idempotency key/digest/scope | `MethodAssetDefinitionRef`;accepted summary ref;effect summary refs | missing/stale/body-boundary rejection stored result |
+| `retire_definition(input, uow)` | `RetireMethodAssetDefinitionInput` | `MethodAssetDefinitionRef`;expected version from loaded definition;safe retirement marker;idempotency key/digest/scope | `MethodAssetDefinitionRef`;accepted summary ref;effect summary refs | active-conflict or missing rejection stored result |
+| `register_catalog_entry(input, uow)` | `RegisterMethodAssetCatalogEntryInput` | `MethodAssetDefinitionRef`;`CatalogScopeRef`;`MethodAssetCatalogClassification`;`MethodAssetApplicabilitySummary`;idempotency key/digest/scope | `MethodAssetCatalogEntryRef`;accepted summary ref;effect summary refs | missing definition / duplicate scoped entry rejection stored result |
+| `reclassify_catalog_entry(input, uow)` | `ReclassifyMethodAssetCatalogEntryInput` | `MethodAssetCatalogEntryRef`;expected version from loaded entry;new classification/applicability;idempotency key/digest/scope | `MethodAssetCatalogEntryRef`;accepted summary ref;effect summary refs | missing/stale/invalid-scope rejection stored result |
+| `retire_catalog_entry(input, uow)` | `RetireMethodAssetCatalogEntryInput` | `MethodAssetCatalogEntryRef`;expected version from loaded entry;safe retirement marker;idempotency key/digest/scope | `MethodAssetCatalogEntryRef`;accepted summary ref;effect summary refs | missing/stale rejection stored result |
+
+All six methods must use the same duplicate/replay rule: lookup stored result by `(idempotency_key_ref, dedup_scope_ref)`, compare `operation_digest_ref`, replay stored safe result on match, return stored safe conflict result on mismatch, and never rerun mutation to recreate a public response.
+
+### 2A. Service input exact Rust-facing schema
+
+All six service inputs contain the same replay envelope fields and differ only by domain command payload. All methods return `Result<MethodAssetStoredOperationResult, MethodAssetRepositoryError>` and the facade converts that stored result into `MethodAssetDefinitionCatalogCommandDispatchOutput`.
+
+```rust
+pub struct EstablishMethodAssetDefinitionInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub definition_kind: MethodAssetDefinitionKind,
+    pub identity_key: MethodAssetIdentityKey,
+    pub definition_summary: MethodAssetDefinitionSummary,
+    pub source_summary_refs: ExternalSourceSummaryRefSet,
+    pub preaccepted_catalog_entry_refs: MethodAssetCatalogEntryRefSet,
+}
+
+pub struct AdjustMethodAssetDefinitionInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub expected_version: MethodAssetExpectedVersion,
+    pub replacement_definition_summary: MethodAssetDefinitionSummary,
+    pub replacement_source_summary_refs: ExternalSourceSummaryRefSet,
+}
+
+pub struct RetireMethodAssetDefinitionInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub expected_version: MethodAssetExpectedVersion,
+    pub retirement_marker_ref: MethodLibrarySafeMarker,
+}
+
+pub struct RegisterMethodAssetCatalogEntryInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub catalog_scope_ref: CatalogScopeRef,
+    pub catalog_classification: MethodAssetCatalogClassification,
+    pub applicability_summary: MethodAssetApplicabilitySummary,
+}
+
+pub struct ReclassifyMethodAssetCatalogEntryInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub expected_version: MethodAssetExpectedVersion,
+    pub new_catalog_classification: MethodAssetCatalogClassification,
+    pub new_applicability_summary: MethodAssetApplicabilitySummary,
+}
+
+pub struct RetireMethodAssetCatalogEntryInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub expected_version: MethodAssetExpectedVersion,
+    pub retirement_marker_ref: MethodLibrarySafeMarker,
+}
+```
+
+Source restrictions:
+
+- `operation_context_ref`, `idempotency_key_ref`, `operation_digest_ref` and `dedup_scope_ref` use Step 6 `3B` application-owned carriers only.
+- `expected_version` is copied from the matching `Versioned<T>` repository load;create commands do not invent expected version.
+- `preaccepted_catalog_entry_refs` is an empty-allowed deterministic ref-set;absence must be represented by empty set, not `None` plus private fake rule.
+- `retirement_marker_ref` is a `MethodLibrarySafeMarker`;it must not be raw reason text, HTTP status, UI label or config value.
+- `source_summary_refs` validates named `ExternalSourceSummaryRef` wrappers only;durable external summary dereference remains deferred.
+
+### 3. Rust-facing version / UoW carriers
+
+| carrier | owner | required shape | source rule |
+|---|---|---|---|
+| `MethodAssetRepositoryVersion` | application | opaque version token;clone/eq/debug only;not a cursor | returned only by repository exact read / stable lookup / successful save。 |
+| `MethodAssetExpectedVersion` | application | wrapper copied from `MethodAssetRepositoryVersion` | update save must use loaded version;create save must use `None` expected version。 |
+| `Versioned<T>` | application | `{ value: T, version: MethodAssetRepositoryVersion }` | returned by exact read / stable lookup;implementation must not synthesize version from timestamp/ref/digest。 |
+| `VersionedRef<TRef>` | application | `{ value_ref: TRef, version: MethodAssetRepositoryVersion }` | returned by successful save so tests can assert version advancement。 |
+| `UnitOfWork` | application port;infra implements | `begin_command_uow()`, repository writes, stored-result writes, then explicit `commit()` or `rollback()` | entry cannot create UoW;repository cannot auto-commit outside supplied UoW。 |
+
+### 4. Current-boundary repository signatures
+
+These method names are the formal callable surface for `commit-03-b`. Fake and durable implementations must share the same behavior.
+
+```rust
+trait MethodAssetDefinitionRepository {
+    fn get_definition_with_version(
+        &self,
+        definition_ref: MethodAssetDefinitionRef,
+    ) -> Result<Option<Versioned<MethodAssetDefinition>>, MethodAssetRepositoryError>;
+
+    fn find_definition_by_identity_key(
+        &self,
+        identity_key: MethodAssetIdentityKey,
+    ) -> Result<Option<Versioned<MethodAssetDefinition>>, MethodAssetRepositoryError>;
+
+    fn save_definition(
+        &self,
+        definition: MethodAssetDefinition,
+        expected_version: Option<MethodAssetExpectedVersion>,
+        uow: &mut dyn UnitOfWork,
+    ) -> Result<VersionedRef<MethodAssetDefinitionRef>, MethodAssetRepositoryError>;
+}
+
+trait MethodAssetCatalogEntryRepository {
+    fn get_catalog_entry_with_version(
+        &self,
+        catalog_entry_ref: MethodAssetCatalogEntryRef,
+    ) -> Result<Option<Versioned<MethodAssetCatalogEntry>>, MethodAssetRepositoryError>;
+
+    fn find_catalog_entry_by_definition_scope(
+        &self,
+        definition_ref: MethodAssetDefinitionRef,
+        catalog_scope_ref: CatalogScopeRef,
+    ) -> Result<Option<Versioned<MethodAssetCatalogEntry>>, MethodAssetRepositoryError>;
+
+    fn save_catalog_entry(
+        &self,
+        catalog_entry: MethodAssetCatalogEntry,
+        expected_version: Option<MethodAssetExpectedVersion>,
+        uow: &mut dyn UnitOfWork,
+    ) -> Result<VersionedRef<MethodAssetCatalogEntryRef>, MethodAssetRepositoryError>;
+}
+```
+
+Repository missing returns `Ok(None)`. Version conflict returns `MethodAssetRepositoryError::VersionConflict` and is mapped by application to replay-safe rejection. Repository implementations must not implicitly create truth on exact read, must not link definition/catalog side effects outside the service UoW, and must not use query material/search index as lookup source.
+
+`MethodAssetRepositoryError` exact current-boundary enum surface is closed by Step 6 `3B.3` and used here without extension:
+
+```rust
+pub enum MethodAssetRepositoryError {
+    VersionConflict {
+        expected_version: Option<MethodAssetExpectedVersion>,
+        actual_version: MethodAssetRepositoryVersion,
+        conflict_marker_ref: MethodLibrarySafeMarker,
+    },
+    DuplicateKeyConflict {
+        conflict_marker_ref: MethodLibrarySafeMarker,
+    },
+    TransactionNotActive {
+        failure_marker_ref: MethodLibrarySafeMarker,
+    },
+    StorageUnavailable {
+        unavailable_marker_ref: MethodLibrarySafeMarker,
+    },
+    StoredResultIntegrityViolation {
+        stored_result_ref: Option<MethodAssetStoredOperationResultRef>,
+        violation_marker_ref: MethodLibrarySafeMarker,
+    },
+}
+```
+
+Implementation must not add local error variants for SQL error, IO error, serialization error, poison error, route error, panic, fake-only condition or raw duplicate payload. Such conditions must map to one of the above safe variants with a `MethodLibrarySafeMarker`, or stop as a design blocker if no mapping exists.
+
+### 5. Current-boundary stored-result / idempotency surface
+
+```rust
+trait MethodAssetStoredOperationResultRepository {
+    fn find_command_result_by_idempotency(
+        &self,
+        idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+        dedup_scope_ref: MethodAssetDedupScopeRef,
+    ) -> Result<Option<MethodAssetStoredOperationResult>, MethodAssetRepositoryError>;
+
+    fn get_stored_operation_result(
+        &self,
+        stored_result_ref: MethodAssetStoredOperationResultRef,
+    ) -> Result<Option<MethodAssetStoredOperationResult>, MethodAssetRepositoryError>;
+
+    fn save_command_result_for_idempotency(
+        &self,
+        idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+        dedup_scope_ref: MethodAssetDedupScopeRef,
+        operation_digest_ref: MethodAssetOperationDigestRef,
+        stored_result: MethodAssetStoredOperationResult,
+        uow: &mut dyn UnitOfWork,
+    ) -> Result<MethodAssetStoredOperationResultRef, MethodAssetRepositoryError>;
+}
+```
+
+`MethodAssetStoredOperationResult` for `commit-03-b` must persist only `stored_result_ref`, `operation_context_ref`, `operation_digest_ref`, `result_kind`, optional accepted/rejected/ignored refs, `effect_summary_refs`, and `replay_marker_ref`. It must not persist public DTO body, raw command shell body, raw error, DB row snapshot, provider payload, event payload, report body or transport status.
+
+### 6. Fake parity and stop rules
+
+| topic | required fake behavior | stop condition |
+|---|---|---|
+| version | create starts with repository version 1 or equivalent opaque token;update requires matching loaded version and advances token。 | fake accepts stale expected version or updates without expected version。 |
+| UoW | writes staged in supplied UoW become visible only after commit;rollback leaves no truth/stored-result/effect。 | fake writes directly to map before commit or leaves stored accepted result after rollback。 |
+| uniqueness | definition identity key and `(definition_ref,catalog_scope_ref)` are unique lookup keys。 | fake creates duplicate definition/catalog rows for same stable key。 |
+| duplicate replay | same key/scope/digest returns previously stored safe result without domain mutation。 | fake reruns domain creation or rebuilds response from current truth。 |
+| conflict | same key/scope with different digest returns safe conflict stored result/rejection。 | fake treats digest mismatch as accepted duplicate。 |
+| external summary refs | `commit-03-b` validates `ExternalSourceSummaryRef` named wrappers only;durable external summary dereference remains `commit-07-a`。 | implementation tries to load provider body, URL/path or external adapter to establish definition。 |
+
+This section resolves `BLK-ML-03B-DESIGN-001` and `BLK-ML-03B-DESIGN-002`. Implementation must still rerun the current boundary Design Gate from `read_docs`.
+
+---
+
 ## R7.11 support / trace / relation / material repository port:先思考
 
 ### 1. 思考边界确认
@@ -2219,6 +2479,24 @@ next_allowed_action: 等待用户确认后进入 Step 7 `R7.24 回填草稿:再�
 | `MethodAssetCommittedTruthSnapshotReader` | application | projection / reconciliation / export flow | infra | committed body-free refs / summaries by truth anchor / scope | 复活旧 snapshot repo;复制 truth body;替代 query assembler | Step 9 / 11 / 17 |
 
 core truth repository 不承接 `FormalizationBasisSummary` 或 `MethodAssetConsumptionMaterial`。basis summary 和 consumption material 必须走 support / material family。
+
+#### §7.3A commit-03-b current-boundary callable surface
+
+`commit-03-b` 当前可实现边界只覆盖 definition/catalog accepted service vertical slice。实现侧必须使用下列 exact callable surface,不得把 §7.3 的 family-level 语义扩成自选方法名或私有 fake 规则。
+
+| surface | exact current-boundary item | rule |
+|---|---|---|
+| command family carrier | `MethodAssetCommandFamilyKind` uses `MethodLibraryCapabilityKind`;only `DefinitionCatalog` is accepted in this boundary。 | API entry must safe-reject all non-definition/catalog command families。 |
+| dispatch marker | `MethodAssetApplicationDispatchRef::DefinitionCatalogCommandService` or equivalent opaque application marker。 | Not a route string,config key,type-name string or service locator。 |
+| facade | `MethodAssetDefinitionCatalogCommandFacade.dispatch_definition_catalog_command(input)`。 | API calls facade only;no repository/domain/UoW direct access。 |
+| service methods | `establish_definition`;`adjust_definition`;`retire_definition`;`register_catalog_entry`;`reclassify_catalog_entry`;`retire_catalog_entry`。 | These are application-internal command inputs built from closed shell refs/markers and Step 6 carriers,not public DTO schemas。 |
+| version carriers | `Versioned<T>`;`VersionedRef<TRef>`;`MethodAssetRepositoryVersion`;`MethodAssetExpectedVersion`。 | Version comes only from repository read/save;never from timestamp,cursor,digest or typed ref string。 |
+| UoW | `begin_command_uow`;writes via repositories and stored-result repository;explicit `commit` / `rollback`。 | Entry cannot create UoW;repository cannot auto-commit。 |
+| definition repository | `get_definition_with_version`;`find_definition_by_identity_key`;`save_definition`。 | Create uses `expected_version=None`;update uses loaded version。 |
+| catalog repository | `get_catalog_entry_with_version`;`find_catalog_entry_by_definition_scope`;`save_catalog_entry`。 | Scope uniqueness is `(definition_ref,catalog_scope_ref)`。 |
+| stored result repository | `find_command_result_by_idempotency`;`get_stored_operation_result`;`save_command_result_for_idempotency`。 | Duplicate replay copies stored safe result;digest conflict returns safe stored conflict/rejection。 |
+
+Current-boundary fake parity requires staged UoW writes, rollback invisibility, repository version conflict, stable uniqueness and duplicate replay without mutation rerun. `ExternalSourceSummaryRefSet` in this boundary is validated as named typed refs only; durable external summary/source adapter dereference remains `commit-07-a`.
 
 #### §7.4 Support / material / relation / peripheral repository family
 

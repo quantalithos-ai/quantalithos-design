@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-03-b |
 | phase | PH-03 method asset definition and catalog truth |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `current-design-with-commit-03-b-exact-schema-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future definition/catalog accepted service vertical slice boundary; cannot start until `commit-03-a` is implemented and project ledger advances |
+| status | ready_for_design_gate |
+| next_allowed_action | read_docs |
+| current_recovery_point | Design closure now fixes exact dispatch/service input carriers, application-owned replay/idempotency refs, stored result carriers and repository error surface. Resume from `read_docs`, reread every required source, then rerun Design Gate before code edits. |
 
 ---
 
@@ -17,38 +17,40 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-03-b` | planned | If project ledger still points to an earlier boundary, implementation agent must not use this file to modify code. |
-| `commit-03-a` handoff must be closed | planned | Definition/catalog contracts and domain truth state must exist before accepted service flow work starts. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-03-b` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-03-b` | pass | Project ledger now points to `commit-03-b`; implementation may use this file only within the accepted service vertical-slice scope. |
+| `commit-03-a` handoff must be closed | pass | Definition/catalog contracts and domain truth state were implemented at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`. |
+| project ledger must set `next_allowed_action = read_docs` for `commit-03-b` | pass | This boundary is now current and begins from `read_docs`. |
 
 ---
 
 ## Required Reads
 
+Exact-schema design closure reactivated this boundary. Any `pass` value below records the previous failed Design Gate read only; implementation must reread every row from the current design baseline before code edits.
+
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This future boundary cannot be executed until it becomes current. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented service flow, repository port/fake, UoW, stored result, config or evidence fields | pending | Any missing accepted flow, repository or stored result surface must return to design. |
-| `standards/coding/rust.md` | Rust application/infra/API module, trait, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
-| `projects/L3-method-library/00-需求文档.md` | definition/catalog P0 use cases and boundary rules | pending | Accepted flow must serve current definition/catalog truth, not old publish/snapshot/outbox behavior. |
-| `projects/L3-method-library/01-架构设计.md` | truth owner, transaction direction and dependency direction | pending | Downstream use truth must not replace method-library definition truth. |
-| `projects/L3-method-library/02-概要设计.md` | definition/catalog processing flow and code subject framework | pending | Minimal API entry only delegates to application facade. |
-| `projects/L3-method-library/03-详细设计.md` | trait/port contracts, protocol contracts, function flows, persistence/UoW, error/recovery, idempotency and implementation handoff | pending | Formal source for accepted service flow, repository fake behavior, UoW order and stored result. |
-| `projects/L3-method-library/04-配置设计.md` | controlled/fake adapter binding and body-free redaction | pending | Fake runtime must keep formal semantics and must not add unclosed config keys. |
-| `projects/L3-method-library/05-测试方案.md` | service-flow-fast, infra-runtime-fake and artifact/report rules | pending | Targeted reports must derive from raw artifacts if generated. |
-| `projects/L3-method-library/06-验收标准.md` | ML-FG-001/005, ML-RL-001, ML-TX-001, ML-SYNC-001 and evidence integrity | pending | Accepted service and UoW rollback are blocking for PH-03. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Current source for phase, boundary, allowed scope, checks and commit discipline. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | definition/catalog repository ports, UoW and fake adapter contracts | pending | Only formal ports and fake semantics may be implemented. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | definition/catalog command/request/response surface | pending | Public protocol must match `commit-03-a` contracts and formal DTOs. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | definition/catalog accepted service flows | pending | Service order, validation, UoW and failure handling must be copied from formal flow. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | repository fake, version and rollback semantics | pending | Fake must preserve version/UoW semantics and must not partially commit. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | safe rejection and recovery behavior | pending | Errors and failure reports must be safe and body-free. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | idempotency key, digest and stored result semantics | pending | Duplicate path must use formal stored result surface; no rerun mutation. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | service-flow-fast and infra-runtime-fake definition/catalog ownership | pending | Use only definition/catalog service vertical slice. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-03-b` row | pending | Allowed scope is service, repo fake, minimal API handler, UoW and stored result. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-03-b` gate row and PH-03 gate | pending | Required checks are service-flow-fast definition/catalog and infra-runtime-fake slice. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-03-b` commit body grouping | pending | Commit body must include `Definition service flow:` and `Repository fake and minimal entry:`. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-03-a` handoff state | latest implementation state | pending | Must confirm definition/catalog contracts/domain landed before this boundary starts. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending_reread | Design closure reactivated the boundary; implementation must reread before code. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented service flow, repository port/fake, UoW, stored result, config or evidence fields | pending_reread | Design closure now exists, but implementation must verify no source remains unclosed. |
+| `standards/coding/rust.md` | Rust application/infra/API module, trait, error and test conventions | pass | Re-read and applied; no implementation files were edited after the blocker was found. |
+| `projects/L3-method-library/00-需求文档.md` | definition/catalog P0 use cases and boundary rules | pass | Re-read and confirmed the accepted flow must stay on current definition/catalog truth only. |
+| `projects/L3-method-library/01-架构设计.md` | truth owner, transaction direction and dependency direction | pass | Re-read and confirmed the minimal API entry must delegate into the application boundary instead of owning truth or runtime state. |
+| `projects/L3-method-library/02-概要设计.md` | definition/catalog processing flow and code subject framework | pass | Re-read and confirmed `commit-03-b` is only the accepted service vertical slice with a minimal API entry. |
+| `projects/L3-method-library/03-详细设计.md` | trait/port contracts, protocol contracts, function flows, persistence/UoW, error/recovery, idempotency and implementation handoff | pending_reread | Must confirm §6.3A / §10.2A close dispatch facade, repository/UoW/stored-result and transaction semantics. |
+| `projects/L3-method-library/04-配置设计.md` | controlled/fake adapter binding and body-free redaction | pass | Re-read and confirmed fake runtime support cannot fill the current missing port/type closure with config or binding invention. |
+| `projects/L3-method-library/05-测试方案.md` | service-flow-fast, infra-runtime-fake and artifact/report rules | pending_reread | Must confirm targeted service-flow-fast / infra-runtime-fake slices after the exact-schema service closure. |
+| `projects/L3-method-library/06-验收标准.md` | ML-FG-001/005, ML-RL-001, ML-TX-001, ML-SYNC-001 and evidence integrity | pending_reread | Must confirm accepted service, UoW rollback and duplicate replay acceptance criteria before implementation edits. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pass | Re-read and confirmed `commit-03-b` forbids inventing repository methods, UoW fields, stored-result schema, service input fields, error variants or minimal-entry service boundaries. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | definition/catalog repository ports, UoW and fake adapter contracts | pending_reread | Must confirm `R7.10A` exact application dispatch, service, repository, UoW, stored-result and fake parity closure. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | definition/catalog command/request/response surface | pending_reread | Command protocol remains shell-level; implementation must use Step 7 `R7.10A` for current-boundary dispatch closure and must not invent public DTO fields. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | definition/catalog accepted service flows | pending_reread | Must confirm definition/catalog flow plus `commit-03-b` external-summary named-ref validation carve-out. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | repository fake, version and rollback semantics | pending_reread | Must confirm §3A / §3B exact persistence, transaction and rollback closure. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | safe rejection and recovery behavior | pass | Re-read and confirmed missing stored-replay or port closure is a design blocker and must not be repaired in the implementation repo. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | idempotency key, digest and stored result semantics | pass | Re-read and confirmed duplicate handling depends on formal stored-result surfaces and no-rerun replay. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | service-flow-fast and infra-runtime-fake definition/catalog ownership | pending_reread | Must confirm tests target only the reactivated definition/catalog service vertical slice. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-03-b` row | pending_reread | Must confirm updated row includes exact dispatch, service input carrier, repository/UoW, stored-result and repository error closure while excluding deferred surfaces. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-03-b` gate row and PH-03 gate | pending_reread | Targeted suites remain required after implementation reruns Design Gate. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-03-b` commit body grouping | pending_reread | Commit body groups remain required after implementation reruns Design Gate and completes code/tests. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-03-a` handoff state | latest implementation state | pass | Recorded `?? .gitignore`; the user-owned `.gitignore` remains untouched and unstaged, and `commit-03-a` handoff is closed at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`. |
 
 ---
 
@@ -82,10 +84,10 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-03-b` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-03-a` implementation commit and handoff recorded | pending | Definition/catalog contract/domain truth must exist. |
-| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
-| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
+| activation guard | project ledger shows `current_boundary = commit-03-b` and `next_allowed_action = read_docs` | pass | Boundary is current and must restart from required reads before implementation edits. |
+| prior handoff | `commit-03-a` implementation commit and handoff recorded | pass | Definition/catalog contracts/domain truth are recorded at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`. |
+| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded `?? .gitignore`; no implementation files were edited and the user-owned file remains untouched. |
+| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
 | workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
 | application check | `cargo check -p method-library-application` or the formal application package check | pending | Use actual package name from formal workspace once activated. |
@@ -105,10 +107,10 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-03-a` to `commit-03-b`. | wait_until_current |
-| design_gate | pending | Implementation agent must reread Required Reads and confirm accepted flow, repository, UoW and stored result closure. | wait_design |
+| activation_gate | pass | `commit-03-a` handoff is closed and the project ledger has advanced to `commit-03-b`; this boundary now starts from `read_docs`. | read_docs |
+| design_gate | pending_reread | Formal `03` §6.3A, Step 6 `3B` and Step 7 `R7.10A` now close exact facade I/O, six service input carriers, application-owned replay/idempotency refs, stored-result carriers and `MethodAssetRepositoryError`; implementation must reread Required Reads and verify the closure before edits. | wait_design |
 | scope_gate | pending | Planned changes must be limited to definition/catalog accepted service vertical slice. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
+| worktree_gate | pass | Recorded `?? .gitignore` before any edit; no implementation files changed and the user-owned file remains protected. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/application/infra/API checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
 | test_gate | pending | Service-flow-fast and infra-runtime-fake definition/catalog slices pass after activation. | fix_gate_failure |
 | evidence_gate | pending | Targeted artifact/report is optional until scripts exist; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
@@ -148,7 +150,10 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-03B-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced through `commit-03-a`; this future boundary must not be used for implementation yet. | After `commit-03-a` handoff, update project ledger to `commit-03-b` and set this boundary to current. | wait_until_current |
+| BLK-ML-03B-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-03-a`; this future boundary could not be used for implementation yet. | `commit-03-a` handoff is now closed, the project ledger advances to `commit-03-b`, and implementation must continue from `read_docs`. | read_docs |
+| BLK-ML-03B-DESIGN-001 | design_gate | resolved | `MethodAssetApiCommandHandlerEntry` previously depended on `MethodAssetCommandFamilyKind` and `MethodAssetApplicationDispatchRef` without a formal application dispatch/service boundary. | Formal `03` §6.3A and Step 7 `R7.10A` now close `MethodAssetCommandFamilyKind` as `MethodLibraryCapabilityKind::DefinitionCatalog`, `MethodAssetApplicationDispatchRef` as an application-owned opaque dispatch marker, and `MethodAssetDefinitionCatalogCommandFacade.dispatch_definition_catalog_command(input)` as the current-boundary facade. | read_docs |
+| BLK-ML-03B-DESIGN-002 | design_gate | resolved | Repository/UoW/stored-result semantics previously stopped at family-level exact-read / lookup / versioned-save semantics. | Formal `03` §6.3A / §10.2A, Step 7 `R7.10A` and Step 11 §3A/§3B now close `Versioned<T>`, `VersionedRef<TRef>`, `MethodAssetRepositoryVersion`, `MethodAssetExpectedVersion`, exact definition/catalog repository methods, stored-result repository methods, UoW transaction order, fake parity and duplicate replay. | read_docs |
+| BLK-ML-03B-DESIGN-003 | design_gate | resolved | `03_ddd_step_07_trait_port_adapter.md` named `MethodAssetDefinitionCatalogCommandDispatchInput` / `Output`, six `*Input` carriers and stored-result repository signatures, but did not close the exact Rust-facing shapes of those carriers or the referenced application-owned replay/idempotency refs and `MethodAssetRepositoryError`; `03_ddd_step_06_object_contracts.md` only listed those support refs by name. | Formal `03` §6.3A, Step 6 `3B` and Step 7 `R7.10A` now close the exact struct/newtype/enum schema for facade I/O, six service input carriers, `MethodAssetOperationContextRef` / `MethodAssetIdempotencyKeyRef` / `MethodAssetOperationDigestRef` / `MethodAssetDedupScopeRef` / `MethodAssetStoredOperationResultRef`, accepted/rejected/effect/replay result refs, stored result carriers and the `MethodAssetRepositoryError` variant surface used by current-boundary repositories. | read_docs |
 
 ---
 
@@ -158,3 +163,4 @@
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
 | accepted service vertical slice | existing design-closure rule applies | Accepted flow, repository fake, UoW and stored result gaps must be fixed in `03/05/06/07` before code; implementation must not invent service semantics. |
+| facade/service input exact schema | new closure applies | Naming a dispatch input/output or service `*Input` carrier is insufficient; current boundary must close every field, optionality, source, forbidden fallback and repository error variant before implementation resumes. |

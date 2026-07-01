@@ -986,19 +986,48 @@ After selector choice, the facade must match the selected shell intent with the 
 | `ReclassifyCatalogEntry` | `MethodAssetDefinitionCatalogCommandSource::ReclassifyCatalogEntry(source)` | `catalog_entry_ref = source.catalog_entry_ref`;load `catalog_entry_ref` via `get_catalog_entry_with_version(...)`;`expected_version = loaded.version`;`new_catalog_classification = source.new_catalog_classification`;`new_applicability_summary = source.new_applicability_summary`。 |
 | `RetireCatalogEntry` | `MethodAssetDefinitionCatalogCommandSource::RetireCatalogEntry(source)` | `catalog_entry_ref = source.catalog_entry_ref`;load `catalog_entry_ref` via `get_catalog_entry_with_version(...)`;`expected_version = loaded.version`;`retirement_marker_ref = source.retirement_marker_ref`。 |
 
+Catalog object helper rules:
+
+- `RegisterCatalogEntry` must call `MethodAssetCatalogEntry::create_for_definition(catalog_entry_ref, definition_ref, catalog_scope_ref, catalog_classification, applicability_summary)` after loading the linked definition. The `catalog_entry_ref` is created by the current-boundary support ref / id helper with exact kind `MethodAssetCatalogEntry`.
+- `create_for_definition(...)` must reject mismatched `catalog_scope_ref`, `catalog_classification.catalog_scope_ref` and `applicability_summary.applicability_scope_ref`;repository/fake must not repair or default these fields.
+- `ReclassifyCatalogEntry` must call `loaded.value.reclassify(new_catalog_classification, new_applicability_summary)` after `catalog_status == Visible` is confirmed. It must update both classification and applicability in the saved truth and keep `catalog_status = Visible`.
+- Reclassification must reject mismatched `new_catalog_classification.catalog_scope_ref` and `new_applicability_summary.applicability_scope_ref`;it must not keep stale applicability from the loaded entry.
+
 Common replay envelope assembly:
 
 | service input field | exact source |
 |---|---|
-| `operation_context_ref` | application operation context factory using `command_shell.actor_context`, `command_shell.metadata`, `api_entry_context_ref` and `application_dispatch_ref`;must output Step 6 `MethodAssetOperationContextRef`。 |
-| `idempotency_key_ref` | copied from `command_shell.metadata.idempotency_key` through the Step 6 `MethodAssetIdempotencyKeyRef` mapper;missing metadata idempotency key is safe rejected before mutation。 |
-| `operation_digest_ref` | canonical body-free digest builder over `command_shell.capability_kind`, `command_shell.boundary_ref.kind`, the matched `command_source` variant and all source fields, plus the shell safe markers / typed refs that are explicitly part of the current source;must exclude raw body, route, provider payload and fake state。 |
-| `dedup_scope_ref` | canonical dedup scope builder from command family, selected intent, primary subject key (`identity_key` for establish, `definition_ref` for definition update/retire/register, `catalog_entry_ref` for catalog update/retire) and `catalog_scope_ref` when the selected source carries catalog scope。 |
+| `operation_context_ref` | copied from Step 6 `3B.1.1` `MethodAssetDefinitionCatalogReplayEnvelope.operation_context_ref`;the facade must not call IdGenerator or parse shell fields directly. |
+| `idempotency_key_ref` | copied from Step 6 `3B.1.1` `MethodAssetDefinitionCatalogReplayEnvelope.idempotency_key_ref`;missing metadata idempotency key is returned as `MissingIdempotencyKey` before mutation. |
+| `operation_digest_ref` | copied from Step 6 `3B.1.1` `MethodAssetDefinitionCatalogReplayEnvelope.operation_digest_ref`;the canonical builder is owned by `MethodAssetDefinitionCatalogSupportRefFactory` and must exclude raw body, route, provider payload and fake state. |
+| `dedup_scope_ref` | copied from Step 6 `3B.1.1` `MethodAssetDefinitionCatalogReplayEnvelope.dedup_scope_ref`;primary subject and catalog scope rules are defined by the factory closure. |
+
+Replay envelope callable surface:
+
+```rust
+pub trait MethodAssetDefinitionCatalogSupportRefFactory {
+    fn definition_catalog_dispatch_ref(&self) -> MethodAssetApplicationDispatchRef;
+    fn new_api_entry_context_ref(&mut self) -> MethodAssetApiEntryContextRef;
+    fn build_definition_catalog_replay_envelope(
+        &mut self,
+        input: MethodAssetDefinitionCatalogReplayEnvelopeFactoryInput,
+    ) -> Result<MethodAssetDefinitionCatalogReplayEnvelope, MethodAssetReplayEnvelopeBuildError>;
+    fn new_stored_operation_result_ref(&mut self) -> MethodAssetStoredOperationResultRef;
+    fn new_accepted_operation_summary_ref(&mut self) -> MethodAssetAcceptedOperationSummaryRef;
+    fn new_safe_reject_reason_ref(&mut self) -> MethodAssetSafeRejectReasonRef;
+    fn new_safe_ignore_reason_ref(&mut self) -> MethodAssetSafeIgnoreReasonRef;
+    fn new_effect_summary_ref(&mut self) -> MethodAssetEffectSummaryRef;
+    fn new_replay_marker_ref(&mut self) -> MethodAssetReplayMarkerRef;
+}
+```
+
+The facade must call `build_definition_catalog_replay_envelope(...)` after selector/source match and before constructing any of the six service inputs. `MethodAssetReplayEnvelopeBuildError` maps to a stored safe rejected result using the already-closed stored result repository. Implementation must not create `MethodAssetOperationContextRef`, `MethodAssetOperationDigestRef`, `MethodAssetDedupScopeRef`, stored-result refs, accepted/rejected/effect refs or replay markers through local constructors, string concatenation, route/config values, timestamp/counter formatting or repository ids.
 
 Assembly failure rules:
 
 - Shell selector and `command_source` variant mismatch returns safe rejected stored result before UoW mutation.
 - Missing `command_source`, missing source field, wrong typed ref kind inside any nested carrier or forbidden body marker returns safe rejected stored result before mutation.
+- Replay envelope factory failure returns safe rejected stored result before UoW mutation.
 - Missing repository target for update/retire/reclassify returns safe rejected stored result;expected version must not be synthesized.
 - Version conflict from save maps through `MethodAssetRepositoryError::VersionConflict`;the facade must not reload and retry by itself.
 - The duplicate digest includes the selected source variant. A duplicate idempotency key with the same selector but different source fields is a digest conflict, not an accepted replay.
@@ -1097,6 +1126,8 @@ Source restrictions:
 - `retirement_marker_ref` is a `MethodLibrarySafeMarker`;it must not be raw reason text, HTTP status, UI label or config value.
 - `source_summary_refs` validates named `ExternalSourceSummaryRef` wrappers only;durable external summary dereference remains deferred.
 - `retire_catalog_entry` must load the catalog entry, require `catalog_status == MethodAssetCatalogEntryStatus::Visible`, call `MethodAssetCatalogEntry.mark_retired(retirement_marker_ref)`, and save with the loaded expected version. `Pending`, `Hidden`, `Deprecated` and `Retired` are safe rejection or duplicate replay states for this current boundary;the service must not coerce them to current `Registered`.
+- `register_catalog_entry` must construct catalog truth only through `MethodAssetCatalogEntry::create_for_definition(catalog_entry_ref, definition_ref, catalog_scope_ref, catalog_classification, applicability_summary)`.
+- `reclassify_catalog_entry` must update classification and applicability together through `MethodAssetCatalogEntry.reclassify(new_catalog_classification, new_applicability_summary)`;stale applicability or scope defaults are forbidden.
 
 ### 3. Rust-facing version / UoW carriers
 

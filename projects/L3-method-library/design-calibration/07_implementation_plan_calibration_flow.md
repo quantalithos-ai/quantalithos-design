@@ -15,7 +15,7 @@
 | 当前模块 | `R13.1 formal document assembly:正式装配` |
 | 当前状态 | completed |
 | 正式文档状态 | full-restart formal assembly completed |
-| 当前设计基线 | `current-design-with-commit-03-b-catalog-retire-closure` |
+| 当前设计基线 | `current-design-with-commit-03-b-helper-factory-closure` |
 | 当前输入形态 | `00`~`06` 已完成 full-restart 装配并可作为新版 `07` 输入 |
 | 目标实现仓 | `/home/aris/Projects/quantalithos-method-library`;Step 3 已确认存在、干净且 git config 正确,但当前 layout 属旧实现形态,需在 PH-01 / 首个 boundary 迁移 |
 
@@ -85,7 +85,7 @@
 | Step 12 中间产物 | completed_confirmed | 已形成实施完成判定思考稿,并经用户确认。 |
 | Step 13 中间产物 | completed | 已形成正式文档装配记录。 |
 | 正式 `07` | completed | 已按 Step 1~12 中间产物完成 full-restart 装配。 |
-| 下一步 | `commit-03-b` ready_for_design_gate_rerun | `commit-03-a` implementation handoff 已由实现仓提交 `5376349eded0e277258c32d0b32b07a7c5aa2fe6` 关闭;实现侧重跑 `commit-03-b` Design Gate 后发现的 contracts ref-kind owner scope、command shell selector、accepted-path command source carrier、dispatch facade、repository/UoW/stored-result surface、exact schema carrier、repository error、definition lifecycle、catalog retirement transition 以及 `retire_definition` formal-version precheck carve-out 已由 formal `03` §6.3A / §10.2A、Step 6 `3B` / `3B.1A` / `3B.1B`、Step 7 `R7.10A`、Step 9 definition/catalog carve-out、Step 10 definition lifecycle/catalog status matrix 和 Step 11 §3A/§3B 闭口;implementation ledger 与 boundary ledger 已重新激活到 `read_docs`。 |
+| 下一步 | `commit-03-b` ready_for_design_gate_rerun | `commit-03-a` implementation handoff 已由实现仓提交 `5376349eded0e277258c32d0b32b07a7c5aa2fe6` 关闭;实现侧重跑 `commit-03-b` Design Gate 后发现的 contracts ref-kind owner scope、command shell selector、accepted-path command source carrier、replay envelope/support ref factory、dispatch facade、repository/UoW/stored-result surface、exact schema carrier、repository error、definition lifecycle、catalog helper persisted-field coverage、catalog retirement transition 以及 `retire_definition` formal-version precheck carve-out 已由 formal `03` §6.3A / §10.2A、Step 6 `3B` / `3B.1.1` / `3B.1A` / `3B.1B`、Step 7 `R7.10A`、Step 9 definition/catalog carve-out、Step 10 definition lifecycle/catalog status matrix 和 Step 11 §3A/§3B 闭口;implementation ledger 与 boundary ledger 已重新激活到 `read_docs`。 |
 
 ## 6. 恢复顺序
 
@@ -101,7 +101,7 @@
 7. 确认当前 implementation ledger 已推进到 `commit-03-b` / `read_docs`,并读取最新 `commit-03-b` boundary ledger
 8. 不得用旧 `07` 的 MethodContent / publish / snapshot / outbox / PostgreSQL / GATE-T 口径定义当前实施计划
 9. 若当前 boundary ledger 任何 required source 再次不闭合,立即回到 `blocked / wait_design`;未通过前不得创建代码、tests 或 evidence
-10. 当前 `commit-03-b` 已因 contracts ref-kind owner scope、command shell selector、body-free command source carrier、source-to-service-input assembly、dispatch facade、service input carriers、repository/UoW/stored-result surface、repository error surface、definition lifecycle、catalog retirement transition、retire formal-version precheck carve-out、fake parity 和 duplicate replay 缺口完成设计闭口而重新激活;恢复实现前必须使用最新 implementation ledger 与 boundary ledger 重跑 Design Gate
+10. 当前 `commit-03-b` 已因 contracts ref-kind owner scope、command shell selector、body-free command source carrier、source-to-service-input assembly、replay envelope/support ref factory、dispatch facade、service input carriers、repository/UoW/stored-result surface、repository error surface、definition lifecycle、catalog helper persisted-field coverage、catalog retirement transition、retire formal-version precheck carve-out、fake parity 和 duplicate replay 缺口完成设计闭口而重新激活;恢复实现前必须使用最新 implementation ledger 与 boundary ledger 重跑 Design Gate
 ```
 
 ## 7. 当前 next_allowed_action
@@ -114,7 +114,7 @@ implementation handoff 台账已推进:
 - `design-calibration/implementation-boundaries/commit-02-b.md`
 - `design-calibration/implementation-boundaries/commit-02-c.md`
 `commit-03-a` implementation handoff 已由实现仓提交 `5376349eded0e277258c32d0b32b07a7c5aa2fe6` 关闭;
-当前 `commit-03-b` definition/catalog accepted service boundary 已由设计侧补齐 implementation-facing contracts ref-kind owner scope、command shell selector、body-free command source carrier、source-to-service-input assembly、dispatch facade、service input carriers、repository/UoW/stored-result、repository error surface、definition lifecycle、catalog retirement transition、retire formal-version precheck carve-out、fake parity 和 duplicate replay closure,并重新激活到 `read_docs`;
+当前 `commit-03-b` definition/catalog accepted service boundary 已由设计侧补齐 implementation-facing contracts ref-kind owner scope、command shell selector、body-free command source carrier、source-to-service-input assembly、replay envelope/support ref factory、dispatch facade、service input carriers、repository/UoW/stored-result、repository error surface、definition lifecycle、catalog helper persisted-field coverage、catalog retirement transition、retire formal-version precheck carve-out、fake parity 和 duplicate replay closure,并重新激活到 `read_docs`;
 下一步由实现侧读取最新 project ledger / boundary ledger / required reads,重跑 Design Gate 和 Scope Gate 后恢复当前 boundary;
 实现侧不得创建超出 `commit-03-b` allowed scope 的代码、tests 或 evidence,也不得在实现仓私补 DTO field、truth-owner rule、state/policy outcome、error family、support carrier、lifecycle/status carrier、repository method、UoW field、stored-result schema 或 evidence;若重跑门禁发现新缺口,必须再次回到 `blocked / wait_design`.
 ```

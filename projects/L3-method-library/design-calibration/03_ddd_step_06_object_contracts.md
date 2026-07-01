@@ -1335,20 +1335,22 @@ pub struct MethodAssetCatalogEntry;
 |---|---|
 | `assert_for_definition(definition_ref)` | 校验目录条目仍绑定原定义。 |
 | `covers_scope(catalog_scope_ref)` | 判断目录条目是否覆盖指定目录范围。 |
-| `update_classification(classification)` | 更新分类语义,不生成 catalog view。 |
+| `update_classification(classification)` | 更新分类语义,不生成 catalog view;`commit-03-b` 只能由 `reclassify(new_catalog_classification, new_applicability_summary)` 间接调用。 |
+| `reclassify(new_catalog_classification, new_applicability_summary)` | 同步更新 `catalog_scope_ref`、`catalog_classification` 和 `applicability_summary`;要求 loaded entry 为 `Visible` 且 `new_applicability_summary.applicability_scope_ref` 与 `new_catalog_classification.catalog_scope_ref` 一致。 |
 | `mark_deprecated(reason_ref: MethodLibrarySafeMarker)` | 标记目录条目弃用线索,不删除 definition truth。 |
 | `assert_visible_for_reclassify()` | `commit-03-b` 重分类前校验 `catalog_status == Visible`;`Pending` / `Hidden` / `Deprecated` / `Retired` 不得被当作当前 `Registered`。 |
 | `mark_retired(retirement_marker_ref: MethodLibrarySafeMarker)` | 将目录条目从当前可发现状态转为 `Retired`;`retirement_marker_ref` 只作为 safe transition/effect 来源,不得保存 raw reason。 |
 
 | 工厂边界 | 作用 |
 |---|---|
-| `create_for_definition(definition_ref, catalog_scope_ref)` | 为定义创建目录条目,并固定 `catalog_status = Visible`。 |
-| `from_catalog_reclassification(catalog_entry_ref, classification)` | 基于显式重分类形成新目录线索;`commit-03-b` 只允许 loaded `Visible` entry 重分类并保持 `Visible`。 |
+| `create_for_definition(catalog_entry_ref, definition_ref, catalog_scope_ref, catalog_classification, applicability_summary)` | 为定义创建目录条目,复制 `RegisterCatalogEntryCommandSource` 中的 classification / applicability,要求 `catalog_classification.catalog_scope_ref == catalog_scope_ref` 且 `applicability_summary.applicability_scope_ref == catalog_scope_ref`,并固定 `catalog_status = Visible`。 |
+| `from_catalog_reclassification(catalog_entry_ref, new_catalog_classification, new_applicability_summary)` | 基于显式重分类形成新目录线索;`commit-03-b` 只允许 loaded `Visible` entry 重分类并保持 `Visible`,同时复制新的 classification / applicability 并令 stored `catalog_scope_ref = new_catalog_classification.catalog_scope_ref`。 |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
 | catalog_entry_is_truth | catalog entry 是目录 truth;catalog view 只是派生读取。 |
 | registered_maps_to_visible | Step 10 中的内部 `Registered` 在 `commit-03-b` Rust-facing 实现中只对应 `MethodAssetCatalogEntryStatus::Visible`。 |
+| catalog_scope_consistency | `catalog_scope_ref`、`catalog_classification.catalog_scope_ref` 和 `applicability_summary.applicability_scope_ref` 必须在 create/reclassify 后一致;不一致 safe reject,不得由 repository 或 fake 默认修正。 |
 | retired_is_terminal_for_catalog_entry | `Retired` catalog entry 仍可历史读取,但不得 reclassify 或再次 retire;duplicate command 只能 replay stored result 或 safe reject。 |
 | no_search_index | 不写搜索索引、缓存结构或 query material 实现。 |
 | no_formalization | 不裁定 formal version。 |
@@ -1411,6 +1413,67 @@ domain tests 必须覆盖 `mark_deprecated` 需要显式 safe marker、不能接
 | `MethodAssetReplayMarkerRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetReplayMarker` | duplicate replay safe marker。 | 只能由 stored-result creation or duplicate replay mapper 输出;不得由 service 重读 truth 合成。 |
 | `MethodAssetApplicationDispatchRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetApplicationDispatch` | API -> application facade dispatch marker。 | `commit-03-b` 唯一合法 target marker value is `DefinitionCatalogCommandService`。 |
 | `MethodAssetApiEntryContextRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetApiEntryContext` | API entry safe context anchor。 | 只能由 API entry context factory 创建,不得由 route / transport request id 拼接。 |
+
+#### 3B.1.1 current-boundary replay envelope factory closure
+
+`commit-03-b` 的 replay envelope ref 生成必须通过 application-owned helper surface 完成。它不是 public DTO,也不是 domain object,只把已闭口的 shell/source/entry refs 映射为六个 service input 共同需要的 opaque refs。
+
+```rust
+pub struct MethodAssetDefinitionCatalogReplayEnvelopeFactoryInput {
+    pub command_shell: MethodLibraryCommandShell,
+    pub command_source: MethodAssetDefinitionCatalogCommandSource,
+    pub selector: MethodAssetDefinitionCatalogCommandSelector,
+    pub api_entry_context_ref: MethodAssetApiEntryContextRef,
+    pub application_dispatch_ref: MethodAssetApplicationDispatchRef,
+}
+
+pub struct MethodAssetDefinitionCatalogReplayEnvelope {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+}
+
+pub enum MethodAssetReplayEnvelopeBuildError {
+    MissingIdempotencyKey { reason_ref: MethodAssetSafeRejectReasonRef },
+    UnsupportedDispatchTarget { reason_ref: MethodAssetSafeRejectReasonRef },
+    SourceSelectorMismatch { reason_ref: MethodAssetSafeRejectReasonRef },
+    OpaqueRefGenerationUnavailable { reason_ref: MethodAssetSafeRejectReasonRef },
+}
+```
+
+Exact factory rules:
+
+- `MethodAssetDefinitionCatalogReplayEnvelopeFactoryInput.command_shell` is the already-closed public shell;the factory may read only `capability_kind`, `boundary_ref`, typed refs / safe markers explicitly required by current source, `actor_context` and `metadata` idempotency fields. It must not read raw body, route, RPC method, transport path, header value, config key or fake runtime map.
+- `application_dispatch_ref` must be the single current-boundary `MethodAssetApplicationDispatchRef` for `DefinitionCatalogCommandService`;wrong-kind or other dispatch target returns `UnsupportedDispatchTarget`.
+- `api_entry_context_ref` must be copied from the API entry context factory output;the replay factory must not create it from route, request id or transport metadata.
+- `operation_context_ref` is minted by the application helper / IdGenerator with exact kind `MethodAssetOperationContext` after copying safe actor metadata, command metadata, `api_entry_context_ref` and `application_dispatch_ref`.
+- `idempotency_key_ref` is copied from `command_shell.metadata.idempotency_key` through the application mapper. Missing idempotency key returns `MissingIdempotencyKey`;the factory must not generate a fallback key from digest, route, subject ref or timestamp.
+- `operation_digest_ref` is minted from a canonical body-free digest input containing only `command_shell.capability_kind`, `command_shell.boundary_ref.kind`, the matched `selector`, the matched `command_source` variant and all source fields, plus explicitly included shell typed refs / safe markers. It must exclude raw DTO body, transport metadata other than formal idempotency metadata, provider payload, repository state and fake-only state.
+- `dedup_scope_ref` is minted from command family, selected intent and the formal primary subject: `identity_key` for establish, `definition_ref` for definition adjust/retire/register catalog, `catalog_entry_ref` for catalog reclassify/retire, plus `catalog_scope_ref` only when the selected source carries catalog scope.
+- `SourceSelectorMismatch` is returned when the selector and `command_source` variant differ;the facade must store a safe rejected result and must not try another selector or infer fields from shell arrays.
+- Factory output refs are opaque named wrappers over `MethodLibraryTypedBoundaryRef` with the exact kinds listed in `3B.1`. Implementation must not build them by string concatenation, hashing raw payload, parsing typed-ref text, timestamp formatting, test-only counters, route names or repository row ids.
+
+Current-boundary opaque-ref helper surface:
+
+```rust
+pub trait MethodAssetDefinitionCatalogSupportRefFactory {
+    fn definition_catalog_dispatch_ref(&self) -> MethodAssetApplicationDispatchRef;
+    fn new_api_entry_context_ref(&mut self) -> MethodAssetApiEntryContextRef;
+    fn build_definition_catalog_replay_envelope(
+        &mut self,
+        input: MethodAssetDefinitionCatalogReplayEnvelopeFactoryInput,
+    ) -> Result<MethodAssetDefinitionCatalogReplayEnvelope, MethodAssetReplayEnvelopeBuildError>;
+    fn new_stored_operation_result_ref(&mut self) -> MethodAssetStoredOperationResultRef;
+    fn new_accepted_operation_summary_ref(&mut self) -> MethodAssetAcceptedOperationSummaryRef;
+    fn new_safe_reject_reason_ref(&mut self) -> MethodAssetSafeRejectReasonRef;
+    fn new_safe_ignore_reason_ref(&mut self) -> MethodAssetSafeIgnoreReasonRef;
+    fn new_effect_summary_ref(&mut self) -> MethodAssetEffectSummaryRef;
+    fn new_replay_marker_ref(&mut self) -> MethodAssetReplayMarkerRef;
+}
+```
+
+The support ref factory is an application-owned port/helper surface implemented by the current-boundary fake/runtime support. It may call the formal IdGenerator internally, but no service, repository, API handler or domain object may bypass it to mint the above refs. The only current-boundary constant-like output is `definition_catalog_dispatch_ref()`, and it still returns an opaque typed ref of kind `MethodAssetApplicationDispatch`, not a string enum, route value or config key.
 
 #### 3B.1A current-boundary command selector intent labels
 

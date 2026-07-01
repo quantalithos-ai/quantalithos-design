@@ -1325,6 +1325,23 @@ pub struct MethodAssetCatalogEntry;
 | no_formalization | 不裁定 formal version。 |
 | no_marketplace_listing | 不表达 marketplace listing、交易、安装或履约。 |
 
+### 3A. `commit-03-a` definition/catalog support carrier closure
+
+本节为实现侧 `commit-03-a` 追加 current-boundary Rust-facing carrier/schema 闭口。它只闭合 `MethodAssetDefinition` / `MethodAssetCatalogEntry` 当前字段所需支撑类型,不提前实现 formalization、consumption、query material、event、job、persistence 或 config schema。
+
+| carrier | Rust-facing shape | exact labels / fields | implementation rule |
+|---|---|---|---|
+| `MethodAssetDefinitionKind` | closed enum | `SpemMethodContent`;`ProcessTemplate`;`LifecycleModel`;`ViewProfile`;`AiPolicy`;`AiObjective`;`RelationSemantic`;`DistributionSemantic`;`ExternalSummaryLink`;`PackageOrganization`;`MethodSetAssembly`;`StandardMappingMaterial` | 来源为当前 `00/01/02` 已确认的数据归属和能力分类;不得恢复旧 P0 七类 subtype,不得加 raw string / provider kind。 |
+| `MethodAssetIdentityKey` | body-free struct | `definition_kind: MethodAssetDefinitionKind`;`identity_namespace_ref: MethodLibraryTypedBoundaryRef`;`identity_anchor_ref: MethodLibraryTypedBoundaryRef`;`applicability_scope_ref: CatalogScopeRef` | definition stable lookup 的唯一 key;来自 command intent 经 identity rule 裁决后的 typed refs;不得由 route、raw name、path、URL、catalog view 或 downstream id 拼接。 |
+| `MethodAssetDefinitionSummary` | body-free struct | `summary_ref: MethodLibraryTypedBoundaryRef`;`definition_kind: MethodAssetDefinitionKind`;`safe_title_ref: MethodLibraryTypedBoundaryRef`;`safe_description_ref: Option<MethodLibraryTypedBoundaryRef>`;`summary_marker_ref: MethodLibrarySafeMarker` | 只保存可公开摘要引用和 marker;不得保存方法正文、外部正文、artifact/archive body、provider payload、report body 或旧 content payload。 |
+| `ExternalSourceSummaryRefSet` | deterministic ref-set struct | `refs: Vec<ExternalSourceSummaryRef>`;ordered by insertion after canonical dedup;empty allowed | 只保存 accepted external safe summary refs;不得保存 external body、URL/path、provider response、digest algorithm detail 或 archive body。 |
+| `MethodAssetCatalogEntryRefSet` | deterministic ref-set struct | `refs: Vec<MethodAssetCatalogEntryRef>`;ordered by insertion after canonical dedup;empty allowed | 只保存 catalog entry typed refs;catalog truth 仍由 `MethodAssetCatalogEntry` 拥有;不得由 catalog view/search result 反写。 |
+| `MethodAssetCatalogClassification` | body-free struct | `definition_kind: MethodAssetDefinitionKind`;`catalog_scope_ref: CatalogScopeRef`;`classification_marker_ref: MethodLibrarySafeMarker` | 分类来源只能是 catalog command intent / policy-safe marker;不得保存 UI 分类、搜索排序、marketplace listing、tag body 或 free-form taxonomy。 |
+| `MethodAssetApplicabilitySummary` | body-free struct | `applicability_scope_ref: CatalogScopeRef`;`applicability_marker_ref: MethodLibrarySafeMarker`;`applicable_context_refs: Vec<MethodLibraryTypedBoundaryRef>`;ordered by insertion after canonical dedup;empty means scope-only applicability | 只表达适用语境摘要和 typed refs;不得保存下游 runtime truth、authorization matrix、organization config、marketplace transaction 或 UI state。 |
+| `MethodAssetCatalogEntryStatus` | closed enum | `Pending`;`Visible`;`Hidden`;`Deprecated`;`Retired` | 当前 boundary 的 catalog public/truth summary status;完整转换仍以 Step 10 lifecycle matrix 为准;不得用 HTTP status、search visibility、feature flag、cache state 或 string status 替代。 |
+
+上述 8 个 carrier 是 `commit-03-a` 当前唯一允许实现的 definition/catalog support schema。若实现还需要新的字段、state、policy outcome、error variant、mapper、config key 或 evidence schema,必须暂停并回到设计真相源闭口。
+
 ### 4. 对象卡片: `FormalizationBasisSummary`
 
 ```rust

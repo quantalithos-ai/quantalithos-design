@@ -15,7 +15,7 @@
 | 当前模块 | `R13.1 formal document assembly:正式装配` |
 | 当前状态 | completed |
 | 正式文档状态 | full-restart formal assembly completed |
-| 当前设计基线 | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` |
+| 当前设计基线 | `current-design-with-commit-03-a-carrier-closure` |
 | 当前输入形态 | `00`~`06` 已完成 full-restart 装配并可作为新版 `07` 输入 |
 | 目标实现仓 | `/home/aris/Projects/quantalithos-method-library`;Step 3 已确认存在、干净且 git config 正确,但当前 layout 属旧实现形态,需在 PH-01 / 首个 boundary 迁移 |
 
@@ -85,7 +85,7 @@
 | Step 12 中间产物 | completed_confirmed | 已形成实施完成判定思考稿,并经用户确认。 |
 | Step 13 中间产物 | completed | 已形成正式文档装配记录。 |
 | 正式 `07` | completed | 已按 Step 1~12 中间产物完成 full-restart 装配。 |
-| 下一步 | `commit-03-a` ready_for_design_gate | `commit-02-c` implementation handoff 已由实现仓提交 `d1b36632172b0fec8a6b5e196ac41c85c92328d0` 关闭;`commit-03-a` definition/catalog boundary 已在基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 激活;实现侧必须从当前 boundary ledger 重新开始并重跑 required reads / Design Gate / Scope Gate,然后才允许修改 `crates/contracts` 与 `crates/domain`。 |
+| 下一步 | `commit-03-a` ready_for_design_gate_rerun | `commit-02-c` implementation handoff 已由实现仓提交 `d1b36632172b0fec8a6b5e196ac41c85c92328d0` 关闭;实现侧重跑 `commit-03-a` Design Gate 后发现的 definition/catalog support carrier/schema 缺口已由 formal `03` §6、Step 6 和 Step 10 闭口;implementation ledger 与 boundary ledger 已重新激活到 `read_docs`。 |
 
 ## 6. 恢复顺序
 
@@ -101,6 +101,7 @@
 7. 确认当前 implementation ledger 已推进到 `commit-03-a` / `read_docs`,并读取最新 `commit-03-a` boundary ledger
 8. 不得用旧 `07` 的 MethodContent / publish / snapshot / outbox / PostgreSQL / GATE-T 口径定义当前实施计划
 9. 若当前 boundary ledger 任何 required source 再次不闭合,立即回到 `blocked / wait_design`;未通过前不得创建代码、tests 或 evidence
+10. 当前 `commit-03-a` 已因 definition/catalog support carrier/schema 缺口完成设计闭口而重新激活;恢复实现前必须使用最新 implementation ledger 与 boundary ledger 重跑 Design Gate
 ```
 
 ## 7. 当前 next_allowed_action
@@ -113,7 +114,7 @@ implementation handoff 台账已推进:
 - `design-calibration/implementation-boundaries/commit-02-b.md`
 - `design-calibration/implementation-boundaries/commit-02-c.md`
 `commit-02-c` implementation handoff 已由实现仓提交 `d1b36632172b0fec8a6b5e196ac41c85c92328d0` 关闭;
-当前 `commit-03-a` definition/catalog boundary 已在基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 激活;
-下一步必须由实现侧读取项目级 implementation ledger 和 `commit-03-a` boundary ledger,重跑 required reads / Design Gate / Scope Gate;
-未通过前不得创建超出 `commit-03-a` allowed scope 的代码、tests 或 evidence,也不得在实现仓私补 DTO field、truth-owner rule、state/policy outcome、error family 或 evidence.
+当前 `commit-03-a` definition/catalog boundary 已由设计侧补齐 implementation-facing support carrier/schema closure,并重新激活到 `read_docs`;
+下一步由实现侧读取最新 project ledger / boundary ledger / required reads,重跑 Design Gate 和 Scope Gate 后恢复当前 boundary;
+实现侧不得创建超出 `commit-03-a` allowed scope 的代码、tests 或 evidence,也不得在实现仓私补 DTO field、truth-owner rule、state/policy outcome、error family、support carrier 或 evidence;若重跑门禁发现新缺口,必须再次回到 `blocked / wait_design`.
 ```

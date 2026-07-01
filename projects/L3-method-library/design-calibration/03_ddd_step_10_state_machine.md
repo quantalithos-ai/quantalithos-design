@@ -854,6 +854,8 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.8 business truth �
 | `Registered` | catalog entry 已绑定 definition 与 catalog scope。 | readable |
 | `Retired` | catalog entry 已退休,不再作为当前发现入口。 | readable historical |
 
+`commit-03-a` Rust-facing status carrier 使用 `MethodAssetCatalogEntryStatus = Pending | Visible | Hidden | Deprecated | Retired`。该 status 是 catalog public/truth summary status,用于 contracts/domain 当前边界落码;本状态机中的 `Registered` 是 transition matrix 的内部 lifecycle 归纳名。实现当前 boundary 时必须使用 `MethodAssetCatalogEntryStatus` 的 exact labels,并将具体转换规则限制在本矩阵允许的 register / reclassify / retire trigger 内,不得引入 HTTP status、search visibility、feature flag、cache state 或 string status。
+
 ```text
 [virtual:not_created]
   | RegisterMethodAssetCatalogEntryFlow

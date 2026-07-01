@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-06-29
-> 当前任务: `commit-02-c` implementation handoff 已关闭,实现仓提交为 `d1b36632172b0fec8a6b5e196ac41c85c92328d0`;`commit-03-a` definition/catalog current boundary 已在基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 激活;实现侧必须从当前 boundary ledger 重新开始并重跑 Design Gate / Scope Gate。
+> 当前任务: `commit-02-c` implementation handoff 已关闭,实现仓提交为 `d1b36632172b0fec8a6b5e196ac41c85c92328d0`;`commit-03-a` definition/catalog boundary 的 support carrier/schema 已由设计侧闭口并重新激活;实现侧必须从 `read_docs` 重读当前台账和 required sources,重新执行 Design Gate 后再恢复当前 boundary。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-03-a design closure ready` | ready_for_implementation_design_gate | 基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 已把 `commit-03-a` 收窄到 definition/catalog DTO shells、domain truth objects、exact state/policy 和 focused contract-domain-fast tests。 | 实现侧必须先读取项目级 implementation ledger 与 `commit-03-a` boundary ledger,然后重跑当前 boundary Design Gate / Scope Gate;若再发现缺口,立即回阻塞。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-03-a.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-03-a design gate reactivated` | ready_for_implementation_design_gate | formal `03` §6、Step 6 和 Step 10 已闭合支撑 `MethodAssetDefinition` / `MethodAssetCatalogEntry` 的 Rust-facing support carrier/schema。 | 实现侧必须读取最新 implementation ledger / boundary ledger,从 `read_docs` 重跑 required reads / Design Gate / Scope Gate;若仍有缺口再回到 `blocked / wait_design`。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-03-a.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-03-a` ready_for_design_gate | ready_for_implementation_design_gate | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-03-a` 的 definition/catalog current boundary 已在基线 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` 激活,实现侧必须从当前 boundary ledger 重新开始并重跑门禁。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-03-a` ready_for_design_gate | ready_for_implementation_design_gate | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-03-a` 的 definition/catalog current boundary 已在基线 `current-design-with-commit-03-a-carrier-closure` 重新激活,实现侧必须从当前 boundary ledger 重新开始并重跑门禁。 |
 
 ---
 
@@ -69,6 +69,7 @@
 | ML-S14-GAP-001 | 正式 `02-概要设计.md` §2~§4 | resolved | §2、§3、§4 缺 `延伸阅读` 块。 | 已在 `02-概要设计` Step 14 修复并关闭。 |
 | ML-D03-RESET-001 | `03-详细设计.md`;旧 `03_ddd_*` | resolved | 旧 03 曾含旧正向主线,容易污染新 03。 | Step 19 已完成正式 03 full-restart 装配;旧材料已隔离。 |
 | ML-D03-S3-RESET-001 | `design-calibration/03_ddd_step_03_runtime_constraints.md` | resolved | 旧 Step 3 文件曾是旧 P0 口径且标记已确认。 | Step 3 已重启并关闭旧 completed 污染。 |
+| BLK-ML-03A-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-03-a.md` | resolved | `commit-03-a` 先前基线未唯一闭合 definition/catalog support carrier/schema,实现若继续将需要自补 `MethodAssetDefinitionKind`、`MethodAssetIdentityKey`、`MethodAssetDefinitionSummary`、`ExternalSourceSummaryRefSet`、`MethodAssetCatalogEntryRefSet`、`MethodAssetCatalogClassification`、`MethodAssetApplicabilitySummary`、`MethodAssetCatalogEntryStatus` 等 Rust-facing 载体。 | formal `03` §6、Step 6 和 Step 10 已发布唯一 implementation-facing carrier/schema closure;implementation ledger / boundary ledger 已重新激活到 `read_docs`。 |
 
 ---
 
@@ -85,6 +86,7 @@
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
 7. 确认 implementation ledger 当前已推进到 `commit-03-a` / `read_docs`,并读取 `commit-03-a` 最新 boundary ledger
 8. 按 boundary ledger 重新执行 required reads / Design Gate / Scope Gate;若任何 source、state、error、marker 或 test-support 再次不闭合,立即回到 `blocked / wait_design`
+9. 当前 `commit-03-a` 已由设计侧补齐 definition/catalog support carrier/schema closure;恢复实现前必须使用最新台账和 required reads,不得沿用旧 blocked gate 结论
 ```
 
 ---
@@ -93,7 +95,7 @@
 
 ```text
 `commit-02-c` implementation handoff 已关闭,实现仓提交为 `d1b36632172b0fec8a6b5e196ac41c85c92328d0`;
-当前 boundary 已推进为 `commit-03-a`,其 definition/catalog formal baseline 固定为 `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b`;
-下一步只允许实现侧从项目级 implementation ledger 与 `commit-03-a` boundary ledger 重新开始,重跑 required reads / Design Gate / Scope Gate,并仅在通过后修改 `crates/contracts` 与 `crates/domain`;
-若实现过程中再次暴露 DTO field、truth-owner rule、state/policy outcome、error family 或 evidence 缺口,必须立即回阻塞而不是在实现仓私补.
+当前 boundary 仍是 `commit-03-a`,其 definition/catalog design baseline 已更新为 `current-design-with-commit-03-a-carrier-closure`;
+下一步允许实现侧从 `read_docs` 重读 implementation ledger、boundary ledger 和 required sources,重新执行 Design Gate / Scope Gate 后恢复当前 boundary;
+实现侧仍不得私补 DTO field、truth-owner rule、state/policy outcome、error family、support carrier 或 evidence;若重跑门禁发现新缺口,必须重新回到 `blocked / wait_design`.
 ```

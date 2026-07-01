@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-03-a |
 | phase | PH-03 method asset definition and catalog truth |
-| design_baseline | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` |
+| design_baseline | `current-design-with-commit-03-a-carrier-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready |
+| status | ready_for_design_gate |
 | next_allowed_action | read_docs |
-| current_recovery_point | active definition/catalog boundary after design baseline `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b`; implementation may edit only `crates/contracts` and `crates/domain` definition/catalog contracts, truth state, exact state/policy and focused tests after rerunning Design / Scope Gate |
+| current_recovery_point | design-side carrier/schema closure has been added for the current definition/catalog support types; implementation must restart required reads and rerun Design Gate before editing `crates/contracts` or `crates/domain` |
 
 ---
 
@@ -27,27 +27,27 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This boundary is now current and must restart from required reads before implementation edits. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented definition/catalog DTO, truth state, policy, marker or evidence schema | pending | Any missing definition/catalog field or truth-owner rule must return to design. |
-| `standards/coding/rust.md` | Rust contract/domain module, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
-| `projects/L3-method-library/00-需求文档.md` | FR-ML definition/catalog scope and non-goals | pending | Do not restore old MethodContent/publish/snapshot/outbox semantics. |
-| `projects/L3-method-library/01-架构设计.md` | truth owner, Definition vs Use and dependency direction | pending | `VETO-ML-001` applies if truth owner is unclear or downstream use truth replaces this truth. |
-| `projects/L3-method-library/02-概要设计.md` | definition/catalog key objects and code subject framework | pending | Use current method asset definition/catalog object model. |
-| `projects/L3-method-library/03-详细设计.md` | object contracts, protocol contracts, state matrix, errors, test cut and implementation handoff | pending | Formal source for definition/catalog DTOs, domain objects, state/policy and safe errors. |
-| `projects/L3-method-library/04-配置设计.md` | source boundary, redaction and external summary constraints | pending | Definition/catalog must remain body-free and config-safe. |
-| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast definition/catalog slice and artifact/report rules | pending | Targeted report must derive from raw artifact if generated. |
-| `projects/L3-method-library/06-验收标准.md` | ML-FG-001/005, ML-RL-001, ML-SYNC-001 and `VETO-ML-001` | pending | Truth owner and definition/catalog foundation are blocking. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Current source for phase, boundary, allowed scope, checks and commit discipline. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | definition/catalog module contracts | pending | Use current module boundaries; do not invent modules. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | definition/catalog object contracts and state fields | pending | Required truth fields and typed refs must be formal. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | definition/catalog DTO shells | pending | This boundary can add DTOs, not accepted service behavior. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | definition/catalog state transitions and terminal rules | pending | State/policy implementation must match formal matrix. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | definition/catalog domain error surfaces | pending | Errors must be safe and body-free. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast definition/catalog ownership | pending | Use definition/catalog contract-domain slice only. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-03-a` row | pending | Allowed scope is definition/catalog DTO, domain object and state/policy. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-03-a` gate row and PH-03 gate | pending | Required checks are contract-domain-fast definition/catalog slice. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-03-a` commit body grouping | pending | Commit body must include `Definition and catalog contracts:` and `Method asset truth state:`. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-02-c` handoff state | latest implementation state | pending | Must confirm PH-02 foundations landed before this boundary starts. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | Must be re-read after reactivation; if a required implementation-closed carrier/schema is still missing, set `blocked / wait_design`. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented definition/catalog DTO, truth state, policy, marker or evidence schema | pending | Must be re-read after reactivation; implementation may copy only the closed carrier/schema and must not invent extra fields. |
+| `standards/coding/rust.md` | Rust contract/domain module, error and test conventions | pending | Must be re-read after reactivation. |
+| `projects/L3-method-library/00-需求文档.md` | FR-ML definition/catalog scope and non-goals | pending | Must be re-read after reactivation; confirms old MethodContent/publish/snapshot/outbox semantics remain forbidden. |
+| `projects/L3-method-library/01-架构设计.md` | truth owner, Definition vs Use and dependency direction | pending | Must be re-read after reactivation; `VETO-ML-001` remains blocking if a new truth carrier ambiguity appears. |
+| `projects/L3-method-library/02-概要设计.md` | definition/catalog key objects and code subject framework | pending | Must be re-read after reactivation; key objects are confirmed and current support carrier/schema is closed by formal §6 / Step 6. |
+| `projects/L3-method-library/03-详细设计.md` | object contracts, protocol contracts, state matrix, errors, test cut and implementation handoff | pending | Re-read after design closure; formal §6 now defines the exact current-boundary Rust-facing support carriers for definition/catalog. |
+| `projects/L3-method-library/04-配置设计.md` | source boundary, redaction and external summary constraints | pending | Must be re-read after reactivation. |
+| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast definition/catalog slice and artifact/report rules | pending | Must be re-read after reactivation. |
+| `projects/L3-method-library/06-验收标准.md` | ML-FG-001/005, ML-RL-001, ML-SYNC-001 and `VETO-ML-001` | pending | Must be re-read after reactivation; truth-owner ambiguity remains a hard blocker if reintroduced. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Must be re-read after reactivation; implementation must stop when current-boundary closure is insufficient. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | definition/catalog module contracts | pending | Must be re-read after reactivation. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | definition/catalog object contracts and state fields | pending | Re-read after design closure; Step 6 now includes the `commit-03-a` definition/catalog support carrier closure. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | definition/catalog DTO shells | pending | Must be re-read after reactivation; DTO family may reference only the closed support carriers and must not invent payload fields. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | definition/catalog state transitions and terminal rules | pending | Re-read after design closure; Step 10 now states the current `MethodAssetCatalogEntryStatus` exact labels and lifecycle relationship. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | definition/catalog domain error surfaces | pending | Must be re-read after reactivation. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast definition/catalog ownership | pending | Must be re-read after reactivation. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-03-a` row | pending | Must be re-read after reactivation. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-03-a` gate row and PH-03 gate | pending | Must be re-read after reactivation. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-03-a` commit body grouping | pending | Must be re-read after reactivation. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-02-c` handoff state | latest implementation state | pending | Implementation agent must record current worktree baseline before edits and protect unrelated files. |
 
 ---
 
@@ -99,9 +99,9 @@
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | Project ledger has advanced from `commit-02-c` to `commit-03-a`; this boundary is now current and starts from `read_docs`. | read_docs |
-| design_gate | pending | Definition/catalog closure must be re-read and implementation must confirm that no extra DTO field, truth-owner rule, state/policy outcome or error family needs to be invented. | wait_design |
+| design_gate | ready_for_rerun | Design-side closure now uniquely defines the current Rust-facing support carriers/schema for the definition/catalog truth objects; implementation must rerun this gate from required reads before code edits. | read_docs |
 | scope_gate | pending | Planned changes must stay inside contracts/domain definition/catalog DTO shells, truth state, exact policy/guard and focused tests only. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
+| worktree_gate | pending | Implementation agent must record current worktree baseline before any edit attempt and protect unrelated files. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/contract/domain checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
 | test_gate | pending | Contract-domain-fast definition/catalog slice and VETO-ML-001 targeted checks pass after activation. | fix_gate_failure |
 | evidence_gate | pending | Targeted artifact/report is optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
@@ -142,6 +142,7 @@
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
 | BLK-ML-03A-ACTIVATION-001 | activation_gate | resolved | Project ledger had not yet advanced through `commit-02-c`, so this future boundary could not be used for implementation yet. | `commit-02-c` handoff is now closed, project ledger advances to `commit-03-a`, and this boundary becomes current from `read_docs`. | read_docs |
+| BLK-ML-03A-DESIGN-001 | design_gate | resolved | Required reads and current-code inspection had found that the prior baseline did not uniquely close the Rust-facing carrier/schema for `MethodAssetDefinitionKind`, `MethodAssetIdentityKey`, `MethodAssetDefinitionSummary`, `ExternalSourceSummaryRefSet`, `MethodAssetCatalogEntryRefSet`, `MethodAssetCatalogClassification`, `MethodAssetApplicabilitySummary` and `MethodAssetCatalogEntryStatus`. | Formal `03` §6, Step 6 and Step 10 now publish the current-boundary carrier/schema closure; implementation must reread and rerun Design Gate rather than rely on the old blocked result. | read_docs |
 
 ---
 
@@ -150,4 +151,4 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| definition/catalog truth owner | exact current closure is definition/catalog foundation only | Current boundary may materialize definition/catalog DTO shells, domain truth objects, exact state/policy and focused tests, but it must defer accepted service flow, repository/runtime behavior and later phase slices. |
+| definition/catalog truth owner | resolved by current carrier/schema closure | Even when object names and state owners are known, implementation must stop if the current baseline does not uniquely close the Rust-facing support carriers/schema for the required truth objects; this boundary now records that closure and must be reread before code resumes. |

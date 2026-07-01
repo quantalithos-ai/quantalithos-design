@@ -1283,22 +1283,27 @@ pub struct MethodAssetDefinition;
 | `definition_summary` | `MethodAssetDefinitionSummary` | body-free 定义摘要;不得保存方法正文、外部正文或 artifact body。 |
 | `source_summary_refs` | `ExternalSourceSummaryRefSet` | 已承接的外部安全摘要引用;不拥有外部 truth。 |
 | `catalog_entry_refs` | `MethodAssetCatalogEntryRefSet` | 已关联目录条目的 typed refs;目录语义仍由 catalog entry 拥有。 |
+| `definition_lifecycle` | `MethodAssetDefinitionLifecycle` | definition truth 的唯一持久化 lifecycle carrier;由 `create(...)` 初始化为 `Active`,由 `mark_retired(...)` 转为 `Retired`,repository 必须随 `Versioned<MethodAssetDefinition>` 保存和返回。 |
 
 | 成员能力 | 作用 |
 |---|---|
 | `assert_same_identity(identity_key)` | 校验输入没有创建重复定义。 |
 | `link_catalog_entry(catalog_entry_ref)` | 关联目录条目,不复制目录 view。 |
 | `accept_source_summary(source_summary_ref)` | 记录可追溯外部摘要引用。 |
+| `assert_active_for_adjust()` | 调整 definition 前校验 `definition_lifecycle == Active`;`Retired` 必须返回 safe rejection,不得继续修改 truth。 |
+| `mark_retired(retirement_marker_ref: MethodLibrarySafeMarker)` | 将 `definition_lifecycle` 从 `Active` 转为 `Retired`;`retirement_marker_ref` 只作为 safe transition/effect 来源,不得保存 raw reason。 |
 | `assert_body_free()` | 校验定义摘要不含外部正文或 artifact body。 |
 
 | 工厂边界 | 作用 |
 |---|---|
-| `create(definition_ref, identity_key, definition_summary)` | 创建方法资产定义 truth。 |
-| `from_existing_definition(definition_ref, identity_key)` | 恢复已存在定义锚点,不重建 truth。 |
+| `create(definition_ref, identity_key, definition_summary)` | 创建方法资产定义 truth,并固定 `definition_lifecycle = Active`。 |
+| `from_existing_definition(definition_ref, identity_key)` | 恢复已存在定义锚点时必须复制 loaded truth 的 `definition_lifecycle`,不得默认为 `Active`。 |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
 | definition_is_truth | definition 是定义 truth owner,view/material 不能反写它。 |
+| definition_lifecycle_is_persisted_truth | `definition_lifecycle` 是 `Active` / `Retired` 的唯一 truth carrier;service、repository fake、query material 或 stored result 不得另建 private side-state。 |
+| retired_is_terminal_for_update | `Retired` definition 仍可历史读取,但不得 adjust、retire again、创建新的 catalog/formalization 主线;duplicate command 只能 replay stored result 或 safe reject。 |
 | no_method_content | 不恢复旧 `MethodContent` 总对象或正文生命周期。 |
 | no_external_body | 不保存标准全文、治理执行正文、artifact body。 |
 | no_formalization_decision | 不裁定正式版本或下游可消费性。 |
@@ -1332,15 +1337,19 @@ pub struct MethodAssetCatalogEntry;
 | `covers_scope(catalog_scope_ref)` | 判断目录条目是否覆盖指定目录范围。 |
 | `update_classification(classification)` | 更新分类语义,不生成 catalog view。 |
 | `mark_deprecated(reason_ref: MethodLibrarySafeMarker)` | 标记目录条目弃用线索,不删除 definition truth。 |
+| `assert_visible_for_reclassify()` | `commit-03-b` 重分类前校验 `catalog_status == Visible`;`Pending` / `Hidden` / `Deprecated` / `Retired` 不得被当作当前 `Registered`。 |
+| `mark_retired(retirement_marker_ref: MethodLibrarySafeMarker)` | 将目录条目从当前可发现状态转为 `Retired`;`retirement_marker_ref` 只作为 safe transition/effect 来源,不得保存 raw reason。 |
 
 | 工厂边界 | 作用 |
 |---|---|
-| `create_for_definition(definition_ref, catalog_scope_ref)` | 为定义创建目录条目。 |
-| `from_catalog_reclassification(catalog_entry_ref, classification)` | 基于显式重分类形成新目录线索。 |
+| `create_for_definition(definition_ref, catalog_scope_ref)` | 为定义创建目录条目,并固定 `catalog_status = Visible`。 |
+| `from_catalog_reclassification(catalog_entry_ref, classification)` | 基于显式重分类形成新目录线索;`commit-03-b` 只允许 loaded `Visible` entry 重分类并保持 `Visible`。 |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
 | catalog_entry_is_truth | catalog entry 是目录 truth;catalog view 只是派生读取。 |
+| registered_maps_to_visible | Step 10 中的内部 `Registered` 在 `commit-03-b` Rust-facing 实现中只对应 `MethodAssetCatalogEntryStatus::Visible`。 |
+| retired_is_terminal_for_catalog_entry | `Retired` catalog entry 仍可历史读取,但不得 reclassify 或再次 retire;duplicate command 只能 replay stored result 或 safe reject。 |
 | no_search_index | 不写搜索索引、缓存结构或 query material 实现。 |
 | no_formalization | 不裁定 formal version。 |
 | no_marketplace_listing | 不表达 marketplace listing、交易、安装或履约。 |
@@ -1356,19 +1365,29 @@ pub struct MethodAssetCatalogEntry;
 | `MethodAssetDefinitionSummary` | body-free struct | `summary_ref: MethodLibraryTypedBoundaryRef`;`definition_kind: MethodAssetDefinitionKind`;`safe_title_ref: MethodLibraryTypedBoundaryRef`;`safe_description_ref: Option<MethodLibraryTypedBoundaryRef>`;`summary_marker_ref: MethodLibrarySafeMarker` | 只保存可公开摘要引用和 marker;不得保存方法正文、外部正文、artifact/archive body、provider payload、report body 或旧 content payload。 |
 | `ExternalSourceSummaryRefSet` | deterministic ref-set struct | `refs: Vec<ExternalSourceSummaryRef>`;ordered by insertion after canonical dedup;empty allowed | 只保存 accepted external safe summary refs;不得保存 external body、URL/path、provider response、digest algorithm detail 或 archive body。 |
 | `MethodAssetCatalogEntryRefSet` | deterministic ref-set struct | `refs: Vec<MethodAssetCatalogEntryRef>`;ordered by insertion after canonical dedup;empty allowed | 只保存 catalog entry typed refs;catalog truth 仍由 `MethodAssetCatalogEntry` 拥有;不得由 catalog view/search result 反写。 |
+| `MethodAssetDefinitionLifecycle` | closed enum | `Active`;`Retired` | 当前 boundary 的 definition truth lifecycle carrier;`create` 只能产生 `Active`,`adjust` 必须保持 `Active`,`retire` 只能 `Active -> Retired`;不得使用 catalog status、formal version state、stored result kind、HTTP status、string status 或 fake private side-state 替代。 |
 | `MethodAssetCatalogClassification` | body-free struct | `definition_kind: MethodAssetDefinitionKind`;`catalog_scope_ref: CatalogScopeRef`;`classification_marker_ref: MethodLibrarySafeMarker` | 分类来源只能是 catalog command intent / policy-safe marker;不得保存 UI 分类、搜索排序、marketplace listing、tag body 或 free-form taxonomy。 |
 | `MethodAssetApplicabilitySummary` | body-free struct | `applicability_scope_ref: CatalogScopeRef`;`applicability_marker_ref: MethodLibrarySafeMarker`;`applicable_context_refs: Vec<MethodLibraryTypedBoundaryRef>`;ordered by insertion after canonical dedup;empty means scope-only applicability | 只表达适用语境摘要和 typed refs;不得保存下游 runtime truth、authorization matrix、organization config、marketplace transaction 或 UI state。 |
-| `MethodAssetCatalogEntryStatus` | closed enum | `Pending`;`Visible`;`Hidden`;`Deprecated`;`Retired` | 当前 boundary 的 catalog public/truth summary status;完整转换仍以 Step 10 lifecycle matrix 为准;不得用 HTTP status、search visibility、feature flag、cache state 或 string status 替代。 |
+| `MethodAssetCatalogEntryStatus` | closed enum | `Pending`;`Visible`;`Hidden`;`Deprecated`;`Retired` | 当前 boundary 的 catalog public/truth summary status;`commit-03-b` exact mapping: register creates `Visible`, reclassify requires and preserves `Visible`, retire requires `Visible` and persists `Retired`;`Pending` / `Hidden` / `Deprecated` are not generated by the six current accepted service flows and must not be silently mapped to `Registered`。不得用 HTTP status、search visibility、feature flag、cache state 或 string status 替代。 |
 
 `commit-03-a` catalog member parameter closure:
 
 | member capability | parameter | Rust-facing carrier | source rule | forbidden workaround |
 |---|---|---|---|---|
 | `MethodAssetCatalogEntry.mark_deprecated(reason_ref)` | `reason_ref` | `MethodLibrarySafeMarker` | 只能复制 catalog command intent、policy-safe marker 或正式 diagnostic marker 中已可公开的 safe marker;当前 boundary 不新增 `MethodAssetCatalogDeprecationReasonRef` / `*ReasonRef` family。 | 不得使用 raw string、UI label、HTTP status、error text、config value、fake private map、provider body 或 test-only marker;不得把该能力改成无参数 status toggle。 |
+| `MethodAssetCatalogEntry.mark_retired(retirement_marker_ref)` | `retirement_marker_ref` | `MethodLibrarySafeMarker` | 只能复制 `RetireCatalogEntryCommandSource.retirement_marker_ref` 或同等正式 safe retirement marker;当前 boundary 不新增 `MethodAssetCatalogRetirementReasonRef` / `*ReasonRef` family。 | 不得复用 `mark_deprecated`、raw reason text、HTTP status、route marker、config value、stored-result kind、fake private map 或参数为空的 `retire()` toggle。 |
 
-domain tests 必须覆盖 `mark_deprecated` 需要显式 safe marker、不能接受 raw reason payload、不能省略参数直接切换 `Deprecated`、且不会删除或重写 `definition_ref` / `catalog_entry_ref`。
+domain tests 必须覆盖 `mark_deprecated` 需要显式 safe marker、不能接受 raw reason payload、不能省略参数直接切换 `Deprecated`、且不会删除或重写 `definition_ref` / `catalog_entry_ref`。`commit-03-b` service/domain tests 还必须覆盖 catalog register 初始化 `Visible`、reclassify 只接受并保持 `Visible`、retire 通过 `mark_retired(MethodLibrarySafeMarker)` 持久化 `Retired`、`Retired` 后 reclassify / retire safe reject 或 duplicate replay,以及 fake/durable repository 不得用 private side-state 或默认 status 重建 catalog lifecycle。
 
-上述 8 个 carrier 与 `mark_deprecated(reason_ref: MethodLibrarySafeMarker)` 参数闭口是 `commit-03-a` 当前唯一允许实现的 definition/catalog support schema。若实现还需要新的字段、state、policy outcome、error variant、mapper、config key 或 evidence schema,必须暂停并回到设计真相源闭口。
+上述 carrier 与 `mark_deprecated(reason_ref: MethodLibrarySafeMarker)` / `mark_retired(retirement_marker_ref: MethodLibrarySafeMarker)` 参数闭口是 `commit-03-a` / `commit-03-b` 当前唯一允许实现的 definition/catalog support schema。`MethodAssetDefinitionLifecycle` 是 `commit-03-b` 为 accepted service vertical slice 追加的 truth-state carrier closure;catalog retirement closure 则复用已闭合的 `MethodAssetCatalogEntryStatus` 并固定 `Registered == Visible`、`Retired == Retired` 的 current-boundary 映射。实现侧只允许在最小 `crates/domain` 范围内补齐这些 transition guard;若实现还需要新的字段、state、policy outcome、error variant、mapper、config key 或 evidence schema,必须暂停并回到设计真相源闭口。
+
+`commit-03-b` definition lifecycle tests must cover:
+
+- establishing definition initializes `MethodAssetDefinitionLifecycle::Active`;
+- adjusting an `Active` definition preserves `Active`;
+- retiring an `Active` definition persists `Retired` through `Versioned<MethodAssetDefinition>`;
+- adjusting or retiring an already `Retired` definition returns a safe rejection or duplicate replay surface without mutating truth;
+- repository fake and durable store must not keep lifecycle in a private side map detached from `MethodAssetDefinition`.
 
 ### 3B. `commit-03-b` application support carrier / ref exact schema closure
 
@@ -1415,6 +1434,69 @@ Selector rules:
 - `typed_refs` and `safe_markers` may supply typed inputs to the selected carrier, but they must not select the service method by list order, count, marker text, raw string, route, config, fake map or handler branch.
 - The selector chooses exactly one service input carrier. If required typed refs / safe markers for that selected input are missing or wrong-kind, the branch returns a safe rejection; it must not fall through to another service input.
 - Duplicate replay digest must include the selected intent label; two commands with the same idempotency key but different intent labels are digest conflicts, not alternate interpretations.
+
+#### 3B.1B current-boundary body-free command source carrier closure
+
+`commit-03-b` accepted path 需要将 shell selector 选中的 command intent 装配成 Step 7 六个 service input。由于 `MethodLibraryCommandShell` 只承载 shared body-free shell,当前 boundary 正式引入 application-owned body-free source carrier:
+
+```rust
+pub enum MethodAssetDefinitionCatalogCommandSource {
+    EstablishDefinition(EstablishDefinitionCommandSource),
+    AdjustDefinition(AdjustDefinitionCommandSource),
+    RetireDefinition(RetireDefinitionCommandSource),
+    RegisterCatalogEntry(RegisterCatalogEntryCommandSource),
+    ReclassifyCatalogEntry(ReclassifyCatalogEntryCommandSource),
+    RetireCatalogEntry(RetireCatalogEntryCommandSource),
+}
+
+pub struct EstablishDefinitionCommandSource {
+    pub definition_kind: MethodAssetDefinitionKind,
+    pub identity_key: MethodAssetIdentityKey,
+    pub definition_summary: MethodAssetDefinitionSummary,
+    pub source_summary_refs: ExternalSourceSummaryRefSet,
+    pub preaccepted_catalog_entry_refs: MethodAssetCatalogEntryRefSet,
+}
+
+pub struct AdjustDefinitionCommandSource {
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub replacement_definition_summary: MethodAssetDefinitionSummary,
+    pub replacement_source_summary_refs: ExternalSourceSummaryRefSet,
+}
+
+pub struct RetireDefinitionCommandSource {
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub retirement_marker_ref: MethodLibrarySafeMarker,
+}
+
+pub struct RegisterCatalogEntryCommandSource {
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub catalog_scope_ref: CatalogScopeRef,
+    pub catalog_classification: MethodAssetCatalogClassification,
+    pub applicability_summary: MethodAssetApplicabilitySummary,
+}
+
+pub struct ReclassifyCatalogEntryCommandSource {
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub new_catalog_classification: MethodAssetCatalogClassification,
+    pub new_applicability_summary: MethodAssetApplicabilitySummary,
+}
+
+pub struct RetireCatalogEntryCommandSource {
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub retirement_marker_ref: MethodLibrarySafeMarker,
+}
+```
+
+Carrier rules:
+
+- `MethodAssetDefinitionCatalogCommandSource` is application-owned and body-free. It is not a public command DTO body, not a route/RPC binding, not a transport payload and not a replacement for Step 8 protocol contracts.
+- Every nested field must reuse the already-closed Step 6 `3A` / `3B` carriers. No extra local `*Kind`, `*Summary`, `*RefSet`, marker, reason or fake-only carrier may be introduced by implementation.
+- The source variant must match the selector chosen from `MethodLibraryCommandShell.boundary_ref.kind`. A mismatch, missing source carrier or unsupported source variant is safe rejected before UoW mutation and stored as a rejected result.
+- This carrier owns the structured accepted-path payload for current boundary service assembly. The facade must not recover those fields from `typed_refs` order, `typed_refs` count, safe marker text, route, handler branch, config key, service locator, fake private map, raw body or provider payload.
+- `ExternalSourceSummaryRefSet` and `MethodAssetCatalogEntryRefSet` keep their deterministic canonical dedup semantics from Step 6 `3A`; empty set is allowed only where the field type says empty allowed.
+- `retirement_marker_ref`, `summary_marker_ref`, `classification_marker_ref` and `applicability_marker_ref` must remain `MethodLibrarySafeMarker` values supplied by closed mapper/source carrier construction; they must not be raw reason text, UI label, HTTP status, config value, repository error text or provider body.
+- The canonical duplicate digest must include `command_shell.capability_kind`, `command_shell.boundary_ref.kind`, the matched `MethodAssetDefinitionCatalogCommandSource` variant label and all body-free source carrier fields in canonical form. It must exclude raw DTO body, route, transport metadata except the formal idempotency metadata, provider payload and fake-only state.
+- If implementation only receives `MethodLibraryCommandShell` without this source carrier, accepted mutation cannot be assembled; the facade must safe reject instead of guessing from shell arrays.
 
 #### 3B.2 set and result support carriers
 

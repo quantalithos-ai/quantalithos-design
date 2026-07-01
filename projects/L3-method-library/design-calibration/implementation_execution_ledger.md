@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `current-design-with-commit-03-b-selector-scope-closure` |
+| current_design_baseline | `current-design-with-commit-03-b-catalog-retire-closure` |
 | current_boundary | `commit-03-b` |
-| gate_status | ready |
-| gate_reason | Design closure resolved the two latest `commit-03-b` blockers: Allowed Scope now includes the minimal contracts ref kind registry/export change required by Step 6 `3B.1` / `3B.1A`; and Step 6 `3B.1A`, Step 7 `R7.10A` §1B, Step 9 definition/catalog notes and formal `03` §6.3A now close `MethodLibraryCommandShell.boundary_ref.kind` as the exact selector source into one of six definition/catalog service inputs. |
-| next_allowed_action | read_docs |
-| current_recovery_point | `commit-03-b` is reactivated at baseline `current-design-with-commit-03-b-selector-scope-closure`; implementation must read this ledger, read `implementation-boundaries/commit-03-b.md`, reread all required sources and rerun Design Gate / Scope Gate before editing code. |
-| last_updated_by | design agent |
-| last_updated_at | 2026-07-01 18:31:00 +0800 |
+| gate_status | ready_for_design_gate |
+| gate_reason | `commit-03-b` now formally closes catalog retirement: Step 6 / formal `03` define `MethodAssetCatalogEntry.mark_retired(retirement_marker_ref: MethodLibrarySafeMarker)`, Step 9 requires `retire_catalog_entry` to assert `catalog_status == Visible` and persist `Retired`, and Step 10 maps internal `Registered` to `MethodAssetCatalogEntryStatus::Visible` with `Visible -> Retired` as the only current-boundary retirement transition. |
+| next_allowed_action | read_current_boundary_ledger |
+| current_recovery_point | `commit-03-b` reactivated after BLK-ML-03B-DESIGN-009 closure. Implementation must reread this ledger, `implementation-boundaries/commit-03-b.md`, formal `03`, Step 6 / Step 7 / Step 9 / Step 10 and `07-实施计划.md`;catalog register/reclassify/retire must use the exact `Visible -> Retired` mapping and must not synthesize catalog status from private maps, search visibility, route text, stored-result kind or default values. |
+| last_updated_by | implementation agent |
+| last_updated_at | 2026-07-01 22:17:33 +0800 |
 
 ---
 
@@ -35,7 +35,7 @@
 | `commit-02-b` | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-b` completed at `9f876697e0487f0c4cf4966928895a24e6559f5d`; shared domain error foundation, five pure policy shells, exact judgement-state enums and pure-domain tests handoff are closed. |
 | `commit-02-c` | `3220f2ee2f10a9889bc10535969e3fae989c236d` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-c` completed at `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests handoff are closed. |
 | `commit-03-a` | `current-design-with-commit-03-a-reason-marker-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-a` completed at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; definition/catalog carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
-| `commit-03-b` | `current-design-with-commit-03-b-selector-scope-closure` | ready | design_gate | read_docs | Design closure now opens minimal contracts ref-kind owner scope and closes shell selector dispatch from `MethodLibraryCommandShell.boundary_ref.kind` into exactly one of the six definition/catalog service inputs; implementation must restart from `read_docs` and rerun gates. |
+| `commit-03-b` | `current-design-with-commit-03-b-catalog-retire-closure` | ready | design_gate | read_docs | Formal `03`, Step 6, Step 9, Step 10 and formal `07` now state catalog register creates `Visible`, reclassify requires/preserves `Visible`, and `retire_catalog_entry` uses `mark_retired(MethodLibrarySafeMarker)` to persist `Retired`;`Pending` / `Hidden` / `Deprecated` are not silently mapped to `Registered` in this boundary. |
 
 ---
 
@@ -62,6 +62,10 @@
 | BLK-ML-03B-DESIGN-003 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-exact-schema-closure` | Formal `03` §6.3A, Step 6 `3B` and Step 7 `R7.10A` now close exact Rust-facing schemas for `MethodAssetDefinitionCatalogCommandDispatchInput` / `Output`, the six `*Input` carriers, application-owned replay/idempotency refs, stored-result body-free carriers and `MethodAssetRepositoryError`; implementation must resume from `read_docs` and must not invent local carrier fields, error variants or fake-only refs. |
 | BLK-ML-03B-DESIGN-004 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-selector-scope-closure` | Step 6 `3B.1` / `3B.1A` exact labels remain owned by `MethodLibraryTypedBoundaryRefKind`; current boundary Allowed Scope now includes minimal `crates/contracts/src/**` and `crates/contracts/tests/**` changes for ref kind registry/export and selector fixtures, while forbidding unrelated contracts DTO/payload work. |
 | BLK-ML-03B-DESIGN-005 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-selector-scope-closure` | Step 6 `3B.1A`, Step 7 `R7.10A` §1B and Step 9 definition/catalog notes now define `MethodLibraryCommandShell.boundary_ref.kind` as the formal selector source, list six exact intent labels and map each to exactly one service input/method with safe rejection for unsupported/unknown/missing selector. |
+| BLK-ML-03B-DESIGN-006 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-command-source-closure` | Formal `03` §6.3A, Step 6 `3B.1B`, Step 7 `R7.10A` §1A / §1C and Step 9 definition/catalog notes now introduce `MethodAssetDefinitionCatalogCommandSource`, require shell selector/source variant match, define exact source-to-service-input field copy rules, expected-version load sources, safe rejection for mismatch/missing source and duplicate digest canonicalization. |
+| BLK-ML-03B-DESIGN-007 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-definition-lifecycle-closure` | Formal `03` §6/§9/§10, Step 6, Step 7, Step 9 and Step 10 now close `MethodAssetDefinitionLifecycle = Active | Retired` as `MethodAssetDefinition.definition_lifecycle`; establish initializes `Active`, adjust requires/preserves `Active`, retire persists `Retired`, and repository fake/durable implementations must return the lifecycle through `Versioned<MethodAssetDefinition>` without private side-state. Implementation must resume from `read_docs` and rerun Design Gate. |
+| BLK-ML-03B-DESIGN-008 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-retire-formal-version-carveout` | Formal `03` §6.3A / §10.2A, Step 7 `R7.10A`, Step 9 definition/catalog flow cards and overlay, Step 10 definition lifecycle matrix, and formal `07` now carve formal-version traceability / active-conflict checks out of `commit-03-b`. `retire_definition` current-boundary behavior is load definition, assert `definition_lifecycle = Active`, use loaded expected version, apply safe retirement marker, save and replay stored result. Implementation must not invent formal-version repository methods or fake conflict checks. |
+| BLK-ML-03B-DESIGN-009 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-catalog-retire-closure` | Formal `03` §6 / §9, Step 6, Step 9, Step 10 and formal `07` now close catalog retirement: `MethodAssetCatalogEntry.mark_retired(retirement_marker_ref: MethodLibrarySafeMarker)`, exact `Registered == Visible`, register creates `Visible`, reclassify requires/preserves `Visible`, retire requires `Visible` and persists `Retired`;`Pending` / `Hidden` / `Deprecated` are safe-reject/non-current states for these accepted service flows. Implementation must resume from `read_docs` and must not invent private catalog status maps or default mappings. |
 
 ---
 
@@ -75,7 +79,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. `commit-03-b` is current at baseline `current-design-with-commit-03-b-selector-scope-closure`; implementation must reread the current boundary and rerun the boundary gates before editing code.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. `commit-03-b` is current at baseline `current-design-with-commit-03-b-catalog-retire-closure`; implementation must reread the current boundary and rerun gates before editing code.
 
 ---
 
@@ -101,4 +105,4 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-02-b` | implemented handoff closed | Implementation handoff records shared domain foundation commit `9f876697e0487f0c4cf4966928895a24e6559f5d`; exact pure-domain error kinds, current-boundary policy shells, judgement-state enums and pure-domain tests are closed. |
 | `commit-02-c` | implemented handoff closed | Implementation handoff records application shell foundation commit `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests are closed. |
 | `commit-03-a` | implemented handoff closed | Implementation handoff records definition/catalog contracts and domain truth commit `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; support carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
-| `commit-03-b` | reactivated for design gate rerun | Design baseline `current-design-with-commit-03-b-selector-scope-closure` closes exact facade I/O, service input carriers, replay/idempotency refs, stored result carriers, repository error surface, minimal contracts ref-kind owner scope and shell selector dispatch; implementation must restart from `read_docs`, rerun Design Gate / Scope Gate and only then edit allowed service/fake/minimal-entry/contracts-ref scope. |
+| `commit-03-b` | design gate reactivated after catalog retirement closure | Design baseline `current-design-with-commit-03-b-catalog-retire-closure` closes lifecycle persistence, the retire-definition formal-version carve-out and catalog retirement transition mapping. Implementation may resume from `read_docs` and rerun Design Gate without inventing a catalog retirement helper or private status map. |

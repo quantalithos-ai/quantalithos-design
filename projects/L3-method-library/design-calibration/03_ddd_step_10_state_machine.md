@@ -821,6 +821,8 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.8 business truth �
 | `Active` | definition 已建立,可被调整、编目、正式化或追溯引用。 | readable |
 | `Retired` | definition 已退休,历史仍可读,不得继续调整或创建新 catalog/formalization 主线。 | readable historical |
 
+`commit-03-b` Rust-facing lifecycle carrier 使用 `MethodAssetDefinitionLifecycle = Active | Retired`。该 carrier 是 `MethodAssetDefinition.definition_lifecycle` 的持久化字段,由 definition repository 作为 `Versioned<MethodAssetDefinition>` 的一部分读写。实现当前 boundary 时必须使用这两个 exact labels;不得引入 draft/proposed/deprecated/superseded、catalog status、formal version state、HTTP status、string status、stored result kind 或 fake private side-state 代替 definition lifecycle。
+
 ```text
 [virtual:not_created]
   | EstablishMethodAssetDefinitionFlow
@@ -835,8 +837,10 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.8 business truth �
 | from | trigger | precondition | to | side effect boundary |
 |---|---|---|---|---|
 | virtual not created | `EstablishMethodAssetDefinitionFlow` | valid identity key;accepted external summary refs if provided;no duplicate replay mutation | `Active` | definition history;definition changed event candidate;stored accepted result |
-| `Active` | `AdjustMethodAssetDefinitionFlow` | exact definition read;expected version;basis/external summaries safe;policy diagnostic accepted | `Active` | definition history;audit hint;stored result |
-| `Active` | `RetireMethodAssetDefinitionFlow` | exact definition read;linked formal versions remain traceable;policy allows retirement reason | `Retired` | retired history;definition changed event candidate |
+| `Active` | `AdjustMethodAssetDefinitionFlow` | exact definition read exposes `definition_lifecycle = Active`;expected version;basis/external summaries safe;policy diagnostic accepted | `Active` | definition history;audit hint;stored result |
+| `Active` | `RetireMethodAssetDefinitionFlow` | exact definition read exposes `definition_lifecycle = Active`;expected version;safe retirement marker | `Retired` | retired history;definition changed event candidate |
+
+`commit-03-b` state-matrix carve-out: definition retirement does not require a formal-version repository precheck in this boundary. Formal-version traceability, active formal-version conflict policy, and any reasoned exception are PH-04 formalization/version concerns and require a separately closed `FormalMethodAssetVersionRepository` callable surface before implementation.
 
 非法转换占位:
 
@@ -854,7 +858,7 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.8 business truth �
 | `Registered` | catalog entry 已绑定 definition 与 catalog scope。 | readable |
 | `Retired` | catalog entry 已退休,不再作为当前发现入口。 | readable historical |
 
-`commit-03-a` Rust-facing status carrier 使用 `MethodAssetCatalogEntryStatus = Pending | Visible | Hidden | Deprecated | Retired`。该 status 是 catalog public/truth summary status,用于 contracts/domain 当前边界落码;本状态机中的 `Registered` 是 transition matrix 的内部 lifecycle 归纳名。实现当前 boundary 时必须使用 `MethodAssetCatalogEntryStatus` 的 exact labels,并将具体转换规则限制在本矩阵允许的 register / reclassify / retire trigger 内,不得引入 HTTP status、search visibility、feature flag、cache state 或 string status。
+`commit-03-a` Rust-facing status carrier 使用 `MethodAssetCatalogEntryStatus = Pending | Visible | Hidden | Deprecated | Retired`。该 status 是 catalog public/truth summary status,用于 contracts/domain 当前边界落码;本状态机中的 `Registered` 是 transition matrix 的内部 lifecycle 归纳名。`commit-03-b` exact mapping: `Registered == MethodAssetCatalogEntryStatus::Visible`, `Retired == MethodAssetCatalogEntryStatus::Retired`;`Pending` / `Hidden` / `Deprecated` 是闭合枚举标签但不由当前六条 accepted service flow 生成,也不得被实现端默认为 `Registered`。实现当前 boundary 时必须使用这些 exact labels,并将具体转换规则限制在本矩阵允许的 register / reclassify / retire trigger 内,不得引入 HTTP status、search visibility、feature flag、cache state 或 string status。
 
 ```text
 [virtual:not_created]
@@ -869,9 +873,9 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.8 business truth �
 
 | from | trigger | precondition | to | side effect boundary |
 |---|---|---|---|---|
-| virtual not created | `RegisterMethodAssetCatalogEntryFlow` | linked definition exists;scoped catalog lookup allows new entry;expected scope valid | `Registered` | catalog history;catalog entry changed event candidate;stored result |
-| `Registered` | `ReclassifyMethodAssetCatalogEntryFlow` | exact catalog read;expected version;policy diagnostic accepts new scope | `Registered` | catalog history;catalog changed event candidate |
-| `Registered` | `RetireMethodAssetCatalogEntryFlow` | exact catalog read;safe retirement reason | `Retired` | catalog retired history;catalog event candidate |
+| virtual not created | `RegisterMethodAssetCatalogEntryFlow` | linked definition exists;scoped catalog lookup allows new entry;expected scope valid | `Registered` / `Visible` | catalog history;catalog entry changed event candidate;stored result |
+| `Registered` / `Visible` | `ReclassifyMethodAssetCatalogEntryFlow` | exact catalog read exposes `catalog_status = Visible`;expected version;policy diagnostic accepts new scope | `Registered` / `Visible` | catalog history;catalog changed event candidate |
+| `Registered` / `Visible` | `RetireMethodAssetCatalogEntryFlow` | exact catalog read exposes `catalog_status = Visible`;expected version;safe retirement marker | `Retired` | catalog retired history;catalog event candidate |
 
 非法转换占位:
 
@@ -879,6 +883,7 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.8 business truth �
 |---|---|---|
 | `Retired` | reclassify / register duplicate | retirement does not delete history and cannot recreate same truth in place |
 | any | create or retire definition | catalog state never mutates `MethodAssetDefinition` |
+| `Pending` / `Hidden` / `Deprecated` | reclassify / retire as current `Registered` | these labels are not generated by the current six accepted service flows and cannot be silently treated as `Visible` in `commit-03-b` |
 
 ### 4. `FormalizationState` 状态机
 

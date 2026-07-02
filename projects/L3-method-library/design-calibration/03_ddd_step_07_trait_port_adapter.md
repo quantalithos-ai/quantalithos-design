@@ -988,7 +988,9 @@ After selector choice, the facade must match the selected shell intent with the 
 
 Catalog object helper rules:
 
-- `RegisterCatalogEntry` must call `MethodAssetCatalogEntry::create_for_definition(catalog_entry_ref, definition_ref, catalog_scope_ref, catalog_classification, applicability_summary)` after loading the linked definition. The `catalog_entry_ref` is created by the current-boundary support ref / id helper with exact kind `MethodAssetCatalogEntry`.
+- `EstablishDefinition` must call `MethodAssetDefinitionCatalogSupportRefFactory.new_definition_ref(identity_key, operation_context_ref, operation_digest_ref, dedup_scope_ref)` after duplicate replay lookup misses and before `MethodAssetDefinition::create(...)`. The returned `definition_ref` is the only accepted new definition truth ref for this boundary.
+- `RegisterCatalogEntry` must call `MethodAssetDefinitionCatalogSupportRefFactory.new_catalog_entry_ref(definition_ref, catalog_scope_ref, catalog_classification, applicability_summary, operation_context_ref, operation_digest_ref, dedup_scope_ref)` after loading the linked definition and confirming no existing `(definition_ref,catalog_scope_ref)` catalog entry. It must then call `MethodAssetCatalogEntry::create_for_definition(catalog_entry_ref, definition_ref, catalog_scope_ref, catalog_classification, applicability_summary)`.
+- `MethodAssetDefinitionCatalogSupportRefFactory` is the only current-boundary callable source for newly minted `MethodAssetDefinitionRef` / `MethodAssetCatalogEntryRef`;service code must not call a generic IdGenerator directly, parse typed-ref text, use repository row ids, route/request ids, timestamps, counters, config keys or fake private maps.
 - `create_for_definition(...)` must reject mismatched `catalog_scope_ref`, `catalog_classification.catalog_scope_ref` and `applicability_summary.applicability_scope_ref`;repository/fake must not repair or default these fields.
 - `ReclassifyCatalogEntry` must call `loaded.value.reclassify(new_catalog_classification, new_applicability_summary)` after `catalog_status == Visible` is confirmed. It must update both classification and applicability in the saved truth and keep `catalog_status = Visible`.
 - Reclassification must reject mismatched `new_catalog_classification.catalog_scope_ref` and `new_applicability_summary.applicability_scope_ref`;it must not keep stale applicability from the loaded entry.
@@ -1018,6 +1020,23 @@ pub trait MethodAssetDefinitionCatalogSupportRefFactory {
     fn new_safe_ignore_reason_ref(&mut self) -> MethodAssetSafeIgnoreReasonRef;
     fn new_effect_summary_ref(&mut self) -> MethodAssetEffectSummaryRef;
     fn new_replay_marker_ref(&mut self) -> MethodAssetReplayMarkerRef;
+    fn new_definition_ref(
+        &mut self,
+        identity_key: MethodAssetIdentityKey,
+        operation_context_ref: MethodAssetOperationContextRef,
+        operation_digest_ref: MethodAssetOperationDigestRef,
+        dedup_scope_ref: MethodAssetDedupScopeRef,
+    ) -> MethodAssetDefinitionRef;
+    fn new_catalog_entry_ref(
+        &mut self,
+        definition_ref: MethodAssetDefinitionRef,
+        catalog_scope_ref: CatalogScopeRef,
+        catalog_classification: MethodAssetCatalogClassification,
+        applicability_summary: MethodAssetApplicabilitySummary,
+        operation_context_ref: MethodAssetOperationContextRef,
+        operation_digest_ref: MethodAssetOperationDigestRef,
+        dedup_scope_ref: MethodAssetDedupScopeRef,
+    ) -> MethodAssetCatalogEntryRef;
 }
 ```
 
@@ -1121,6 +1140,7 @@ pub struct RetireMethodAssetCatalogEntryInput {
 Source restrictions:
 
 - `operation_context_ref`, `idempotency_key_ref`, `operation_digest_ref` and `dedup_scope_ref` use Step 6 `3B` application-owned carriers only.
+- New `definition_ref` for establish and new `catalog_entry_ref` for register are minted only through `MethodAssetDefinitionCatalogSupportRefFactory.new_definition_ref(...)` / `new_catalog_entry_ref(...)` at the accepted flow points;repository save, domain factory, API handler and fake runtime must not create or replace truth refs.
 - `expected_version` is copied from the matching `Versioned<T>` repository load;create commands do not invent expected version.
 - `preaccepted_catalog_entry_refs` is an empty-allowed deterministic ref-set;absence must be represented by empty set, not `None` plus private fake rule.
 - `retirement_marker_ref` is a `MethodLibrarySafeMarker`;it must not be raw reason text, HTTP status, UI label or config value.

@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `current-design-with-commit-03-b-helper-factory-closure` |
+| current_design_baseline | `current-design-with-commit-03-b-truth-ref-factory-closure` |
 | current_boundary | `commit-03-b` |
 | gate_status | ready_for_design_gate |
-| gate_reason | `commit-03-b` now closes the two latest helper/factory gaps: Step 6 / formal `03` define exact catalog-entry create/reclassify helper signatures covering `catalog_classification` and `applicability_summary`, and Step 6 / Step 7 define `MethodAssetDefinitionCatalogSupportRefFactory` plus replay envelope input/output/error surfaces for operation-context, idempotency, digest, dedup and stored-result related opaque refs. |
+| gate_reason | `commit-03-b` truth-ref creation closure is now formalized: Step 6 `3B.1.1`, Step 7 `R7.10A`, Step 9 definition/catalog overlay and formal `03/07` close `MethodAssetDefinitionCatalogSupportRefFactory.new_definition_ref(...)` / `new_catalog_entry_ref(...)` as the only current-boundary source for new definition/catalog truth refs. |
 | next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | `commit-03-b` reactivated after BLK-ML-03B-DESIGN-010 and BLK-ML-03B-DESIGN-011 closure. Implementation must reread this ledger, `implementation-boundaries/commit-03-b.md`, formal `03`, Step 6 / Step 7 / Step 9 / Step 10 and `07-实施计划.md`;catalog helper parameters and replay envelope refs must be copied from the newly closed helper/factory surfaces, not invented locally. |
-| last_updated_by | implementation agent |
-| last_updated_at | 2026-07-01 23:12:00 +0800 |
+| current_recovery_point | `commit-03-b` reactivated after BLK-ML-03B-DESIGN-012 closure. Implementation must reread this ledger, `implementation-boundaries/commit-03-b.md`, formal `03`, Step 6 / Step 7 / Step 9 / Step 10 and `07-实施计划.md`;new `MethodAssetDefinitionRef` / `MethodAssetCatalogEntryRef` must be copied from the closed support ref factory methods, not minted locally. |
+| last_updated_by | design agent |
+| last_updated_at | 2026-07-02 00:00:00 +0800 |
 
 ---
 
@@ -35,7 +35,7 @@
 | `commit-02-b` | `544ad0eeb00a2e0bcb8eca17cf29b55d23ea769b` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-b` completed at `9f876697e0487f0c4cf4966928895a24e6559f5d`; shared domain error foundation, five pure policy shells, exact judgement-state enums and pure-domain tests handoff are closed. |
 | `commit-02-c` | `3220f2ee2f10a9889bc10535969e3fae989c236d` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-c` completed at `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests handoff are closed. |
 | `commit-03-a` | `current-design-with-commit-03-a-reason-marker-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-a` completed at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; definition/catalog carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
-| `commit-03-b` | `current-design-with-commit-03-b-helper-factory-closure` | ready | design_gate | read_docs | Formal `03`, Step 6, Step 7 and formal `07` now close catalog helper persisted-field coverage and replay envelope/support ref factory generation;implementation resumes from `read_docs` and must not locally construct helper parameters or opaque refs. |
+| `commit-03-b` | `current-design-with-commit-03-b-truth-ref-factory-closure` | ready | design_gate | read_docs | Formal `03`, Step 6, Step 7, Step 9 and formal `07` now close catalog helper persisted-field coverage, replay envelope/support ref factory generation and definition/catalog truth-ref factory methods;implementation resumes from `read_docs` and must not locally construct helper parameters, opaque refs or truth refs. |
 
 ---
 
@@ -68,6 +68,7 @@
 | BLK-ML-03B-DESIGN-009 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-catalog-retire-closure` | Formal `03` §6 / §9, Step 6, Step 9, Step 10 and formal `07` now close catalog retirement: `MethodAssetCatalogEntry.mark_retired(retirement_marker_ref: MethodLibrarySafeMarker)`, exact `Registered == Visible`, register creates `Visible`, reclassify requires/preserves `Visible`, retire requires `Visible` and persists `Retired`;`Pending` / `Hidden` / `Deprecated` are safe-reject/non-current states for these accepted service flows. Implementation must resume from `read_docs` and must not invent private catalog status maps or default mappings. |
 | BLK-ML-03B-DESIGN-010 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-helper-factory-closure` | Formal `03` §6.3A, Step 6 `MethodAssetCatalogEntry`, Step 7 `R7.10A` and formal `07` now close exact helper signatures / field-copy rules: `create_for_definition(catalog_entry_ref, definition_ref, catalog_scope_ref, catalog_classification, applicability_summary)` and `reclassify(new_catalog_classification, new_applicability_summary)` cover all current-boundary persisted catalog fields and reject scope mismatch. |
 | BLK-ML-03B-DESIGN-011 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-helper-factory-closure` | Formal `03` §6.3A, Step 6 `3B.1.1`, Step 7 `R7.10A` and formal `07` now close `MethodAssetDefinitionCatalogSupportRefFactory`, `MethodAssetDefinitionCatalogReplayEnvelopeFactoryInput`, `MethodAssetDefinitionCatalogReplayEnvelope` and `MethodAssetReplayEnvelopeBuildError`;facade/service code must copy factory outputs for operation-context/idempotency/digest/dedup and stored-result related refs, and must not mint opaque refs locally. |
+| BLK-ML-03B-DESIGN-012 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-truth-ref-factory-closure` | Formal `03` §6.3A, Step 6 `3B.1.1`, Step 7 `R7.10A`, Step 9 definition/catalog overlay and formal `07` now close `MethodAssetDefinitionCatalogSupportRefFactory.new_definition_ref(...)` / `new_catalog_entry_ref(...)` as the only current-boundary source for new `MethodAssetDefinitionRef` and `MethodAssetCatalogEntryRef`;service/domain/repository/API/fake code must not mint or replace truth refs locally. |
 
 ---
 
@@ -81,7 +82,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque-ref factory or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. `commit-03-b` is current at baseline `current-design-with-commit-03-b-helper-factory-closure`; implementation must reread the current boundary and rerun gates before editing code.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. `commit-03-b` is current at baseline `current-design-with-commit-03-b-truth-ref-factory-closure`; implementation must reread the current boundary and rerun gates before editing code.
 
 ---
 
@@ -107,4 +108,4 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-02-b` | implemented handoff closed | Implementation handoff records shared domain foundation commit `9f876697e0487f0c4cf4966928895a24e6559f5d`; exact pure-domain error kinds, current-boundary policy shells, judgement-state enums and pure-domain tests are closed. |
 | `commit-02-c` | implemented handoff closed | Implementation handoff records application shell foundation commit `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests are closed. |
 | `commit-03-a` | implemented handoff closed | Implementation handoff records definition/catalog contracts and domain truth commit `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; support carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
-| `commit-03-b` | design gate reactivated after helper/factory closure | Design baseline `current-design-with-commit-03-b-helper-factory-closure` closes catalog helper persisted-field coverage and replay envelope/support ref factory generation in addition to lifecycle persistence, the retire-definition formal-version carve-out and catalog retirement transition mapping. Implementation may resume from `read_docs` and rerun Design Gate without inventing catalog helper parameters, replay opaque refs, a catalog retirement helper or private status map. |
+| `commit-03-b` | design gate reactivated after truth-ref factory closure | Design baseline `current-design-with-commit-03-b-truth-ref-factory-closure` closes definition/catalog truth-ref factory methods in addition to catalog helper persisted-field coverage, replay envelope/support ref factory generation, lifecycle persistence, the retire-definition formal-version carve-out and catalog retirement transition mapping. Implementation may resume from `read_docs` and rerun Design Gate without inventing catalog helper parameters, replay opaque refs, definition/catalog truth refs, a catalog retirement helper or private status map. |

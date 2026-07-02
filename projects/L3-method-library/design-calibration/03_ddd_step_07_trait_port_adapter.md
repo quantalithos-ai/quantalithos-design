@@ -1279,6 +1279,317 @@ This section resolves `BLK-ML-03B-DESIGN-001` and `BLK-ML-03B-DESIGN-002`. Imple
 
 ---
 
+## R7.10B `commit-04-b` implementation-facing closure
+
+### 1. Design patch scope
+
+本节闭合 `commit-04-b` 当前 formalization/version accepted service vertical slice。它只把 already-defined PH-04 command service、duplicate replay、version conflict 和 commit unknown 补成 Rust-facing facade / service input / repository / resolver / UoW surface。它不新增 public command DTO body,不进入 query/material/publisher/job,也不恢复 publish/fingerprint/snapshot/outbox 主线。
+
+| closure item | current-boundary decision |
+|---|---|
+| command family carrier | `MethodAssetCommandFamilyKind` 在 `commit-04-b` 的 exact Rust-facing carrier 是 `method_library_contracts::MethodLibraryCapabilityKind`;本 boundary 只接受 `FormalizationVersion`,其他 family safe rejected。 |
+| command shell input | API entry passes `method_library_contracts::MethodLibraryCommandShell` plus `MethodAssetFormalizationVersionCommandSource`, `MethodAssetApiEntryContextRef` and `MethodAssetApplicationDispatchRef`;entry 不展开 public DTO body,不创建 domain object。 |
+| application dispatch ref | `MethodAssetApplicationDispatchRef` 是 application-owned opaque dispatch marker;`commit-04-b` 唯一合法值是 `FormalizationVersionCommandService`;不得使用 route string、type-name string、config key 或 fake private locator。 |
+| application facade | API 只调用 `MethodAssetFormalizationVersionCommandFacade.dispatch_formalization_version_command(input)`,不得直连 repository、domain、UoW 或 infra adapter。 |
+| command service methods | `evaluate_formalization_eligibility`;`initiate_formalization`;`establish_formal_version`;`record_formal_version_semantic_change`;`supersede_formal_version`;`retire_formal_version`。 |
+| truth/support repositories | definition/catalog repositories 复用 `commit-03-b` exact callable surface;本 boundary 新增 formalization state、formal version、basis summary exact read/save/current lookup surface。 |
+| resolver / builder seams | formalization basis resolver、policy diagnostic builder、retirement precheck helper 只返回 body-free summary / marker / safe reason。 |
+| replay / commit unknown | duplicate replay 只复制 stored safe result;commit unknown 只允许 formal stored surface + versioned repo read-back,不得 blind retry。 |
+
+### 1A. Facade I/O exact Rust-facing schema
+
+```rust
+pub struct MethodAssetFormalizationVersionCommandDispatchInput {
+    pub command_shell: MethodLibraryCommandShell,
+    pub command_source: MethodAssetFormalizationVersionCommandSource,
+    pub api_entry_context_ref: MethodAssetApiEntryContextRef,
+    pub application_dispatch_ref: MethodAssetApplicationDispatchRef,
+}
+
+pub struct MethodAssetFormalizationVersionCommandDispatchOutput {
+    pub stored_result_ref: MethodAssetStoredOperationResultRef,
+    pub result_kind: MethodAssetStoredOperationResultKind,
+    pub replay_marker_ref: MethodAssetReplayMarkerRef,
+    pub accepted_summary_ref: Option<MethodAssetAcceptedOperationSummaryRef>,
+    pub rejected_reason_ref: Option<MethodAssetSafeRejectReasonRef>,
+    pub ignored_reason_ref: Option<MethodAssetSafeIgnoreReasonRef>,
+    pub effect_summary_refs: MethodAssetEffectSummaryRefSet,
+}
+```
+
+`MethodAssetFormalizationVersionCommandDispatchOutput` is assembled only by copying the stored-result safe surface. The facade must not rebuild accepted/rejected output from current truth,raw repository rows,transport status,governance body,trace/audit material or provider payload.
+
+### 1B. Command shell selector and dispatch closure
+
+```rust
+pub enum MethodAssetFormalizationVersionCommandSelector {
+    EvaluateFormalizationEligibility,
+    InitiateFormalization,
+    EstablishFormalVersion,
+    RecordFormalVersionSemanticChange,
+    SupersedeFormalVersion,
+    RetireFormalVersion,
+}
+
+pub enum MethodAssetFormalizationVersionServiceInput {
+    EvaluateFormalizationEligibility(EvaluateMethodAssetFormalizationEligibilityInput),
+    InitiateFormalization(InitiateMethodAssetFormalizationInput),
+    EstablishFormalVersion(EstablishFormalMethodAssetVersionInput),
+    RecordFormalVersionSemanticChange(RecordFormalVersionSemanticChangeInput),
+    SupersedeFormalVersion(SupersedeFormalMethodAssetVersionInput),
+    RetireFormalVersion(RetireFormalMethodAssetVersionInput),
+}
+```
+
+| shell condition | selector | service input | service method |
+|---|---|---|---|
+| `capability_kind == FormalizationVersion` and `boundary_ref.kind == MethodAssetFormalizationEligibilityEvaluateIntent` | `EvaluateFormalizationEligibility` | `EvaluateMethodAssetFormalizationEligibilityInput` | `evaluate_formalization_eligibility` |
+| `capability_kind == FormalizationVersion` and `boundary_ref.kind == MethodAssetFormalizationInitiateIntent` | `InitiateFormalization` | `InitiateMethodAssetFormalizationInput` | `initiate_formalization` |
+| `capability_kind == FormalizationVersion` and `boundary_ref.kind == FormalMethodAssetVersionEstablishIntent` | `EstablishFormalVersion` | `EstablishFormalMethodAssetVersionInput` | `establish_formal_version` |
+| `capability_kind == FormalizationVersion` and `boundary_ref.kind == FormalMethodAssetVersionSemanticChangeRecordIntent` | `RecordFormalVersionSemanticChange` | `RecordFormalVersionSemanticChangeInput` | `record_formal_version_semantic_change` |
+| `capability_kind == FormalizationVersion` and `boundary_ref.kind == FormalMethodAssetVersionSupersedeIntent` | `SupersedeFormalVersion` | `SupersedeFormalMethodAssetVersionInput` | `supersede_formal_version` |
+| `capability_kind == FormalizationVersion` and `boundary_ref.kind == FormalMethodAssetVersionRetireIntent` | `RetireFormalVersion` | `RetireFormalMethodAssetVersionInput` | `retire_formal_version` |
+
+Non-`FormalizationVersion` family,unknown intent,mismatch between selector and source variant,missing required typed refs / markers,or wrong dispatch target all return safe rejected stored result before UoW mutation.
+
+### 1C. Command source to service input assembly closure
+
+After selector choice,the facade must match the shell intent with the `MethodAssetFormalizationVersionCommandSource` variant from Step 6 `4B.5`. This is the only current-boundary source for structured accepted-path fields.
+
+| selector | required source variant | service input field assembly |
+|---|---|---|
+| `EvaluateFormalizationEligibility` | `MethodAssetFormalizationVersionCommandSource::EvaluateFormalizationEligibility(source)` | `definition_ref = source.definition_ref`;`catalog_entry_ref = source.catalog_entry_ref`;`basis_summary_refs = source.basis_summary_refs`;`eligibility_rule_ref = source.eligibility_rule_ref`;load current state via `find_formalization_state_by_definition_catalog(...)`;copy `current_formalization_state_ref` and `expected_state_version` when present。 |
+| `InitiateFormalization` | `MethodAssetFormalizationVersionCommandSource::InitiateFormalization(source)` | `definition_ref = source.definition_ref`;`catalog_entry_ref = source.catalog_entry_ref`;`trigger_marker_ref = source.trigger_marker_ref`;`basis_summary_refs = source.basis_summary_refs`;load current state via `find_formalization_state_by_definition_catalog(...)`;copy `current_formalization_state_ref` and `expected_state_version` when present。 |
+| `EstablishFormalVersion` | `MethodAssetFormalizationVersionCommandSource::EstablishFormalVersion(source)` | `formalization_state_ref = source.formalization_state_ref`;load state via `get_formalization_state_with_version(...)`;`expected_state_version = loaded.version`;`definition_ref = source.definition_ref`;`catalog_entry_ref = source.catalog_entry_ref`;`version_boundary_summary = source.version_boundary_summary`。 |
+| `RecordFormalVersionSemanticChange` | `MethodAssetFormalizationVersionCommandSource::RecordFormalVersionSemanticChange(source)` | `formal_version_ref = source.formal_version_ref`;load version via `get_formal_method_asset_version_with_version(...)`;`expected_version = loaded.version`;`semantic_change_marker_ref = source.semantic_change_marker_ref`;`basis_summary_refs = source.basis_summary_refs`;`governance_basis_ref = source.governance_basis_ref`。 |
+| `SupersedeFormalVersion` | `MethodAssetFormalizationVersionCommandSource::SupersedeFormalVersion(source)` | `previous_formal_version_ref = source.previous_formal_version_ref`;load previous version;`previous_expected_version = loaded.version`;`next_formal_version_ref = source.next_formal_version_ref`;load next version;`next_expected_version = loaded.version`;`supersession_marker_ref = source.supersession_marker_ref`。 |
+| `RetireFormalVersion` | `MethodAssetFormalizationVersionCommandSource::RetireFormalVersion(source)` | `formal_version_ref = source.formal_version_ref`;load version via `get_formal_method_asset_version_with_version(...)`;`expected_version = loaded.version`;`retirement_marker_ref = source.retirement_marker_ref`。 |
+
+Common replay envelope assembly:
+
+- All six inputs copy `operation_context_ref`, `idempotency_key_ref`, `operation_digest_ref` and `dedup_scope_ref` only from `MethodAssetFormalizationVersionSupportRefFactory.build_formalization_version_replay_envelope(...)`.
+- `EvaluateFormalizationEligibility` and `InitiateFormalization` must call `new_formalization_state_ref(...)` only after duplicate replay lookup misses and only when current-state lookup is absent.
+- `EstablishFormalVersion` must call `new_formal_method_asset_version_ref(...)` only after duplicate replay lookup misses,after the loaded state proves `Eligible`,and after `find_current_formal_method_asset_version(...)` returns `None`.
+- `RecordFormalVersionSemanticChange`, `SupersedeFormalVersion` and `RetireFormalVersion` must not mint new truth refs in this boundary.
+
+### 2A. Service input exact Rust-facing schema
+
+All six service inputs contain the same replay envelope fields and differ only by body-free command payload. All methods return `Result<MethodAssetStoredOperationResult, MethodAssetRepositoryError>` and the facade converts that stored result into `MethodAssetFormalizationVersionCommandDispatchOutput`.
+
+```rust
+pub struct EvaluateMethodAssetFormalizationEligibilityInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub current_formalization_state_ref: Option<FormalizationStateRef>,
+    pub expected_state_version: Option<MethodAssetExpectedVersion>,
+    pub basis_summary_refs: FormalizationBasisSummaryRefSet,
+    pub eligibility_rule_ref: FormalizationEligibilityRuleRef,
+}
+
+pub struct InitiateMethodAssetFormalizationInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub current_formalization_state_ref: Option<FormalizationStateRef>,
+    pub expected_state_version: Option<MethodAssetExpectedVersion>,
+    pub trigger_marker_ref: MethodLibrarySafeMarker,
+    pub basis_summary_refs: FormalizationBasisSummaryRefSet,
+}
+
+pub struct EstablishFormalMethodAssetVersionInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub formalization_state_ref: FormalizationStateRef,
+    pub expected_state_version: MethodAssetExpectedVersion,
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub version_boundary_summary: FormalVersionBoundarySummary,
+}
+
+pub struct RecordFormalVersionSemanticChangeInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub formal_version_ref: FormalMethodAssetVersionRef,
+    pub expected_version: MethodAssetExpectedVersion,
+    pub semantic_change_marker_ref: MethodLibrarySafeMarker,
+    pub basis_summary_refs: FormalizationBasisSummaryRefSet,
+    pub governance_basis_ref: Option<GovernanceBasisRef>,
+}
+
+pub struct SupersedeFormalMethodAssetVersionInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub previous_formal_version_ref: FormalMethodAssetVersionRef,
+    pub previous_expected_version: MethodAssetExpectedVersion,
+    pub next_formal_version_ref: FormalMethodAssetVersionRef,
+    pub next_expected_version: MethodAssetExpectedVersion,
+    pub supersession_marker_ref: MethodLibrarySafeMarker,
+}
+
+pub struct RetireFormalMethodAssetVersionInput {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+    pub formal_version_ref: FormalMethodAssetVersionRef,
+    pub expected_version: MethodAssetExpectedVersion,
+    pub retirement_marker_ref: MethodLibrarySafeMarker,
+}
+```
+
+### 3. Current-boundary repository / resolver / UoW signatures
+
+`MethodAssetDefinitionRepository`, `MethodAssetCatalogEntryRepository` and `MethodAssetStoredOperationResultRepository` reuse the exact `commit-03-b` callable surface. `commit-04-b` adds only the current-flow methods below.
+
+```rust
+pub enum MethodAssetCommitObservation {
+    Committed,
+    CommitUnknown { unknown_marker_ref: MethodLibrarySafeMarker },
+}
+
+trait FormalizationStateRepository {
+    fn get_formalization_state_with_version(
+        &self,
+        formalization_state_ref: FormalizationStateRef,
+    ) -> Result<Option<Versioned<FormalizationState>>, MethodAssetRepositoryError>;
+
+    fn find_formalization_state_by_definition_catalog(
+        &self,
+        definition_ref: MethodAssetDefinitionRef,
+        catalog_entry_ref: MethodAssetCatalogEntryRef,
+    ) -> Result<Option<Versioned<FormalizationState>>, MethodAssetRepositoryError>;
+
+    fn save_formalization_state(
+        &self,
+        formalization_state: FormalizationState,
+        expected_version: Option<MethodAssetExpectedVersion>,
+        uow: &mut dyn UnitOfWork,
+    ) -> Result<VersionedRef<FormalizationStateRef>, MethodAssetRepositoryError>;
+}
+
+trait FormalMethodAssetVersionRepository {
+    fn get_formal_method_asset_version_with_version(
+        &self,
+        formal_version_ref: FormalMethodAssetVersionRef,
+    ) -> Result<Option<Versioned<FormalMethodAssetVersion>>, MethodAssetRepositoryError>;
+
+    fn find_current_formal_method_asset_version(
+        &self,
+        formalization_state_ref: FormalizationStateRef,
+    ) -> Result<Option<Versioned<FormalMethodAssetVersion>>, MethodAssetRepositoryError>;
+
+    fn save_formal_method_asset_version(
+        &self,
+        formal_version: FormalMethodAssetVersion,
+        expected_version: Option<MethodAssetExpectedVersion>,
+        uow: &mut dyn UnitOfWork,
+    ) -> Result<VersionedRef<FormalMethodAssetVersionRef>, MethodAssetRepositoryError>;
+}
+
+trait FormalizationBasisSummaryRepository {
+    fn get_formalization_basis_summary_with_version(
+        &self,
+        basis_summary_ref: FormalizationBasisSummaryRef,
+    ) -> Result<Option<Versioned<FormalizationBasisSummary>>, MethodAssetRepositoryError>;
+}
+
+pub struct FormalizationBasisResolutionInput {
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub catalog_entry_ref: Option<MethodAssetCatalogEntryRef>,
+    pub basis_summary_refs: FormalizationBasisSummaryRefSet,
+    pub governance_basis_ref: Option<GovernanceBasisRef>,
+}
+
+pub struct FormalizationBasisResolution {
+    pub accepted_basis_summary_refs: FormalizationBasisSummaryRefSet,
+    pub pending_marker_ref: Option<MethodLibrarySafeMarker>,
+    pub rejection_reason_ref: Option<FormalizationEligibilityRejectionRef>,
+}
+
+trait FormalizationBasisResolverPort {
+    fn resolve_formalization_basis(
+        &self,
+        input: FormalizationBasisResolutionInput,
+    ) -> Result<FormalizationBasisResolution, MethodAssetRepositoryError>;
+}
+
+pub struct FormalizationEligibilityDiagnostic {
+    pub target_state_kind: FormalizationStateKind,
+    pub reason_summary: FormalizationStateReasonSummary,
+}
+
+pub struct FormalVersionChangeDiagnostic {
+    pub accepted_change_marker_ref: MethodLibrarySafeMarker,
+    pub blocking_reason_ref: Option<MethodAssetSafeRejectReasonRef>,
+}
+
+trait MethodAssetPolicyDiagnosticBuilderPort {
+    fn build_formalization_eligibility_diagnostic(
+        &self,
+        definition: &MethodAssetDefinition,
+        catalog_entry: &MethodAssetCatalogEntry,
+        basis_resolution: &FormalizationBasisResolution,
+        eligibility_rule_ref: FormalizationEligibilityRuleRef,
+    ) -> Result<FormalizationEligibilityDiagnostic, MethodAssetRepositoryError>;
+
+    fn build_formal_version_change_diagnostic(
+        &self,
+        formal_version: &FormalMethodAssetVersion,
+        basis_summary_refs: &FormalizationBasisSummaryRefSet,
+        governance_basis_ref: Option<GovernanceBasisRef>,
+        semantic_change_marker_ref: MethodLibrarySafeMarker,
+    ) -> Result<FormalVersionChangeDiagnostic, MethodAssetRepositoryError>;
+}
+
+trait MethodAssetConsumptionMaterialRepository {
+    fn find_consumption_material_refs_by_formal_version(
+        &self,
+        formal_version_ref: FormalMethodAssetVersionRef,
+    ) -> Result<Vec<VersionedRef<MethodAssetConsumptionMaterialRef>>, MethodAssetRepositoryError>;
+}
+
+trait ConsumptionImpactSummaryRepository {
+    fn find_pending_impact_summary_refs_by_formal_version(
+        &self,
+        formal_version_ref: FormalMethodAssetVersionRef,
+    ) -> Result<Vec<VersionedRef<ConsumptionImpactSummaryRef>>, MethodAssetRepositoryError>;
+}
+```
+
+Current-boundary callable rules:
+
+- `find_formalization_state_by_definition_catalog(...)` is the only current-boundary page-free lookup for evaluate/initiate;service code must not scan history,query material or fake maps.
+- `find_current_formal_method_asset_version(...)` is only used to prove absence before establish;service code must not infer current version from latest timestamp,publish flag,fingerprint or history page.
+- `find_consumption_material_refs_by_formal_version(...)` and `find_pending_impact_summary_refs_by_formal_version(...)` are retirement precheck helpers only;they do not authorize read-material refresh,impact repair or downstream runtime inspection.
+- `UnitOfWork.commit()` for this boundary must return `MethodAssetCommitObservation`;`CommitUnknown` must stop post-commit side effects and enter formal read-back flow instead of blind retry.
+
+### 4. Fake parity and stop rules
+
+| topic | required fake behavior | stop condition |
+|---|---|---|
+| formalization state parity | fake stores `state_kind`,`state_reason_summary`,`basis_summary_refs`,`current_formal_version_ref` inside the same `FormalizationState` value returned by versioned reads;rollback hides pending changes。 | fake reconstructs state from stored result,effect refs,string status or private side map。 |
+| formal version parity | fake stores `version_state`,`version_boundary_summary`,`basis_summary_refs`,`supersedes_version_ref` inside the same `FormalMethodAssetVersion` value returned by versioned reads。 | fake derives current/superseded/retired from latest timestamp,publish flag,snapshot/fingerprint or private map。 |
+| duplicate replay | same key/scope/digest returns previously stored safe result without rerunning evaluate/initiate/establish/change/supersede/retire mutation。 | fake reruns mutation or rebuilds response from current truth。 |
+| commit unknown | fake may model `CommitUnknown`,but recovery still must read back stored result and versioned truth through the same callable surface before any accepted claim。 | fake treats timeout as rollback or accepted success without formal read-back proof。 |
+| missing basis/version/state | exact read returns `Ok(None)` and current branch maps that to safe rejected stored result。 | fake auto-creates missing state/version,defaults basis,or falls through to another command branch。 |
+
+This section resolves `BLK-ML-04B-DESIGN-001` and the callable-surface half of `BLK-ML-04B-DESIGN-003`. Implementation must rerun the current boundary Design Gate from `read_docs`.
+
+---
+
 ## R7.11 support / trace / relation / material repository port:先思考
 
 ### 1. 思考边界确认

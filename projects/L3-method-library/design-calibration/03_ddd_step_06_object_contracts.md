@@ -1064,13 +1064,169 @@ Transition ownership:
 | `ForbiddenFormalizationTriggerKind` | closed enum | `Read`;`Reference`;`Sync`;`RuntimeUse`;`DownstreamConsumption`;`Query` | 只表达禁止隐式触发正式化的来源类别;不得用 route、topic、handler name、raw trigger string、feature flag 或 scheduler id。 |
 | `ForbiddenFormalizationTriggerKindSet` | deterministic enum-set struct | `forbidden_kinds: Vec<ForbiddenFormalizationTriggerKind>`;ordered by insertion after canonical dedup;empty illegal for `default_core_rule` | 只保存 closed trigger labels;不得保存 command/query body、route text、broker topic、raw event payload 或 config profile。 |
 
-#### 4B.5 implementation and test redlines
+#### 4B.5 `commit-04-b` current-boundary formalization/version command carrier closure
+
+`commit-04-b` 不新增 public command DTO body,但必须让 `MethodLibraryCommandShell` 被 application facade 唯一派发到 6 条 formalization/version service input,并为 replay / duplicate / truth-ref mint 提供 exact current-boundary helper surface。下列 carrier 只服务 PH-04 formalization/version service vertical slice,不得被扩展成 query/material/job/publisher/runtime config/evidence schema。
+
+##### 4B.5.1 current-boundary command selector intent labels
+
+当前 boundary 的唯一正式选择源仍是 `MethodLibraryCommandShell.boundary_ref.kind`。该 `boundary_ref` 表达 body-free request-intent boundary,不是 route、RPC method、transport path、DTO body snapshot、handler name 或 config key。
+
+| `command_shell.boundary_ref` exact kind | selector variant | service input carrier | service method |
+|---|---|---|---|
+| `MethodAssetFormalizationEligibilityEvaluateIntent` | `EvaluateFormalizationEligibility` | `EvaluateMethodAssetFormalizationEligibilityInput` | `evaluate_formalization_eligibility` |
+| `MethodAssetFormalizationInitiateIntent` | `InitiateFormalization` | `InitiateMethodAssetFormalizationInput` | `initiate_formalization` |
+| `FormalMethodAssetVersionEstablishIntent` | `EstablishFormalVersion` | `EstablishFormalMethodAssetVersionInput` | `establish_formal_version` |
+| `FormalMethodAssetVersionSemanticChangeRecordIntent` | `RecordFormalVersionSemanticChange` | `RecordFormalVersionSemanticChangeInput` | `record_formal_version_semantic_change` |
+| `FormalMethodAssetVersionSupersedeIntent` | `SupersedeFormalVersion` | `SupersedeFormalMethodAssetVersionInput` | `supersede_formal_version` |
+| `FormalMethodAssetVersionRetireIntent` | `RetireFormalVersion` | `RetireFormalMethodAssetVersionInput` | `retire_formal_version` |
+
+Selector rules:
+
+- `command_shell.capability_kind` must be `MethodLibraryCapabilityKind::FormalizationVersion`;any other family is safe rejected before mutation.
+- `command_shell.boundary_ref.kind` must be exactly one of the six labels above;wrong kind / missing kind / future kind is safe rejected and stored as rejected result.
+- `typed_refs` and `safe_markers` may supply typed inputs to the selected carrier, but they must not select the service method by list order, count, marker text, raw string, route, config, fake map or handler branch.
+- Duplicate replay digest must include the selected intent label;the same idempotency key under a different intent label is a digest conflict,not an alternate interpretation.
+
+##### 4B.5.2 current-boundary body-free command source carrier closure
+
+由于 `MethodLibraryCommandShell` 只承载 shared body-free shell,`commit-04-b` 正式引入 application-owned accepted-path source carrier:
+
+```rust
+pub enum MethodAssetFormalizationVersionCommandSource {
+    EvaluateFormalizationEligibility(EvaluateFormalizationEligibilityCommandSource),
+    InitiateFormalization(InitiateMethodAssetFormalizationCommandSource),
+    EstablishFormalVersion(EstablishFormalMethodAssetVersionCommandSource),
+    RecordFormalVersionSemanticChange(RecordFormalVersionSemanticChangeCommandSource),
+    SupersedeFormalVersion(SupersedeFormalMethodAssetVersionCommandSource),
+    RetireFormalVersion(RetireFormalMethodAssetVersionCommandSource),
+}
+
+pub struct EvaluateFormalizationEligibilityCommandSource {
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub basis_summary_refs: FormalizationBasisSummaryRefSet,
+    pub eligibility_rule_ref: FormalizationEligibilityRuleRef,
+}
+
+pub struct InitiateMethodAssetFormalizationCommandSource {
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub trigger_marker_ref: MethodLibrarySafeMarker,
+    pub basis_summary_refs: FormalizationBasisSummaryRefSet,
+}
+
+pub struct EstablishFormalMethodAssetVersionCommandSource {
+    pub formalization_state_ref: FormalizationStateRef,
+    pub definition_ref: MethodAssetDefinitionRef,
+    pub catalog_entry_ref: MethodAssetCatalogEntryRef,
+    pub version_boundary_summary: FormalVersionBoundarySummary,
+}
+
+pub struct RecordFormalVersionSemanticChangeCommandSource {
+    pub formal_version_ref: FormalMethodAssetVersionRef,
+    pub semantic_change_marker_ref: MethodLibrarySafeMarker,
+    pub basis_summary_refs: FormalizationBasisSummaryRefSet,
+    pub governance_basis_ref: Option<GovernanceBasisRef>,
+}
+
+pub struct SupersedeFormalMethodAssetVersionCommandSource {
+    pub previous_formal_version_ref: FormalMethodAssetVersionRef,
+    pub next_formal_version_ref: FormalMethodAssetVersionRef,
+    pub supersession_marker_ref: MethodLibrarySafeMarker,
+}
+
+pub struct RetireFormalMethodAssetVersionCommandSource {
+    pub formal_version_ref: FormalMethodAssetVersionRef,
+    pub retirement_marker_ref: MethodLibrarySafeMarker,
+}
+```
+
+Carrier rules:
+
+- `MethodAssetFormalizationVersionCommandSource` is application-owned and body-free. It is not a public command DTO body, route/RPC binding, transport payload or replacement for Step 8 protocol contracts.
+- Every nested field must reuse already-closed Step 6 carriers. No local `*ReasonRef`, `*HistoryRef`, `*VersionNumber`, `*Fingerprint`, payload wrapper or fake-only carrier may be invented by implementation.
+- The source variant must match the selector chosen from `MethodLibraryCommandShell.boundary_ref.kind`;mismatch, missing source carrier or unsupported source variant is safe rejected before UoW mutation and stored as a rejected result.
+- `trigger_marker_ref`, `semantic_change_marker_ref`, `supersession_marker_ref` and `retirement_marker_ref` must remain `MethodLibrarySafeMarker` values supplied by closed mapper/source carrier construction;they must not be raw reason text, UI label, HTTP status, config value, repository error text, governance body, provider payload or artifact body excerpt.
+- The canonical duplicate digest must include `command_shell.capability_kind`, `command_shell.boundary_ref.kind`, the matched `MethodAssetFormalizationVersionCommandSource` variant label and all body-free source carrier fields in canonical form. It must exclude raw DTO body, route, transport metadata except formal idempotency metadata, provider payload, repository state, snapshot/fingerprint text and fake-only state.
+- If implementation only receives `MethodLibraryCommandShell` without this source carrier, accepted mutation cannot be assembled;the facade must safe reject instead of guessing from shell arrays.
+
+##### 4B.5.3 current-boundary replay envelope and truth-ref factory closure
+
+`commit-04-b` replay envelope ref 生成必须通过 application-owned helper surface 完成。它不是 public DTO,也不是 domain object,只把已闭口的 shell/source/entry refs 映射为 6 个 service input 共同需要的 opaque refs。同一 helper surface 也是 `commit-04-b` evaluate/initiate establish accepted path 唯一允许的新 truth-ref 创建来源。
+
+```rust
+pub struct MethodAssetFormalizationVersionReplayEnvelopeFactoryInput {
+    pub command_shell: MethodLibraryCommandShell,
+    pub command_source: MethodAssetFormalizationVersionCommandSource,
+    pub selector: MethodAssetFormalizationVersionCommandSelector,
+    pub api_entry_context_ref: MethodAssetApiEntryContextRef,
+    pub application_dispatch_ref: MethodAssetApplicationDispatchRef,
+}
+
+pub struct MethodAssetFormalizationVersionReplayEnvelope {
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub idempotency_key_ref: MethodAssetIdempotencyKeyRef,
+    pub operation_digest_ref: MethodAssetOperationDigestRef,
+    pub dedup_scope_ref: MethodAssetDedupScopeRef,
+}
+```
+
+Exact factory rules:
+
+- `application_dispatch_ref` must be the single current-boundary `MethodAssetApplicationDispatchRef` for `FormalizationVersionCommandService`;wrong-kind or other dispatch target returns safe rejected `UnsupportedDispatchTarget`.
+- `operation_context_ref`, `idempotency_key_ref`, `operation_digest_ref` and `dedup_scope_ref` reuse the Step 6 `3B.1.1` application-owned support refs;the factory must not create fallback idempotency key, digest or scope from route, timestamp, payload, repository row id or fake map.
+- `dedup_scope_ref` is minted from command family, selected intent and the formal primary subject: `(definition_ref,catalog_entry_ref)` for evaluate/initiate, `formalization_state_ref` for establish, `formal_version_ref` for semantic change/retire, and `(previous_formal_version_ref,next_formal_version_ref)` for supersede.
+- `new_formalization_state_ref(...)` may be called only by evaluate/initiate after duplicate replay lookup misses and only when `find_formalization_state_by_definition_catalog(...)` returns `None`;service/domain/repository/API/fake code must not mint formalization state refs locally.
+- `new_formal_method_asset_version_ref(...)` may be called only by `EstablishFormalMethodAssetVersionFlow` after duplicate replay lookup misses, after the loaded formalization state proves `Eligible`, and before `FormalMethodAssetVersion.from_formalization_state(...)`.
+
+Current-boundary opaque-ref helper surface:
+
+```rust
+pub trait MethodAssetFormalizationVersionSupportRefFactory {
+    fn formalization_version_dispatch_ref(&self) -> MethodAssetApplicationDispatchRef;
+    fn new_api_entry_context_ref(&mut self) -> MethodAssetApiEntryContextRef;
+    fn build_formalization_version_replay_envelope(
+        &mut self,
+        input: MethodAssetFormalizationVersionReplayEnvelopeFactoryInput,
+    ) -> Result<MethodAssetFormalizationVersionReplayEnvelope, MethodAssetReplayEnvelopeBuildError>;
+    fn new_stored_operation_result_ref(&mut self) -> MethodAssetStoredOperationResultRef;
+    fn new_accepted_operation_summary_ref(&mut self) -> MethodAssetAcceptedOperationSummaryRef;
+    fn new_safe_reject_reason_ref(&mut self) -> MethodAssetSafeRejectReasonRef;
+    fn new_safe_ignore_reason_ref(&mut self) -> MethodAssetSafeIgnoreReasonRef;
+    fn new_effect_summary_ref(&mut self) -> MethodAssetEffectSummaryRef;
+    fn new_replay_marker_ref(&mut self) -> MethodAssetReplayMarkerRef;
+    fn new_formalization_state_ref(
+        &mut self,
+        definition_ref: MethodAssetDefinitionRef,
+        catalog_entry_ref: MethodAssetCatalogEntryRef,
+        operation_context_ref: MethodAssetOperationContextRef,
+        operation_digest_ref: MethodAssetOperationDigestRef,
+        dedup_scope_ref: MethodAssetDedupScopeRef,
+    ) -> FormalizationStateRef;
+    fn new_formal_method_asset_version_ref(
+        &mut self,
+        formalization_state_ref: FormalizationStateRef,
+        definition_ref: MethodAssetDefinitionRef,
+        catalog_entry_ref: MethodAssetCatalogEntryRef,
+        version_boundary_summary: FormalVersionBoundarySummary,
+        operation_context_ref: MethodAssetOperationContextRef,
+        operation_digest_ref: MethodAssetOperationDigestRef,
+        dedup_scope_ref: MethodAssetDedupScopeRef,
+    ) -> FormalMethodAssetVersionRef;
+}
+```
+
+The support ref factory is an application-owned port/helper surface implemented by the current-boundary fake/runtime support. It may call the formal IdGenerator internally, but no repository, API handler or domain object may bypass it to mint the above refs. The only current-boundary constant-like output is `formalization_version_dispatch_ref()`, and it still returns an opaque typed ref of kind `MethodAssetApplicationDispatch`, not a string enum, route value or config key.
+
+#### 4B.6 implementation and test redlines
 
 - `commit-04-a` implementation may add contracts ref kind registry/export entries for the exact refs above, but this does not authorize new public command/query DTO body, route binding, repository fake, application service or event/job payload.
 - `FormalizationStateKind` and `FormalMethodAssetVersionState` are the only current-boundary truth-state carriers for formalization/version;implementation must not reuse `MethodAssetDefinitionLifecycle` or `MethodAssetCatalogEntryStatus`.
 - `FormalMethodAssetVersion.version_state` must be persisted in the domain truth object and returned by domain constructors/transition helpers;repository private side-state, stored result kind or fake-only status map is forbidden.
 - `FormalizationBasisSafeSummary`, `FormalizationStateReasonSummary`, `FormalVersionBoundarySummary` and requirement carriers are body-free support carriers;tests must include redlines for raw source body、policy text、snapshot/fingerprint、provider payload、config/env value 和 stack trace。
-- If implementation needs a new formalization/version repository method, service input, operation context, stored result, id generator output, public DTO field, error variant, config key or evidence schema, it must stop and return to the owning Step / boundary ledger;this section only closes current-boundary contracts/domain carrier and state guard schema.
+- `commit-04-b` implementation may add minimal contracts ref kind registry/export entries for the six selector intent labels above, but this does not authorize new public command DTO body, route binding, payload field, query shell, event payload or job schema.
+- If implementation needs a new formalization/version repository method, service input, operation context, stored result, id generator output, public DTO field, error variant, config key or evidence schema beyond `4B.5` and Step 7 `commit-04-b` exact closure, it must stop and return to the owning Step / boundary ledger.
 
 ### 5. 对象族卡片: `MethodLibrarySafeMarker`
 

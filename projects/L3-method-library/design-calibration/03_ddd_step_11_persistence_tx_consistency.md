@@ -726,6 +726,45 @@ next_allowed_action: 等待用户确认后进入 Step 11 `R11.8 core business tr
 
 The accepted branch must commit truth and stored result in the same logical atomic boundary or a formally equivalent fake atomic boundary. A fake repository that exposes truth before stored result commit,or leaves stored result after truth rollback,violates `commit-03-b`。
 
+### 3C. `commit-04-b` repository / resolver / UoW / stored-result persistence closure
+
+本节闭合 `commit-04-b` 当前 accepted service 所需的 exact persistence semantics。它只适用于 formalization/version accepted command service vertical slice,不提前实现 query/history/material refresh,publisher,job 或 downstream runtime inspection。
+
+| Step 7 callable | logical store | read key | write / unique key | version source | UoW rule | missing / conflict rule |
+|---|---|---|---|---|---|---|
+| `get_formalization_state_with_version(formalization_state_ref)` | `formalization_states` | `formalization_state_ref` | none | stored row version -> `Versioned<FormalizationState>` | read before state mutation | missing returns `None`,not implicit create。 |
+| `find_formalization_state_by_definition_catalog(definition_ref,catalog_entry_ref)` | `formalization_states` | unique `(definition_ref,catalog_entry_ref)` | none | stored row version -> `Versioned<FormalizationState>` | read before evaluate/initiate create decision | duplicate current-state rows are consistency defects,not alternate candidates。 |
+| `save_formalization_state(formalization_state, expected_version, uow)` | `formalization_states` | none | `formalization_state_ref`;unique `(definition_ref,catalog_entry_ref)` | create `None` -> new version;update expected loaded version -> next version | staged in supplied command UoW | version mismatch maps to safe conflict;rollback leaves no row/version advance。 |
+| `get_formal_method_asset_version_with_version(formal_version_ref)` | `formal_method_asset_versions` | `formal_version_ref` | none | stored row version -> `Versioned<FormalMethodAssetVersion>` | read before command mutation | missing returns `None`,not implicit create。 |
+| `find_current_formal_method_asset_version(formalization_state_ref)` | `formal_method_asset_versions` | unique current-by-state lookup | none | stored row version -> `Versioned<FormalMethodAssetVersion>` | read before establish | more than one current version for one state is consistency defect,not last-write-wins。 |
+| `save_formal_method_asset_version(formal_version, expected_version, uow)` | `formal_method_asset_versions` | none | `formal_version_ref`;unique current-by-state invariant maintained by service + store | create `None` -> new version;update expected loaded version -> next version | staged in supplied command UoW | version mismatch maps to safe conflict;rollback leaves no row/version advance。 |
+| `get_formalization_basis_summary_with_version(basis_summary_ref)` | `formalization_basis_summaries` | `basis_summary_ref` | none | stored row version -> `Versioned<FormalizationBasisSummary>` | read-only in current boundary | missing basis summary is safe rejected/manual,not resolver fallback。 |
+| `find_consumption_material_refs_by_formal_version(formal_version_ref)` | `method_asset_consumption_materials` | stable secondary index by `formal_version_ref` | none | each item exposes stored version through `VersionedRef<MethodAssetConsumptionMaterialRef>` | read-only retirement precheck | empty list is allowed;service must not create or refresh material here。 |
+| `find_pending_impact_summary_refs_by_formal_version(formal_version_ref)` | `consumption_impact_summaries` | stable secondary index by `formal_version_ref` or linked impact source | none | each item exposes stored version through `VersionedRef<ConsumptionImpactSummaryRef>` | read-only retirement precheck | empty list is allowed;service must not fabricate impact summary here。 |
+| `find_command_result_by_idempotency(...)` / `get_stored_operation_result(...)` / `save_command_result_for_idempotency(...)` | `method_asset_stored_operation_results` + idempotency index | same as `commit-03-b` | same as `commit-03-b` | immutable stored result row | same command UoW as accepted/rejected mutation | missing stored result during read-back is replay consistency/manual,not mutation rerun。 |
+
+Resolver / builder persistence rules:
+
+- `FormalizationBasisResolverPort.resolve_formalization_basis(...)` is non-durable. It consumes repository-loaded body-free basis summaries and returns body-free resolution only;it must not save basis summary or allocate durable ids.
+- `MethodAssetPolicyDiagnosticBuilderPort.build_formalization_eligibility_diagnostic(...)` and `build_formal_version_change_diagnostic(...)` are non-durable. Their outputs may be copied into truth transition summaries or stored-result safe summaries, but there is no diagnostic repository in `commit-04-b`.
+- `MethodAssetCommitObservation::CommitUnknown` is a transaction observation,not a persisted truth state. It is resolved only through stored-result + versioned-repository read-back.
+
+`commit-04-b` transaction sequences:
+
+| branch | required sequence | rollback / unknown rule |
+|---|---|---|
+| fresh evaluate/initiate accepted | begin command UoW -> duplicate lookup -> read definition/catalog/current state/basis -> resolve basis + build diagnostic -> create/update formalization state -> save formalization state -> create stored accepted result -> save command result -> commit | rollback leaves no state/result advance;`CommitUnknown` must read back stored result first,then current-state lookup by definition/catalog。 |
+| fresh establish accepted | begin command UoW -> duplicate lookup -> read state/definition/catalog/current version -> mint version ref -> save formal version -> save updated formalization state -> save command result -> commit | both truth writes and stored result are atomic;`CommitUnknown` must read back stored result,then exact version/state reads before any accepted claim。 |
+| fresh semantic change / supersede / retire accepted | begin command UoW -> duplicate lookup -> read required version(s)/precheck refs -> apply current-boundary transition -> save mutated version truth -> save command result -> commit | rollback leaves no partial version transition;`CommitUnknown` must read back stored result,then exact version read(s) and precheck helper reads。 |
+| safe rejected / conflict | begin minimal command UoW -> create stored rejected/conflict result -> save command result -> commit | if rejected result cannot be saved,return consistency-safe/manual surface and leave no partial truth mutation。 |
+| duplicate replay | read stored result by key/scope -> compare digest -> return stored safe surface | no UoW mutation,no domain mutation,no truth reload used to rebuild response。 |
+
+`commit-04-b` fake parity requirements:
+
+- fake `formalization_states` and `formal_method_asset_versions` stores must preserve optimistic version behavior,current-state uniqueness,current-version uniqueness and rollback invisibility with the same method surface as durable adapters。
+- fake `CommitUnknown` simulation may leave commit observation unresolved,but it must still require the same formal read-back order as durable code;it must not return accepted success from an in-memory flag alone。
+- fake retirement precheck helpers must return only stored material/impact refs;they must not inspect downstream runtime truth,private queues,logs or ad hoc flags。
+
 ### 4. created vs updated vs append-only 边界
 
 | family | create boundary | update boundary | append-only boundary | notes |

@@ -1025,6 +1025,38 @@ next_allowed_action: 等待用户确认后进入 Step 8 `R8.10 Command protocol 
 | raw external body / artifact body / report body / provider payload | 违反 body-free 边界。 |
 | maintenance job execution | Command 只登记请求、挂起、介入或替代;执行由 Operations Job family 承接。 |
 
+### 6A. `commit-04-b` exact formalization/version command protocol closure
+
+本节只闭合 `commit-04-b` 需要落码的 6 条 PH-04 command protocol/source/input/output surface。它不新增 public DTO body 字段,也不改变 `R8.10` family-level command shell 规则。
+
+| protocol surface | exact current-boundary closure |
+|---|---|
+| public command family | public shell 仍使用 `MethodLibraryCommandShell`;`command_shell.capability_kind` 必须是 `MethodLibraryCapabilityKind::FormalizationVersion`;其他 family safe rejected。 |
+| public request selector source | `command_shell.boundary_ref.kind` must be exactly one of `MethodAssetFormalizationEligibilityEvaluateIntent`;`MethodAssetFormalizationInitiateIntent`;`FormalMethodAssetVersionEstablishIntent`;`FormalMethodAssetVersionSemanticChangeRecordIntent`;`FormalMethodAssetVersionSupersedeIntent`;`FormalMethodAssetVersionRetireIntent`。 |
+| accepted-path structured source | structured accepted-path fields must come from application-owned `MethodAssetFormalizationVersionCommandSource`;implementation must not recover them from `typed_refs` order/count,marker text,route,RPC name,raw body,provider payload or fake maps。 |
+| dispatch input | exact Rust-facing dispatch input is `MethodAssetFormalizationVersionCommandDispatchInput { command_shell, command_source, api_entry_context_ref, application_dispatch_ref }`;entry only copies shared shell and current-boundary source carrier。 |
+| dispatch output | exact Rust-facing dispatch output is `MethodAssetFormalizationVersionCommandDispatchOutput { stored_result_ref, result_kind, replay_marker_ref, accepted_summary_ref, rejected_reason_ref, ignored_reason_ref, effect_summary_refs }`;output only copies `MethodAssetStoredOperationResult` safe surface。 |
+| duplicate replay / digest | canonical duplicate digest must include command family,selected intent label,matched `MethodAssetFormalizationVersionCommandSource` variant and its body-free fields;same key/scope with different intent or different source fields is digest conflict,not accepted replay。 |
+
+Current-boundary selector/source map:
+
+| selector intent | required source variant | required body-free fields |
+|---|---|---|
+| `MethodAssetFormalizationEligibilityEvaluateIntent` | `EvaluateFormalizationEligibility` | `definition_ref`;`catalog_entry_ref`;`basis_summary_refs`;`eligibility_rule_ref` |
+| `MethodAssetFormalizationInitiateIntent` | `InitiateFormalization` | `definition_ref`;`catalog_entry_ref`;`trigger_marker_ref`;`basis_summary_refs` |
+| `FormalMethodAssetVersionEstablishIntent` | `EstablishFormalVersion` | `formalization_state_ref`;`definition_ref`;`catalog_entry_ref`;`version_boundary_summary` |
+| `FormalMethodAssetVersionSemanticChangeRecordIntent` | `RecordFormalVersionSemanticChange` | `formal_version_ref`;`semantic_change_marker_ref`;`basis_summary_refs`;optional `governance_basis_ref` |
+| `FormalMethodAssetVersionSupersedeIntent` | `SupersedeFormalVersion` | previous / next `FormalMethodAssetVersionRef`;`supersession_marker_ref` |
+| `FormalMethodAssetVersionRetireIntent` | `RetireFormalVersion` | `formal_version_ref`;`retirement_marker_ref` |
+
+Protocol redlines:
+
+- HLD placeholders such as `FormalizationTriggerSummary`,`VersionSemanticChangeSummary`,`VersionSupersessionReasonRef` and `VersionRetirementReasonRef` are not a license for implementation to invent new public DTO families in `commit-04-b`;current boundary accepted-path assembly must stay inside the already-closed Step 6 body-free source carrier and Step 7 service input closure.
+- `FormalizationHistoryRef` remains deferred as an explicit public secondary type;current boundary stores only replay-safe accepted/effect summary refs and must not invent a history ref family locally.
+- Unsupported selector,source/selector mismatch,missing idempotency key,missing required typed refs / markers and wrong dispatch target all return safe rejected stored result before UoW mutation.
+
+This section resolves the protocol/source/input/output half of `BLK-ML-04B-DESIGN-002`.
+
 ### 7. `R8.11` 进入门禁
 
 | 项 | 门禁 |

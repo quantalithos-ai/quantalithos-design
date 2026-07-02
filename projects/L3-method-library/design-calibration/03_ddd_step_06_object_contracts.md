@@ -1228,6 +1228,71 @@ The support ref factory is an application-owned port/helper surface implemented 
 - `commit-04-b` implementation may add minimal contracts ref kind registry/export entries for the six selector intent labels above, but this does not authorize new public command DTO body, route binding, payload field, query shell, event payload or job schema.
 - If implementation needs a new formalization/version repository method, service input, operation context, stored result, id generator output, public DTO field, error variant, config key or evidence schema beyond `4B.5` and Step 7 `commit-04-b` exact closure, it must stop and return to the owning Step / boundary ledger.
 
+### 4C. `commit-05-a` current-boundary controlled-consumption carrier closure
+
+本节闭合 `commit-05-a` 当前 Rust-facing ref family、state labels、support carrier 和 availability marker carrier。它只服务 controlled consumption material 的 contracts/domain carrier、Definition vs Use guard、boundary state guard 和 focused tests;不得提前实现 application service、repository fake/durable behavior、availability resolver/mapper port、downstream runtime、handoff、query material refresh、event、job、config 或 evidence schema。
+
+#### 4C.1 consumption typed ref kind closure
+
+下列 named ref 均属于 `MethodLibraryTypedBoundaryRef` 家族,实现侧必须以 named newtype wrapper over `MethodLibraryTypedBoundaryRef` 承载,并固定 exact `MethodLibraryTypedBoundaryRefKind` 标签。不得把它们 alias 到 formal version、catalog entry、stored result、route id、raw string、downstream runtime id、fake private id 或 test-only wrapper。
+
+| named ref | Rust-facing owner | exact `MethodLibraryTypedBoundaryRefKind` | current-boundary use | implementation rule |
+|---|---|---|---|---|
+| `MethodAssetConsumptionMaterialRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetConsumptionMaterial` | `MethodAssetConsumptionMaterial.consumption_material_ref`;material state guard fixtures。 | 只能来自 current-boundary domain/test factory input or later formal material repository;不得由 query route、formal version ref text、runtime id、install state、timestamp 或 fake map 生成。 |
+| `ConsumptionContextRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `ConsumptionContext` | material context、guard context、boundary context。 | 只能来自 body-free command/source carrier or closed context resolver summary;不得由 actor id、runtime tenant、marketplace listing、route 或 config profile 推导。 |
+| `DownstreamConsumptionBoundaryRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `DownstreamConsumptionBoundary` | material `boundary_ref`;guard/boundary object identity。 | 只能来自 boundary factory input or formally loaded boundary identity;不得由 downstream runtime id、URL、installation id 或 fake private key 生成。 |
+| `MethodAssetConsumptionMaterialCursorRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetConsumptionMaterialCursor` | material `source_cursor_ref`;body-free refresh/source anchor。 | 只能来自 material builder / formal version source cursor output;当前 boundary tests 可使用 explicit fixture ref,不得从 timestamp、version number、idempotency digest、page cursor 或 query cursor 代替。 |
+| `DefinitionUseBoundaryGuardRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `DefinitionUseBoundaryGuard` | `DefinitionUseBoundaryGuard.guard_ref`;guard state fixtures。 | 只能来自 guard factory input or formally loaded guard identity;不得由 protected definition/version refs 拼接。 |
+| `MethodAssetConsumptionMaterialScopeRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `MethodAssetConsumptionMaterialScope` | `DownstreamConsumptionBoundary.material_scope_ref`。 | 只能来自 body-free boundary source carrier or policy-safe scope output;不得从 context ref、route、runtime scope string、auth matrix 或 marketplace listing 推导。 |
+
+#### 4C.2 safe reason and marker wrapper closure
+
+| carrier | Rust-facing shape | exact fields / labels | implementation rule |
+|---|---|---|---|
+| `DefinitionUseGuardReasonRef` | named safe-marker wrapper | wraps `MethodLibrarySafeMarker` | 只承接 guard / policy / violation mapper 的 safe reason marker;不得新增 local reason enum、raw reason text、HTTP status、config key、repository error text、stack trace、provider payload 或 downstream runtime reason。 |
+| `ConsumptionBoundaryReasonRef` | named safe-marker wrapper | wraps `MethodLibrarySafeMarker` | 只承接 boundary / policy / availability mapper 的 safe reason marker;不得用 auth matrix、runtime state、install result、marketplace state、config value 或 fake enum 代替。 |
+| `MethodAssetConsumptionAvailabilityMarker` | body-free struct | `marker_ref: MethodLibrarySafeMarker`;`target_state: MethodAssetConsumptionAvailabilityTarget`;`source_kind: MethodAssetConsumptionAvailabilityMarkerSource`;`source_marker_ref: MethodLibrarySafeMarker`;`reason_ref: Option<MethodLibrarySafeMarker>` | `MarkMethodAssetConsumptionMaterialStateFlow` 和 domain transition 只能复制该 carrier。缺少 marker/source 时是 design blocker,不是 runtime retry。 |
+| `MethodAssetConsumptionAvailabilityTarget` | closed enum | `Ready`;`Stale`;`Unavailable`;`Constrained` | 不包含 `Prepared`: `Prepared` 只能由 material factory 初始化。不得加入 `Degraded` 或 `Retired`;formal display `degraded` 映射到 `Constrained`。 |
+| `MethodAssetConsumptionAvailabilityMarkerSource` | closed enum | `AvailabilityResolver`;`DegradedMapper`;`DownstreamConsumptionBoundaryGuard` | 只表达 formal marker source family;不得加入 raw adapter error、HTTP/SQL status、exception text、runtime health string、config profile、fake private enum 或 `Other`。 |
+
+#### 4C.3 exact controlled-consumption states
+
+| carrier | Rust-facing shape | exact labels | implementation rule |
+|---|---|---|---|
+| `MethodAssetConsumptionMaterialState` | closed enum | `Prepared`;`Ready`;`Stale`;`Unavailable`;`Constrained` | 这是 `commit-05-a` 唯一 material state。历史 / display labels 映射为 `preparing -> Prepared`, `available -> Ready`, `stale -> Stale`, `unavailable -> Unavailable`, `degraded -> Constrained`;`retired` 不属于 material state,由 `FormalMethodAssetVersionState::Retired` 阻止 prepare。 |
+| `DefinitionUseBoundaryGuardState` | closed enum | `Monitoring`;`ViolationRecorded`;`RejectedCandidate`;`ManualReviewRequired` | `Monitoring` 是 allowed/passive guard judgement;`RejectedCandidate` 对应 blocked/rejected;`ViolationRecorded` 对应 violation-detected;`ManualReviewRequired` 对应 manual-review。不得作为 permission matrix、auth result、definition lifecycle 或 downstream runtime truth。 |
+| `DownstreamConsumptionBoundaryState` | closed enum | `Registered`;`Unsupported`;`Constrained`;`Unavailable`;`Retired` | `Registered` 对应 supported;`Unsupported` 对应 unsupported;`Constrained` 对应 degraded/boundary limited;`Unavailable` 对应 unavailable;`Retired` 对应 retired。当前 accepted domain helpers只生成 `Registered` / `Constrained` / `Unavailable`;`Unsupported` / `Retired` 可被 loaded/rejected safely,不得 silent default 为 `Registered`。 |
+
+#### 4C.4 exact material / boundary support carriers
+
+| carrier | Rust-facing shape | exact labels / fields | implementation rule |
+|---|---|---|---|
+| `MethodAssetConsumptionSummary` | body-free struct | `summary_marker_ref: MethodLibrarySafeMarker`;`formal_version_ref: FormalMethodAssetVersionRef`;`definition_ref: MethodAssetDefinitionRef`;`boundary_ref: DownstreamConsumptionBoundaryRef` | 只表达可公开消费摘要锚点和 marker;不得保存 method body、formal version body、semantic diff body、downstream execution result、runtime config、provider payload、marketplace transaction 或 UI description。 |
+| `FormalVersionRequiredState` | closed enum | `ActiveOnly`;`ActiveOrSupersededHistoricalRead` | 当前 material prepare 只能使用 `ActiveOnly`;historical read 只可作为 future read/material branch 显式传入,不得由 service/fake 默认放宽。 |
+| `FormalVersionRequirement` | body-free struct | `required_state: FormalVersionRequiredState`;`requirement_marker_ref: MethodLibrarySafeMarker` | 只表达 formal version state requirement;不得保存 version body、fingerprint、latest flag、publish/current flag 或 raw policy text。 |
+| `MethodAssetAllowedUseKind` | closed enum | `Read`;`Reference`;`Assemble`;`Distribute` | 只表达 use family,不表达 runtime execution,permission role,marketplace fulfillment or UI action。 |
+| `MethodAssetAllowedUseKindSet` | deterministic enum-set struct | `allowed_kinds: Vec<MethodAssetAllowedUseKind>`;ordered by insertion after canonical dedup;empty illegal for `Registered` boundary | 不得保存 route、handler name、role/scope matrix、policy expression、config flag 或 raw use string。 |
+| `DownstreamForbiddenWriteKind` | closed enum | `DefinitionTruth`;`FormalVersionTruth`;`ConsumptionMaterialTruth`;`TraceAuditTruth`;`LineageTruth` | 只表达禁止反写的 truth family;不得加入 repository table name、SQL operation、runtime endpoint、broker topic 或 marketplace state。 |
+| `DownstreamForbiddenWriteKindSet` | deterministic enum-set struct | `forbidden_kinds: Vec<DownstreamForbiddenWriteKind>`;ordered by insertion after canonical dedup;empty illegal for `Registered` boundary | 当前 boundary 默认 guard must include definition/formal version writeback redlines through explicit source carrier/tests;不得由 service/fake 私下硬编码。 |
+
+#### 4C.5 current-boundary object field and helper closure
+
+`commit-05-a` 让 Step 6 对象卡片中的字段骨架成为可落码 truth/support carrier。下列字段为 current-boundary persisted/domain fields;若实现需要新增字段、mapper output、repository method、application source carrier 或 evidence schema,必须暂停回设计。
+
+| object | exact current-boundary fields | exact helper / transition | implementation rule |
+|---|---|---|---|
+| `MethodAssetConsumptionMaterial` | `consumption_material_ref`;`formal_version_ref`;`definition_ref`;`consumption_context_ref`;`boundary_ref`;`consumption_summary`;`source_cursor_ref`;`material_state: MethodAssetConsumptionMaterialState`;`availability_marker: Option<MethodAssetConsumptionAvailabilityMarker>` | `from_formal_version(consumption_material_ref, formal_version_ref, definition_ref, boundary_ref, consumption_context_ref, consumption_summary, source_cursor_ref)` initializes `Prepared`;`apply_availability_marker(marker)` moves only to marker target `Ready` / `Stale` / `Unavailable` / `Constrained`;`mark_stale(reason_ref)` is a convenience wrapper that must build/copy an availability marker with `target_state = Stale`。 | material is controlled read material,not second truth。No query prepare, no downstream runtime truth, no raw method body, no local `Retired` material state, no marker synthesis。 |
+| `DefinitionUseBoundaryGuard` | `guard_ref`;`protected_definition_ref`;`protected_formal_version_ref`;`consumption_context_ref`;`boundary_ref`;`guard_reason_ref`;`guard_state: DefinitionUseBoundaryGuardState` | `protect_formal_consumption(guard_ref, definition_ref, formal_version_ref, boundary_ref, consumption_context_ref, guard_reason_ref)` initializes `Monitoring`;`mark_violation(violation_ref: MethodLibrarySafeMarker)` moves to `ViolationRecorded`;`reject_downstream_definition_write(write_attempt_ref: MethodLibraryTypedBoundaryRef, reason_ref: DefinitionUseGuardReasonRef)` moves to `RejectedCandidate` or `ManualReviewRequired` only from safe marker source。 | guard never mutates definition/formal-version/material truth and never reads downstream payload/auth matrix。 |
+| `DownstreamConsumptionBoundary` | `boundary_ref`;`consumption_context_ref`;`formal_version_requirement`;`allowed_use_kind_set`;`forbidden_write_kind_set`;`material_scope_ref`;`boundary_reason_ref`;`boundary_state: DownstreamConsumptionBoundaryState` | `for_consumption_context(boundary_ref, consumption_context_ref, formal_version_requirement, allowed_use_kind_set, forbidden_write_kind_set, material_scope_ref, boundary_reason_ref)` initializes `Registered`;`scope_limited(reason_ref)` moves to `Constrained`;`unavailable(reason_ref)` moves to `Unavailable`;future `Unsupported` / `Retired` transitions require later formal source。 | boundary declares consumption constraints only;it does not store auth matrix、runtime install/execution state、marketplace fulfillment、handoff delivery or adapter health implementation。 |
+
+Implementation / test redlines:
+
+- `commit-05-a` implementation may add minimal contracts ref kind registry/export entries for `4C.1` and contracts/domain carrier exports/tests for `4C.2`~`4C.5`.
+- Contracts/domain tests must cover exact enum labels, wrong-kind typed-ref rejection, deterministic enum-set dedup, body-free summary redlines, copy-only availability marker transition, Definition vs Use writeback rejection and no downstream truth persistence.
+- `MethodAssetConsumptionMaterialState::Constrained` is the only current-boundary Rust-facing representation for formal display degraded material;implementation must not add `Degraded` as a second material state.
+- `FormalMethodAssetVersionState::Retired` blocks new material creation;implementation must not add `MethodAssetConsumptionMaterialState::Retired`.
+- If implementation needs availability resolver/mapper callable surface, material repository, application service source carrier, distribution handoff, real downstream runtime, query refresh, event/job/report/evidence schema or config key, it must stop and return to the owning Step / boundary ledger.
+
 ### 5. 对象族卡片: `MethodLibrarySafeMarker`
 
 ```rust

@@ -7,9 +7,9 @@
 | phase | PH-04 formalization and version semantics |
 | design_baseline | `current-design-with-commit-04-b-service-replay-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | Design updated the current-boundary retirement rule: `RetireFormalMethodAssetVersionFlow` is version-repo-only inside `commit-04-b`, and consumption / pending-impact prechecks are deferred to `commit-05-a` / `commit-06-a`. Implementation must reread every Required Read row from this ledger, rerun Design Gate / Scope Gate, and must not add `MethodAssetConsumptionMaterialRef`, `ConsumptionImpactSummaryRef` or any future-owner helper scan/private map before editing `crates/application`, `crates/contracts`, `crates/infra` or `crates/api`. |
+| status | implemented |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | Implementation handoff closed by commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; formalization/version services, duplicate replay and replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are complete inside the current boundary scope. |
 
 ---
 
@@ -87,19 +87,19 @@
 | prior handoff | `commit-04-a` implementation commit and handoff recorded | pass | PH-04 formalization/version contracts/domain slice is recorded at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded `?? .gitignore`; the unrelated user-owned file remains untouched and unstaged. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
-| format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
-| workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
-| application check | `cargo check -p method-library-application` or the formal application package check | pending | Use actual package name from formal workspace once activated. |
-| infra check | `cargo check -p method-library-infra` or the formal infra package check | pending | Fake replay storage and runtime support must compile. |
-| api check | `cargo check -p method-library-api` or the formal API package check if API files changed | pending | Minimal handler must compile and call application facade only. |
-| service-flow-fast formalization | targeted formalization/version service-flow and replay tests | pending | Must cover accepted, rejected, duplicate replay, version conflict and commit unknown paths. |
-| replay consistency tests | stored result missing / mismatch / duplicate replay tests | pending | Missing surface must fail safely, not rebuild from truth. |
-| VETO targeted audit | check `VETO-ML-002` / `VETO-ML-004` risk is not introduced | pending | Silent overwrite or invalid use edge blocks commit. |
-| dependency boundary | inspect Cargo manifests / metadata for forbidden sibling or reverse dependencies | pending | Application must not depend on infra/API; infra may depend inward. |
-| redaction fixture scan | check tests/artifacts/reports do not include forbidden raw body/secret/provider/config material | pending | Required for body-free service evidence. |
-| evidence report | run-scoped `service-flow-fast` artifact/report if scripts exist | pending | Generated reports must derive from raw artifacts and retain failures. |
-| whitespace | `git diff --check` and `git diff --cached --check` before commit | pending | Required for Commit Gate. |
-| staged scope | `git diff --cached --name-only` | pending | Must match Allowed Scope. |
+| format | `cargo fmt --all` | pass | Re-run at current HEAD `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f` and completed cleanly before handoff closure. |
+| workspace check | `cargo check` | pass | `cargo check` passed again at current HEAD after the replay-integrity redline follow-up. |
+| application check | `cargo check -p method-library-application` or the formal application package check | pass | `cargo check -p method-library-application` passed at current HEAD; application crate keeps inward-only dependencies on contracts/domain. |
+| infra check | `cargo check -p method-library-infra` or the formal infra package check | pass | `cargo check -p method-library-infra` passed at current HEAD; fake replay runtime support compiles after the integrity-test hook addition. |
+| api check | `cargo check -p method-library-api` or the formal API package check if API files changed | pass | `cargo check -p method-library-api` passed at current HEAD; minimal handler still delegates through the application facade. |
+| service-flow-fast formalization | targeted formalization/version service-flow and replay tests | pass | `cargo test -p method-library-contracts --test formalization_contracts`, `cargo test -p method-library-application --test formalization_version_foundation`, `cargo test -p method-library-infra --test formalization_version_runtime` and `cargo test -p method-library-api --test formalization_version_entry` all passed at current HEAD. |
+| replay consistency tests | stored result missing / mismatch / duplicate replay tests | pass | `formalization_version_runtime` now covers duplicate replay without rerun, missing stored-result integrity conflict and `CommitUnknown` read-back without future-owner prechecks. |
+| VETO targeted audit | check `VETO-ML-002` / `VETO-ML-004` risk is not introduced | pass | Version-conflict rejection, duplicate replay no-rerun, replay-integrity conflict and retire read-back tests passed; current boundary still excludes controlled-consumption/use behavior. |
+| dependency boundary | inspect Cargo manifests / metadata for forbidden sibling or reverse dependencies | pass | `crates/application/Cargo.toml` depends only on `method-library-contracts` and `method-library-domain`; infra depends inward on application/contracts/domain, and API depends on application/contracts/infra only. |
+| redaction fixture scan | check tests/artifacts/reports do not include forbidden raw body/secret/provider/config material | pass | `rg -n "MethodContent|publish|snapshot|outbox|secret|provider body|raw body|stack trace|http status|provider payload"` over touched formalization source/tests and the run-scoped report returned no matches. |
+| evidence report | run-scoped `service-flow-fast` artifact/report if scripts exist | pass | `bash scripts/checks/check_paths.sh --run-id 20260702T155112Z-commit-04-b ...` and `bash scripts/reports/generate_reports.sh --run-id 20260702T155112Z-commit-04-b ...` both passed; derived report is `reports/runs/20260702T155112Z-commit-04-b/suites/service-flow-fast.md`. |
+| whitespace | `git diff --check` and `git diff --cached --check` before commit | pass | `git diff --check`, `git diff --cached --check`, `git show --check --format=oneline ce425b55fa3726f0149ae338ad9337e684e45f93` and `git show --check --format=oneline 1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f` were clean. |
+| staged scope | `git diff --cached --name-only` | pass | Final delivery scope is limited to allowed contracts/application/infra/api files, targeted tests and the run-scoped `service-flow-fast` report. |
 
 ---
 
@@ -110,12 +110,12 @@
 | activation_gate | pass | Project ledger has advanced from `commit-04-a` to `commit-04-b`, and `commit-04-a` handoff is closed by `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`. | read_docs |
 | design_gate | pass | Required reads now align on one current-boundary rule: `RetireFormalMethodAssetVersionFlow` is version-repo-only inside `commit-04-b`, and consumption / pending-impact traceability prechecks are carved to `commit-05-a` / `commit-06-a`. | wait_design |
 | scope_gate | pass | Allowed scope remains unchanged: only the six selector intent labels may touch contracts, and the retire-formal-version accepted path no longer demands extra future-owner typed refs or helper scans. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
-| build_gate | pending | Formatting, workspace/application/infra/API checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
-| test_gate | pending | Service-flow-fast formalization/replay and VETO targeted checks pass after activation. | fix_gate_failure |
-| evidence_gate | pending | Targeted artifact/report is optional until scripts exist; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
-| commit_gate | pending | staged scope, commit message, whitespace and required checks have evidence. | fix_gate_failure |
-| handoff_gate | pending | commit hash, checks run, tests not run, blockers and next boundary state recorded. | handoff |
+| worktree_gate | pass | Pre-edit and final worktree audits both recorded only the user-owned untracked `.gitignore`; `.codex/` and `target/` remained unstaged. | fix_gate_failure |
+| build_gate | pass | `cargo fmt --all`, `cargo check`, `cargo check -p method-library-application`, `cargo check -p method-library-infra` and `cargo check -p method-library-api` all passed at current HEAD. | fix_gate_failure |
+| test_gate | pass | Targeted formalization/version contract, application, infra and API tests all passed, including duplicate replay, replay-integrity conflict and `CommitUnknown` retirement read-back. | fix_gate_failure |
+| evidence_gate | pass | Run-scoped raw artifacts and derived report were validated under `artifacts/test/20260702T155112Z-commit-04-b/**` and `reports/runs/20260702T155112Z-commit-04-b/**`. | fix_gate_failure |
+| commit_gate | pass | Commit scope, subjects/body groups, whitespace and required checks were rechecked across implementation commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`. | fix_gate_failure |
+| handoff_gate | pass | Implementation commits, targeted checks, run-scoped evidence and untouched user-change audit close this boundary. | handoff |
 
 ---
 
@@ -123,12 +123,12 @@
 
 | gate | status | evidence |
 |---|---|---|
-| staged_scope | pending | Must include only allowed `commit-04-b` formalization service/replay files and generated targeted evidence if applicable. |
-| unrelated_changes | pending | User-owned unrelated changes must remain unstaged. |
-| commit_message_format | pending | Planned subject: `feat(formalization): add version service replay` |
-| commit_body_group | pending | Body group must include `Formalization services:` and `Stored replay and conflict handling:` from Step 11 mapping. |
-| whitespace | pending | `git diff --cached --check` must pass. |
-| required_checks | pending | Required Checks table must have pass/not_applicable evidence. |
+| staged_scope | pass | Commit `ce425b55fa3726f0149ae338ad9337e684e45f93` stayed inside allowed contracts/application/infra/api/test/report files, and commit `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f` stayed inside the allowed infra runtime/test replay-integrity redline subset. |
+| unrelated_changes | pass | The user-owned untracked `.gitignore` remained outside both commits. |
+| commit_message_format | pass | Current boundary is delivered by `feat(formalization): add version service replay` and `test(formalization): cover replay integrity conflict`. |
+| commit_body_group | pass | Both implementation commits include the required body group `Stored replay and conflict handling:`, and the main service-flow commit also includes `Formalization services:`. |
+| whitespace | pass | `git diff --cached --check` passed before each commit and both committed diffs are whitespace-clean. |
+| required_checks | pass | Required Checks now contain only `pass` outcomes with concrete command, artifact or report evidence. |
 
 ---
 
@@ -136,13 +136,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after implementation repo commit. |
-| committed_message | pending | Fill after implementation repo commit. |
-| gates_run | pending | List exact commands and targeted reports. |
-| tests_not_run | pending | Must state none or explain; cannot claim consumption/query/publisher/job suites. |
-| remaining_blockers | pending | Must reference blocker table; any blocking design gap prevents handoff. |
-| final_conclusion | pending | Must be one of pass / fail / cannot_decide with exact evidence source. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation handoff closes on follow-up commit `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`, following service-flow commit `ce425b55fa3726f0149ae338ad9337e684e45f93`. |
+| committed_message | pass | `test(formalization): cover replay integrity conflict` after `feat(formalization): add version service replay`. |
+| gates_run | pass | Handoff audit ran `git status --short`, `git config user.name`, `git config user.email`, `cargo fmt --all`, `cargo check`, `cargo check -p method-library-application`, `cargo check -p method-library-infra`, `cargo check -p method-library-api`, `cargo test -p method-library-contracts --test formalization_contracts`, `cargo test -p method-library-application --test formalization_version_foundation`, `cargo test -p method-library-infra --test formalization_version_runtime`, `cargo test -p method-library-api --test formalization_version_entry`, `bash scripts/checks/check_paths.sh --run-id 20260702T155112Z-commit-04-b --artifact-root artifacts/test/20260702T155112Z-commit-04-b --report-root reports/runs/20260702T155112Z-commit-04-b`, `bash scripts/reports/generate_reports.sh --run-id 20260702T155112Z-commit-04-b --artifact-root artifacts/test/20260702T155112Z-commit-04-b --report-root reports/runs/20260702T155112Z-commit-04-b`, `rg -n "MethodContent|publish|snapshot|outbox|secret|provider body|raw body|stack trace|http status|provider payload" crates/application/src/formalization_version.rs crates/application/tests/formalization_version_foundation.rs crates/infra/src/formalization_version.rs crates/infra/tests/formalization_version_runtime.rs crates/api/src/formalization_version.rs crates/api/tests/formalization_version_entry.rs crates/contracts/tests/formalization_contracts.rs`, `git diff --check`, `git diff --cached --check`, `git show --check --format=oneline ce425b55fa3726f0149ae338ad9337e684e45f93` and `git show --check --format=oneline 1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`. |
+| tests_not_run | pass | No controlled-consumption/distribution, query/material, publisher/worker, job, trace/audit, external/peripheral or release/acceptance suites were run because they belong to later boundaries. |
+| remaining_blockers | pass | No remaining blocker was found inside `commit-04-b`; next boundary `commit-05-a` is activated by the project ledger and must restart from `read_docs`. |
+| final_conclusion | pass | `commit-04-b` allowed scope is implemented and handoff is closed by implementation commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f` plus successful targeted checks and run-scoped `service-flow-fast` evidence. |
+| user_owned_changes_untouched | pass | Implementation handoff preserved user-owned untracked `.gitignore`; `.codex/` and `target/` remained unstaged. |
 
 ---
 

@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `current-design-with-commit-04-b-service-replay-closure` |
-| current_boundary | `commit-04-b` |
+| current_design_baseline | `current-design-with-commit-05-a-consumption-carrier-closure` |
+| current_boundary | `commit-05-a` |
 | gate_status | ready |
-| gate_reason | `commit-04-b` retirement-precheck contradiction is closed. Formal `03` §6.3B, Step 7 `R7.10B`, Step 9 `3A` and Step 11 `3C` now keep `RetireFormalMethodAssetVersionFlow` version-repo-only inside the current boundary and defer consumption / pending-impact traceability prechecks to `commit-05-a` / `commit-06-a`. |
+| gate_reason | `commit-05-a` Design Gate blockers are closed: formal `03` §6.3C, Step 6 `4C`, Step 10 `8.2`, Step 12 `6.1`, formal `07` and the implementation boundary now publish one exact controlled-consumption state/carrier/availability-marker surface for contracts/domain implementation. |
 | next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | Implementation must reread `implementation-boundaries/commit-04-b.md`, then reread all required design sources from that boundary and rerun Design Gate / Scope Gate before editing code. Inside `commit-04-b`, do not add `MethodAssetConsumptionMaterialRef`, `ConsumptionImpactSummaryRef`, future-owner helper repos, scans or private precheck maps. |
+| current_recovery_point | Implementation must reread `implementation-boundaries/commit-05-a.md`, then reread all Required Reads from that boundary and rerun Design Gate / Scope Gate before editing code. Inside `commit-05-a`, use only the closed controlled-consumption typed refs, state carriers, safe reason wrappers, body-free support carriers and copy-only availability marker; do not add application services, repositories, resolver/mapper ports, downstream runtime, query refresh or evidence schema. |
 | last_updated_by | design agent |
-| last_updated_at | 2026-07-02 20:56:20 +0800 |
+| last_updated_at | 2026-07-03 02:40:37 +0800 |
 
 ---
 
@@ -37,7 +37,8 @@
 | `commit-03-a` | `current-design-with-commit-03-a-reason-marker-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-a` completed at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; definition/catalog carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
 | `commit-03-b` | `current-design-with-commit-03-b-truth-ref-factory-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-b` completed across `891d323` and `66496cf`; accepted definition/catalog service flow, fake parity, minimal API entry and targeted `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
 | `commit-04-a` | `current-design-with-commit-04-a-formalization-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-a` completed at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |
-| `commit-04-b` | `current-design-with-commit-04-b-service-replay-closure` | ready | scope_gate | read_current_boundary_ledger | Design revised the current-boundary retirement rule: `retire_formal_version` is version-repo-only in `commit-04-b`, and consumption / pending-impact traceability prechecks are deferred to `commit-05-a` / `commit-06-a`. Implementation must reread the current boundary ledger and required reads before code edits. |
+| `commit-04-b` | `current-design-with-commit-04-b-service-replay-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-b` completed across `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; formalization/version services, duplicate replay and replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
+| `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | ready | design_gate | read_current_boundary_ledger | Design closed the controlled-consumption material state, guard/boundary carriers and availability-marker source surface. Implementation must reread the current boundary ledger and required reads before code edits. |
 
 ---
 
@@ -78,6 +79,10 @@
 | BLK-ML-04B-DESIGN-002 | `commit-04-b` | implementation | resolved | `current-design-with-commit-04-b-service-replay-closure` | Step 8 `6A`, Step 9 `3A` and formal `03` §6.3B now close the six PH-04 command selector/source/input/output carriers, duplicate digest rules, replay-safe output mapping and exact function-level flow overlay. Implementation must resume from `read_current_boundary_ledger` and rerun `read_docs`. |
 | BLK-ML-04B-DESIGN-003 | `commit-04-b` | implementation | resolved | `current-design-with-commit-04-b-service-replay-closure` | Step 7 `R7.10B`, Step 11 `3C` and formal `03` §6.3B now close the exact repository, resolver, policy-diagnostic, version-state-only retirement precheck, `MethodAssetCommitObservation`, stored-result and fake-parity callable surface required by the current flows. Implementation must resume from `read_current_boundary_ledger` and rerun `read_docs`. |
 | BLK-ML-04B-DESIGN-004 | `commit-04-b` | implementation | resolved | `current-design-with-commit-04-b-service-replay-closure` | Formal `03` §6.3B, Step 7 `R7.10B`, Step 9 `3A` and Step 11 `3C` now carve consumption / pending-impact traceability prechecks out of `commit-04-b` and keep `RetireFormalMethodAssetVersionFlow` version-repo-only in the current boundary. Implementation must reread `implementation-boundaries/commit-04-b.md`, rerun `read_docs` and must not add future-owner typed refs, helper scans or private precheck maps. |
+| BLK-ML-05A-ACTIVATION-001 | `commit-05-a` | implementation | resolved | `planned-after-d3faf90-handoff-ledger` | `commit-04-b` handoff is now closed, project ledger advances to `commit-05-a`, and implementation must continue from `read_docs` and rerun the new current-boundary Design Gate before editing code. |
+| BLK-ML-05A-DESIGN-001 | `commit-05-a` | implementation | resolved | `current-design-with-commit-05-a-consumption-carrier-closure` | Formal `03` §6.3C, Step 6 `4C.3` and Step 10 `MethodAssetConsumptionMaterial` / `8.2` now close `MethodAssetConsumptionMaterialState = Prepared | Ready | Stale | Unavailable | Constrained`;historical `degraded` maps to `Constrained`, and `retired` is blocked by formal version state rather than a material state. Implementation must resume from `read_docs` and rerun Design Gate. |
+| BLK-ML-05A-DESIGN-002 | `commit-05-a` | implementation | resolved | `current-design-with-commit-05-a-consumption-carrier-closure` | Formal `03` §6.3C and Step 6 `4C.1`~`4C.5` now close exact consumption typed refs, safe reason wrappers, body-free support carriers, `DefinitionUseBoundaryGuardState`, `DownstreamConsumptionBoundaryState`, object field/helper closure and no-downstream-truth test redlines. Implementation must not fall back to the older `commit-02-b` generic shell closure for this boundary. |
+| BLK-ML-05A-DESIGN-003 | `commit-05-a` | implementation | resolved | `current-design-with-commit-05-a-consumption-carrier-closure` | Formal `03` §6.3C, Step 6 `4C.2`, Step 10 `8.2` and Step 12 `6.1` now close `MethodAssetConsumptionAvailabilityMarker`, target/source enums, copy-only state transition and missing-source design-blocker rules. Implementation must copy this marker carrier and must not synthesize availability/degraded/unavailable from raw errors, runtime state or fake private enums. |
 
 ---
 
@@ -86,12 +91,12 @@
 Any implementation agent resuming `L3-method-library` must read files in this order:
 
 1. `projects/L3-method-library/design-calibration/implementation_execution_ledger.md`
-2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-04-b.md`
+2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-05-a.md`
 3. `projects/L3-method-library/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary remains `commit-04-b`;the latest design closure now defines `RetireFormalMethodAssetVersionFlow` as version-repo-only in this boundary and defers consumption / pending-impact traceability checks to `commit-05-a` / `commit-06-a`.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory, marker source or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is now `commit-05-a`; `commit-04-b` handoff is closed by commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`, and the next allowed implementation work is the controlled-consumption contracts/domain boundary after rerunning its Required Reads / Design Gate.
 
 ---
 
@@ -119,4 +124,5 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-03-a` | implemented handoff closed | Implementation handoff records definition/catalog contracts and domain truth commit `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; support carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
 | `commit-03-b` | implemented handoff closed | Implementation handoff records accepted definition/catalog service vertical slice commits `891d323` and `66496cf`; exact selector/source dispatch, replay envelope/support ref factory usage, definition/catalog truth-ref factory calls, lifecycle/status persistence, fake parity, minimal API entry and targeted `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
 | `commit-04-a` | implemented handoff closed | Implementation handoff records formalization/version contracts and state-guard commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; exact typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |
-| `commit-04-b` | current boundary ready | Current baseline `current-design-with-commit-04-b-service-replay-closure` now closes the retirement-precheck scope contradiction by keeping `retire_formal_version` version-repo-only in this boundary; implementation must restart from the latest current boundary ledger and rerun Design Gate / Scope Gate before editing code. |
+| `commit-04-b` | implemented handoff closed | Implementation handoff records formalization/version service and replay commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; duplicate replay, version conflict, commit-unknown read-back, replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
+| `commit-05-a` | current boundary pending | Current boundary now advances to controlled consumption material contracts/domain; implementation must rerun `commit-05-a` Required Reads, Design Gate and Scope Gate before editing code. |

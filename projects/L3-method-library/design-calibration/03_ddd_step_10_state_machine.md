@@ -629,7 +629,7 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.6 状态主语筛�
 | ML-D03-S10-WATCH-001 | `ExternalSourceSummary` | external unavailable、body violation、schema version support 是否形成状态 owner 仍需 error/config 闭口。 | Step 12 / Step 14 | 保留到 R10.9/R10.10 时只写已闭口部分。 |
 | ML-D03-S10-WATCH-002 | `DownstreamConsumptionBoundary` | boundary adjustment 与 availability state 的持久 owner 仍需 Step 11 支撑。 | Step 11 / Step 12 | R10.9/R10.10 先按 boundary marker / decision 审计。 |
 | ML-D03-S10-WATCH-003 | stored result / replay | stored accepted/rejected/ignored surface schema 仍未在 Step 10 定义。 | Step 11 / Step 13 | R10.17/R10.18 只定义 replay state boundary。 |
-| ML-D03-S10-WATCH-004 | query stale/degraded/unavailable | marker 必须复制 resolver / mapper / availability 输出,不能由 query service 合成。 | Step 12 / Step 15 | R10.13/R10.14 必须记录 marker source。 |
+| ML-D03-S10-WATCH-004 | query stale/degraded/unavailable | marker 必须复制 resolver / mapper / availability 输出,不能由 query service 合成。 | Step 12 / Step 15 | Query/read marker source 后移;`commit-05-a` material marker carrier 已由本文件 `8.2` 和 Step 6 `4C.2` 单独闭口。 |
 | ML-D03-S10-WATCH-005 | event candidate persistence | candidate 是否 durable、publisher reload 来源、target registry binding 后移。 | Step 11 / Step 14 | R10.19/R10.20 只定义 candidate/outcome state boundary。 |
 | ML-D03-S10-WATCH-006 | job checkpoint/report | checkpoint identity、report persistence、run history schema 后移。 | Step 11 / Step 13 / Step 15 | R10.15/R10.16 不写 durable schema。 |
 | ML-D03-S10-BLOCK-001 | none | 当前筛选未发现必须回退 Step 6/7/8/9 的 hard blocker。 | n/a | 无暂停。 |
@@ -760,7 +760,7 @@ business truth accepted 转换可以产生 body-free history、audit hint、even
 
 | ID | topic | R10.7 判断 | R10.8 处理 |
 |---|---|---|---|
-| ML-D03-S10-BT-WATCH-001 | `MethodAssetConsumptionMaterial` availability marker | Step 9 明确 service 不能合成 marker。 | R10.8 可写转换边界,但 marker source 必须回指 resolver / mapper;缺来源不得补。 |
+| ML-D03-S10-BT-WATCH-001 | `MethodAssetConsumptionMaterial` availability marker | Step 9 明确 service 不能合成 marker。 | R10.8 可写转换边界;`commit-05-a` exact marker carrier/source enum 在 Step 6 `4C.2` 和本文件 `8.2` 闭口。缺少该 carrier 仍不得由 service/fake 自补。 |
 | ML-D03-S10-BT-WATCH-002 | package / assembly unavailable marker | mark unavailable / stale flow 依赖 degraded mapper / availability port。 | R10.8 只写复制 marker 的转换,不写 marker 枚举细节。 |
 | ML-D03-S10-BT-WATCH-003 | formal version supersession owner | Step 9 允许 previous / next pair,但具体 pairing owner 和 persistence 后移。 | R10.8 只写 lifecycle 约束和 trigger,不写 table/index。 |
 | ML-D03-S10-BT-BLOCK-001 | none | 当前 business truth 思考未发现必须回退 Step 6/7/8/9 的 hard blocker。 | 无暂停。 |
@@ -975,6 +975,10 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.8 business truth �
 | `Stale` | availability / freshness marker 判定材料陈旧。 | readable stale |
 | `Unavailable` | availability resolver 判定当前不可用。 | readable unavailable surface |
 | `Constrained` | consumption boundary 判定受限。 | readable constrained surface |
+
+上述 labels 是 `commit-05-a` exact Rust-facing `MethodAssetConsumptionMaterialState` carrier,并保存于 `MethodAssetConsumptionMaterial.material_state`。历史 / display labels 的 current-boundary 映射固定为 `preparing -> Prepared`, `available -> Ready`, `stale -> Stale`, `unavailable -> Unavailable`, `degraded -> Constrained`;`retired` 不属于 material state,由 `FormalMethodAssetVersionState::Retired` 阻止新 material。实现侧不得新增 `Degraded` / `Retired` material state、string status、stored result kind、query freshness status、adapter runtime state 或 fake private side-state 代替该 carrier。
+
+`MarkMethodAssetConsumptionMaterialStateFlow` 必须复制 Step 6 `4C.2` exact `MethodAssetConsumptionAvailabilityMarker`。该 marker 的 `target_state` 只能是 `Ready` / `Stale` / `Unavailable` / `Constrained`,`source_kind` 只能是 `AvailabilityResolver` / `DegradedMapper` / `DownstreamConsumptionBoundaryGuard`。缺少 marker 或 source kind 时仍是 design blocker,不得由 service/domain/fake 从 raw error、HTTP/SQL status、route、config、exception text、query result、runtime adapter state 或 private enum 合成。
 
 ```text
 [virtual:not_created]
@@ -1346,6 +1350,9 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.10 source/referenc
 | `Monitoring` | guard 可用于检查 definition/formal version 是否被 use 侧反写。 | readable diagnostic |
 | `ViolationRecorded` | 已记录 body-free violation marker / safe reason。 | readable diagnostic |
 | `RejectedCandidate` | violation candidate 因缺 safe reason 或非法 body 输入被拒绝。 | readable diagnostic |
+| `ManualReviewRequired` | guard candidate 需要人工处理,但不得保存 raw body 或授权 runtime truth。 | readable diagnostic |
+
+上述 labels 是 `commit-05-a` exact Rust-facing `DefinitionUseBoundaryGuardState` carrier。历史 / display labels 映射固定为 `allowed -> Monitoring`, `blocked -> RejectedCandidate`, `violation-detected -> ViolationRecorded`, `manual-review -> ManualReviewRequired`。实现侧不得新增 permission/auth state,不得把 downstream runtime success、role matrix、token scope、HTTP status、raw violation body 或 fake private enum 当作 guard state。
 
 ```text
 [Monitoring]
@@ -1355,12 +1362,16 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.10 source/referenc
    ^
    | invalid candidate / raw body rejected
 [RejectedCandidate]
+   ^
+   | safe manual marker
+[ManualReviewRequired]
 ```
 
 | from | trigger | precondition | to | side effect boundary |
 |---|---|---|---|---|
 | `Monitoring` | `RecordDefinitionUseBoundaryViolationFlow` | guard ref valid;safe violation summary present;raw request body absent | `ViolationRecorded` | guard violation event candidate;audit / trace candidate;stored result |
 | `Monitoring` | `RecordDefinitionUseBoundaryViolationFlow` rejected branch | safe reason missing or candidate needs raw body | `RejectedCandidate` | safe rejection surface;stored result |
+| `Monitoring` / `RejectedCandidate` | `RecordDefinitionUseBoundaryViolationFlow` manual branch | formal safe manual marker present;raw body absent | `ManualReviewRequired` | safe manual review marker;stored result |
 
 非法转换占位:
 
@@ -1376,8 +1387,12 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.10 source/referenc
 | state | 含义 | public read |
 |---|---|---|
 | `Registered` | consumption context 与 boundary summary 已登记。 | readable |
+| `Unsupported` | 当前语境不支持该 use family,但该状态不是 runtime failure。 | readable unsupported |
 | `Constrained` | boundary 当前限制 consumption material 或 use kind。 | readable constrained |
 | `Unavailable` | boundary / availability source 当前不可用。 | readable unavailable surface |
+| `Retired` | boundary 历史化,不得作为新 material prepare 的有效边界。 | readable historical |
+
+上述 labels 是 `commit-05-a` exact Rust-facing `DownstreamConsumptionBoundaryState` carrier。历史 / display labels 映射固定为 `supported -> Registered`, `unsupported -> Unsupported`, `degraded -> Constrained`, `unavailable -> Unavailable`, `retired -> Retired`。当前 accepted domain helpers 只生成 `Registered` / `Constrained` / `Unavailable`;`Unsupported` / `Retired` 可被显式表达并 safe reject,但不得 silent default 为 `Registered` 或从 runtime adapter state 推导。
 
 ```text
 [virtual:not_created]
@@ -1387,12 +1402,14 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.10 source/referenc
      |                         |
      +------------------------> [Constrained]
      +------------------------> [Unavailable]
+     +------------------------> [Unsupported]
+     +------------------------> [Retired]
 ```
 
 | from | trigger | precondition | to | side effect boundary |
 |---|---|---|---|---|
 | virtual not created | `RegisterDownstreamConsumptionBoundaryFlow` | consumption context refs valid;raw downstream id rejected;policy diagnostic accepted | `Registered` / `Constrained` | boundary changed event candidate;trace candidate;stored result |
-| `Registered` / `Constrained` / `Unavailable` | `AdjustDownstreamConsumptionBoundaryFlow` | boundary owner loaded;expected version;adjustment reason safe;availability/diagnostic marker source present when changing marker state | `Registered` / `Constrained` / `Unavailable` | boundary changed event candidate;stored result |
+| `Registered` / `Constrained` / `Unavailable` / `Unsupported` / `Retired` | `AdjustDownstreamConsumptionBoundaryFlow` | boundary owner loaded;expected version;adjustment reason safe;availability/diagnostic marker source present when changing marker state | `Registered` / `Constrained` / `Unavailable` / `Unsupported` / `Retired` | boundary changed event candidate;stored result |
 
 非法转换占位:
 
@@ -1401,6 +1418,7 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.10 source/referenc
 | any | adjust formal version truth | boundary adjustment cannot mutate formal version |
 | any | store auth matrix / install state / downstream runtime truth | boundary is safe consumption judgement only |
 | any | create ref from raw downstream id | context ref must be formal typed ref |
+| `Unsupported` / `Retired` | prepare new consumption material as if supported | unsupported/retired boundary must be explicit safe rejection or historical read,not default accepted boundary |
 
 ### 6. `ExternalBodyBoundaryRule` 状态机
 
@@ -1475,6 +1493,28 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.10 source/referenc
 | `MethodAssetDefinition`;`MethodAssetCatalogEntry`;`MethodAssetRelation`;`MethodPackage`;`MethodSetAssembly` | truth lifecycle later;当前 boundary 不得抢写。 |
 | `FormalizationBasisSummary`;`ExternalSourceSummary`;`MethodAssetTraceMaterial`;`ConsumptionImpactSummary`;`MethodAssetAuditTrail`;`MethodAssetEvidenceLineage` | source / trace / support owner later;当前 boundary 只允许 judgement shell。 |
 | read/material、maintenance/job、replay/runtime、outbound/handoff families | application / infra / worker / jobs owning boundary later。 |
+
+### 8.2 `commit-05-a` current-boundary controlled-consumption state closure supplement
+
+当前 implementation boundary `commit-05-a` 只允许把 controlled consumption material、Definition vs Use guard、downstream consumption boundary 和 material availability marker 收窄为 contracts/domain carrier 与 pure state guard。实现端当前只允许落码以下 exact labels:
+
+| current-boundary state / marker carrier | exact labels / fields | current implementation rule |
+|---|---|---|
+| `MethodAssetConsumptionMaterialState` | `Prepared`;`Ready`;`Stale`;`Unavailable`;`Constrained` | `Prepared` 只能由 material factory 初始化;`Ready/Stale/Unavailable/Constrained` 只能由 `MethodAssetConsumptionAvailabilityMarker.target_state` 复制。历史 `degraded` 映射到 `Constrained`;不得实现 local `Degraded` / `Retired` material state。 |
+| `DefinitionUseBoundaryGuardState` | `Monitoring`;`ViolationRecorded`;`RejectedCandidate`;`ManualReviewRequired` | 只表达 Definition vs Use judgement,不 materialize permission matrix、definition truth、formal version lifecycle 或 downstream runtime truth。 |
+| `DownstreamConsumptionBoundaryState` | `Registered`;`Unsupported`;`Constrained`;`Unavailable`;`Retired` | 只表达 boundary judgement。当前 accepted helpers 只生成 `Registered/Constrained/Unavailable`;`Unsupported/Retired` 必须显式 safe reject / historical,不得默认成 `Registered`。 |
+| `MethodAssetConsumptionAvailabilityTarget` | `Ready`;`Stale`;`Unavailable`;`Constrained` | 作为 material state transition target,不包含 `Prepared`、`Degraded` 或 `Retired`。 |
+| `MethodAssetConsumptionAvailabilityMarkerSource` | `AvailabilityResolver`;`DegradedMapper`;`DownstreamConsumptionBoundaryGuard` | 只表达 formal marker source family;不得从 raw adapter error、HTTP/SQL status、exception text、runtime state、config profile 或 fake private enum 推导。 |
+
+`commit-05-a` state closure source:
+
+- Step 6 `4C.1` closes consumption named refs and exact typed-ref kind labels.
+- Step 6 `4C.2` closes safe reason wrappers and `MethodAssetConsumptionAvailabilityMarker`.
+- Step 6 `4C.3` closes material / guard / boundary state carriers.
+- Step 6 `4C.4` closes body-free material and boundary support carriers.
+- Step 6 `4C.5` closes current object fields, factory initial states, transition helper signatures and test redlines.
+
+If implementation needs repository persistence, application service source carrier, availability resolver/mapper port, downstream runtime, query refresh, event/job/report/evidence schema or config key beyond this supplement, it must stop and return to the owning Step / boundary ledger.
 
 ### 9. R10.10 stop-review
 
@@ -3574,11 +3614,11 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.22 跨状态机审
 | ML-D03-S10-WATCH-001 | `ExternalSourceSummary` unavailable/body violation/schema support | handoff_to_step12_14 | R10.10 wrote boundary state only;Step 12/14 must close error/config mapping. |
 | ML-D03-S10-WATCH-002 | `DownstreamConsumptionBoundary` durable owner / availability | handoff_to_step11_12 | R10.10 wrote decision boundary;Step 11/12 decide persistence/recovery. |
 | ML-D03-S10-WATCH-003 | stored accepted/rejected/ignored replay surface schema | handoff_to_step11_13 | R10.18 wrote replay state boundary only. |
-| ML-D03-S10-WATCH-004 | query stale/degraded/unavailable marker source | handoff_to_step12_15 | R10.14 wrote copy-only marker rule;mapping/observability remain later. |
+| ML-D03-S10-WATCH-004 | query stale/degraded/unavailable marker source | handoff_to_step12_15_for_query_only | R10.14 wrote copy-only marker rule for public query/read surfaces;`commit-05-a` material state marker carrier is separately closed by Step 6 `4C.2` and this Step 10 `8.2` supplement. |
 | ML-D03-S10-WATCH-005 | event candidate persistence / publisher reload / target binding | handoff_to_step11_14_15 | R10.20 wrote candidate/outcome state boundary only. |
 | ML-D03-S10-WATCH-006 | job checkpoint/report/run history schema | handoff_to_step11_13_15 | R10.16 wrote state boundary only. |
 | ML-D03-S10-BLOCK-001 | hard blocker | none | No hard blocker found in Step 10. |
-| ML-D03-S10-BT-WATCH-001 | material availability marker source | handoff_to_step12_15 | R10.8/R10.14 require formal mapper/resolver source. |
+| ML-D03-S10-BT-WATCH-001 | material availability marker source | closed_in_commit_05_a | Step 6 `4C.2` closes `MethodAssetConsumptionAvailabilityMarker`, `MethodAssetConsumptionAvailabilityTarget` and `MethodAssetConsumptionAvailabilityMarkerSource`;services/domain/fakes may only copy that marker carrier and must still stop if a later application flow lacks a resolver/mapper callable surface. |
 | ML-D03-S10-REPLAY-WATCH-001 | durable idempotency schema | handoff_to_step11_13 | no schema in Step 10. |
 | ML-D03-S10-RUNTIME-WATCH-001 | runtime config binding | handoff_to_step14 | no config key / secret / URL in Step 10. |
 | ML-D03-S10-OUTBOUND-WATCH-001 | publication outcome schema | handoff_to_step12_15 | state boundary only;protocol/artifact schema remains later. |

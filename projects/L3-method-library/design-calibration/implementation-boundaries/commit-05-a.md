@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-05-a |
 | phase | PH-05 controlled consumption and distribution semantics |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `current-design-with-commit-05-a-consumption-carrier-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future controlled consumption material contracts/domain boundary; cannot start until `commit-04-b` is implemented and project ledger advances |
+| status | ready |
+| next_allowed_action | read_docs |
+| current_recovery_point | Design closed the controlled-consumption material state, guard/boundary carriers and availability-marker source surface. Implementation must restart from this ledger `read_docs` sequence, reread all Required Reads and rerun Design Gate / Scope Gate before editing contracts/domain code. |
 
 ---
 
@@ -17,9 +17,9 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-05-a` | planned | If project ledger still points to an earlier boundary, implementation agent must not use this file to modify code. |
-| `commit-04-b` handoff must be closed | planned | Formalization/version service and stored replay must exist before controlled consumption material work starts. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-05-a` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-05-a` | pass | Project ledger now points to `commit-05-a`; implementation may use this file only within the controlled consumption contracts/domain scope. |
+| `commit-04-b` handoff must be closed | pass | Formalization/version service and stored replay handoff is closed by implementation commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`. |
+| project ledger must set `next_allowed_action = read_current_boundary_ledger` for `commit-05-a` | pass | Project ledger now requires rereading this current boundary ledger, then this ledger requires `read_docs` before implementation edits. |
 
 ---
 
@@ -27,27 +27,27 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This future boundary cannot be executed until it becomes current. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented consumption material, guard, availability marker, downstream truth or evidence schema | pending | Any missing consumption/availability field or guard must return to design. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | Implementation must reread before code; blocker handling still requires `blocked / wait_design` if any current-boundary closure is missing or contradictory. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented consumption material, guard, availability marker, downstream truth or evidence schema | pending | Includes current-boundary marker/watch closure rule;implementation must not invent material state, guard carrier or availability marker source. |
 | `standards/coding/rust.md` | Rust contract/domain module, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
-| `projects/L3-method-library/00-需求文档.md` | controlled consumption scope and Definition vs Use boundary | pending | Consumption cannot create or replace definition/formalization truth. |
-| `projects/L3-method-library/01-架构设计.md` | Definition vs Use, downstream boundary and dependency direction | pending | `VETO-ML-003` / `VETO-ML-004` apply to downstream truth replacement and invalid use. |
-| `projects/L3-method-library/02-概要设计.md` | consumption material key objects and availability outline | pending | Use current controlled consumption object model. |
-| `projects/L3-method-library/03-详细设计.md` | consumption object contracts, protocol contracts, state matrix, errors and test cut | pending | Formal source for consumption material, Definition vs Use guard and availability markers. |
-| `projects/L3-method-library/04-配置设计.md` | availability, degraded/unavailable and downstream handoff boundary | pending | This boundary defines marker contracts/domain only; no runtime downstream adapter. |
-| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast consumption material and artifact/report rules | pending | Targeted report must derive from raw artifact if generated. |
-| `projects/L3-method-library/06-验收标准.md` | ML-FG-003/007/008 seed, ML-RL-002, `VETO-ML-003` and `VETO-ML-004` | pending | Downstream truth replacement and invalid consumption are blocking. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Current source for phase, boundary, allowed scope, checks and commit discipline. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | consumption/distribution module boundary | pending | Use current module boundaries; do not invent modules. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | consumption material, availability marker and guard object contracts | pending | Required typed refs, marker source and state fields must be formal. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | consumption material DTO shells | pending | This boundary can add DTOs, not service/handoff behavior. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | consumption state and availability guard matrix | pending | State/guard implementation must match formal matrix. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | consumption safe error surfaces | pending | Errors must be safe and body-free. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast consumption ownership | pending | Use consumption material contract-domain slice only. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-05-a` row | pending | Allowed scope is consumption material, Definition vs Use guard and availability marker. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-05-a` gate row and PH-05 gate | pending | Required checks are contract-domain-fast consumption material. |
+| `projects/L3-method-library/00-需求文档.md` | controlled consumption scope and Definition vs Use boundary | pass | Re-read and confirmed `VETO-ML-003` / `VETO-ML-004` remain blocking for any controlled-consumption implementation. |
+| `projects/L3-method-library/01-架构设计.md` | Definition vs Use, downstream boundary and dependency direction | pending | Must confirm current guard/boundary implementation does not allow downstream truth replacement. |
+| `projects/L3-method-library/02-概要设计.md` | consumption material key objects and availability outline | pending | Must compare key objects against formal `03` §6.3C and Step 6 `4C` current closure. |
+| `projects/L3-method-library/03-详细设计.md` | consumption object contracts, protocol contracts, state matrix, errors and test cut | pending | Must include §6.3C `commit-05-a` implementation-facing controlled-consumption carrier closure. |
+| `projects/L3-method-library/04-配置设计.md` | availability, degraded/unavailable and downstream handoff boundary | pass | Re-read and confirmed this boundary still cannot defer missing marker schema to runtime/adapter work. |
+| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast consumption material and artifact/report rules | pass | Re-read; no evidence run was started because code activation did not pass Design Gate. |
+| `projects/L3-method-library/06-验收标准.md` | ML-FG-003/007/008 seed, ML-RL-002, `VETO-ML-003` and `VETO-ML-004` | pass | Re-read and confirmed acceptance redlines; the current gate stopped before any implementation because those risks cannot be audited without exact formal closure. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Must confirm `commit-05-a` scope is contracts/domain only and excludes service/repository/runtime/query/evidence behavior. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | consumption/distribution module boundary | pending | Must use current module boundaries; do not invent modules. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | consumption material, availability marker and guard object contracts | pending | Must include Step 6 `4C` exact typed refs, state carriers, safe reason wrappers, support carriers and availability marker carrier. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | consumption material DTO shells | pending | Protocol scope must copy closed contracts/domain carriers and must not add service/runtime behavior. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | consumption state and availability guard matrix | pending | Must include `MethodAssetConsumptionMaterial` exact state mapping and Step 10 `8.2` current-boundary controlled-consumption state closure supplement. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | consumption safe error surfaces | pending | Must include Step 12 `6.1` material availability marker closure and missing-source blocker rule. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast consumption ownership | pending | Must cover contract/domain exact-label, copy-only marker and no-downstream-truth tests. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-05-a` row | pending | Must verify allowed scope and forbidden runtime/service/query/evidence scope. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-05-a` gate row and PH-05 gate | pending | Required checks are contract-domain-fast consumption material and VETO targeted audit. |
 | `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-05-a` commit body grouping | pending | Commit body must include `Consumption material contracts:` and `Definition versus use guards:`. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-04-b` handoff state | latest implementation state | pending | Must confirm formalization/version services landed before this boundary starts. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-04-b` handoff state | latest implementation state | pending | Must recheck before edits; prior report recorded user-owned `?? .gitignore` and `commit-04-b` closed by `ce425b55fa3726f0149ae338ad9337e684e45f93` / `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`. |
 
 ---
 
@@ -77,15 +77,15 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-05-a` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-04-b` implementation commit and handoff recorded | pending | Formalization/version service and replay must exist. |
+| activation guard | project ledger shows `current_boundary = commit-05-a` and `next_allowed_action = read_current_boundary_ledger`; this ledger shows `next_allowed_action = read_docs` | pending | Implementation must verify both ledgers before edits. |
+| prior handoff | `commit-04-b` implementation commit and handoff recorded | pass | PH-04 formalization/version service and replay slice is recorded at `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
 | workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
 | contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Use actual package name from formal workspace once activated. |
 | domain check | `cargo check -p method-library-domain` or the formal domain package check | pending | Use actual package name from formal workspace once activated. |
-| contract-domain-fast consumption | targeted consumption material contract-domain tests | pending | Must cover Definition vs Use guard and availability marker semantics. |
+| contract-domain-fast consumption | targeted consumption material contract-domain tests | pending | Must cover exact labels, wrong-kind refs, body-free carriers, copy-only marker transition and downstream truth exclusion. |
 | VETO targeted audit | check `VETO-ML-003` / `VETO-ML-004` risk is not introduced | pending | Downstream truth replacement or invalid consumption blocks commit. |
 | redaction fixture scan | check tests/fixtures do not include forbidden raw body/secret/provider/config material | pending | Required for body-free consumption boundary. |
 | evidence report | run-scoped `contract-domain-fast` artifact/report if scripts exist | pending | Optional until scripts exist; generated reports must derive from raw artifacts. |
@@ -98,10 +98,10 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-04-b` to `commit-05-a`. | wait_until_current |
-| design_gate | pending | Implementation agent must reread Required Reads and confirm consumption material, Definition vs Use guard and availability marker closure. | wait_design |
-| scope_gate | pending | Planned changes must be limited to consumption material contracts/domain and guard tests. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
+| activation_gate | pending | `commit-04-b` handoff is closed and the project ledger has advanced to `commit-05-a`; implementation must verify both ledgers before code edits. | read_docs |
+| design_gate | pending | Formal `03` §6.3C, Step 6 `4C`, Step 10 `8.2`, Step 12 `6.1`, formal `07` and this boundary now close the current-boundary controlled-consumption state/carrier/availability-marker surface; implementation must reread and verify. | wait_design |
+| scope_gate | pending | Planned work must remain limited to allowed `crates/contracts` and `crates/domain` consumption slice. | fix_gate_failure |
+| worktree_gate | pending | Initial implementation worktree status must be recorded; unrelated user changes protected. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/contract/domain checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
 | test_gate | pending | Contract-domain-fast consumption material slice and VETO targeted checks pass after activation. | fix_gate_failure |
 | evidence_gate | pending | Targeted artifact/report is optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
@@ -141,7 +141,10 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-05A-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced through `commit-04-b`; this future boundary must not be used for implementation yet. | After `commit-04-b` handoff, update project ledger to `commit-05-a` and set this boundary to current. | wait_until_current |
+| BLK-ML-05A-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-04-b`; this future boundary could not be used for implementation yet. | `commit-04-b` handoff is now closed, project ledger advances to `commit-05-a`, and implementation must continue from `read_docs` and rerun the current-boundary Design Gate before editing code. | read_docs |
+| BLK-ML-05A-DESIGN-001 | design_gate | resolved | Formal `03` and Step 10 previously used conflicting material state labels. | Formal `03` §6.3C, Step 6 `4C.3` and Step 10 `MethodAssetConsumptionMaterial` / `8.2` now close `MethodAssetConsumptionMaterialState = Prepared | Ready | Stale | Unavailable | Constrained`, map historical `degraded` to `Constrained` and exclude local material `Retired`. | read_docs |
+| BLK-ML-05A-DESIGN-002 | design_gate | resolved | Step 6 object cards previously named consumption/guard/boundary refs and support carriers without one current-boundary Rust-facing closure. | Formal `03` §6.3C and Step 6 `4C.1`~`4C.5` now close exact typed refs, safe reason wrappers, body-free support carriers, guard/boundary state carriers and object helper closure. | read_docs |
+| BLK-ML-05A-DESIGN-003 | design_gate | resolved | Availability marker wrappers/tests were in scope while marker source was still a watch item. | Formal `03` §6.3C, Step 6 `4C.2`, Step 10 `8.2` and Step 12 `6.1` now close `MethodAssetConsumptionAvailabilityMarker`, target/source enums, copy-only transition and missing-source blocker rule. | read_docs |
 
 ---
 
@@ -150,4 +153,22 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| controlled consumption guards | existing design-closure rule applies | Consumption material, Definition vs Use guard and availability marker gaps must be fixed in `03/05/06/07` before code; implementation must not invent downstream truth or marker semantics. |
+| controlled consumption guards | standards updated | Added current-boundary marker/watch closure rule to `standards/document/设计真相源闭环与可落码性标准.md`; consumption material, Definition vs Use guard and availability marker gaps are now closed in formal `03`, Step 6, Step 10, Step 12 and this ledger. |
+
+## Blocker BLK-ML-05A-DESIGN-001
+
+- status: resolved by `current-design-with-commit-05-a-consumption-carrier-closure`.
+- Formal `03` §6.3C, Step 6 `4C.3` and Step 10 `MethodAssetConsumptionMaterial` / `8.2` now define the only Rust-facing material state as `MethodAssetConsumptionMaterialState = Prepared | Ready | Stale | Unavailable | Constrained`.
+- Historical / display labels are fixed: `preparing -> Prepared`, `available -> Ready`, `stale -> Stale`, `unavailable -> Unavailable`, `degraded -> Constrained`;`retired` is not material state and is enforced through `FormalMethodAssetVersionState::Retired`.
+
+## Blocker BLK-ML-05A-DESIGN-002
+
+- status: resolved by `current-design-with-commit-05-a-consumption-carrier-closure`.
+- Formal `03` §6.3C and Step 6 `4C.1`~`4C.5` now define exact consumption typed refs, safe reason wrappers, body-free support carriers, object fields, helper signatures and test redlines.
+- Current boundary must use `DefinitionUseBoundaryGuardState = Monitoring | ViolationRecorded | RejectedCandidate | ManualReviewRequired` and `DownstreamConsumptionBoundaryState = Registered | Unsupported | Constrained | Unavailable | Retired`;the older `commit-02-b` generic shell supplement is not authoritative for `commit-05-a` controlled-consumption carrier implementation.
+
+## Blocker BLK-ML-05A-DESIGN-003
+
+- status: resolved by `current-design-with-commit-05-a-consumption-carrier-closure`.
+- Formal `03` §6.3C, Step 6 `4C.2`, Step 10 `8.2` and Step 12 `6.1` now define `MethodAssetConsumptionAvailabilityMarker`, `MethodAssetConsumptionAvailabilityTarget = Ready | Stale | Unavailable | Constrained` and `MethodAssetConsumptionAvailabilityMarkerSource = AvailabilityResolver | DegradedMapper | DownstreamConsumptionBoundaryGuard`.
+- Implementation must copy the marker carrier. Missing marker/source remains a design blocker;raw errors, runtime state, query result or fake private enum must not synthesize availability/degraded/unavailable state.

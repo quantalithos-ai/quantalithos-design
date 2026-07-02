@@ -472,6 +472,19 @@ next_allowed_action: 等待用户确认后进入 Step 12 `R12.4 错误层级与�
 | ML-D03-S12-WATCH-004 no rollback external failure | `publisher / handoff failed` stays separate from committed truth and maps by formal outcome. | R12.9/R12.10 and Step 15 audit. |
 | ML-D03-S12-WATCH-005 design blocker vs error | `design_blocker` is separate classification,not retryable runtime error. | Final closure audit and implementation gate. |
 
+### 6.1 `commit-05-a` current-boundary material availability marker closure supplement
+
+`commit-05-a` 的 controlled consumption contracts/domain slice 已在 Step 6 `4C.2` / `4C.3` 和 Step 10 `8.2` 闭合 material availability marker 的 Rust-facing carrier。当前 boundary 的错误恢复规则如下:
+
+| family | exact current-boundary source | missing-source result | implementation rule |
+|---|---|---|---|
+| material stale / unavailable / constrained marker | `MethodAssetConsumptionAvailabilityMarker { marker_ref, target_state, source_kind, source_marker_ref, reason_ref }` | marker carrier missing -> `design_blocker`;do not classify as retryable dependency error | domain transition copies `target_state` and marker fields only;no local mapper,raw error parsing or fake-private marker synthesis。 |
+| material degraded display state | `MethodAssetConsumptionAvailabilityTarget::Constrained` from marker source `DegradedMapper` or `DownstreamConsumptionBoundaryGuard` | missing `source_kind` or source marker -> `design_blocker` | implementation must not add `MethodAssetConsumptionMaterialState::Degraded`;formal display `degraded` maps to `Constrained` only through the marker carrier。 |
+| material unavailable state | `MethodAssetConsumptionAvailabilityTarget::Unavailable` from marker source `AvailabilityResolver` or `DownstreamConsumptionBoundaryGuard` | missing availability source marker -> `design_blocker` | implementation must not infer unavailable from HTTP/SQL status、exception text、timeout、config、runtime install state or repository absence。 |
+| guard/boundary safe rejection | `DefinitionUseGuardReasonRef` / `ConsumptionBoundaryReasonRef` wrappers over `MethodLibrarySafeMarker` | missing safe reason marker -> safe reject if formal branch has rejection marker;otherwise `design_blocker` | no raw body、permission matrix、policy text、runtime auth result or downstream payload in error surface。 |
+
+This supplement closes only the contracts/domain marker carrier needed by `commit-05-a`. Later application service flows still need their own Step 7 resolver/mapper callable surface before they may obtain this marker from an adapter/resolver. If that callable surface is missing in a later boundary, the implementation must open a new design blocker instead of reusing raw errors or fake maps.
+
 ### 7. R12.4 stop-review
 
 | 检查项 | 结果 |

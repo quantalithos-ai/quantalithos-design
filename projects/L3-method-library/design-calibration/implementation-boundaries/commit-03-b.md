@@ -7,9 +7,9 @@
 | phase | PH-03 method asset definition and catalog truth |
 | design_baseline | `current-design-with-commit-03-b-truth-ref-factory-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | Design Gate reactivated after BLK-ML-03B-DESIGN-012 closure: formal `03`, Step 6, Step 7, Step 9 and formal `07` now close `MethodAssetDefinitionCatalogSupportRefFactory.new_definition_ref(...)` / `new_catalog_entry_ref(...)` as the only current-boundary source for new definition/catalog truth refs. Implementation must reread required docs and rerun gates before editing code;truth refs must be copied from the closed factory outputs, not minted locally. |
+| status | implemented |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | Accepted definition/catalog service vertical slice completed by implementation commits `891d323` (service flow) and `66496cf` (run-scoped evidence); future boundary activation must restart from `read_docs` before editing the next allowed scope. |
 
 ---
 
@@ -98,19 +98,19 @@ Accepted-path command source, definition lifecycle design closure, catalog retir
 | prior handoff | `commit-03-a` implementation commit and handoff recorded | pass | Definition/catalog contracts/domain truth are recorded at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded `?? .gitignore`; no implementation files were edited and the user-owned file remains untouched. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
-| format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
-| workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
-| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Required if contracts ref kind registry/export changed for Step 6 `3B.1` / `3B.1A`. |
-| application check | `cargo check -p method-library-application` or the formal application package check | pending | Use actual package name from formal workspace once activated. |
-| infra check | `cargo check -p method-library-infra` or the formal infra package check | pending | Fake repository and runtime support must compile. |
-| api check | `cargo check -p method-library-api` or the formal API package check if API files changed | pending | Minimal handler must compile and call application facade only. |
-| service-flow-fast definition | targeted definition/catalog service-flow tests | pending | Must cover accepted, rejected, rollback, duplicate replay, replay envelope failure rejection, establish Active, adjust Active, retire definition Retired, register catalog with classification/applicability, reclassify catalog with updated applicability, retire catalog Visible -> Retired and post-retire rejection/replay paths assigned to this boundary. |
-| infra-runtime-fake definition | targeted fake repository/runtime tests | pending | Must preserve version, UoW, stored result, support ref factory output uniqueness/opacity for replay refs and definition/catalog truth refs, `definition_lifecycle` and catalog `catalog_status` / classification / applicability persistence semantics. |
-| dependency boundary | inspect Cargo manifests / metadata for forbidden sibling or reverse dependencies | pending | Infra may depend inward; application must not depend on infra/API. |
-| redaction fixture scan | check tests/artifacts/reports do not include forbidden raw body/secret/provider/config material | pending | Required for body-free service evidence. |
-| evidence report | run-scoped `service-flow-fast` / `infra-runtime-fake` artifacts and reports if scripts exist | pending | Generated reports must derive from raw artifacts and retain failures. |
-| whitespace | `git diff --check` and `git diff --cached --check` before commit | pending | Required for Commit Gate. |
-| staged scope | `git diff --cached --name-only` | pending | Must match Allowed Scope. |
+| format | `cargo fmt --all` | pass | `cargo fmt --all` passes after the committed service/fake/minimal-entry and evidence changes. |
+| workspace check | `cargo check` | pass | Full workspace compiles after implementation commits `891d323` and `66496cf`. |
+| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pass | `cargo check -p method-library-contracts` passes after the selector/ref-kind registry and export changes. |
+| application check | `cargo check -p method-library-application` or the formal application package check | pass | `cargo check -p method-library-application` passes for the definition/catalog accepted-service slice. |
+| infra check | `cargo check -p method-library-infra` or the formal infra package check | pass | `cargo check -p method-library-infra` passes for the in-memory fake/runtime support. |
+| api check | `cargo check -p method-library-api` or the formal API package check if API files changed | pass | `cargo check -p method-library-api` passes for the minimal facade-only API entry. |
+| service-flow-fast definition | targeted definition/catalog service-flow tests | pass | `cargo test -p method-library-application -p method-library-api` passed and raw output is captured under `artifacts/test/20260702T073133Z-commit-03-b/suites/service-flow-fast/test-output.txt`; derived report is `reports/runs/20260702T073133Z-commit-03-b/suites/service-flow-fast.md`. |
+| infra-runtime-fake definition | targeted fake repository/runtime tests | pass | `cargo test -p method-library-infra` passed and raw output is captured under `artifacts/test/20260702T073133Z-commit-03-b/suites/infra-runtime-fake/test-output.txt`; derived report is `reports/runs/20260702T073133Z-commit-03-b/suites/infra-runtime-fake.md`. |
+| dependency boundary | inspect Cargo manifests / metadata for forbidden sibling or reverse dependencies | pass | Workspace manifests keep `application -> contracts/domain`, `infra -> application/contracts/domain`, `api -> application/contracts/infra`; application does not depend on infra or API. |
+| redaction fixture scan | check tests/artifacts/reports do not include forbidden raw body/secret/provider/config material | pass | A targeted `rg` scan over current-boundary tests, raw artifacts and reports found no `MethodContent`, `publish`, `snapshot`, `outbox`, `secret`, `provider body`, `raw body`, `http status` or `stack trace` leakage. |
+| evidence report | run-scoped `service-flow-fast` / `infra-runtime-fake` artifacts and reports if scripts exist | pass | Raw artifacts were captured under `artifacts/test/20260702T073133Z-commit-03-b/**`; run-scoped reports are `reports/runs/20260702T073133Z-commit-03-b/suites/service-flow-fast.md` and `reports/runs/20260702T073133Z-commit-03-b/suites/infra-runtime-fake.md`; `check_paths.sh` and `generate_reports.sh` dry runs also passed for the same roots. |
+| whitespace | `git diff --check` and `git diff --cached --check` before commit | pass | `git diff --check` and `git diff --cached --check` passed before both implementation commits; staged evidence files were whitespace-clean after EOF normalization. |
+| staged scope | `git diff --cached --name-only` | pass | Final commit scope stayed inside allowed contracts/domain/application/infra/api files plus the current-boundary `artifacts/test/20260702T073133Z-commit-03-b/**` and `reports/runs/20260702T073133Z-commit-03-b/**` outputs. |
 
 ---
 
@@ -119,14 +119,14 @@ Accepted-path command source, definition lifecycle design closure, catalog retir
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | `commit-03-a` handoff is closed and the project ledger has advanced to `commit-03-b`; activation completed before the design blockers were recorded, and the latest design closure resumes this boundary from `read_docs`. | read_docs |
-| design_gate | pending | Required reads must be rerun against baseline `current-design-with-commit-03-b-truth-ref-factory-closure`;Step 6 / Step 7 / Step 9 now close exact support factory methods for definition/catalog truth ref creation, so implementation can verify the gate without inventing truth-ref helpers. | wait_design |
-| scope_gate | pending | Planned changes must be limited to current allowed service/fake/minimal-entry/contracts/domain lifecycle and catalog status transition scope. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status must be recorded again; unrelated user changes must remain protected. | fix_gate_failure |
-| build_gate | pending | Formatting, workspace/application/infra/API checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
-| test_gate | pending | Service-flow-fast and infra-runtime-fake definition/catalog slices pass after activation. | fix_gate_failure |
-| evidence_gate | pending | Targeted artifact/report is optional until scripts exist; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
-| commit_gate | pending | staged scope, commit message, whitespace and required checks have evidence. | fix_gate_failure |
-| handoff_gate | pending | commit hash, checks run, tests not run, blockers and next boundary state recorded. | handoff |
+| design_gate | pass | Required reads were rerun against baseline `current-design-with-commit-03-b-truth-ref-factory-closure`; no new carrier, selector/source map, helper parameter, opaque ref, truth ref, lifecycle/status state or evidence schema had to be invented locally. | scope_gate |
+| scope_gate | pass | Implementation stayed inside the allowed contracts/domain/application/infra/api definition/catalog slice plus run-scoped evidence outputs only. | worktree_gate |
+| worktree_gate | pass | Pre-edit and final worktree audits preserved the unrelated untracked `.gitignore`; `.codex/` and `target/` were never staged. | build_gate |
+| build_gate | pass | `cargo fmt --all`, `cargo check`, `cargo check -p method-library-contracts`, `cargo check -p method-library-application`, `cargo check -p method-library-infra` and `cargo check -p method-library-api` all pass. | test_gate |
+| test_gate | pass | `cargo test -p method-library-contracts -p method-library-domain`, `cargo test -p method-library-application -p method-library-api` and `cargo test -p method-library-infra` all pass inside the current-boundary definition/catalog slice. | evidence_gate |
+| evidence_gate | pass | Run-scoped raw artifacts and derived reports were generated under `artifacts/test/20260702T073133Z-commit-03-b/**` and `reports/runs/20260702T073133Z-commit-03-b/**`, with matching path/report dry-run validation. | commit_gate |
+| commit_gate | pass | Commit scope, subjects/body groups, whitespace and required checks were rechecked across implementation commits `891d323` and `66496cf`. | handoff_gate |
+| handoff_gate | pass | Implementation commits, targeted checks, run-scoped evidence and untouched user-change audit close this boundary. | start_next_boundary |
 
 ---
 
@@ -134,12 +134,12 @@ Accepted-path command source, definition lifecycle design closure, catalog retir
 
 | gate | status | evidence |
 |---|---|---|
-| staged_scope | pending | Must include only allowed `commit-03-b` service/fake/minimal-entry files and generated targeted evidence if applicable. |
-| unrelated_changes | pending | User-owned unrelated changes must remain unstaged. |
-| commit_message_format | pending | Planned subject: `feat(definition): add definition service flow` |
-| commit_body_group | pending | Body group must include `Definition service flow:` and `Repository fake and minimal entry:` from Step 11 mapping. |
-| whitespace | pending | `git diff --cached --check` must pass. |
-| required_checks | pending | Required Checks table must have pass/not_applicable evidence. |
+| staged_scope | pass | Commit `891d323` stayed inside allowed contracts/domain/application/infra/api files, and commit `66496cf` stayed inside the allowed run-scoped artifact/report outputs. |
+| unrelated_changes | pass | The user-owned untracked `.gitignore` remained outside both commits. |
+| commit_message_format | pass | Current boundary is delivered by `feat(definition): add definition service flow` and `test(definition): add commit-03-b suite evidence`. |
+| commit_body_group | pass | Both implementation commits include the required body groups `Definition service flow:` and `Repository fake and minimal entry:`. |
+| whitespace | pass | `git diff --cached --check` passed before each commit and the committed evidence files are whitespace-clean. |
+| required_checks | pass | Required Checks now contain only `pass` outcomes with concrete command, artifact or report evidence. |
 
 ---
 
@@ -147,13 +147,13 @@ Accepted-path command source, definition lifecycle design closure, catalog retir
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after implementation repo commit. |
-| committed_message | pending | Fill after implementation repo commit. |
-| gates_run | pending | List exact commands and targeted reports. |
-| tests_not_run | pending | Must state none or explain; cannot claim formalization/publisher/job/query suites. |
-| remaining_blockers | pending | Must reference blocker table; any blocking design gap prevents handoff. |
-| final_conclusion | pending | Must be one of pass / fail / cannot_decide with exact evidence source. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation handoff closes on evidence commit `66496cf`, following service-flow commit `891d323`. |
+| committed_message | pass | `test(definition): add commit-03-b suite evidence` after `feat(definition): add definition service flow`. |
+| gates_run | pass | Handoff audit ran `git status --short`, `git config user.name`, `git config user.email`, `cargo fmt --all`, `cargo check`, `cargo check -p method-library-contracts`, `cargo check -p method-library-application`, `cargo check -p method-library-infra`, `cargo check -p method-library-api`, `cargo test -p method-library-contracts -p method-library-domain`, `cargo test -p method-library-application -p method-library-api`, `cargo test -p method-library-infra`, `bash scripts/checks/check_paths.sh --run-id 20260702T073133Z-commit-03-b --artifact-root artifacts/test/20260702T073133Z-commit-03-b --report-root reports/runs/20260702T073133Z-commit-03-b`, `bash scripts/reports/generate_reports.sh --run-id 20260702T073133Z-commit-03-b --artifact-root artifacts/test/20260702T073133Z-commit-03-b --report-root reports/runs/20260702T073133Z-commit-03-b`, `git diff --check` and `git diff --cached --check`. |
+| tests_not_run | pass | No formalization/version, query/material, publisher/worker, job, external summary dereference or release/acceptance suites were run because they belong to later boundaries. |
+| remaining_blockers | pass | No remaining blocker was found inside `commit-03-b`; future boundary activation remains outside this handoff. |
+| final_conclusion | pass | `commit-03-b` allowed scope is implemented and handoff is closed by implementation commits `891d323` and `66496cf` plus successful targeted checks and run-scoped `service-flow-fast` / `infra-runtime-fake` evidence. |
+| user_owned_changes_untouched | pass | Implementation handoff preserved user-owned untracked `.gitignore`; `.codex/` and `target/` remained unstaged. |
 
 ---
 

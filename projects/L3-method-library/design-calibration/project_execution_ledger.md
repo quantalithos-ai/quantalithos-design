@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-07-02
-> 当前任务: `commit-04-a` implementation handoff 已关闭,实现仓提交为 `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`;项目级 implementation ledger 已推进到 `commit-04-b`,当前允许实现侧从 current boundary ledger 开始读取并执行 formalization/version services/replay 的 Design Gate / Scope Gate。
+> 当前任务: `commit-04-b` Design Gate 已在实现侧重跑 required reads 后阻塞;当前 baseline 缺 formalization/version current-boundary exact callable surface、command carrier/source map 和 repository/resolver method closure。项目级 implementation ledger 已回写为 `blocked / wait_design`,实现侧不得修改 application/infra/api 代码。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-04-b activated` | ready_for_implementation_design_gate | `commit-04-a` formalization/version contracts/domain handoff 已关闭;`commit-04-b` 现在是 formalization/version services/replay 当前边界,Allowed scope 限定在 application/infra formalization service、stored replay、version conflict / commit unknown handling、对应 tests 和最小 api 委托层。 | 实现侧必须读取最新 implementation ledger / `commit-04-b` boundary ledger,从 `read_docs` 重跑 required reads / Design Gate / Scope Gate;若仍有缺口再回到 `blocked / wait_design`。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-04-b.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-04-b design gate blocked` | blocked_wait_design | `commit-04-b` 已完成流程激活,但 required reads 证明 formalization/version 当前边界只有 family-level flow / repository semantics,缺 exact service callable surface、command input/output/source carriers 和 repository/resolver signatures。 | 设计侧必须先补 formal `03/07` 当前 boundary 闭口;实现侧只允许等待设计修复并从最新 implementation ledger / `commit-04-b` boundary ledger 重新开始。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-04-b.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-04-b` active | ready_for_implementation_design_gate | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-04-b` formalization/version services and replay boundary 已在基线 `current-design-with-commit-04-b-active-ledger` 激活,实现侧必须从当前 boundary ledger 重新开始并重跑门禁。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-04-b` blocked | wait_design | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-04-b` 虽已激活,但 current baseline 仍缺 exact callable surface、command carrier/source map 和 repository/resolver closure,实现侧必须等待设计闭口。 |
 
 ---
 
@@ -98,9 +98,9 @@
 4. 读取 `design-calibration/implementation_execution_ledger.md`
 5. 读取 `design-calibration/implementation-boundaries/commit-04-b.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前已推进到 `commit-04-b` / `read_current_boundary_ledger`,并读取 `commit-04-b` 最新 boundary ledger
-8. 按 boundary ledger 重新执行 required reads / Design Gate / Scope Gate;若任何 source、state、error、marker、stored-result 语义或 test-support 再次不闭合,立即回到 `blocked / wait_design`
-9. 当前 `commit-04-b` 已由项目级 implementation ledger 激活;恢复实现前必须使用最新台账和 required reads,不得沿用 `commit-04-a` 的 scope、checks 或 handoff 结论
+7. 确认 implementation ledger 当前已推进到 `commit-04-b` / `wait_design`,并读取 `commit-04-b` 最新 blocked boundary ledger
+8. 按 boundary ledger 指向的 blocker 文件定位 formal `03/07` 缺口;未闭口前不得创建代码、tests 或 evidence
+9. 当前 `commit-04-b` 已在 Design Gate 被 `BLK-ML-04B-DESIGN-001`~`003` 阻塞;恢复实现前必须先等待设计修复,然后从项目级 implementation ledger 和当前 boundary ledger 重新开始
 ```
 
 ---
@@ -108,8 +108,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`commit-04-a` implementation handoff 已关闭,实现仓提交为 `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`;
-当前 boundary 是 `commit-04-b`,其 formalization/version services/replay design baseline 已更新为 `current-design-with-commit-04-b-active-ledger`;
-下一步允许实现侧从 `read_current_boundary_ledger` 读取 implementation ledger、`commit-04-b` boundary ledger 和 required sources,重新执行 Design Gate / Scope Gate 后开始当前 boundary;
-实现侧仍不得私补 DTO field、truth-owner rule、service input、repository/UoW/stored-result 语义、error family、support carrier 或 evidence;若重跑门禁发现新缺口,必须重新回到 `blocked / wait_design`.
+`commit-04-b` Design Gate 已在 required reads rerun 后阻塞;
+当前 boundary 仍是 `commit-04-b`,其 baseline 仍为 `current-design-with-commit-04-b-active-ledger`;
+下一步只允许设计侧补 formal `03` / Step 7 / Step 8 / Step 9 / Step 11 / formal `07` 的 current-boundary exact callable surface、command carrier/source map 和 repository/resolver method closure;
+实现侧不得私补 service method、input/output carrier、repository method、resolver result、UoW field、stored-result schema、error family 或 evidence;待设计闭口后,必须从最新 implementation ledger 和 `commit-04-b` boundary ledger 重新开始 Design Gate.
 ```

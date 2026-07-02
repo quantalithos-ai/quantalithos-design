@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-04-a |
 | phase | PH-04 formalization and version semantics |
-| design_baseline | `current-design-with-commit-04-a-active-ledger` |
+| design_baseline | `current-design-with-commit-04-a-formalization-carrier-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | blocked |
-| next_allowed_action | wait_design |
-| current_recovery_point | Design Gate rerun is blocked after required reads: formal `03` §9.3 conflicts with Step 10 on exact formalization/version state labels, formalization/version typed refs still lack exact `MethodLibraryTypedBoundaryRefKind` closure, and multiple current-boundary support / requirement carriers remain name-only without Rust-facing shape closure. Wait for design closure before editing contracts or domain code. |
+| status | ready |
+| next_allowed_action | read_current_boundary_ledger |
+| current_recovery_point | Design closure for exact formalization/version state labels, typed-ref kind labels, support / requirement carriers and `FormalMethodAssetVersion.version_state` is now recorded in formal `03`, Step 6 and Step 10. Implementation must reread this boundary ledger and rerun Design Gate before editing contracts or domain code. |
 
 ---
 
@@ -27,26 +27,26 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pass | Re-read during the `commit-04-a` Design Gate rerun; blocked conclusion now follows the required `blocked / wait_design` ledger rule. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented formalization/version DTO, state, transition, guard, marker or evidence schema | pass | Re-read during the `commit-04-a` Design Gate rerun; the current baseline still leaves state labels, typed refs and support carriers insufficiently closed, so implementation must return to design. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pass | Re-read during the `commit-04-a` Design Gate rerun; the boundary now returns to ready / read-current-ledger after formal design closure. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented formalization/version DTO, state, transition, guard, marker or evidence schema | pass | Existing standard applies: current design now closes the exact enum/ref/carrier truth source in formal `03`, Step 6 and Step 10; implementation must still rerun the gate. |
 | `standards/coding/rust.md` | Rust contract/domain module, error and test conventions | pass | Re-read and confirmed Rust naming/testing rules for any future contracts/domain implementation. |
 | `projects/L3-method-library/00-需求文档.md` | formalization/version requirements and version non-goals | pass | Re-read and confirmed silent overwrite and invalid formal-use edges remain blocking risks. |
 | `projects/L3-method-library/01-架构设计.md` | Definition vs Use, formal version ownership and dependency direction | pass | Re-read and confirmed formal version semantics must remain explicit and stable. |
 | `projects/L3-method-library/02-概要设计.md` | formalization/version key objects and state outline | pass | Re-read and confirmed the current formalization/version object model is the target scope for this boundary. |
-| `projects/L3-method-library/03-详细设计.md` | formalization/version object contracts, protocol contracts, state matrix, errors and test cut | pass | Re-read and found a current-boundary conflict between §9.3 business-state labels and Step 10 exact matrices, plus missing current-boundary carrier closure for multiple formalization/version support types. |
+| `projects/L3-method-library/03-详细设计.md` | formalization/version object contracts, protocol contracts, state matrix, errors and test cut | pass | Formal §6.2B / §9.3 now align formalization/version state labels with Step 10 and summarize commit-04-a implementation-facing ref/support carrier closure. |
 | `projects/L3-method-library/04-配置设计.md` | redaction and config boundary | pass | Re-read and confirmed this boundary cannot invent config-driven formalization/version semantics. |
-| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast formalization/version slice and artifact/report rules | pass | Re-read the target suite/report rules; implementation is blocked before tests because schema/state closure is incomplete. |
+| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast formalization/version slice and artifact/report rules | pass | Re-read the target suite/report rules; implementation must cover exact enum labels, wrong-kind refs, body-free carriers, invalid transitions and version overwrite redlines after activation. |
 | `projects/L3-method-library/06-验收标准.md` | ML-FG-002/006, ML-RL-003/007, ML-STATE, `VETO-ML-002` and `VETO-ML-004` | pass | Re-read the formalization/version acceptance and VETO rules; exact state/version carriers must be explicit before code. |
 | `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pass | Re-read and confirmed `commit-04-a` allows only current-boundary formalization/version contracts/domain closure. |
 | `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | formalization/version module contracts | pass | Re-read and confirmed module ownership only; no new module invention is allowed. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | formalization/version object contracts and required fields | pass | Re-read and found required typed refs plus support/requirement carriers named by field only, without exact ref-kind or Rust-facing shape closure for the current boundary. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | formalization/version DTO shells | pass | Re-read and confirmed shell-family intent, but exact current-boundary typed carriers still depend on unresolved Step 6 closure. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | formalization/version state matrix and terminal guards | pass | Re-read and found exact matrices use `AssessmentPending/Eligible/Ineligible/VersionEstablished` and `Active/Superseded/Retired`, which conflict with the §9.3 summary labels in formal `03`. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | formalization/version object contracts and required fields | pass | Step 6 `4B` now closes current-boundary formalization/version typed refs, ref sets, state labels, support / requirement carriers and `FormalMethodAssetVersion.version_state`. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | formalization/version DTO shells | pass | Re-read and confirmed shell-family intent; current-boundary typed carrier closure is now supplied by Step 6 `4B`, while public DTO/application service work remains out of scope. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | formalization/version state matrix and terminal guards | pass | Step 10 labels remain canonical and now explicitly map to `FormalizationStateKind` and `FormalMethodAssetVersionState` / `FormalMethodAssetVersion.version_state`. |
 | `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | formalization/version domain error surfaces | pass | Re-read and confirmed implementation must not invent missing state/typed-ref/schema closure through ad hoc error carriers. |
 | `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast formalization/version ownership | pass | Re-read and confirmed only the formalization/version contract-domain slice belongs here once design closure is complete. |
 | `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-04-a` row | pass | Re-read the `commit-04-a` boundary row. It authorizes formalization/version DTO, state guard and domain tests only after exact current-boundary closure exists. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-04-a` gate row and PH-04 gate | pass | Re-read the current-boundary gate row. `contract-domain-fast` formalization/version remains blocked by unresolved schema/state closure. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-04-a` commit body grouping | pass | Re-read the `commit-04-a` commit body rule; no implementation commit is allowed while Design Gate is blocked. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-04-a` gate row and PH-04 gate | pass | Re-read the current-boundary gate row. `contract-domain-fast` formalization/version may proceed after implementation reruns Design Gate against the updated baseline. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-04-a` commit body grouping | pass | Re-read the `commit-04-a` commit body rule; implementation commit remains limited to formalization/version contracts/domain closure. |
 | `/home/aris/Projects/quantalithos-method-library` git status and `commit-03-b` handoff state | latest implementation state | pass | Recorded `?? .gitignore`; the user-owned file remains untouched and `commit-03-b` handoff is closed by `891d323` / `66496cf`. |
 
 ---
@@ -99,7 +99,7 @@
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | Project ledger has advanced from `commit-03-b` to `commit-04-a`, and `commit-03-b` handoff is closed by `891d323` / `66496cf`. | read_docs |
-| design_gate | blocked | Required reads were rerun, but current baseline still conflicts on exact `FormalizationState` / `FormalMethodAssetVersion` labels and leaves formalization/version typed refs plus support / requirement carriers insufficiently closed for `crates/contracts` / `crates/domain`; see `BLK-ML-04A-DESIGN-001`~`003`. | wait_design |
+| design_gate | ready | Formal `03`, Step 6 and Step 10 now close exact `FormalizationStateKind`, `FormalMethodAssetVersionState`, formalization/version typed-ref kinds, ref sets, support / requirement carriers and `FormalMethodAssetVersion.version_state`; implementation must rerun Design Gate before code edits. | read_docs |
 | scope_gate | pending | Planned changes must be limited to formalization/version contracts and domain state guards. | fix_gate_failure |
 | worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/contract/domain checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
@@ -142,9 +142,9 @@
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
 | BLK-ML-04A-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-03-b`; this future boundary could not be used for implementation yet. | Project ledger now advances to `commit-04-a`, records `commit-03-b` handoff closure and sets this boundary to current. | read_docs |
-| BLK-ML-04A-DESIGN-001 | design_gate | active | Formal `03` §9.3 lists `FormalizationState` as `not-started/in-review/accepted/rejected/blocked` and `FormalMethodAssetVersion` as `candidate/current/superseded/retired`, but Step 10 exact matrices use `AssessmentPending/Eligible/Ineligible/VersionEstablished` and `Active/Superseded/Retired`. The current boundary cannot choose one set locally. | Formal `03` and Step 10 must close one exact current-boundary Rust-facing state carrier set for `FormalizationStateKind` and formal version lifecycle labels, plus their mapping into contracts/domain tests. | wait_design |
-| BLK-ML-04A-DESIGN-002 | design_gate | active | Step 6 fields require `FormalizationBasisSummaryRef`, `FormalizationStateRef`, `FormalMethodAssetVersionRef`, `FormalizationEligibilityRuleRef` and `FormalizationEligibilityRejectionRef`, but the current baseline does not define the exact `MethodLibraryTypedBoundaryRefKind` labels or named-wrapper/export rule for these families. | Step 6 / formal `03` must close the exact ref-kind labels and wrapper/export rules needed by `crates/contracts/src/refs.rs` and current-boundary fixtures. | wait_design |
-| BLK-ML-04A-DESIGN-003 | design_gate | active | `FormalizationBasisKind`, `FormalizationBasisSafeSummary`, `FormalizationStateReasonSummary`, `FormalVersionBoundarySummary`, `MethodAssetDefinitionRequirement`, `FormalizationBasisRequirement`, `OptionalGovernanceBasisRequirement` and `ForbiddenFormalizationTriggerKindSet` are used as current-boundary fields, but no exact Rust-facing shape / labels / optionality are closed in the current baseline. | Formal `03/07` must add current-boundary exact carrier closure for these support / requirement families before contracts/domain code or tests can be written. | wait_design |
+| BLK-ML-04A-DESIGN-001 | design_gate | resolved | Formal `03` §9.3 previously conflicted with Step 10 state labels. | Formal `03` §6.2B / §9.3 and Step 10 now close `FormalizationStateKind = AssessmentPending | Eligible | Ineligible | VersionEstablished` and `FormalMethodAssetVersionState = Active | Superseded | Retired`, with old publish/review/candidate/current labels marked as historical pollution. | read_current_boundary_ledger |
+| BLK-ML-04A-DESIGN-002 | design_gate | resolved | Step 6 fields required formalization/version refs without exact kind labels. | Step 6 `4B.1` and formal `03` §6.2B now close named-wrapper/export rules and exact `MethodLibraryTypedBoundaryRefKind` labels for `FormalizationBasisSummaryRef`, `FormalizationStateRef`, `FormalMethodAssetVersionRef`, `FormalizationEligibilityRuleRef` and `FormalizationEligibilityRejectionRef`. | read_current_boundary_ledger |
+| BLK-ML-04A-DESIGN-003 | design_gate | resolved | Support / requirement carriers were name-only. | Step 6 `4B.2`~`4B.4` and formal `03` §6.2B now close exact Rust-facing shapes, labels and optionality for formalization/version ref sets, basis/state/version support carriers and eligibility requirement carriers. | read_current_boundary_ledger |
 
 ---
 
@@ -153,6 +153,6 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| formalization/version state guards | existing design-closure rule applies | Formalization/version DTO, state, guard and VETO gaps must be fixed in `03/05/06/07` before code; implementation must not invent version semantics. |
-| formalization/version exact state labels | new closure required | Summary tables and exact matrices must converge to one current-boundary Rust-facing label set before contracts/domain code or tests resume. |
-| formalization/version typed refs and support carriers | new closure required | Current boundary must close exact `MethodLibraryTypedBoundaryRefKind` labels and Rust-facing shapes for formalization/version ref and support / requirement families; name-only carriers are insufficient for implementation. |
+| formalization/version state guards | existing design-closure rule applies | Formalization/version DTO, state, guard and VETO gaps must be fixed in `03/05/06/07` before code; current design now does that for commit-04-a carrier/state scope. |
+| formalization/version exact state labels | resolved in design | Formal `03` and Step 10 now converge to one current-boundary Rust-facing label set; no standards update needed because the existing exact enum closure rule already covered the issue. |
+| formalization/version typed refs and support carriers | resolved in design | Step 6 and formal `03` now close exact `MethodLibraryTypedBoundaryRefKind` labels and Rust-facing shapes; no standards update needed because the existing ref/carrier closure rule already covered name-only carrier gaps. |

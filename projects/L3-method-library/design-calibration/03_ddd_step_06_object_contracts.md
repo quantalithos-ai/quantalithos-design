@@ -968,6 +968,11 @@ pub struct MethodLibraryTypedBoundaryRef;
 | `MethodAssetCatalogEntryRef` | 方法资产定义与目录 | catalog entry truth 创建后暴露的稳定 ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族, exact kind 为 `MethodAssetCatalogEntry`。 |
 | `CatalogScopeRef` | 方法资产定义与目录 | catalog read scope / applicability scope。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `GovernanceBasisRef` | 正式化与版本 | governance / basis 的 body-free typed ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
+| `FormalizationBasisSummaryRef` | 正式化与版本 | formalization basis summary truth 创建后暴露的稳定 ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族, exact kind 为 `FormalizationBasisSummary`。 |
+| `FormalizationStateRef` | 正式化与版本 | formalization state owner 创建后暴露的稳定 ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族, exact kind 为 `FormalizationState`。 |
+| `FormalMethodAssetVersionRef` | 正式化与版本 | formal method asset version truth 创建后暴露的稳定 ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族, exact kind 为 `FormalMethodAssetVersion`。 |
+| `FormalizationEligibilityRuleRef` | 正式化与版本 | formalization eligibility rule 创建后暴露的稳定 ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族, exact kind 为 `FormalizationEligibilityRule`。 |
+| `FormalizationEligibilityRejectionRef` | 正式化与版本 | eligibility safe rejection 创建后暴露的稳定 ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族, exact kind 为 `FormalizationEligibilityRejection`。 |
 | `ConsumptionContextRef` | 受控消费 | 下游消费语境的 typed boundary。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `TraceSubjectRef` | 追溯与一致性保护 | trace / audit subject 的 safe ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
 | `ConsumptionImpactSourceRef` | 追溯与一致性保护 | impact 来源的 body-free ref。 | 进入 `MethodLibraryTypedBoundaryRef` 家族。 |
@@ -1000,6 +1005,72 @@ pub struct MethodLibraryTypedBoundaryRef;
 - wrong-kind `MethodLibraryTypedBoundaryRef` 不能进入对应 named ref / ref-set。
 - ref-set 去重排序不得解析 opaque ref body。
 - fake/test fixture 不得用字符串 prefix 或私有 map 构造成员 ref。
+
+### 4B. `commit-04-a` current-boundary formalization/version carrier closure
+
+本节闭合 `commit-04-a` 当前 Rust-facing ref family、state labels、support carrier 和 requirement carrier。它只服务 formalization / version 的 contracts/domain carrier、state guard 和 pure domain tests;不得提前实现 application service replay、repository fake/durable behavior、query material、consumption material、event、job、runtime config 或 evidence schema。
+
+#### 4B.1 formalization/version typed ref kind closure
+
+下列 named ref 均属于 `MethodLibraryTypedBoundaryRef` 家族,实现侧必须以 named newtype wrapper over `MethodLibraryTypedBoundaryRef` 承载,并固定 exact `MethodLibraryTypedBoundaryRefKind` 标签。不得把它们 alias 到 `MethodAssetDefinitionRef`、`MethodAssetCatalogEntryRef`、stored-result ref、route id、raw string、fake private id 或 test-only wrapper。
+
+| named ref | Rust-facing owner | exact `MethodLibraryTypedBoundaryRefKind` | current-boundary use | implementation rule |
+|---|---|---|---|---|
+| `FormalizationBasisSummaryRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `FormalizationBasisSummary` | `FormalizationBasisSummary.basis_summary_ref`;`FormalizationBasisSummaryRefSet.refs`;formalization state/version support refs。 | 只能来自 basis summary truth 创建或正式 loaded basis summary identity;不得由 external body、policy text、marker text 或 fake map 生成。 |
+| `FormalizationStateRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `FormalizationState` | `FormalizationState.formalization_state_ref`;formal version `formalization_state_ref`;state reason/boundary summary source。 | 只能来自 formalization state owner 创建或正式 loaded state identity;不得由 status text、catalog entry ref 或 command route 推导。 |
+| `FormalMethodAssetVersionRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `FormalMethodAssetVersion` | `FormalMethodAssetVersion.formal_version_ref`;supersession refs;version ref sets;future consumption anchor。 | 只能来自 formal version truth 创建或正式 loaded version identity;不得由 latest timestamp、fingerprint、publish flag、snapshot id 或 fake counter 推导。 |
+| `FormalizationEligibilityRuleRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `FormalizationEligibilityRule` | `FormalizationEligibilityRule.rule_ref`;domain rule fixtures。 | 只能来自 eligibility rule creation/factory;不得由 config profile、policy route、handler name 或 raw rule text 生成。 |
+| `FormalizationEligibilityRejectionRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | `FormalizationEligibilityRejection` | `FormalizationEligibilityRule.rejection_reason_ref`;`FormalizationStateReasonSummary.eligibility_rejection_ref`。 | 只能来自 safe eligibility rejection mapper/domain factory output;不得由 raw policy failure、stack trace、provider payload、config/env value 或 raw error text 生成。 |
+
+#### 4B.2 formalization/version ref-set closure
+
+| ref set | Rust-facing shape | ordering / empty rule | implementation rule |
+|---|---|---|---|
+| `FormalizationBasisSummaryRefSet` | deterministic ref-set struct with `refs: Vec<FormalizationBasisSummaryRef>` | ordered by insertion after canonical dedup;empty allowed only for pending/ineligible state reasons where no accepted basis exists yet | 只保存 basis summary typed refs;不得保存 basis body、external body、governance body、policy text、digest detail 或 marker text。 |
+| `FormalMethodAssetVersionRefSet` | deterministic ref-set struct with `refs: Vec<FormalMethodAssetVersionRef>` | ordered by insertion after canonical dedup;empty allowed only where relation/package/peripheral field explicitly allows no formal version member | 只保存 formal version typed refs;不得保存 version body、snapshot/export body、fingerprint/hash drift、semantic diff body 或 latest/current flag。 |
+
+contracts/domain tests 必须覆盖 wrong-kind rejection、canonical dedup/ordering 不解析 opaque ref body、empty legality、以及 fake/test fixture 不得通过 string prefix 或 private map 构造 member ref。
+
+#### 4B.3 exact formalization state and version state labels
+
+| carrier | Rust-facing shape | exact labels | implementation rule |
+|---|---|---|---|
+| `FormalizationStateKind` | closed enum | `AssessmentPending`;`Eligible`;`Ineligible`;`VersionEstablished` | 与 Step 10 `FormalizationState` 状态矩阵完全一致。旧 `not-started` / `in-review` / `accepted` / `rejected` / `blocked` 是历史污染,不得实现或映射为 public truth。 |
+| `FormalMethodAssetVersionState` | closed enum | `Active`;`Superseded`;`Retired` | 与 Step 10 `FormalMethodAssetVersion` 状态矩阵完全一致,并保存于 `FormalMethodAssetVersion.version_state`。旧 `candidate` / `current` labels 是历史污染,不得实现或用作 truth state。 |
+
+Transition ownership:
+
+- `FormalizationState.pending_for_definition(...)` creates `AssessmentPending`.
+- `FormalizationState.mark_eligible(...)` can only move to `Eligible` after basis / eligibility guard passes.
+- `FormalizationState.block(...)` records safe ineligibility as `Ineligible`.
+- `FormalizationState.mark_formalized(formal_version_ref)` moves the state owner to `VersionEstablished`.
+- `FormalMethodAssetVersion.from_formalization_state(...)` creates `version_state = Active`.
+- `FormalMethodAssetVersion.from_explicit_version_change(...)` creates a new `Active` version and keeps the previous version transition explicit through supersession.
+- `FormalMethodAssetVersion.supersede_with(next_version_ref)` moves the previous version to `Superseded`.
+- `RetireFormalMethodAssetVersionFlow` moves `Active` or `Superseded` to `Retired`;retired version cannot become active source again.
+
+#### 4B.4 exact support / requirement carriers
+
+| carrier | Rust-facing shape | exact labels / fields | implementation rule |
+|---|---|---|---|
+| `FormalizationBasisKind` | closed enum | `ExternalSummary`;`GovernanceBasis`;`BasisReassessment` | 只表达 current-boundary basis source family;不得加入 raw provider kind、approval workflow state、free-form basis kind 或 `Other`。 |
+| `FormalizationBasisKindSet` | deterministic enum-set struct | `kinds: Vec<FormalizationBasisKind>`;ordered by insertion after canonical dedup;empty illegal unless a field explicitly permits no accepted basis kind | 只保存 closed enum labels;不得保存 numeric threshold、policy text、config flag 或 marker text。 |
+| `FormalizationBasisSafeSummary` | body-free struct | `summary_marker_ref: MethodLibrarySafeMarker`;`source_summary_ref: Option<ExternalSourceSummaryRef>`;`governance_basis_ref: Option<GovernanceBasisRef>`;`reassessment_marker_ref: Option<MethodLibrarySafeMarker>` | 必须与 `basis_kind` 兼容,且至少一个 source ref/marker 存在;不得保存 external body、governance execution body、evidence body、standard text、artifact body 或 provider payload。 |
+| `FormalizationStateReasonSummary` | body-free struct | `reason_marker_ref: MethodLibrarySafeMarker`;`basis_summary_refs: FormalizationBasisSummaryRefSet`;`eligibility_rejection_ref: Option<FormalizationEligibilityRejectionRef>` | 只保存可公开原因摘要和 typed refs;不得保存 raw policy text、raw rejection body、SQL/HTTP status、stack trace、config/env value 或 provider payload。 |
+| `FormalVersionBoundarySummary` | body-free struct | `boundary_marker_ref: MethodLibrarySafeMarker`;`definition_ref: MethodAssetDefinitionRef`;`catalog_entry_ref: MethodAssetCatalogEntryRef`;`formalization_state_ref: FormalizationStateRef`;`basis_summary_refs: FormalizationBasisSummaryRefSet` | 只表达版本成立时的 body-free boundary refs 和 marker;不得保存 snapshot/export body、fingerprint/hash drift、version-number algorithm、semantic diff body 或 artifact body。 |
+| `MethodAssetDefinitionRequirement` | body-free struct | `definition_required: bool`;`catalog_entry_required: bool`;`active_definition_required: bool`;`visible_catalog_entry_required: bool`;`requirement_marker_ref: MethodLibrarySafeMarker` | 用于 eligibility precheck 的安全条件表达;不得直接承载 definition/catalog truth body、repository row body、runtime truth 或 UI state。 |
+| `FormalizationBasisRequirement` | body-free struct | `accepted_basis_kinds: FormalizationBasisKindSet`;`requires_body_free_summary: bool`;`requirement_marker_ref: MethodLibrarySafeMarker` | 用 closed basis kind set 表达要求;不得用 raw policy text、organization config、numeric threshold、external response 或 marker text 替代。 |
+| `OptionalGovernanceBasisRequirement` | body-free struct | `governance_basis_allowed: bool`;`governance_basis_required: bool`;`requirement_marker_ref: MethodLibrarySafeMarker` | `governance_basis_required` implies `governance_basis_allowed`;不得保存治理审批过程、执行结果正文、policy engine payload 或 reviewer note。 |
+| `ForbiddenFormalizationTriggerKind` | closed enum | `Read`;`Reference`;`Sync`;`RuntimeUse`;`DownstreamConsumption`;`Query` | 只表达禁止隐式触发正式化的来源类别;不得用 route、topic、handler name、raw trigger string、feature flag 或 scheduler id。 |
+| `ForbiddenFormalizationTriggerKindSet` | deterministic enum-set struct | `forbidden_kinds: Vec<ForbiddenFormalizationTriggerKind>`;ordered by insertion after canonical dedup;empty illegal for `default_core_rule` | 只保存 closed trigger labels;不得保存 command/query body、route text、broker topic、raw event payload 或 config profile。 |
+
+#### 4B.5 implementation and test redlines
+
+- `commit-04-a` implementation may add contracts ref kind registry/export entries for the exact refs above, but this does not authorize new public command/query DTO body, route binding, repository fake, application service or event/job payload.
+- `FormalizationStateKind` and `FormalMethodAssetVersionState` are the only current-boundary truth-state carriers for formalization/version;implementation must not reuse `MethodAssetDefinitionLifecycle` or `MethodAssetCatalogEntryStatus`.
+- `FormalMethodAssetVersion.version_state` must be persisted in the domain truth object and returned by domain constructors/transition helpers;repository private side-state, stored result kind or fake-only status map is forbidden.
+- `FormalizationBasisSafeSummary`, `FormalizationStateReasonSummary`, `FormalVersionBoundarySummary` and requirement carriers are body-free support carriers;tests must include redlines for raw source body、policy text、snapshot/fingerprint、provider payload、config/env value 和 stack trace。
+- If implementation needs a new formalization/version repository method, service input, operation context, stored result, id generator output, public DTO field, error variant, config key or evidence schema, it must stop and return to the owning Step / boundary ledger;this section only closes current-boundary contracts/domain carrier and state guard schema.
 
 ### 5. 对象族卡片: `MethodLibrarySafeMarker`
 
@@ -1186,8 +1257,8 @@ R6.8 historical_next_allowed_action: 等待用户确认后进入 Step 6 `R6.9 do
 | `MethodAssetDefinition` | definition identity、definition summary、source summary refs。 | summary 只能来自当前 00/01/02 允许的 body-free 输入;不得保存 `MethodContent` 或外部正文。 |
 | `MethodAssetCatalogEntry` | catalog scope、classification、applicability context。 | catalog entry 是 truth;catalog view 是派生读取,不得混写。 |
 | `FormalizationBasisSummary` | external summary ref、governance basis ref、basis kind。 | 只能承接 safe ref / summary,不得复制治理执行、标准全文或 artifact 正文。 |
-| `FormalizationState` | state kind、state reason、basis refs、current formal version ref。 | Step 6 只定义 owner 和词表候选;状态迁移后移 Step 10。 |
-| `FormalMethodAssetVersion` | version boundary summary、basis refs、supersedes ref。 | 不使用 publish、fingerprint、snapshot 或 hash drift 作为版本语义。 |
+| `FormalizationState` | state kind、state reason、basis refs、current formal version ref。 | Step 6 `4B` 固定 exact `FormalizationStateKind` carrier 与字段来源;完整迁移矩阵后移 Step 10。 |
+| `FormalMethodAssetVersion` | version state、version boundary summary、basis refs、supersedes ref。 | Step 6 `4B` 固定 exact `FormalMethodAssetVersionState`;不使用 publish、fingerprint、snapshot 或 hash drift 作为版本语义。 |
 | `MethodAssetConsumptionMaterial` | formal version ref、definition ref、consumption context、boundary ref、consumption summary。 | 不保存下游运行 truth;不恢复独立 `MethodAssetConsumptionReadMaterial`。 |
 
 ### 4. R6.10 写入分组
@@ -1631,7 +1702,7 @@ pub struct FormalizationBasisSummary;
 | `basis_summary_ref` | `FormalizationBasisSummaryRef` | domain 创建的依据摘要稳定引用。 |
 | `definition_ref` | `MethodAssetDefinitionRef` | 依据适用的定义锚点。 |
 | `catalog_entry_ref` | `Option<MethodAssetCatalogEntryRef>` | 依据适用的目录语境,可为空。 |
-| `basis_kind` | `FormalizationBasisKind` | 当前 00/01/02 允许的依据类型。 |
+| `basis_kind` | `FormalizationBasisKind` | Step 6 `4B.4` 闭合的 exact basis source label。 |
 | `external_summary_ref` | `Option<ExternalSourceSummaryRef>` | 外部摘要引用;不保存外部正文。 |
 | `governance_basis_ref` | `Option<GovernanceBasisRef>` | 治理依据 typed ref;不保存治理执行正文。 |
 | `basis_safe_summary` | `FormalizationBasisSafeSummary` | 可公开 / 可追溯的安全摘要。 |
@@ -1674,7 +1745,7 @@ pub struct FormalizationState;
 | `formalization_state_ref` | `FormalizationStateRef` | domain 创建的状态 owner 引用。 |
 | `definition_ref` | `MethodAssetDefinitionRef` | 状态所属定义锚点。 |
 | `catalog_entry_ref` | `MethodAssetCatalogEntryRef` | 状态判断所处目录 / 适用语境。 |
-| `state_kind` | `FormalizationStateKind` | 概要状态词表;完整迁移留 Step 10。 |
+| `state_kind` | `FormalizationStateKind` | Step 6 `4B.3` / Step 10 闭合的 exact state label: `AssessmentPending`、`Eligible`、`Ineligible`、`VersionEstablished`。 |
 | `state_reason_summary` | `FormalizationStateReasonSummary` | 进入当前状态的安全原因摘要。 |
 | `basis_summary_refs` | `FormalizationBasisSummaryRefSet` | 可用于正式化判断的依据摘要引用。 |
 | `current_formal_version_ref` | `Option<FormalMethodAssetVersionRef>` | 已正式化时的当前版本引用。 |
@@ -1694,7 +1765,7 @@ pub struct FormalizationState;
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
-| state_owner_only | Step 6 只固定状态 owner 和词表候选,不写完整迁移矩阵。 |
+| state_owner_only | Step 6 固定状态 owner、exact Rust-facing state carrier 和字段来源;完整迁移矩阵仍以 Step 10 为准。 |
 | no_governance_workflow | 不保存治理审批 / 执行过程。 |
 | no_publish_lifecycle | 不恢复 draft/review/publish 生命周期。 |
 | no_query_trigger | 读取不能触发正式化状态变化。 |
@@ -1719,6 +1790,7 @@ pub struct FormalMethodAssetVersion;
 | `definition_ref` | `MethodAssetDefinitionRef` | 版本所属定义锚点。 |
 | `catalog_entry_ref` | `MethodAssetCatalogEntryRef` | 版本成立时的目录 / 适用语境线索。 |
 | `formalization_state_ref` | `FormalizationStateRef` | 使版本成立的状态 owner。 |
+| `version_state` | `FormalMethodAssetVersionState` | Step 6 `4B.3` / Step 10 闭合的 exact version lifecycle label: `Active`、`Superseded`、`Retired`。 |
 | `version_boundary_summary` | `FormalVersionBoundarySummary` | 版本边界安全摘要。 |
 | `basis_summary_refs` | `FormalizationBasisSummaryRefSet` | 支撑版本成立的依据摘要引用。 |
 | `supersedes_version_ref` | `Option<FormalMethodAssetVersionRef>` | 被显式替代的上一正式版本。 |
@@ -1732,8 +1804,8 @@ pub struct FormalMethodAssetVersion;
 
 | 工厂边界 | 作用 |
 |---|---|
-| `from_formalization_state(definition_ref, formalization_state_ref, boundary_summary)` | 从已闭合正式化状态建立正式版本。 |
-| `from_explicit_version_change(previous_version_ref, change_summary)` | 基于显式版本语义变化形成后续版本。 |
+| `from_formalization_state(definition_ref, formalization_state_ref, boundary_summary)` | 从已闭合正式化状态建立正式版本,初始 `version_state = Active`。 |
+| `from_explicit_version_change(previous_version_ref, change_summary)` | 基于显式版本语义变化形成后续版本,新版本 `version_state = Active`,上一版本替代关系必须显式表达。 |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
@@ -1741,6 +1813,7 @@ pub struct FormalMethodAssetVersion;
 | no_fingerprint_semantics | 不用 fingerprint/hash drift 作为版本语义。 |
 | no_snapshot_body | 不保存 snapshot / export body。 |
 | explicit_supersession | 版本替代必须显式表达,不得隐式覆盖。 |
+| version_state_is_truth | `version_state` 是正式版本 truth 字段,不得放入 repository private side-state、stored result kind 或 fake-only map。 |
 
 ### 7. 对象卡片: `MethodAssetConsumptionMaterial`
 

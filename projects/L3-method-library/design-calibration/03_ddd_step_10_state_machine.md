@@ -896,6 +896,8 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.8 business truth �
 | `Ineligible` | eligibility 被安全拒绝,需要新 basis 或新 trigger 重新评估。 | readable diagnostic |
 | `VersionEstablished` | 已基于该 formalization 建立 formal version,本状态成为历史依据。 | readable historical |
 
+上述 labels 是 `commit-04-a` exact Rust-facing `FormalizationStateKind` carrier。`FormalizationState.state_kind` 必须保存这些 labels,不得恢复旧 `not-started` / `in-review` / `accepted` / `rejected` / `blocked` 或 publish/review lifecycle。
+
 ```text
 [virtual:not_started]
   | InitiateMethodAssetFormalizationFlow / EvaluateMethodAssetFormalizationEligibilityFlow
@@ -932,6 +934,8 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.8 business truth �
 | `Active` | formal version 已建立,可作为 current / consumption / relation source。 | readable |
 | `Superseded` | formal version 已被后续 version 替代,仍可历史读取。 | readable historical |
 | `Retired` | formal version 已退休,不得作为新 consumption material 来源。 | readable historical |
+
+上述 labels 是 `commit-04-a` exact Rust-facing `FormalMethodAssetVersionState` carrier,并保存于 `FormalMethodAssetVersion.version_state`。旧 `candidate` / `current` labels 不再是 truth state,不得用 latest timestamp、publish flag、fingerprint 或 snapshot 推导。
 
 ```text
 [virtual:not_created]

@@ -16,12 +16,12 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `current-design-with-commit-04-a-active-ledger` |
 | current_boundary | `commit-04-a` |
-| gate_status | ready_for_design_gate |
-| gate_reason | `commit-03-b` handoff is closed by implementation commits `891d323` and `66496cf`; `commit-04-a` is now the current formalization/version contracts/domain boundary and must start from `read_docs`. |
-| next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | `commit-04-a` activated after `commit-03-b` handoff. Implementation must read this ledger, `implementation-boundaries/commit-04-a.md`, formal `07-实施计划.md` and all `commit-04-a` required reads before editing code. |
-| last_updated_by | design agent |
-| last_updated_at | 2026-07-02 16:05:00 +0800 |
+| gate_status | blocked |
+| gate_reason | `commit-04-a` Design Gate rerun found three design blockers inside the current baseline: formal `03` §9.3 conflicts with Step 10 on the exact `FormalizationState` / `FormalMethodAssetVersion` state labels, Step 6 names formalization/version typed-ref families without exact `MethodLibraryTypedBoundaryRefKind` closure, and multiple current-boundary support / requirement carriers remain name-only without Rust-facing shape closure. |
+| next_allowed_action | wait_design |
+| current_recovery_point | `commit-04-a` is blocked at Design Gate after rereading the current boundary sources. Wait for formal `03/07` closure of exact state labels, formalization/version typed-ref kind labels and support / requirement carrier shapes before editing `crates/contracts` or `crates/domain`. |
+| last_updated_by | implementation agent |
+| last_updated_at | 2026-07-02 16:40:15 +0800 |
 
 ---
 
@@ -36,7 +36,7 @@
 | `commit-02-c` | `3220f2ee2f10a9889bc10535969e3fae989c236d` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-c` completed at `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests handoff are closed. |
 | `commit-03-a` | `current-design-with-commit-03-a-reason-marker-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-a` completed at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; definition/catalog carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
 | `commit-03-b` | `current-design-with-commit-03-b-truth-ref-factory-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-b` completed across `891d323` and `66496cf`; accepted definition/catalog service flow, fake parity, minimal API entry and targeted `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
-| `commit-04-a` | `current-design-with-commit-04-a-active-ledger` | ready | design_gate | read_docs | Formalization/version contracts/domain boundary is now current; implementation must rerun required reads and gates before editing `contracts` / `domain`. |
+| `commit-04-a` | `current-design-with-commit-04-a-active-ledger` | blocked | design_gate | wait_design | Design Gate rerun found a formal state-label conflict plus missing formalization/version typed-ref kind closure and name-only support / requirement carriers; see `BLK-ML-04A-DESIGN-001`~`003`. |
 
 ---
 
@@ -70,6 +70,9 @@
 | BLK-ML-03B-DESIGN-010 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-helper-factory-closure` | Formal `03` §6.3A, Step 6 `MethodAssetCatalogEntry`, Step 7 `R7.10A` and formal `07` now close exact helper signatures / field-copy rules: `create_for_definition(catalog_entry_ref, definition_ref, catalog_scope_ref, catalog_classification, applicability_summary)` and `reclassify(new_catalog_classification, new_applicability_summary)` cover all current-boundary persisted catalog fields and reject scope mismatch. |
 | BLK-ML-03B-DESIGN-011 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-helper-factory-closure` | Formal `03` §6.3A, Step 6 `3B.1.1`, Step 7 `R7.10A` and formal `07` now close `MethodAssetDefinitionCatalogSupportRefFactory`, `MethodAssetDefinitionCatalogReplayEnvelopeFactoryInput`, `MethodAssetDefinitionCatalogReplayEnvelope` and `MethodAssetReplayEnvelopeBuildError`;facade/service code must copy factory outputs for operation-context/idempotency/digest/dedup and stored-result related refs, and must not mint opaque refs locally. |
 | BLK-ML-03B-DESIGN-012 | `commit-03-b` | implementation | resolved | `current-design-with-commit-03-b-truth-ref-factory-closure` | Formal `03` §6.3A, Step 6 `3B.1.1`, Step 7 `R7.10A`, Step 9 definition/catalog overlay and formal `07` now close `MethodAssetDefinitionCatalogSupportRefFactory.new_definition_ref(...)` / `new_catalog_entry_ref(...)` as the only current-boundary source for new `MethodAssetDefinitionRef` and `MethodAssetCatalogEntryRef`;service/domain/repository/API/fake code must not mint or replace truth refs locally. |
+| BLK-ML-04A-DESIGN-001 | `commit-04-a` | implementation | active | `current-design-with-commit-04-a-active-ledger` | Formal `03` §9.3 lists `FormalizationState` as `not-started/in-review/accepted/rejected/blocked` and `FormalMethodAssetVersion` as `candidate/current/superseded/retired`, but Step 10 exact matrices use `AssessmentPending/Eligible/Ineligible/VersionEstablished` and `Active/Superseded/Retired`. Design must close one exact current-boundary Rust-facing state carrier set before implementation resumes. |
+| BLK-ML-04A-DESIGN-002 | `commit-04-a` | implementation | active | `current-design-with-commit-04-a-active-ledger` | Step 6 fields require `FormalizationBasisSummaryRef`, `FormalizationStateRef`, `FormalMethodAssetVersionRef`, `FormalizationEligibilityRuleRef` and `FormalizationEligibilityRejectionRef`, but the current baseline does not close their exact `MethodLibraryTypedBoundaryRefKind` labels or named-wrapper/export rule for the contracts ref registry. Design must close the ref-kind family before `crates/contracts/src/refs.rs` can be extended. |
+| BLK-ML-04A-DESIGN-003 | `commit-04-a` | implementation | active | `current-design-with-commit-04-a-active-ledger` | `FormalizationBasisKind`, `FormalizationBasisSafeSummary`, `FormalizationStateReasonSummary`, `FormalVersionBoundarySummary`, `MethodAssetDefinitionRequirement`, `FormalizationBasisRequirement`, `OptionalGovernanceBasisRequirement` and `ForbiddenFormalizationTriggerKindSet` are referenced by Step 6 object cards as current-boundary fields, but the baseline does not close their exact Rust-facing shape / labels / optionality. Design must add concrete carrier closure before contracts/domain implementation resumes. |
 
 ---
 
@@ -83,7 +86,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is `commit-04-a` at baseline `current-design-with-commit-04-a-active-ledger`; implementation must reread the current boundary and rerun gates before editing code.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is `commit-04-a` at baseline `current-design-with-commit-04-a-active-ledger`; the latest Design Gate rerun is blocked by `BLK-ML-04A-DESIGN-001`~`003`, so implementation must wait for design closure before rereading the current boundary and resuming.
 
 ---
 
@@ -110,3 +113,4 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-02-c` | implemented handoff closed | Implementation handoff records application shell foundation commit `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests are closed. |
 | `commit-03-a` | implemented handoff closed | Implementation handoff records definition/catalog contracts and domain truth commit `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; support carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
 | `commit-03-b` | implemented handoff closed | Implementation handoff records accepted definition/catalog service vertical slice commits `891d323` and `66496cf`; exact selector/source dispatch, replay envelope/support ref factory usage, definition/catalog truth-ref factory calls, lifecycle/status persistence, fake parity, minimal API entry and targeted `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
+| `commit-04-a` | design gate blocked | Current baseline `current-design-with-commit-04-a-active-ledger` still conflicts on exact formalization/version state labels and leaves formalization/version typed-ref kinds plus support / requirement carriers unclosed. Implementation is stopped at Design Gate and must wait for design closure. |

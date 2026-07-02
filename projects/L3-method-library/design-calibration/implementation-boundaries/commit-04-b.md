@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-04-b |
 | phase | PH-04 formalization and version semantics |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `current-design-with-commit-04-b-active-ledger` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future formalization/version service and stored replay boundary; cannot start until `commit-04-a` is implemented and project ledger advances |
+| status | ready |
+| next_allowed_action | read_docs |
+| current_recovery_point | `commit-04-b` is active after `commit-04-a` handoff closure; implementation must start from required reads and rerun Design Gate / Scope Gate before editing application, infra or minimal api code. |
 
 ---
 
@@ -17,9 +17,9 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-04-b` | planned | If project ledger still points to an earlier boundary, implementation agent must not use this file to modify code. |
-| `commit-04-a` handoff must be closed | planned | Formalization/version DTOs, state guards and domain tests must exist before service/replay work starts. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-04-b` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-04-b` | pass | Project ledger now points to `commit-04-b`; implementation may use this file only within the formalization/version service/replay scope. |
+| `commit-04-a` handoff must be closed | pass | Formalization/version contracts/domain handoff is closed by implementation commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`. |
+| project ledger must set `next_allowed_action = read_current_boundary_ledger` for `commit-04-b` | pass | Project ledger now requires reading this current boundary ledger before implementation edits. |
 
 ---
 
@@ -79,8 +79,8 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-04-b` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-04-a` implementation commit and handoff recorded | pending | Formalization/version contract/domain truth must exist. |
+| activation guard | project ledger shows `current_boundary = commit-04-b` and `next_allowed_action = read_current_boundary_ledger` | pass | Project ledger activates this boundary; implementation must continue with this file and then required reads. |
+| prior handoff | `commit-04-a` implementation commit and handoff recorded | pass | PH-04 formalization/version contracts/domain slice is recorded at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
@@ -103,7 +103,7 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-04-a` to `commit-04-b`. | wait_until_current |
+| activation_gate | pass | Project ledger has advanced from `commit-04-a` to `commit-04-b`, and `commit-04-a` handoff is closed by `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`. | read_docs |
 | design_gate | pending | Implementation agent must reread Required Reads and confirm formalization/version service, stored replay and conflict closure. | wait_design |
 | scope_gate | pending | Planned changes must be limited to formalization/version services and replay slice. | fix_gate_failure |
 | worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
@@ -146,7 +146,7 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-04B-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced through `commit-04-a`; this future boundary must not be used for implementation yet. | After `commit-04-a` handoff, update project ledger to `commit-04-b` and set this boundary to current. | wait_until_current |
+| BLK-ML-04B-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-04-a`; this future boundary could not be used for implementation yet. | Project ledger now advances to `commit-04-b`, records `commit-04-a` handoff closure and sets this boundary to current. | read_docs |
 
 ---
 

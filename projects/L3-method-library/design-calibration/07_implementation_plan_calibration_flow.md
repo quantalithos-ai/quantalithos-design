@@ -15,7 +15,7 @@
 | 当前模块 | `R13.1 formal document assembly:正式装配` |
 | 当前状态 | completed |
 | 正式文档状态 | full-restart formal assembly completed |
-| 当前设计基线 | `current-design-with-commit-04-a-active-ledger` |
+| 当前设计基线 | `current-design-with-commit-04-b-active-ledger` |
 | 当前输入形态 | `00`~`06` 已完成 full-restart 装配并可作为新版 `07` 输入 |
 | 目标实现仓 | `/home/aris/Projects/quantalithos-method-library`;Step 3 已确认存在、干净且 git config 正确,但当前 layout 属旧实现形态,需在 PH-01 / 首个 boundary 迁移 |
 
@@ -85,7 +85,7 @@
 | Step 12 中间产物 | completed_confirmed | 已形成实施完成判定思考稿,并经用户确认。 |
 | Step 13 中间产物 | completed | 已形成正式文档装配记录。 |
 | 正式 `07` | completed | 已按 Step 1~12 中间产物完成 full-restart 装配。 |
-| 下一步 | `commit-04-a` active | `commit-03-b` implementation handoff 已由实现仓提交 `891d323` 和 `66496cf` 关闭;项目级 implementation ledger 已推进到 `commit-04-a`,当前 boundary ledger 已从 `planned / wait_until_current` 激活为 `ready / read_docs`;实现侧必须从当前 ledger 重新读取并执行 formalization/version contracts/domain 的 Design Gate / Scope Gate。 |
+| 下一步 | `commit-04-b` active | `commit-04-a` implementation handoff 已由实现仓提交 `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a` 关闭;项目级 implementation ledger 已推进到 `commit-04-b`,当前 boundary ledger 已从 `planned / wait_until_current` 激活为 `ready / read_docs`;实现侧必须从当前 ledger 重新读取并执行 formalization/version services/replay 的 Design Gate / Scope Gate。 |
 
 ## 6. 恢复顺序
 
@@ -97,11 +97,11 @@
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
 5. 读取 `design-calibration/implementation_execution_ledger.md`
-6. 读取 `design-calibration/implementation-boundaries/commit-04-a.md`
-7. 确认当前 implementation ledger 已推进到 `commit-04-a` / `read_current_boundary_ledger`,并读取最新 `commit-04-a` boundary ledger
+6. 读取 `design-calibration/implementation-boundaries/commit-04-b.md`
+7. 确认当前 implementation ledger 已推进到 `commit-04-b` / `read_current_boundary_ledger`,并读取最新 `commit-04-b` boundary ledger
 8. 不得用旧 `07` 的 MethodContent / publish / snapshot / outbox / PostgreSQL / GATE-T 口径定义当前实施计划
-9. 若当前 boundary ledger 任何 required source 再次不闭合,立即回到 `blocked / wait_design`;未通过前不得创建代码、tests 或 evidence
-10. 当前 `commit-04-a` 已因 `commit-03-b` handoff closure 完成设计台账激活;恢复实现前必须使用最新 implementation ledger 与 boundary ledger 重跑 Design Gate
+9. 若当前 boundary ledger 任何 required source、stored-result 语义或 replay/error surface 再次不闭合,立即回到 `blocked / wait_design`;未通过前不得创建代码、tests 或 evidence
+10. 当前 `commit-04-b` 已因 `commit-04-a` handoff closure 完成设计台账激活;恢复实现前必须使用最新 implementation ledger 与 boundary ledger 重跑 Design Gate
 ```
 
 ## 7. 当前 next_allowed_action
@@ -111,10 +111,10 @@ Step 13 `R13.1 formal document assembly:正式装配` completed;
 正式 `07-实施计划.md` 已完成 full-restart 装配并提交;
 implementation handoff 台账已推进:
 - `design-calibration/implementation_execution_ledger.md`
-- `design-calibration/implementation-boundaries/commit-02-b.md`
-- `design-calibration/implementation-boundaries/commit-02-c.md`
-`commit-03-b` implementation handoff 已由实现仓提交 `891d323` 和 `66496cf` 关闭;
-当前 `commit-04-a` formalization/version contracts/domain boundary 已由设计侧推进为 current boundary,并激活到 `read_docs`;
-下一步由实现侧读取最新 project ledger / `commit-04-a` boundary ledger / required reads,重跑 Design Gate 和 Scope Gate 后开始当前 boundary;
-实现侧不得创建超出 `commit-04-a` allowed scope 的代码、tests 或 evidence,也不得在实现仓私补 DTO field、truth-owner rule、state/policy outcome、error family、support carrier、lifecycle/status carrier、repository method、UoW field、stored-result schema 或 evidence;若重跑门禁发现新缺口,必须再次回到 `blocked / wait_design`.
+- `design-calibration/implementation-boundaries/commit-04-a.md`
+- `design-calibration/implementation-boundaries/commit-04-b.md`
+`commit-04-a` implementation handoff 已由实现仓提交 `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a` 关闭;
+当前 `commit-04-b` formalization/version services/replay boundary 已由设计侧推进为 current boundary,并激活到 `read_docs`;
+下一步由实现侧读取最新 project ledger / `commit-04-b` boundary ledger / required reads,重跑 Design Gate 和 Scope Gate 后开始当前 boundary;
+实现侧不得创建超出 `commit-04-b` allowed scope 的代码、tests 或 evidence,也不得在实现仓私补 DTO field、truth-owner rule、service input、repository/UoW/stored-result 语义、error family、support carrier、commit-unknown surface 或 evidence;若重跑门禁发现新缺口,必须再次回到 `blocked / wait_design`.
 ```

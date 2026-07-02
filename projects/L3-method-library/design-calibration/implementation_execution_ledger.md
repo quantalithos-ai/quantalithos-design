@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `current-design-with-commit-04-a-formalization-carrier-closure` |
-| current_boundary | `commit-04-a` |
-| gate_status | pass |
-| gate_reason | `commit-04-a` implementation handoff is closed by implementation commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support carriers and domain state guards are now landed and verified within the current boundary scope. |
-| next_allowed_action | handoff |
-| current_recovery_point | `commit-04-a` handoff closed at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; do not start `commit-04-b` until the project ledger formally advances and `implementation-boundaries/commit-04-b.md` leaves `planned / wait_until_current`. |
-| last_updated_by | implementation agent |
-| last_updated_at | 2026-07-02 17:19:47 +0800 |
+| current_design_baseline | `current-design-with-commit-04-b-active-ledger` |
+| current_boundary | `commit-04-b` |
+| gate_status | ready_for_design_gate |
+| gate_reason | `commit-04-a` handoff is closed by implementation commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; `commit-04-b` is now the current formalization/version services and replay boundary and must restart from `read_docs`. |
+| next_allowed_action | read_current_boundary_ledger |
+| current_recovery_point | `commit-04-b` activated after `commit-04-a` handoff. Implementation must read this ledger, `implementation-boundaries/commit-04-b.md`, formal `07-实施计划.md` and all `commit-04-b` required reads before editing code. |
+| last_updated_by | design agent |
+| last_updated_at | 2026-07-02 17:31:45 +0800 |
 
 ---
 
@@ -37,6 +37,7 @@
 | `commit-03-a` | `current-design-with-commit-03-a-reason-marker-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-a` completed at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; definition/catalog carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
 | `commit-03-b` | `current-design-with-commit-03-b-truth-ref-factory-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-b` completed across `891d323` and `66496cf`; accepted definition/catalog service flow, fake parity, minimal API entry and targeted `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
 | `commit-04-a` | `current-design-with-commit-04-a-formalization-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-a` completed at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |
+| `commit-04-b` | `current-design-with-commit-04-b-active-ledger` | ready | design_gate | read_docs | Formalization/version services and replay boundary is now current; implementation must rerun required reads and gates before editing `application` / `infra` / minimal `api`. |
 
 ---
 
@@ -81,12 +82,12 @@
 Any implementation agent resuming `L3-method-library` must read files in this order:
 
 1. `projects/L3-method-library/design-calibration/implementation_execution_ledger.md`
-2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-04-a.md`
+2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-04-b.md`
 3. `projects/L3-method-library/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is `commit-04-a` at baseline `current-design-with-commit-04-a-formalization-carrier-closure`; implementation must reread the current boundary ledger and rerun Design Gate before editing code.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is `commit-04-b` at baseline `current-design-with-commit-04-b-active-ledger`; implementation must reread the current boundary ledger and rerun Design Gate before editing code.
 
 ---
 

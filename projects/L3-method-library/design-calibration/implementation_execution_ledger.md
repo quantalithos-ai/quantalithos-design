@@ -16,12 +16,12 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `current-design-with-commit-04-a-formalization-carrier-closure` |
 | current_boundary | `commit-04-a` |
-| gate_status | ready |
-| gate_reason | `commit-04-a` design blockers are closed in formal `03`, Step 6 and Step 10: exact formalization/version state labels, typed-ref kind labels, support / requirement carrier shapes and `FormalMethodAssetVersion.version_state` are now implementation-facing design truth. |
-| next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | Implementation agent must reread this project ledger, `implementation-boundaries/commit-04-a.md`, `07-实施计划.md` and the current boundary required reads, then rerun Design Gate before editing `/home/aris/Projects/quantalithos-method-library/crates/contracts` or `/home/aris/Projects/quantalithos-method-library/crates/domain`. |
-| last_updated_by | design agent |
-| last_updated_at | 2026-07-02 16:50:52 +0800 |
+| gate_status | pass |
+| gate_reason | `commit-04-a` implementation handoff is closed by implementation commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support carriers and domain state guards are now landed and verified within the current boundary scope. |
+| next_allowed_action | handoff |
+| current_recovery_point | `commit-04-a` handoff closed at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; do not start `commit-04-b` until the project ledger formally advances and `implementation-boundaries/commit-04-b.md` leaves `planned / wait_until_current`. |
+| last_updated_by | implementation agent |
+| last_updated_at | 2026-07-02 17:19:47 +0800 |
 
 ---
 
@@ -36,7 +36,7 @@
 | `commit-02-c` | `3220f2ee2f10a9889bc10535969e3fae989c236d` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-02-c` completed at `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests handoff are closed. |
 | `commit-03-a` | `current-design-with-commit-03-a-reason-marker-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-a` completed at `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; definition/catalog carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
 | `commit-03-b` | `current-design-with-commit-03-b-truth-ref-factory-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-b` completed across `891d323` and `66496cf`; accepted definition/catalog service flow, fake parity, minimal API entry and targeted `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
-| `commit-04-a` | `current-design-with-commit-04-a-formalization-carrier-closure` | ready | design_gate | read_current_boundary_ledger | Formal `03`, Step 6 and Step 10 now close exact formalization/version state labels, typed-ref kind labels, support / requirement carriers and version-state field ownership; implementation must reread and rerun Design Gate. |
+| `commit-04-a` | `current-design-with-commit-04-a-formalization-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-a` completed at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |
 
 ---
 
@@ -113,4 +113,4 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-02-c` | implemented handoff closed | Implementation handoff records application shell foundation commit `d1b36632172b0fec8a6b5e196ac41c85c92328d0`; shell-only application ports, shell UoW / Clock / IdGenerator carriers, exact idempotency shell carriers and shell-focused unit tests are closed. |
 | `commit-03-a` | implemented handoff closed | Implementation handoff records definition/catalog contracts and domain truth commit `5376349eded0e277258c32d0b32b07a7c5aa2fe6`; support carriers, typed refs, truth objects and targeted `contract-domain-fast` evidence are closed. |
 | `commit-03-b` | implemented handoff closed | Implementation handoff records accepted definition/catalog service vertical slice commits `891d323` and `66496cf`; exact selector/source dispatch, replay envelope/support ref factory usage, definition/catalog truth-ref factory calls, lifecycle/status persistence, fake parity, minimal API entry and targeted `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
-| `commit-04-a` | design closure ready | Current baseline `current-design-with-commit-04-a-formalization-carrier-closure` closes exact formalization/version state labels, typed-ref kinds, ref sets, support / requirement carriers and `FormalMethodAssetVersion.version_state`; implementation may resume from `read_current_boundary_ledger` and rerun Design Gate. |
+| `commit-04-a` | implemented handoff closed | Implementation handoff records formalization/version contracts and state-guard commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; exact typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |

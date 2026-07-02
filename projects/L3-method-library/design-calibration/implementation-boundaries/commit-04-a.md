@@ -7,9 +7,9 @@
 | phase | PH-04 formalization and version semantics |
 | design_baseline | `current-design-with-commit-04-a-formalization-carrier-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready |
-| next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | Design closure for exact formalization/version state labels, typed-ref kind labels, support / requirement carriers and `FormalMethodAssetVersion.version_state` is now recorded in formal `03`, Step 6 and Step 10. Implementation must reread this boundary ledger and rerun Design Gate before editing contracts or domain code. |
+| status | implemented |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | Implementation handoff closed by commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support carriers, domain state guards and targeted contract/domain tests are complete inside the current boundary scope. |
 
 ---
 
@@ -81,16 +81,16 @@
 | prior handoff | `commit-03-b` implementation commit and handoff recorded | pass | PH-03 definition/catalog accepted vertical slice is recorded at `891d323` and `66496cf`. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded `?? .gitignore`; the unrelated user-owned file remains untouched and unstaged. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
-| format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
-| workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
-| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Use actual package name from formal workspace once activated. |
-| domain check | `cargo check -p method-library-domain` or the formal domain package check | pending | Use actual package name from formal workspace once activated. |
-| contract-domain-fast formalization | targeted formalization/version contract-domain tests | pending | Must cover version guards, invalid transitions and silent overwrite prevention. |
-| VETO targeted audit | check `VETO-ML-002` / `VETO-ML-004` risk is not introduced | pending | Silent overwrite or invalid use edge blocks commit. |
-| redaction fixture scan | check tests/fixtures do not include forbidden raw body/secret/provider/config material | pending | Required for body-free formalization/version boundary. |
-| evidence report | run-scoped `contract-domain-fast` artifact/report if scripts exist | pending | Optional until scripts exist; generated reports must derive from raw artifacts. |
-| whitespace | `git diff --check` and `git diff --cached --check` before commit | pending | Required for Commit Gate. |
-| staged scope | `git diff --cached --name-only` | pending | Must match Allowed Scope. |
+| format | `cargo fmt --all` | pass | `cargo fmt --all` passed before commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`. |
+| workspace check | `cargo check` | pass | Full workspace `cargo check` passed after the `commit-04-a` contracts/domain changes. |
+| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pass | `cargo check -p method-library-contracts` passed for the formalization contract slice. |
+| domain check | `cargo check -p method-library-domain` or the formal domain package check | pass | `cargo check -p method-library-domain` passed for the formalization domain state-guard slice. |
+| contract-domain-fast formalization | targeted formalization/version contract-domain tests | pass | `cargo test -p method-library-contracts --test formalization_contracts` and `cargo test -p method-library-domain --test formal_method_version` passed, covering exact labels, wrong-kind refs, canonical dedup, invalid transitions and silent overwrite prevention. |
+| VETO targeted audit | check `VETO-ML-002` / `VETO-ML-004` risk is not introduced | pass | `formalization_state_rejects_invalid_transitions_and_silent_overwrite` and `formal_version_guards_preserve_active_and_block_retired_or_superseded_reuse` passed; current boundary added no controlled-consumption/use behavior. |
+| redaction fixture scan | check tests/fixtures do not include forbidden raw body/secret/provider/config material | pass | `rg -n "MethodContent|publish|snapshot|outbox|secret|provider body|raw body|stack trace|http status|provider payload"` over touched formalization contract/domain source and tests returned no matches. |
+| evidence report | run-scoped `contract-domain-fast` artifact/report if scripts exist | not_applicable | User handoff for `commit-04-a` explicitly restricted this boundary to contracts/domain code and pure tests; no evidence/report generation was added or required. |
+| whitespace | `git diff --check` and `git diff --cached --check` before commit | pass | `git diff --check`, `git diff --cached --check` and `git show --check 821ba8bfce080164a2a8b081c32f32e4ad7d6f0a` were clean. |
+| staged scope | `git diff --cached --name-only` | pass | Final commit scope matches allowed files only: contracts/domain source plus the two formalization test files. |
 
 ---
 
@@ -99,14 +99,14 @@
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | Project ledger has advanced from `commit-03-b` to `commit-04-a`, and `commit-03-b` handoff is closed by `891d323` / `66496cf`. | read_docs |
-| design_gate | ready | Formal `03`, Step 6 and Step 10 now close exact `FormalizationStateKind`, `FormalMethodAssetVersionState`, formalization/version typed-ref kinds, ref sets, support / requirement carriers and `FormalMethodAssetVersion.version_state`; implementation must rerun Design Gate before code edits. | read_docs |
-| scope_gate | pending | Planned changes must be limited to formalization/version contracts and domain state guards. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
-| build_gate | pending | Formatting, workspace/contract/domain checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
-| test_gate | pending | Contract-domain-fast formalization/version slice and VETO targeted checks pass after activation. | fix_gate_failure |
-| evidence_gate | pending | Targeted artifact/report is optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
-| commit_gate | pending | staged scope, commit message, whitespace and required checks have evidence. | fix_gate_failure |
-| handoff_gate | pending | commit hash, checks run, tests not run, blockers and next boundary state recorded. | handoff |
+| design_gate | pass | Current design baseline was reread and exact formalization/version typed refs, support carriers and state labels were implemented without local schema invention. | wait_design |
+| scope_gate | pass | Commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a` touches only allowed contracts/domain source and tests for the formalization/version slice. | fix_gate_failure |
+| worktree_gate | pass | Initial and final worktree checks preserved the user-owned untracked `.gitignore`; no unrelated files were staged or reset. | fix_gate_failure |
+| build_gate | pass | `cargo fmt --all`, `cargo check`, `cargo check -p method-library-contracts` and `cargo check -p method-library-domain` all passed. | fix_gate_failure |
+| test_gate | pass | Targeted formalization contract/domain tests passed and covered silent-overwrite and invalid-transition guards. | fix_gate_failure |
+| evidence_gate | not_applicable | `commit-04-a` was explicitly constrained away from evidence/report generation; no report scripts or raw suite artifacts were added in this boundary. | fix_gate_failure |
+| commit_gate | pass | Staged scope, commit subject/body grouping and whitespace checks were validated before commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`. | fix_gate_failure |
+| handoff_gate | pass | Commit hash, command list, tests not run, untouched user file and remaining-boundary state are now recorded in this ledger. | handoff |
 
 ---
 
@@ -114,12 +114,12 @@
 
 | gate | status | evidence |
 |---|---|---|
-| staged_scope | pending | Must include only allowed `commit-04-a` formalization/version contract/domain files and generated targeted evidence if applicable. |
-| unrelated_changes | pending | User-owned unrelated changes must remain unstaged. |
-| commit_message_format | pending | Planned subject: `feat(formalization): add version contract and state guards` |
-| commit_body_group | pending | Body group must include `Formalization contracts:` and `Version state guards:` from Step 11 mapping. |
-| whitespace | pending | `git diff --cached --check` must pass. |
-| required_checks | pending | Required Checks table must have pass/not_applicable evidence. |
+| staged_scope | pass | Commit file list contains only `crates/contracts/src/formalization.rs`, `crates/contracts/src/lib.rs`, `crates/contracts/src/refs.rs`, `crates/contracts/tests/formalization_contracts.rs`, `crates/domain/src/formal_method_version.rs`, `crates/domain/src/lib.rs` and `crates/domain/tests/formal_method_version.rs`. |
+| unrelated_changes | pass | User-owned untracked `.gitignore` remained unstaged and untouched throughout the boundary. |
+| commit_message_format | pass | Commit subject is `feat(formalization): add version contract and state guards`. |
+| commit_body_group | pass | Commit body contains both `Formalization contracts:` and `Version state guards:` groups with current-boundary scoped bullets. |
+| whitespace | pass | Pre-commit `git diff --cached --check` and post-commit `git show --check 821ba8bfce080164a2a8b081c32f32e4ad7d6f0a` were clean. |
+| required_checks | pass | All required build/test/scope checks are recorded as `pass` or `not_applicable` in the Required Checks table above. |
 
 ---
 
@@ -127,13 +127,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after implementation repo commit. |
-| committed_message | pending | Fill after implementation repo commit. |
-| gates_run | pending | List exact commands and targeted reports. |
-| tests_not_run | pending | Must state none or explain; cannot claim formalization service/replay suites. |
-| remaining_blockers | pending | Must reference blocker table; any blocking design gap prevents handoff. |
-| final_conclusion | pending | Must be one of pass / fail / cannot_decide with exact evidence source. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation handoff closes on commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`. |
+| committed_message | pass | `feat(formalization): add version contract and state guards`. |
+| gates_run | pass | Handoff audit ran `git status --short`, `git rev-parse HEAD`, `cargo fmt --all`, `cargo check`, `cargo check -p method-library-contracts`, `cargo check -p method-library-domain`, `cargo test -p method-library-contracts --test formalization_contracts`, `cargo test -p method-library-domain --test formal_method_version`, `rg -n "MethodContent|publish|snapshot|outbox|secret|provider body|raw body|stack trace|http status|provider payload" crates/contracts/tests/formalization_contracts.rs crates/domain/tests/formal_method_version.rs crates/contracts/src/formalization.rs crates/domain/src/formal_method_version.rs`, `git diff --check`, `git diff --cached --check`, `git show --name-only --format= 821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`, `git show --check --format=oneline 821ba8bfce080164a2a8b081c32f32e4ad7d6f0a` and `git log -1 --format=%s%n%b 821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`. |
+| tests_not_run | pass | No formalization/version application service, replay/idempotency, repository fake, API/runtime, query/material, publisher/worker, job or evidence/report suites were run because `commit-04-a` forbids them. |
+| remaining_blockers | pass | No remaining blocker was found inside `commit-04-a`; next boundary `commit-04-b` remains future `planned / wait_until_current`. |
+| final_conclusion | pass | `commit-04-a` allowed scope is implemented and handoff is closed by commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a` plus successful targeted contracts/domain checks. |
+| user_owned_changes_untouched | pass | Implementation handoff preserved user-owned untracked `.gitignore`; no `.codex/`, `target/` or unrelated files were staged. |
 
 ---
 

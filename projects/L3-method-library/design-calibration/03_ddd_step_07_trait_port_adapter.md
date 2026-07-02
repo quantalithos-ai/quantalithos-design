@@ -1293,7 +1293,7 @@ This section resolves `BLK-ML-03B-DESIGN-001` and `BLK-ML-03B-DESIGN-002`. Imple
 | application facade | API 只调用 `MethodAssetFormalizationVersionCommandFacade.dispatch_formalization_version_command(input)`,不得直连 repository、domain、UoW 或 infra adapter。 |
 | command service methods | `evaluate_formalization_eligibility`;`initiate_formalization`;`establish_formal_version`;`record_formal_version_semantic_change`;`supersede_formal_version`;`retire_formal_version`。 |
 | truth/support repositories | definition/catalog repositories 复用 `commit-03-b` exact callable surface;本 boundary 新增 formalization state、formal version、basis summary exact read/save/current lookup surface。 |
-| resolver / builder seams | formalization basis resolver、policy diagnostic builder、retirement precheck helper 只返回 body-free summary / marker / safe reason。 |
+| resolver / builder seams | formalization basis resolver、policy diagnostic builder 只返回 body-free summary / marker / safe reason;current-boundary retirement precheck against consumption material / impact summary is carved out until those owners are materialized in later boundaries。 |
 | replay / commit unknown | duplicate replay 只复制 stored safe result;commit unknown 只允许 formal stored surface + versioned repo read-back,不得 blind retry。 |
 
 ### 1A. Facade I/O exact Rust-facing schema
@@ -1554,26 +1554,13 @@ trait MethodAssetPolicyDiagnosticBuilderPort {
     ) -> Result<FormalVersionChangeDiagnostic, MethodAssetRepositoryError>;
 }
 
-trait MethodAssetConsumptionMaterialRepository {
-    fn find_consumption_material_refs_by_formal_version(
-        &self,
-        formal_version_ref: FormalMethodAssetVersionRef,
-    ) -> Result<Vec<VersionedRef<MethodAssetConsumptionMaterialRef>>, MethodAssetRepositoryError>;
-}
-
-trait ConsumptionImpactSummaryRepository {
-    fn find_pending_impact_summary_refs_by_formal_version(
-        &self,
-        formal_version_ref: FormalMethodAssetVersionRef,
-    ) -> Result<Vec<VersionedRef<ConsumptionImpactSummaryRef>>, MethodAssetRepositoryError>;
-}
 ```
 
 Current-boundary callable rules:
 
 - `find_formalization_state_by_definition_catalog(...)` is the only current-boundary page-free lookup for evaluate/initiate;service code must not scan history,query material or fake maps.
 - `find_current_formal_method_asset_version(...)` is only used to prove absence before establish;service code must not infer current version from latest timestamp,publish flag,fingerprint or history page.
-- `find_consumption_material_refs_by_formal_version(...)` and `find_pending_impact_summary_refs_by_formal_version(...)` are retirement precheck helpers only;they do not authorize read-material refresh,impact repair or downstream runtime inspection.
+- `RetireFormalMethodAssetVersionFlow` current-boundary precheck is limited to exact formal-version read, `version_state` guard and explicit `retirement_marker_ref`;it must not inspect `MethodAssetConsumptionMaterial` or `ConsumptionImpactSummary` owners before `commit-05-a` / `commit-06-a` materialize those contracts/domain slices.
 - `UnitOfWork.commit()` for this boundary must return `MethodAssetCommitObservation`;`CommitUnknown` must stop post-commit side effects and enter formal read-back flow instead of blind retry.
 
 ### 4. Fake parity and stop rules

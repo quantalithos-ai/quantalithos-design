@@ -27,6 +27,7 @@
 | v0.14 | 2026-06-13 | Step 10 状态主语筛选流程 | 补充进入状态矩阵前必须先筛选状态主语、排除非状态机对象、按状态族分批,并禁止为统一管理新增全局状态机 |
 | v0.15 | 2026-06-14 | 继续任务恢复门禁 | 要求每次 Step 开工、继续或上下文恢复时先读取详细设计校准 flow 状态台账,再确认当前 Step、模块和下一动作 |
 | v0.16 | 2026-06-15 | 项目级台账恢复顺序 | 要求继续详细设计讨论时先读取 `project_execution_ledger.md`,再读取详细设计 flow 和当前 Step 文件 |
+| v0.17 | 2026-07-03 | Step 6 对象契约质量增强 | 强化 Step 6 的批次计划、模块执行顺序、非 core 模块对象闭口决策、对象组字段 / 状态闭环审计和 Step 7 承接门禁 |
 
 ---
 
@@ -721,9 +722,13 @@ Step 19. 整理正式详细设计文档
 
 #### 本步输出
 
+- Step 6 写入批次状态表
 - shared vocabulary / typed ref / public marker 的全局基础对象小节,如果本仓需要
+- 模块执行顺序表
 - 每个模块的 capability / 功能清单
 - 功能到对象映射表
+- 非 `contracts` / `domain` 模块对象闭口决策表,如果本仓存在 `application` / `infra` / `api` / `worker` / `jobs` 等非 core 模块
+- 每个对象的能力到字段 / 函数 / 状态映射表
 - 每个模块内的对象小节
 - 类型定义代码块
 - 成员变量表
@@ -731,28 +736,53 @@ Step 19. 整理正式详细设计文档
 - 工厂 / 静态函数表
 - enum 变体表,必须包含 Rustdoc 注释列
 - 不变量与禁止事项
+- 模块内停审记录
+- 对象组字段来源审计表
+- 状态闭环审计表
+- Step 7 承接清单
+- 当前批次结论与待确认事项
 
 #### 应问的问题
 
 ```text
-0. 本仓是否需要先收敛跨模块 shared vocabulary、typed ref、public marker 或基础 state enum？
-1. 当前模块需要完成哪些功能 / capability？
-2. 每个功能需要哪些输入、输出、状态、副作用、外部协作或后续 Step 承接点？
-3. 每个功能应该由哪些对象承接？哪些属于 truth object、policy / guard、view / report、application helper、adapter state 或 entry object？
-4. 是否存在功能无人承接、对象没有功能来源、对象职责过大或对象跨越模块边界？
-5. 每个模块中最终需要定义哪些 struct / enum / value object / service？
-6. 每个对象需要完成哪些对象级能力？主要责任和不变量是什么？
-7. 对象为了完成这些能力需要哪些成员变量？每个字段的类型、作用、约束和来源是什么？
-8. 对象需要哪些成员函数？完整签名、参数类型、返回类型和副作用是什么？
-9. 哪些函数是工厂函数或静态函数？factory 入参是否覆盖必填字段？
-10. 哪些状态 enum 需要写变体、允许来源和允许去向？
-11. 每个 enum variant 的 Rustdoc 注释是什么？带载荷 variant 的载荷类型承载什么语义？
-12. 当前模块完成后,模块内字段闭环、状态闭环、对象职责边界和后续 Step 承接点是否通过审计？
+0. 是否已经建立 Step 6 文件骨架、写入批次状态表和模块执行顺序表？若没有,当前批次先补骨架还是先补对象组计划？
+1. 本仓是否需要先收敛跨模块 shared vocabulary、typed ref、public marker 或基础 state enum？
+2. 当前模块需要完成哪些功能 / capability？
+3. 每个功能需要哪些输入、输出、状态、副作用、外部协作或后续 Step 承接点？
+4. 每个功能应该由哪些对象承接？哪些属于 truth object、policy / guard、view / report、application helper、adapter state 或 entry object？
+5. 是否存在功能无人承接、对象没有功能来源、对象职责过大或对象跨越模块边界？
+6. 对于 `application` / `infra` / `api` / `worker` / `jobs` 等非 core 模块,当前 Step 6 必须正式闭口哪些对象,哪些只能 defer 到后续 Step？defer 的理由和承接 Step 是什么？
+7. 每个模块中最终需要定义哪些 struct / enum / value object / service？
+8. 每个对象需要完成哪些对象级能力？主要责任和不变量是什么？
+9. 对象为了完成这些能力需要哪些成员变量？每个字段的类型、作用、约束和来源是什么？
+10. 对象需要哪些成员函数？完整签名、参数类型、返回类型和副作用是什么？
+11. 哪些函数是工厂函数或静态函数？factory 入参是否覆盖必填字段？若没有覆盖,剩余字段由哪个正式来源提供？
+12. 哪些状态 enum 需要写变体、允许来源和允许去向？
+13. 每个 enum variant 的 Rustdoc 注释是什么？带载荷 variant 的载荷类型承载什么语义？
+14. 当前模块或对象组完成后,模块内停审记录是否已经写明:功能承接、对象来源、字段来源、状态迁移和边界约束？
+15. 所有模块写完后,对象组字段来源审计表是否已经覆盖高复用字段、truth object、view / report、application helper、adapter state 和 entry object？
+16. 所有模块写完后,状态闭环审计表是否已经覆盖 domain truth、read / projection、maintenance / publication、entry disposition 等状态族？
+17. 哪些 object / field / state / helper 明确由 Step 7+ 承接？Step 7 承接清单是否已经逐项命名 port、repository、resolver、protocol 或 flow 闭口点？
 ```
 
 #### 期望产出
 
 ````md
+#### Step 6 写入批次状态表
+
+| 批次 | 覆盖范围 | 写入状态 | 是否内容完整 | 停审状态 | 后续批次 |
+|---|---|---|---|---|---|
+
+#### 模块执行顺序表
+
+| 顺序 | 模块 | 模块职责 | 输入来源 | 完成后停审点 |
+|---|---|---|---|---|
+
+#### 非 `contracts` / `domain` 模块对象闭口决策表
+
+| 模块 | 当前 Step 6 是否闭口 | 需要闭口的对象组 | 若 defer 的理由 | 后续承接 Step |
+|---|---|---|---|---|
+
 #### <ModuleName> capability / 功能清单
 
 | 功能 / capability | 输入 | 输出 | 状态 / 副作用 | 所属对象 | 后续 Step 承接 |
@@ -760,8 +790,13 @@ Step 19. 整理正式详细设计文档
 
 #### <ModuleName> 功能到对象映射
 
-| 对象 | 承接功能 | 对象类别 | 不承接的功能 / 禁止事项 |
-|---|---|---|---|
+| 对象 | 承接功能 | 对象类别 | 对象能力 | 不承接的功能 / 禁止事项 |
+|---|---|---|---|---|
+
+#### <ModuleName> 对象能力到字段 / 函数 / 状态映射
+
+| 对象 | 对象能力 | 必需字段 | factory / 构造入口 | 成员函数 | 状态 enum / variant | 字段来源 |
+|---|---|---|---|---|---|---|
 
 ##### <TypeName>
 
@@ -773,7 +808,7 @@ pub struct TypeName {
 }
 ```
 
-| 字段 | 类型 | 作用 | 约束 |
+| 字段 | 类型 | 作用 | 约束 / 来源 |
 |---|---|---|---|
 
 | 函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
@@ -795,6 +830,28 @@ pub enum EnumName {
 
 | 变体 | Rustdoc 注释 | 作用 | 允许来源 | 允许去向 |
 |---|---|---|---|---|
+
+#### 模块内停审记录
+
+| 模块 | 审查项 | 结论 | 缺口 / 修正 |
+|---|---|---|---|
+
+#### 对象组字段来源审计表
+
+| 对象组 | 代表对象 | Step 6 已闭合字段来源 | 后续 Step 必须闭合 | 实现侧暂停条件 |
+|---|---|---|---|---|
+
+#### 状态闭环审计表
+
+| 状态族 | 状态主语 | 初始状态 | 关键迁移 | 终态 / 特殊状态 | 后续 Step 闭合位置 |
+|---|---|---|---|---|---|
+
+#### Step 7 承接清单
+
+| Step 7 契约组 | 必须承接的 Step 6 内容 | Step 7 输出要求 | 若未承接的实现 blocker |
+|---|---|---|---|
+
+#### 当前批次结论与待确认事项
 ````
 
 #### 回填位置
@@ -804,13 +861,17 @@ pub enum EnumName {
 
 #### 执行约束
 
+- Step 6 必须先建立 Step 6 文件骨架、写入批次状态表和模块执行顺序表,再开始对象卡片写作。对象契约很重时,必须按批次持续补完,不得把“先写骨架后补细节”误用成长期空心章节。
 - Step 6 必须先完成 shared vocabulary / typed ref / public marker 的必要全局收敛,再逐模块展开对象;不得把所有模块对象一股脑混在一个全局章节讨论。
-- 逐模块执行时,每个模块都必须先写 capability / 功能清单和功能到对象映射,再写对象卡片。
+- 逐模块执行时,每个模块都必须先写 capability / 功能清单、功能到对象映射和对象能力到字段 / 函数 / 状态映射,再写对象卡片。
 - 每完成一个模块或一个明确对象组,必须停下来做模块内审查:功能是否有人承接、对象是否有功能来源、字段来源是否闭合、状态是否闭合、是否越过模块边界。
-- 所有模块写完后,必须再做一次跨模块闭环审计,检查 shared ref、重复对象、跨模块依赖、命名、字段来源和状态语义是否一致。
+- 对 `application` / `infra` / `api` / `worker` / `jobs` 等非 core 模块,必须显式作出“当前 Step 6 正式闭口”或“defer 到后续 Step”的决策;不得机械地一律推迟,也不得在没有稳定输入载体时强行补对象。
+- 如果 `application` / `infra` / entry object 已经是 visibility、stored result、idempotency、runtime availability、job report、entry disposition 等稳定 carrier 的唯一正式归属,则必须在 Step 6 闭口,不能推给 Step 7+ 临时补。
+- 所有模块写完后,必须再做一次跨模块闭环审计,检查 shared ref、重复对象、跨模块依赖、命名、字段来源和状态语义是否一致,并写入对象组字段来源审计表与状态闭环审计表。
 - 每个对象必须独立成小节。
 - 字段必须写类型。
 - 函数参数必须写类型。
+- 字段表必须写 `约束 / 来源`,不能只写抽象约束而不交代字段进入方式。
 - 类型、enum variant 和公开函数必须使用 Rustdoc 风格中文注释。
 - enum 代码块中每个 variant 上方必须有 `///` 注释。
 - 非状态类 enum 也必须写变体表;`允许来源` 和 `允许去向` 可写 `不适用`。
@@ -818,17 +879,20 @@ pub enum EnumName {
 - 不把所有对象集中写入一个全局对象章节。
 - 不以概要设计对象清单替代功能抽象;如果对象无法回指任何模块功能,必须删除、合并或标为后续 phase reserved。
 - 不让一个对象承接多个不相干模块功能;发现对象职责过大时,必须拆分或重新归属。
+- 未完成对象组字段来源审计表、状态闭环审计表、Step 7 承接清单和当前批次结论前,不得把 Step 6 标记为完成。
 
 正确示例:
 
 ```text
-先收敛 contracts shared refs。
+先建 Step 6 骨架、批次状态表和模块执行顺序表。
+先收敛 contracts shared refs,再明确 application / infra / api / worker / jobs 是否需要在 Step 6 闭口对象。
 然后按 domain 模块讨论:
   domain capability: 创建 context、打开 gate、记录 decision、关闭 nonconformity。
   功能到对象映射: GovernanceContext 承接 context readiness;Gate 承接 pending decision;GovernanceDecision 承接 formal outcome。
+  对象能力映射: Gate 的 pending/open/close 能力分别需要哪些字段、transition method 和状态 enum。
   再分别写字段、factory、transition method 和 state enum。
 domain 完成后停审,再进入 application helper 模块。
-最后做跨模块字段 / 状态 / ref 闭环审计。
+最后做对象组字段来源审计、状态闭环审计和 Step 7 承接清单。
 ```
 
 错误示例:
@@ -836,6 +900,7 @@ domain 完成后停审,再进入 application helper 模块。
 ```text
 直接把 contracts、domain、application、infra、api、worker、jobs 的所有对象列在一个巨大对象清单里。
 没有说明模块要完成哪些功能,也没有功能到对象映射。
+没有写批次计划、模块顺序、非 core 模块闭口决策或字段 / 状态审计。
 为了赶进度,字段表从已有对象名猜字段。
 ```
 
@@ -844,15 +909,19 @@ domain 完成后停审,再进入 application helper 模块。
 - reviewer 无法判断某个功能是否没有对象承接。
 - 对象可能只是“看起来需要”的类型,无法回到模块职责。
 - 字段和函数容易从对象名或旧文档猜出来,而不是从对象能力和功能闭环推导出来。
+- non-core 模块对象会在 Step 7 / 8 / 9 被动补写,导致 Step 6 失去对象真相源地位。
 - 后续 Step 7 / Step 8 / Step 9 会发现 port、DTO、flow 找不到对应对象能力或字段来源。
 
 #### 进入下一步的条件
 
 ```text
+Step 6 写入批次状态表和模块执行顺序表已完成。
 每个模块的功能 / capability 已经映射到对象。
 每个对象都能回到所属模块功能。
 每个模块内的对象、字段、函数、状态和不变量已经足够实现者直接写 Rust 类型和 impl。
+非 core 模块对象的闭口 / defer 决策已经显式记录。
 跨模块 shared ref、字段来源、状态语义和依赖方向已经完成闭环审计。
+对象组字段来源审计表、状态闭环审计表和 Step 7 承接清单已经完成。
 ```
 
 ---

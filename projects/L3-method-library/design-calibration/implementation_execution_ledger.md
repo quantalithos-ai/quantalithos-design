@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `current-design-with-commit-05-a-consumption-carrier-closure` |
-| current_boundary | `commit-05-a` |
-| gate_status | ready |
-| gate_reason | `commit-05-a` Design Gate blockers are closed: formal `03` §6.3C, Step 6 `4C`, Step 10 `8.2`, Step 12 `6.1`, formal `07` and the implementation boundary now publish one exact controlled-consumption state/carrier/availability-marker surface for contracts/domain implementation. |
-| next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | Implementation must reread `implementation-boundaries/commit-05-a.md`, then reread all Required Reads from that boundary and rerun Design Gate / Scope Gate before editing code. Inside `commit-05-a`, use only the closed controlled-consumption typed refs, state carriers, safe reason wrappers, body-free support carriers and copy-only availability marker; do not add application services, repositories, resolver/mapper ports, downstream runtime, query refresh or evidence schema. |
-| last_updated_by | design agent |
-| last_updated_at | 2026-07-03 02:40:37 +0800 |
+| current_design_baseline | `6e4dd1a14111df1a1e4f10bc1db1d49bf9a941d4` |
+| current_boundary | `commit-05-b` |
+| gate_status | blocked |
+| gate_reason | `commit-05-b` Design Gate failed: formal `03-详细设计.md` stops at `commit-05-a` exact closure and does not publish a current-boundary `commit-05-b` implementation-facing callable surface; available Step 7/9/11 text remains family-level distribution/handoff seams and generic transaction rules, so implementation cannot derive exact application facade, repository/UoW/stored-result surface or fake parity without inventing design. |
+| next_allowed_action | wait_design |
+| current_recovery_point | `commit-05-b` blocked at Design Gate after required reads; wait for design-side exact current-boundary closure before any distribution/handoff service implementation. |
+| last_updated_by | implementation agent |
+| last_updated_at | 2026-07-03 11:18:54 +0800 |
 
 ---
 
@@ -38,7 +38,8 @@
 | `commit-03-b` | `current-design-with-commit-03-b-truth-ref-factory-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-03-b` completed across `891d323` and `66496cf`; accepted definition/catalog service flow, fake parity, minimal API entry and targeted `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
 | `commit-04-a` | `current-design-with-commit-04-a-formalization-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-a` completed at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |
 | `commit-04-b` | `current-design-with-commit-04-b-service-replay-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-b` completed across `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; formalization/version services, duplicate replay and replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
-| `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | ready | design_gate | read_current_boundary_ledger | Design closed the controlled-consumption material state, guard/boundary carriers and availability-marker source surface. Implementation must reread the current boundary ledger and required reads before code edits. |
+| `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-a` completed across `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; controlled-consumption contracts/domain carriers, pure-domain guards and targeted contract/domain checks are closed. |
+| `commit-05-b` | `6e4dd1a14111df1a1e4f10bc1db1d49bf9a941d4` | blocked | design_gate | wait_design | Required reads completed, but current baseline still lacks an exact `commit-05-b` implementation-facing closure in formal `03`; Step 7/9/11 only provide family-level distribution/handoff seams, so implementation must stop and wait for design closure. |
 
 ---
 
@@ -83,6 +84,8 @@
 | BLK-ML-05A-DESIGN-001 | `commit-05-a` | implementation | resolved | `current-design-with-commit-05-a-consumption-carrier-closure` | Formal `03` §6.3C, Step 6 `4C.3` and Step 10 `MethodAssetConsumptionMaterial` / `8.2` now close `MethodAssetConsumptionMaterialState = Prepared | Ready | Stale | Unavailable | Constrained`;historical `degraded` maps to `Constrained`, and `retired` is blocked by formal version state rather than a material state. Implementation must resume from `read_docs` and rerun Design Gate. |
 | BLK-ML-05A-DESIGN-002 | `commit-05-a` | implementation | resolved | `current-design-with-commit-05-a-consumption-carrier-closure` | Formal `03` §6.3C and Step 6 `4C.1`~`4C.5` now close exact consumption typed refs, safe reason wrappers, body-free support carriers, `DefinitionUseBoundaryGuardState`, `DownstreamConsumptionBoundaryState`, object field/helper closure and no-downstream-truth test redlines. Implementation must not fall back to the older `commit-02-b` generic shell closure for this boundary. |
 | BLK-ML-05A-DESIGN-003 | `commit-05-a` | implementation | resolved | `current-design-with-commit-05-a-consumption-carrier-closure` | Formal `03` §6.3C, Step 6 `4C.2`, Step 10 `8.2` and Step 12 `6.1` now close `MethodAssetConsumptionAvailabilityMarker`, target/source enums, copy-only state transition and missing-source design-blocker rules. Implementation must copy this marker carrier and must not synthesize availability/degraded/unavailable from raw errors, runtime state or fake private enums. |
+| BLK-ML-05B-ACTIVATION-001 | `commit-05-b` | implementation | resolved | `6e4dd1a14111df1a1e4f10bc1db1d49bf9a941d4` | `commit-05-a` handoff is now closed, the project ledger advances to `commit-05-b`, and implementation must continue from `read_docs` and rerun the new current-boundary Design Gate before editing code. |
+| BLK-ML-05B-DESIGN-001 | `commit-05-b` | implementation | open | `6e4dd1a14111df1a1e4f10bc1db1d49bf9a941d4` | Formal `03-详细设计.md` ends current-boundary exact closure at `commit-05-a` ([03-详细设计.md:844-866]); Step 7 only defines family-level availability/distribution/handoff seams ([03_ddd_step_07_trait_port_adapter.md:2951-2968]); Step 9 only gives phase-level relation/distribution flow cards ([03_ddd_step_09_function_flows.md:1088-1093]); Step 11 only gives generic transaction categories ([03_ddd_step_11_persistence_tx_consistency.md:1984-1991]). Design must publish exact `commit-05-b` application facade/service inputs, repository/UoW/stored-result callable surface and fake parity before implementation can resume. |
 
 ---
 
@@ -91,12 +94,12 @@
 Any implementation agent resuming `L3-method-library` must read files in this order:
 
 1. `projects/L3-method-library/design-calibration/implementation_execution_ledger.md`
-2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-05-a.md`
+2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-05-b.md`
 3. `projects/L3-method-library/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory, marker source or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is now `commit-05-a`; `commit-04-b` handoff is closed by commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`, and the next allowed implementation work is the controlled-consumption contracts/domain boundary after rerunning its Required Reads / Design Gate.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory, marker source or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is now `commit-05-b`; required reads completed, but Design Gate is blocked until formal `03` publishes exact current-boundary distribution/handoff callable surfaces beyond the current family-level Step 7/9/11 seams. `commit-05-a` handoff remains closed at commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`.
 
 ---
 
@@ -125,4 +128,4 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-03-b` | implemented handoff closed | Implementation handoff records accepted definition/catalog service vertical slice commits `891d323` and `66496cf`; exact selector/source dispatch, replay envelope/support ref factory usage, definition/catalog truth-ref factory calls, lifecycle/status persistence, fake parity, minimal API entry and targeted `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
 | `commit-04-a` | implemented handoff closed | Implementation handoff records formalization/version contracts and state-guard commit `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; exact typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |
 | `commit-04-b` | implemented handoff closed | Implementation handoff records formalization/version service and replay commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; duplicate replay, version conflict, commit-unknown read-back, replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
-| `commit-05-a` | current boundary pending | Current boundary now advances to controlled consumption material contracts/domain; implementation must rerun `commit-05-a` Required Reads, Design Gate and Scope Gate before editing code. |
+| `commit-05-a` | implemented handoff closed | Implementation handoff records controlled-consumption contracts/domain commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; typed refs, state carriers, availability marker closure, pure-domain guards and targeted contract/domain tests are closed. |

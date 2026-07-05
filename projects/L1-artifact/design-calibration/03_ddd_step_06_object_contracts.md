@@ -1423,7 +1423,7 @@ pub struct ArtifactBaseline {
     pub baseline_scope_ref: ArtifactBaselineScopeRef,
     pub baseline_state: ArtifactBaselineState,
     pub membership_refs: ArtifactBaselineMembershipRefSet,
-    pub freeze_context_ref: ArtifactReviewAnchorRef,
+    pub freeze_context_ref: Option<ArtifactReviewAnchorRef>,
 }
 ```
 
@@ -1433,12 +1433,12 @@ pub struct ArtifactBaseline {
 | `baseline_scope_ref` | 正式 baseline scope carrier;不得退化成 free-form label |
 | `baseline_state` | 初始为 `Candidate`;只能按成员函数推进 |
 | `membership_refs` | ordered unique;只允许 formal membership refs |
-| `freeze_context_ref` | 必须回指正式 `ArtifactReviewAnchorRef`;不得为空 |
+| `freeze_context_ref` | 候选阶段为 `None`;冻结时由 `FreezeArtifactBaseline` 绑定正式 `ArtifactReviewAnchorRef`;Frozen 后不得为空 |
 
 | 成员函数签名 | 作用 | 参数说明 | 返回 | 副作用 / 不变量 |
 |---|---|---|---|---|
-| `fn from_members(artifact_baseline_ref: ArtifactBaselineRef, baseline_scope_ref: ArtifactBaselineScopeRef, membership_refs: ArtifactBaselineMembershipRefSet, freeze_context_ref: ArtifactReviewAnchorRef) -> Self` | 从候选成员集合建立基线 | generated ref、scope ref、membership refs、freeze context ref | `Self` | 建立候选 baseline |
-| `fn freeze(&mut self) -> ArtifactDomainResult<()>` | `Candidate -> Frozen` | 无 | `ArtifactDomainResult<()>` | 进入受控冻结状态 |
+| `fn from_members(artifact_baseline_ref: ArtifactBaselineRef, baseline_scope_ref: ArtifactBaselineScopeRef, membership_refs: ArtifactBaselineMembershipRefSet) -> Self` | 从候选成员集合建立基线 | generated ref、scope ref、membership refs | `Self` | 建立候选 baseline;`freeze_context_ref = None` |
+| `fn freeze(&mut self, freeze_context_ref: ArtifactReviewAnchorRef) -> ArtifactDomainResult<()>` | `Candidate -> Frozen` | formal review anchor ref | `ArtifactDomainResult<()>` | 写入 `freeze_context_ref = Some(freeze_context_ref)` 并进入受控冻结状态 |
 | `fn supersede(&mut self) -> ArtifactDomainResult<()>` | `Frozen -> Superseded` | 无 | `ArtifactDomainResult<()>` | 退出当前主基线位置 |
 | `fn retire(&mut self, reason: ArtifactBaselineRetireReason) -> ArtifactDomainResult<()>` | 退出主链 | retire reason | `ArtifactDomainResult<()>` | 进入 `Retired`;不得再 freeze |
 
@@ -1446,7 +1446,7 @@ pub struct ArtifactBaseline {
 |---|---|
 | 成员只能是正式版本 | candidate / current latest 均不允许直接入 baseline |
 | baseline 不允许动态解析 current version | `membership_refs` 必须显式冻结 |
-| freeze context 必须正式化 | `freeze_context_ref` 不得用 report/view/trace ref 代替 |
+| freeze context 必须正式化 | Frozen baseline 的 `freeze_context_ref` 必须为 `Some(ArtifactReviewAnchorRef)`,不得用 report/view/trace ref 代替 |
 
 ### 9.8 `ArtifactBaselineMembership`
 

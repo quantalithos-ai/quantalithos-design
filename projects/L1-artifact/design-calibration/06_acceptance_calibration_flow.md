@@ -5,7 +5,7 @@
 > 书写规范: `standards/document/验收标准书写规范.md`
 > 中间产物规范: `standards/document/设计文档讨论中间产物规范.md`
 > 当前目标: 按新版正式 `00/01/02/03/04/05` 复核并重写 `L1-artifact` 的 `06-验收标准.md`
-> 当前状态: Step 9 已完成;待用户审查
+> 当前状态: Step 15 已完成;正式 `06-验收标准.md` 已装配;用户审查通过;已进入 `07-实施计划.md` Step 1
 
 ---
 
@@ -49,13 +49,13 @@
 | 6 | 定义数据边界与架构红线验收 | `01` 数据所有权、`02/03` 禁止事项、`05` 红线证据 | `06_acceptance_step_06_data_arch_redlines.md` | Step 5 | 已完成;待用户审查 | truth / snapshot / ref / forbidden body 和架构红线闭合 | 等待用户审查 Step 6 |
 | 7 | 定义接口、事件与跨仓同步验收 | `03` protocol、`04` topic/config、`05` suite / evidence | `06_acceptance_step_07_interfaces_events_sync.md` | Step 6 | 已完成;用户审查通过 | 16 Command、13 Query、6 Consumer、8 Event、6 Job、relay facade 和跨仓 seam 裁决闭合 | 进入 Step 8 `定义状态机、事务与一致性验收` |
 | 8 | 定义状态机、事务与一致性验收 | `03` state / transaction / idempotency、`05` idempotency cases | `06_acceptance_step_08_state_tx_consistency.md` | Step 7 | 已完成;待用户审查 | 状态迁移、UoW、stored result、duplicate replay、commit unknown、query no-write、job no-truth-repair 闭合 | 等待用户审查 Step 8 |
-| 9 | 定义非功能验收门禁 | `00` NFR、`04` config、`05` nonfunctional | `06_acceptance_step_09_nonfunctional.md` | Step 8 | 已完成;待用户审查 | 性能 sample、安全、可用性、恢复、依赖降级、配置 fail-fast 和无来源指标边界闭合 | 待 Step 9 审查 |
-| 10 | 定义可观测性、审计与证据门禁 | `03` observability、`05` evidence/report | `06_acceptance_step_10_observability_evidence.md` | Step 9 | 未开始 | trace/audit/log/metric/report、artifact/report pairing、redaction/dependency/report audit 闭合 | 待 Step 9 审查 |
-| 11 | 定义一票否决项 | `00` §14.6、`05` VETO /不可接受项 | `06_acceptance_step_11_veto.md` | Step 10 | 未开始 | `VF-ART-001~004` 与不可风险接受项闭合 | 待 Step 10 审查 |
-| 12 | 定义缺陷分级、复验与放行规则 | `05` §11 / §12 / §14 | `06_acceptance_step_12_defects_retest_release.md` | Step 11 | 未开始 | S/A/B/R、复验范围、放行影响和关闭证据闭合 | 待 Step 11 审查 |
-| 13 | 定义风险接受与遗留项 | `05` residual risk、Step 2~12 | `06_acceptance_step_13_risk_acceptance.md` | Step 12 | 未开始 | residual、接受人、影响、后续动作、截止条件和不可接受风险闭合 | 待 Step 12 审查 |
-| 14 | 定义最终结论与签署口径 | Step 1~13 | `06_acceptance_step_14_final_decision_signoff.md` | Step 13 | 未开始 | 通过 / 有条件通过 / 不通过三值规则、签署角色和归档口径闭合 | 待 Step 13 审查 |
-| 15 | 整理正式验收标准文档 | Step 1~14、书写规范 | `06_acceptance_step_15_formal_document_assembly.md` 与 `../06-验收标准.md` | Step 14 | 未开始 | 正式 `06` 每章有校准来源,正式 `06` 已装配且未引入未确认口径 | 待 Step 14 审查 |
+| 9 | 定义非功能验收门禁 | `00` NFR、`04` config、`05` nonfunctional | `06_acceptance_step_09_nonfunctional.md` | Step 8 | 已完成;用户审查通过 | 性能 sample、安全、可用性、恢复、依赖降级、配置 fail-fast 和无来源指标边界闭合 | 进入 Step 10 `定义可观测性、审计与证据门禁` |
+| 10 | 定义可观测性、审计与证据门禁 | `03` observability、`05` evidence/report | `06_acceptance_step_10_observability_evidence.md` | Step 9 | 已完成;用户审查通过 | trace/audit/log/metric/report、artifact/report pairing、redaction/dependency/report audit 闭合 | 进入 Step 11 `定义一票否决项` |
+| 11 | 定义一票否决项 | `00` §14.6、`05` VETO /不可接受项 | `06_acceptance_step_11_veto.md` | Step 10 | 已完成;用户审查通过 | `VF-ART-001~004` 与不可风险接受项闭合 | 进入 Step 12 `定义缺陷分级、复验与放行规则` |
+| 12 | 定义缺陷分级、复验与放行规则 | `05` §11 / §12 / §14 | `06_acceptance_step_12_defects_retest_release.md` | Step 11 | 已完成;用户审查通过 | S/A/B/R、复验范围、放行影响和关闭证据闭合 | 进入 Step 13 `定义风险接受与遗留项` |
+| 13 | 定义风险接受与遗留项 | `05` residual risk、Step 2~12 | `06_acceptance_step_13_risk_acceptance.md` | Step 12 | 已完成;用户审查通过 | residual、接受人、影响、后续动作、截止条件和不可接受风险闭合 | 进入 Step 14 `定义最终结论与签署口径` |
+| 14 | 定义最终结论与签署口径 | Step 1~13 | `06_acceptance_step_14_final_decision_signoff.md` | Step 13 | 已完成;用户审查通过 | 通过 / 有条件通过 / 不通过三值规则、签署角色和归档口径闭合 | 进入 Step 15 `整理正式验收标准文档` |
+| 15 | 整理正式验收标准文档 | Step 1~14、书写规范 | `06_acceptance_step_15_formal_document_assembly.md` 与 `../06-验收标准.md` | Step 14 | 已完成;用户审查通过 | 正式 `06` 每章有校准来源,正式 `06` 已装配且未引入未确认口径 | 进入 `07-实施计划.md` Step 1 |
 
 ---
 
@@ -95,8 +95,8 @@
 
 | 项 | 状态 |
 |---|---|
-| 正式 `06-验收标准.md` | 旧正文保留;尚未在本轮重写中修改 |
-| 当前完成 Step | Step 9 已完成;等待用户审查 |
-| 当前下一步 | 审查 `06_acceptance_step_09_nonfunctional.md`;通过后进入 Step 10 |
-| 是否创建 / 替换未来 Step 文件 | 已创建 `06_acceptance_calibration_flow.md`、`06_acceptance_step_01_input_boundary.md`、`06_acceptance_step_02_scope.md`、`06_acceptance_step_03_baseline.md`、`06_acceptance_step_04_entry_exit.md`、`06_acceptance_step_05_function_gate.md`、`06_acceptance_step_06_data_arch_redlines.md`、`06_acceptance_step_07_interfaces_events_sync.md`、`06_acceptance_step_08_state_tx_consistency.md` 与 `06_acceptance_step_09_nonfunctional.md`;未创建未来 Step 文件 |
-| 旧 `06` 如何处理 | 只作历史诊断输入;Step 15 再按新版 `00`~`05` 和 Step 1~14 结论重写正式 `06` |
+| 正式 `06-验收标准.md` | 已按 Step 1~15 装配完成;用户审查通过 |
+| 当前完成 Step | Step 15 已完成;正式 `06-验收标准.md` 已装配并审查通过 |
+| 当前下一步 | 已进入 `07-实施计划.md` Step 1;详见 `07_implementation_plan_calibration_flow.md` |
+| 是否创建 / 替换未来 Step 文件 | 已创建 `06_acceptance_calibration_flow.md`、`06_acceptance_step_01_input_boundary.md`、`06_acceptance_step_02_scope.md`、`06_acceptance_step_03_baseline.md`、`06_acceptance_step_04_entry_exit.md`、`06_acceptance_step_05_function_gate.md`、`06_acceptance_step_06_data_arch_redlines.md`、`06_acceptance_step_07_interfaces_events_sync.md`、`06_acceptance_step_08_state_tx_consistency.md`、`06_acceptance_step_09_nonfunctional.md`、`06_acceptance_step_10_observability_evidence.md`、`06_acceptance_step_11_veto.md`、`06_acceptance_step_12_defects_retest_release.md`、`06_acceptance_step_13_risk_acceptance.md`、`06_acceptance_step_14_final_decision_signoff.md` 与 `06_acceptance_step_15_formal_document_assembly.md` |
+| 旧 `06` 如何处理 | 已被新版正式 `06-验收标准.md` 替换;旧正文只保留在 git history |

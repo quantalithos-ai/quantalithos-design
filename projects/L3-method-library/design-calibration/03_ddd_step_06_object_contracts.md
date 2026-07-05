@@ -1904,6 +1904,34 @@ Carrier rules:
 
 This resolves `BLK-ML-03B-DESIGN-003` Step 6 support carrier half. Step 7 `R7.10A` owns the exact facade I/O and six service input carriers that consume these types.
 
+### 3B.4 `commit-05-b` distribution / handoff support and outcome shell closure
+
+`commit-05-b` current boundary does not introduce new truth families, but it does require Step 6 to close the body-free support carriers and outcome shell wrappers that current distribution / handoff flows need in order to avoid private side-state, target-body leakage or downstream truth synthesis.
+
+| current-boundary carrier | Rust-facing shape | exact labels / fields | implementation rule |
+|---|---|---|---|
+| `MethodAssetDistributionRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | exact kind `MethodAssetDistribution` | `MethodAssetDistribution` is the only distribution truth ref kind for `commit-05-b`; it may only be minted by the formal support ref factory or loaded from an already accepted typed ref. |
+| `DistributionContextRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | exact kind `DistributionContext` | `DistributionContext` is the only distribution context ref kind for `commit-05-b`; it may only come from accepted source carrier or formal loaded context identity. |
+| `MethodAssetPublicationOutcomeRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | exact kind `MethodAssetPublicationOutcome` | outcome ref for the publication outcome shell; service code may not fabricate a local publication outcome id, derive it from target body or parse a route/config string. |
+| `MethodAssetHandoffMarkerRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | exact kind `MethodAssetHandoffMarker` | outcome ref for the handoff marker shell; service code may not fabricate a local handoff marker id, derive it from report/archive/package body or parse a route/config string. |
+| `MethodAssetPublicationBoundaryMarkerRef` | body-free marker ref | `MethodLibrarySafeMarker` carrier | boundary marker only, not delivery truth; copied into event candidate / publisher binding summaries and publication outcome shells. |
+| `MethodAssetHandoffBoundaryMarkerRef` | body-free marker ref | `MethodLibrarySafeMarker` carrier | boundary marker only, not delivery truth; copied into handoff binding summaries and handoff outcome shells. |
+| `MethodAssetPublicationOutcome` | body-free struct | `Published { publication_ref, candidate_ref, target_ref_set, boundary_marker_ref }`;`Blocked { publication_ref, candidate_ref, target_ref_set, reason_ref, diagnostic_ref }`;`Unavailable { publication_ref, candidate_ref, target_ref_set, reason_ref, diagnostic_ref }`;`Failed { publication_ref, candidate_ref, target_ref_set, reason_ref, diagnostic_ref }` | publication outcome is a stored safe shell only; it must never contain payload body, topic, URL, delivery receipt, subscriber ack or downstream system state. |
+| `MethodAssetHandoffOutcome` | body-free struct | `Prepared { handoff_ref, target_ref, boundary_marker_ref, hint_ref }`;`Delivered { handoff_ref, target_ref, boundary_marker_ref, receipt_marker_ref }`;`Blocked { handoff_ref, target_ref, boundary_marker_ref, reason_ref, diagnostic_ref }`;`Unavailable { handoff_ref, target_ref, boundary_marker_ref, reason_ref, diagnostic_ref }`;`Failed { handoff_ref, target_ref, boundary_marker_ref, reason_ref, diagnostic_ref }` | handoff outcome is a body-free marker shell only; `Delivered` means the local handoff seam accepted the marker, not that any external system truth changed. |
+| `MethodAssetAdapterAvailabilitySummary` | body-free struct | `Available { availability_state_ref, marker_ref }`;`Degraded { availability_state_ref, marker_ref, diagnostic_ref }`;`Unavailable { availability_state_ref, marker_ref, diagnostic_ref }`;`Disabled { availability_state_ref, marker_ref, reason_ref }` | adapter availability summary is a slot-level precheck shell only; it must not become downstream runtime truth or material state. |
+| `MethodAssetCollaborationTargetSummary` | body-free struct | `Enabled { target_ref_set, summary_marker_ref }`;`Disabled { target_ref_set, reason_ref }`;`Blocked { target_ref_set, reason_ref, diagnostic_ref }`;`Unavailable { target_ref_set, reason_ref, diagnostic_ref }` | target summary is a body-free target routing shell only; it must not expose config key, URL, topic, secret or target body. |
+| `MethodAssetHandoffTargetRefSet` | deterministic ref-set struct | `refs: Vec<MethodAssetHandoffTargetRef>`;ordered by insertion after canonical dedup;empty allowed | only body-free handoff target refs are allowed; the set may not contain target body, package body or archive body. |
+
+`commit-05-b` boundary rules:
+
+- `MethodAssetDistributionRef` and `DistributionContextRef` are the only current-boundary distribution-family typed refs allowed to cross the distribution / handoff seam.
+- `MethodAssetPublicationOutcomeRef` and `MethodAssetHandoffMarkerRef` are the only current-boundary stored outcome ref kinds for publication and handoff persistence. They are not aliases for `MethodAssetEventCandidateAssemblyRef`, `MethodAssetPublisherBindingStateRef` or any runtime delivery id.
+- `MethodAssetPublicationBoundaryMarkerRef` and `MethodAssetHandoffBoundaryMarkerRef` are safe markers only; they must be copied from formal marker sources and must not be synthesized from route, config, provider body or delivery state.
+- `MethodAssetPublicationOutcome` and `MethodAssetHandoffOutcome` are body-free shells only. They may store refs, safe markers, diagnostics and target ref sets, but they may not store payload body, topic, URL, archive body, report body, external receipt body or downstream system state.
+- `MethodAssetAdapterAvailabilitySummary` and `MethodAssetCollaborationTargetSummary` are current-boundary adapter summary shells only. They may block or degrade service before publisher / handoff calls, but they may not become delivery truth or downstream runtime truth.
+- `MethodAssetHandoffTargetRefSet` is the current-boundary target carrier for handoff inputs and summaries. It must remain opaque, typed and body-free; implementation must not replace it with raw strings or private map keys.
+- The exact publication / handoff repo and UoW surfaces in Step 7 / Step 11 must consume these carriers as-is; if implementation needs any additional field, kind or carrier for this boundary, it must return to design instead of inventing a local substitute.
+
 ### 4. 对象卡片: `FormalizationBasisSummary`
 
 ```rust

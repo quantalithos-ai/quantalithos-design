@@ -2369,3 +2369,54 @@ next_allowed_action: 等待用户确认后进入 Step 12 `R12.1 开工与必读�
 | 是否未修改正式 `03-详细设计.md` | no |
 
 next_allowed_action: 等待用户确认后进入 Step 11 `R11.7 core business truth 持久化契约:先思考`;只允许思考 definition、catalog、formalization、formal version、consumption material、relation、package、assembly 的持久化契约;不得直接修改正式 `03-详细设计.md`;不得写 source/reference、trace/audit、read/projection、maintenance/job、idempotency/replay、outbound/handoff 的完整 contract、repository semantic 表、transaction boundary 表、一致性策略表、error taxonomy、config key、test case schema 或 implementation code。
+
+---
+
+## Design-side closure patch: `commit-05-b` distribution / handoff persistence and UoW overlay
+
+### 1. Patch status
+
+| item | value |
+|---|---|
+| reason | `commit-05-b` implementation Design Gate required exact current-boundary repository/UoW/stored-result/fake parity closure for distribution/handoff services. |
+| formal source | `projects/L3-method-library/03-详细设计.md` §6.3D |
+| status | active_for_implementation_boundary |
+
+### 2. Logical store / repository closure
+
+| logical store / surface | repository surface | persistence rule |
+|---|---|---|
+| relation read anchor | `MethodAssetRelationRepository.get_relation_with_version(relation_ref)`;`list_relation_refs_by_distribution_context(distribution_context_ref, page_request)`。 | Read-only for `commit-05-b`;no relation truth creation/save, no runtime graph truth and no marketplace relation material. |
+| distribution builder output | no standalone repository;only `DistributionReadMaterialBuilderPort.build_distribution_read_material(input)`。 | Non-durable transient body-free output. No `distribution_read_materials` table, no material save/list surface and no package/listing body. |
+| `event_candidate_assemblies` | `MethodAssetEventCandidateAssemblyRepository.append_event_candidate_assembly(assembly, uow)`;`get_event_candidate_assembly(assembly_ref)`。 | Append-only candidate shell;reload authority for publication/handoff;refs/markers/summary only. |
+| `publication_outcomes` | `MethodAssetPublicationOutcomeRepository.save_publication_outcome(outcome, uow)`;`get_publication_outcome(publication_ref)`。 | Stored shell with `Published | Blocked | Unavailable | Failed`;refs/markers/diagnostic only;not delivery truth. |
+| `handoff_markers` | `MethodAssetHandoffMarkerRepository.save_handoff_marker(outcome, uow)`;`get_handoff_marker(handoff_ref)`。 | Stored shell with `Prepared | Delivered | Blocked | Unavailable | Failed`;body-free receipt/failure marker only;not package/report/archive body. |
+| stored operation result | reuse current command stored-result repository surface: `find_command_result_by_idempotency`;`get_stored_operation_result`;`save_command_result_for_idempotency`。 | Duplicate replay returns stored refs and never reruns builder, target registry, publisher or handoff. |
+
+### 3. Transaction boundary
+
+| boundary | writes allowed inside boundary | rollback / failure rule | forbidden side effects |
+|---|---|---|---|
+| accepted distribution command UoW | stored accepted/rejected result;body-free event candidate shell;authorized effect summary refs;safe diagnostic refs。 | If command UoW rolls back, no accepted stored result and no candidate shell become durable. | publisher delivery, handoff delivery, real adapter calls, query refresh, report generation, transport retry, raw body read. |
+| publication outcome UoW | load candidate shell;save `MethodAssetPublicationOutcome` shell。 | Publication failure saves safe outcome only and never rolls back accepted command result/candidate. | reread current truth to rebuild payload, store topic/payload/delivery receipt/subscriber ack. |
+| handoff marker UoW | load body-free handoff input refs;save `MethodAssetHandoffOutcome` marker shell。 | Handoff failure saves safe marker only and never rolls back accepted command result/candidate/report shell. | persist package body, report body, archive body, external receipt body, external system state or raw exception. |
+| duplicate replay | read stored result/candidate/outcome/marker refs as needed。 | No mutation or external side effect rerun. | rerun builder, target registry, publisher, handoff, real adapter or fake side effect. |
+
+### 4. Fake parity
+
+| fake store / adapter | required parity |
+|---|---|
+| relation repository fake | `Versioned<T>` read, page by distribution context, version conflict and rollback invisibility must match durable semantics. |
+| candidate repository fake | append-only candidate shell;candidate reload by `assembly_ref`;no current truth reread. |
+| publication outcome repository fake | versioned publication shell;safe outcome labels only;no delivery receipt or topic state. |
+| handoff marker repository fake | versioned handoff marker shell;safe marker/receipt/failure refs only;no package/report/archive body. |
+| builder / target / publisher / handoff fake | same input/output labels as application ports;no fake-only enum, raw error string, URL/topic/config key or implicit success by missing failure. |
+| stored result / UoW fake | reservation/replay semantics, rollback invisibility and no side-effect rerun on duplicate. |
+
+### 5. Current-boundary persistence blockers if missing
+
+| missing item | gate result |
+|---|---|
+| availability marker source, target summary label, publication outcome label or handoff outcome label cannot be traced to formal §6.3D | Design Gate blocked;implementation must not synthesize locally. |
+| implementation needs durable distribution material save/list surface | Design Gate blocked;current Step 11 explicitly excludes it. |
+| implementation needs topic, URL, transport, retry/dead-letter, external receipt body, package/report/archive body or downstream runtime state | Scope Gate blocked;belongs to later config/worker/report boundaries or is forbidden. |

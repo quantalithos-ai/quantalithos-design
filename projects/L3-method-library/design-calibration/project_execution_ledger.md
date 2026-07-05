@@ -1,8 +1,8 @@
 # L3-method-library 项目设计讨论执行台账
 
 > 创建日期: 2026-06-15
-> 最近更新: 2026-07-03
-> 当前任务: `commit-05-a` controlled consumption contracts/domain current-boundary exact closure 已完成。项目级 implementation ledger 和当前 boundary ledger 已推进到 `ready / read_current_boundary_ledger`;实现侧现在必须按最新台账从 `read_docs` 重新跑 Design Gate / Scope Gate 后再改 contracts / domain 代码。
+> 最近更新: 2026-07-05
+> 当前任务: `commit-05-b` distribution/handoff current-boundary exact closure 已完成。项目级 implementation ledger 和当前 boundary ledger 已推进到 `ready / read_current_boundary_ledger`;实现侧现在必须按最新台账从 `read_docs` 重新跑 Design Gate / Scope Gate 后再改 application / infra / narrow contracts-domain integration 代码。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-05-a design gate ready` | ready_read_current_boundary_ledger | `commit-05-a` 所需 controlled consumption material state carrier、Definition vs Use guard、DownstreamConsumptionBoundary carrier、safe reason wrappers、body-free support carriers 和 copy-only availability marker 已在 formal `03` §6.3C、Step 6 `4C`、Step 10 `8.2`、Step 12 `6.1`、formal `07` 闭口。 | 实现侧必须从最新 implementation ledger / `commit-05-a` boundary ledger 重新开始,按 required reads 重跑 Design Gate / Scope Gate 后再进入 contracts / domain 代码修改。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-05-a.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-05-b design gate ready` | ready_read_current_boundary_ledger | `commit-05-b` 所需 distribution/handoff facade、selector/source carriers、service inputs、replay/support factory、relation read anchor、non-durable distribution builder、target registry、publication outcome、handoff marker、stored-result/UoW 和 fake parity 已在 formal `03` §6.3D、Step 7/9/11 closure patches、formal `07` 闭口。 | 实现侧必须从最新 implementation ledger / `commit-05-b` boundary ledger 重新开始,按 required reads 重跑 Design Gate / Scope Gate 后再进入 application / infra / narrow contracts-domain integration 代码修改。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-05-b.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-05-a` ready | read_current_boundary_ledger | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-05-a` 当前基线已闭合 controlled-consumption exact carrier/state/marker closure,实现侧应回到最新 implementation ledger / boundary ledger 重新开工。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-05-b` ready | read_current_boundary_ledger | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-05-b` 当前基线已闭合 distribution/handoff exact callable-surface closure,实现侧应回到最新 implementation ledger / boundary ledger 重新开工。 |
 
 ---
 
@@ -87,6 +87,7 @@
 | BLK-ML-05A-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-05-a.md` | resolved | `MethodAssetConsumptionMaterial` 曾在 formal `03` 与 Step 10 使用两套状态词,实现若继续会自行选择 `degraded/constrained/retired` 映射。 | formal `03` §6.3C、Step 6 `4C.3` 和 Step 10 `MethodAssetConsumptionMaterial` / `8.2` 已闭合 `MethodAssetConsumptionMaterialState = Prepared | Ready | Stale | Unavailable | Constrained`;历史 `degraded` 映射到 `Constrained`,`retired` 由 formal version state 阻止 material prepare。 |
 | BLK-ML-05A-DESIGN-002 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-05-a.md` | resolved | consumption material / guard / boundary 的 named refs、reason refs、support carriers 和 guard/boundary state 曾只有字段名或旧 shell,没有 current-boundary Rust-facing closure。 | formal `03` §6.3C 和 Step 6 `4C.1`~`4C.5` 已闭合 exact typed refs、safe reason wrappers、body-free support carriers、`DefinitionUseBoundaryGuardState`、`DownstreamConsumptionBoundaryState`、object field/helper closure 和 no-downstream-truth test redlines。 |
 | BLK-ML-05A-DESIGN-003 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-05-a.md` | resolved | `commit-05-a` allowed scope 要求 availability marker wrappers/tests,但 Step 10 / Step 12 曾只留下 marker source watch / design blocker,实现会被迫自补 marker schema。 | formal `03` §6.3C、Step 6 `4C.2`、Step 10 `8.2` 和 Step 12 `6.1` 已闭合 `MethodAssetConsumptionAvailabilityMarker`、target/source enums、copy-only rule、missing-source blocker 和禁止 raw error/fake marker synthesis。 |
+| BLK-ML-05B-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-05-b.md` | resolved | `commit-05-b` 曾只有 family-level distribution/handoff seams,缺 exact application facade、service input source map、repository/UoW/stored-result surface 和 fake parity,实现若继续会自补 downstream truth、delivery semantics 或 fake-only mapping。 | formal `03` §6.3D、Step 7 closure patch、Step 9 flow overlay、Step 11 persistence/UoW overlay 和 formal `07` 已闭合 distribution/handoff facade、selector/source carriers、service inputs、support/ref factory、builder/target/publisher/handoff ports、outcome shell、stored result/UoW、fake parity 和 carve-outs。 |
 
 ---
 
@@ -99,11 +100,11 @@
 2. 读取 `design-calibration/07_implementation_plan_calibration_flow.md`
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 读取 `design-calibration/implementation_execution_ledger.md`
-5. 读取 `design-calibration/implementation-boundaries/commit-05-a.md`
+5. 读取 `design-calibration/implementation-boundaries/commit-05-b.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前已推进到 `commit-05-a` / `read_current_boundary_ledger`,并读取 `commit-05-a` 最新 current boundary ledger
+7. 确认 implementation ledger 当前已推进到 `commit-05-b` / `read_current_boundary_ledger`,并读取 `commit-05-b` 最新 current boundary ledger
 8. 按 boundary ledger 的 required reads 重新重跑 Design Gate / Scope Gate;只有在 `read_docs` 检查通过后才能开始代码、tests 或 evidence
-9. 若重跑时再次发现 consumption carrier、state label、availability marker source、reason wrapper、support carrier、allowed scope 或 tests 仍有未闭口矛盾,实现侧必须重新回写 `blocked / wait_design`,然后从项目级 implementation ledger 和当前 boundary ledger 重新开始
+9. 若重跑时再次发现 distribution/handoff facade、selector/source map、port、outcome shell、stored-result/UoW、fake parity、allowed scope 或 tests 仍有未闭口矛盾,实现侧必须重新回写 `blocked / wait_design`,然后从项目级 implementation ledger 和当前 boundary ledger 重新开始
 ```
 
 ---
@@ -111,8 +112,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`commit-05-a` controlled consumption contracts/domain current-boundary exact closure 已完成;
-当前 boundary 是 `commit-05-a`,其 baseline 已推进到 `current-design-with-commit-05-a-consumption-carrier-closure`;
-下一步由实现侧读取最新 implementation ledger 和 `commit-05-a` boundary ledger,按 required reads 重新开始 Design Gate / Scope Gate,然后只在 allowed contracts/domain scope 内改代码;
-实现侧仍不得私补 consumption state label、availability marker target/source、reason wrapper、support carrier、application service、repository fake、resolver/mapper port、runtime adapter、query refresh 或 evidence schema;若重跑 gate 时发现新缺口,必须按规范重新回写 blocker.
+`commit-05-b` distribution/handoff current-boundary exact closure 已完成;
+当前 boundary 是 `commit-05-b`,其 baseline 已推进到 `current-design-with-commit-05-b-distribution-handoff-closure`;
+下一步由实现侧读取最新 implementation ledger 和 `commit-05-b` boundary ledger,按 required reads 重新开始 Design Gate / Scope Gate,然后只在 allowed application / infra / narrow contracts-domain integration scope 内改代码;
+实现侧仍不得私补 distribution/handoff selector/source map、outcome shell、repository/UoW method、fake-only marker、downstream truth、real delivery、transport/config key、durable distribution material store、relation lifecycle or evidence schema;若重跑 gate 时发现新缺口,必须按规范重新回写 blocker.
 ```

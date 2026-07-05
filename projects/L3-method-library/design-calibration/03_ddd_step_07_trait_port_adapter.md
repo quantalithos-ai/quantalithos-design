@@ -3226,3 +3226,71 @@ next_allowed_action: 等待用户确认后进入 Step 7 `R7.26 自检与停审:�
 | 是否进入 Step 8 正文或后续 Step | 否。 |
 
 next_allowed_action: Step 7 completed;等待用户确认后进入 Step 8 `R8.1 开工与必读文档:先思考`;只允许思考 Step 8 开工边界、必读文档、Step 7 承接输入、协议族分组框架和旧 API 协议污染隔离方式;不得直接修改正式 `03-详细设计.md`;不得继承旧 Step 8 completed 状态;不得直接写 command / query / event / job DTO schema、function flow、状态矩阵、persistence schema、config key 或 test case schema;不得进入 `R8.2`、Step 9 或后续 Step。
+
+---
+
+## Design-side closure patch: `commit-05-b` distribution / handoff callable surface
+
+### 1. Patch status
+
+| item | value |
+|---|---|
+| reason | `commit-05-b` implementation Design Gate required exact current-boundary callable surfaces beyond the earlier family-level seam table. |
+| formal source | `projects/L3-method-library/03-详细设计.md` §6.3D |
+| patch scope | application facade, selector/source carriers, distribution builder, target registry, publisher/handoff outcomes, fake parity and carve-outs for `commit-05-b` only. |
+| status | active_for_implementation_boundary |
+
+### 2. Current-boundary facade and source map
+
+| surface | exact closure |
+|---|---|
+| command family | `MethodLibraryCapabilityKind::RelationDistribution`;all other families safe rejected before mutation. |
+| dispatch target | `MethodAssetApplicationDispatchRef` must target `DistributionHandoffCommandService`;route string、service locator、config key、type-name or fake enum is forbidden. |
+| facade | `MethodAssetDistributionHandoffCommandFacade.dispatch_distribution_handoff_command(input)` is the only entry-facing callable surface. |
+| facade input | `MethodAssetDistributionHandoffCommandDispatchInput { command_shell, command_source, api_entry_context_ref, application_dispatch_ref }`。 |
+| facade output | `MethodAssetDistributionHandoffCommandDispatchOutput { stored_result_ref, result_kind, replay_marker_ref, accepted_summary_ref, rejected_reason_ref, ignored_reason_ref, effect_summary_refs }`。 |
+| selector labels | `MethodAssetDistributionRefPrepareIntent`;`MethodAssetDistributionContextAdjustIntent`;`MethodAssetDistributionAvailabilityMarkIntent`。 |
+| command source | `MethodAssetDistributionHandoffCommandSource` with variants `PrepareDistributionRef`;`AdjustDistributionContext`;`MarkDistributionAvailability`;each variant copies only typed refs、safe markers、availability marker and expected version values listed in formal §6.3D. |
+| replay/support factory | `MethodAssetDistributionHandoffReplayEnvelopeFactoryInput`;`MethodAssetDistributionHandoffReplayEnvelope`;`MethodAssetDistributionHandoffSupportRefFactory`, including `new_distribution_ref(...)` for prepare flow when no accepted distribution ref is supplied. |
+
+Selector/source mismatch, missing source fields, wrong-kind refs, unsupported dispatch target, unsupported family, raw-body requirement or fake-private source lookup must return safe rejection and must not enter domain/repository mutation.
+
+### 3. Port and repository callable surface
+
+| family | current-boundary callable surface | closure rule |
+|---|---|---|
+| `MethodAssetRelationRepository` | `get_relation_with_version(relation_ref)`;`list_relation_refs_by_distribution_context(distribution_context_ref, page_request)`。 | Read anchor and expected-version source only. `commit-05-b` must not create or save relation truth, runtime graph truth or marketplace relation material. |
+| `DistributionReadMaterialBuilderPort` | `build_distribution_read_material(input) -> DistributionReadMaterialBuildOutcome`。 | Non-durable builder;returns body-free summary / effect refs only. No standalone `distribution_read_materials` store or save/list repository is authorized. |
+| `MethodAssetConsumptionAvailabilityResolverPort` | explain existing consumption/distribution availability marker as ready/stale/unavailable/constrained. | Copy-only marker source. No runtime status, cache state, HTTP/SQL code, exception text or fake enum mapping. |
+| `MethodAssetDegradedDecisionMapperPort` | map safe diagnostic / marker inputs to degraded decision refs. | Degraded decision is copied into service result/effect only;not stored as runtime truth. |
+| `MethodAssetAdapterAvailabilityPort` | `check_required_distribution_slots(required_slot_refs) -> MethodAssetAdapterAvailabilitySummary`。 | Slot availability only;not config source, health body, consumption state or downstream runtime truth. |
+| `MethodAssetCollaborationTargetRegistryPort` | `resolve_distribution_targets(scope_ref, publisher_binding_ref, handoff_binding_ref) -> MethodAssetCollaborationTargetSummary`。 | Enabled/disabled/blocked/unavailable target summary only;no config key、topic、URL、secret、transport product or target body. |
+| `MethodAssetEventCandidatePublisherPort` | `publish_event_candidate(candidate_ref, target_summary_ref) -> MethodAssetPublicationOutcome`。 | Outcome is safe local shell,not delivery truth. Publisher must not reread current truth to rebuild payload. |
+| `MethodAssetCollaborationHandoffPort` | `prepare_distribution_handoff(input) -> MethodAssetHandoffOutcome`。 | Body-free handoff refs / markers / hints only;no report body、archive body、package body、external receipt body or external system state. |
+| `MethodAssetEventCandidateAssemblyRepository` | `append_event_candidate_assembly(assembly, uow)`;`get_event_candidate_assembly(assembly_ref)`。 | Candidate shell is append-only reload authority. |
+| `MethodAssetPublicationOutcomeRepository` | `save_publication_outcome(outcome, uow)`;`get_publication_outcome(publication_ref)`。 | Publication outcome stores refs/markers only and stays separate from accepted truth UoW. |
+| `MethodAssetHandoffMarkerRepository` | `save_handoff_marker(outcome, uow)`;`get_handoff_marker(handoff_ref)`。 | Handoff marker stores refs/markers only and is not report/archive/package body storage. |
+| stored result repository | reuse `find_command_result_by_idempotency`;`get_stored_operation_result`;`save_command_result_for_idempotency`。 | Duplicate replay returns stored refs and never reruns builder, target registry, publisher or handoff. |
+
+### 4. Outcome shell labels
+
+| shell | exact labels |
+|---|---|
+| `DistributionReadMaterialBuildOutcome` | `Built`;`Unavailable`;`Rejected`。 |
+| `MethodAssetAdapterAvailabilitySummary` | `Available`;`Degraded`;`Unavailable`;`Disabled`。 |
+| `MethodAssetCollaborationTargetSummary` | `Enabled`;`Disabled`;`Blocked`;`Unavailable`。 |
+| `MethodAssetPublicationOutcome` | `Published`;`Blocked`;`Unavailable`;`Failed`。 |
+| `MethodAssetHandoffOutcome` | `Prepared`;`Delivered`;`Blocked`;`Unavailable`;`Failed`。 |
+
+All outcome fields are typed refs, safe markers, safe diagnostics, target refs, candidate refs or receipt/failure marker refs. No outcome may contain payload body, transport body, topic, URL, secret, external receipt body, package body, archive body, report body or raw exception.
+
+### 5. Fake / durable parity gate
+
+| fake family | parity requirement |
+|---|---|
+| relation repository fake | versioned read, expected-version conflict, staged UoW visibility and rollback invisibility. |
+| builder / availability fake | configured body-free summary / availability marker / degraded decision by typed refs;missing source returns formal unavailable/rejected outcome. |
+| target registry fake | enabled/disabled/blocked/unavailable summary with typed target refs and safe markers. |
+| publisher fake | candidate ref + target summary in, safe publication outcome out;no payload, topic, ack, delivery receipt or current-truth reread. |
+| handoff fake | body-free handoff input in, safe handoff outcome out;no report/archive/package body, external receipt body or external system state. |
+| stored result / UoW fake | duplicate replay no-rerun;rollback hides staged writes;commit unknown resolved by stored-result/read-back,not blind retry. |

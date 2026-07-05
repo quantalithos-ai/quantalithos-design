@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `6e4dd1a14111df1a1e4f10bc1db1d49bf9a941d4` |
+| current_design_baseline | `current-design-with-commit-05-b-distribution-handoff-closure` |
 | current_boundary | `commit-05-b` |
-| gate_status | blocked |
-| gate_reason | `commit-05-b` Design Gate failed: formal `03-详细设计.md` stops at `commit-05-a` exact closure and does not publish a current-boundary `commit-05-b` implementation-facing callable surface; available Step 7/9/11 text remains family-level distribution/handoff seams and generic transaction rules, so implementation cannot derive exact application facade, repository/UoW/stored-result surface or fake parity without inventing design. |
-| next_allowed_action | wait_design |
-| current_recovery_point | `commit-05-b` blocked at Design Gate after required reads; wait for design-side exact current-boundary closure before any distribution/handoff service implementation. |
-| last_updated_by | implementation agent |
-| last_updated_at | 2026-07-03 11:18:54 +0800 |
+| gate_status | ready |
+| gate_reason | `commit-05-b` Design Gate closure is now published: formal `03` §6.3D plus Step 7 / Step 9 / Step 11 closure patches define exact distribution/handoff application facade, selector/source carriers, replay/support factory, builder/target/publisher/handoff ports, outcome shells, stored-result/UoW and fake parity; implementation must rerun required reads and gates before code. |
+| next_allowed_action | read_current_boundary_ledger |
+| current_recovery_point | `commit-05-b` design closure ready; implementation must read this project ledger, then `implementation-boundaries/commit-05-b.md`, then rerun required reads / Design Gate / Scope Gate before distribution/handoff service implementation. |
+| last_updated_by | design agent |
+| last_updated_at | 2026-07-05 16:53:34 +0800 |
 
 ---
 
@@ -39,7 +39,7 @@
 | `commit-04-a` | `current-design-with-commit-04-a-formalization-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-a` completed at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |
 | `commit-04-b` | `current-design-with-commit-04-b-service-replay-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-b` completed across `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; formalization/version services, duplicate replay and replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
 | `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-a` completed across `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; controlled-consumption contracts/domain carriers, pure-domain guards and targeted contract/domain checks are closed. |
-| `commit-05-b` | `6e4dd1a14111df1a1e4f10bc1db1d49bf9a941d4` | blocked | design_gate | wait_design | Required reads completed, but current baseline still lacks an exact `commit-05-b` implementation-facing closure in formal `03`; Step 7/9/11 only provide family-level distribution/handoff seams, so implementation must stop and wait for design closure. |
+| `commit-05-b` | `current-design-with-commit-05-b-distribution-handoff-closure` | ready | design_gate | read_docs | Formal `03` §6.3D, Step 7 closure patch, Step 9 flow overlay, Step 11 persistence/UoW overlay and formal `07` now publish exact current-boundary distribution/handoff callable surfaces; implementation must rerun required reads from the current boundary ledger before code edits. |
 
 ---
 
@@ -85,7 +85,7 @@
 | BLK-ML-05A-DESIGN-002 | `commit-05-a` | implementation | resolved | `current-design-with-commit-05-a-consumption-carrier-closure` | Formal `03` §6.3C and Step 6 `4C.1`~`4C.5` now close exact consumption typed refs, safe reason wrappers, body-free support carriers, `DefinitionUseBoundaryGuardState`, `DownstreamConsumptionBoundaryState`, object field/helper closure and no-downstream-truth test redlines. Implementation must not fall back to the older `commit-02-b` generic shell closure for this boundary. |
 | BLK-ML-05A-DESIGN-003 | `commit-05-a` | implementation | resolved | `current-design-with-commit-05-a-consumption-carrier-closure` | Formal `03` §6.3C, Step 6 `4C.2`, Step 10 `8.2` and Step 12 `6.1` now close `MethodAssetConsumptionAvailabilityMarker`, target/source enums, copy-only state transition and missing-source design-blocker rules. Implementation must copy this marker carrier and must not synthesize availability/degraded/unavailable from raw errors, runtime state or fake private enums. |
 | BLK-ML-05B-ACTIVATION-001 | `commit-05-b` | implementation | resolved | `6e4dd1a14111df1a1e4f10bc1db1d49bf9a941d4` | `commit-05-a` handoff is now closed, the project ledger advances to `commit-05-b`, and implementation must continue from `read_docs` and rerun the new current-boundary Design Gate before editing code. |
-| BLK-ML-05B-DESIGN-001 | `commit-05-b` | implementation | open | `6e4dd1a14111df1a1e4f10bc1db1d49bf9a941d4` | Formal `03-详细设计.md` ends current-boundary exact closure at `commit-05-a` ([03-详细设计.md:844-866]); Step 7 only defines family-level availability/distribution/handoff seams ([03_ddd_step_07_trait_port_adapter.md:2951-2968]); Step 9 only gives phase-level relation/distribution flow cards ([03_ddd_step_09_function_flows.md:1088-1093]); Step 11 only gives generic transaction categories ([03_ddd_step_11_persistence_tx_consistency.md:1984-1991]). Design must publish exact `commit-05-b` application facade/service inputs, repository/UoW/stored-result callable surface and fake parity before implementation can resume. |
+| BLK-ML-05B-DESIGN-001 | `commit-05-b` | implementation | resolved | `current-design-with-commit-05-b-distribution-handoff-closure` | Formal `03` §6.3D, Step 7 design-side closure patch, Step 9 flow overlay, Step 11 persistence/UoW overlay and formal `07` now close exact `commit-05-b` distribution/handoff application facade, selector/source carriers, service inputs, replay/support ref factory, relation read anchor, non-durable distribution builder, target registry, publication outcome, handoff marker, stored-result/UoW, fake parity and carve-outs. Implementation must reread the current boundary ledger and rerun required reads / Design Gate / Scope Gate before editing code. |
 
 ---
 
@@ -99,7 +99,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory, marker source or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is now `commit-05-b`; required reads completed, but Design Gate is blocked until formal `03` publishes exact current-boundary distribution/handoff callable surfaces beyond the current family-level Step 7/9/11 seams. `commit-05-a` handoff remains closed at commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory, marker source or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is now `commit-05-b`; design-side closure has been published in formal `03` §6.3D plus Step 7 / Step 9 / Step 11 closure patches. Implementation must start from `implementation-boundaries/commit-05-b.md`, rerun required reads, then execute Design Gate / Scope Gate before code. `commit-05-a` handoff remains closed at commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`.
 
 ---
 

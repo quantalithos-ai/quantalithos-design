@@ -1638,3 +1638,40 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.1 开工与必读�
 | 是否形成 Step 10~16 handoff 摘要 | pass |
 | 是否修改正式 `03-详细设计.md` | no |
 | 是否进入 Step 10 | no |
+
+---
+
+## Design-side closure patch: `commit-05-b` distribution / handoff flow overlay
+
+### 1. Patch status
+
+| item | value |
+|---|---|
+| reason | `commit-05-b` implementation Design Gate required exact current-boundary flow sequencing for distribution/handoff services. |
+| formal source | `projects/L3-method-library/03-详细设计.md` §6.3D |
+| status | active_for_implementation_boundary |
+
+### 2. Command flow exact overlay
+
+| flow | selected service input | exact sequence | branch / replay / side effect rule |
+|---|---|---|---|
+| `PrepareMethodAssetDistributionRefFlow` | `PrepareMethodAssetDistributionRefInput` | 1. read stored result by idempotency;2. build replay envelope;3. load relation by `relation_ref`;4. create or copy `MethodAssetDistributionRef` through formal support ref factory/source;5. call `DistributionReadMaterialBuilderPort`;6. append body-free event candidate shell when emitted;7. save stored accepted/rejected result;8. commit accepted-command UoW;9. after commit, target registry / publisher / handoff may record safe outcome shells. | Duplicate replay returns stored result and does not rerun builder/publisher/handoff. Relation missing, context unresolved, builder unavailable, wrong-kind ref or marketplace/listing body request returns safe rejected/degraded result. No durable `DistributionReadMaterial` store is created. |
+| `AdjustMethodAssetDistributionContextFlow` | `AdjustMethodAssetDistributionContextInput` | 1. read stored result by idempotency;2. build replay envelope;3. load relation/distribution anchor;4. validate previous/new `DistributionContextRef`;5. copy adjustment safe reason/effect refs;6. append candidate shell if effect is emitted;7. save stored result;8. commit accepted-command UoW. | Expected-version conflict, scope mismatch, unresolved context, raw downstream authorization request or missing source field returns safe rejection. Flow does not expand consumption authorization and does not create downstream runtime state. |
+| `MarkMethodAssetDistributionAvailabilityFlow` | `MarkMethodAssetDistributionAvailabilityInput` | 1. read stored result by idempotency;2. build replay envelope;3. load distribution/relation anchor;4. copy exact `MethodAssetConsumptionAvailabilityMarker`;5. call degraded mapper only with safe marker/diagnostic input;6. append body-free availability changed candidate shell;7. save stored result;8. commit accepted-command UoW;9. after commit, publication/handoff failure records safe outcome only. | Missing marker/source is design blocker. Unavailable/degraded marker remains a copied marker/outcome;it is not accepted delivery, downstream sync state, runtime health truth or query refresh success. |
+
+### 3. Publication / handoff flow exact overlay
+
+| flow | reload source | exact sequence | branch / replay / side effect rule |
+|---|---|---|---|
+| `MethodAssetDistributionRefChangedPublicationFlow` | `event_candidate_assemblies.assembly_ref` | 1. load body-free event candidate shell;2. resolve target registry;3. call `MethodAssetEventCandidatePublisherPort`;4. save `MethodAssetPublicationOutcome`;5. optionally call handoff port only with body-free handoff input;6. save `MethodAssetHandoffOutcome` marker shell. | Target disabled/blocked/unavailable, publisher failed or handoff failed records safe outcome only. It never rereads current truth to rebuild payload and never rolls back accepted command result. |
+| `MethodAssetDistributionAvailabilityChangedPublicationFlow` | `event_candidate_assemblies.assembly_ref` plus copied availability marker | 1. load candidate shell;2. verify copied marker exists;3. resolve target registry;4. call publisher port;5. save publication outcome;6. if handoff requested, call handoff port and save marker shell. | Missing marker stops as design/audit issue. Outcome never stores downstream sync state, subscriber ack, topic, delivery receipt, package body, archive body or report body. |
+
+### 4. Current-boundary flow carve-outs
+
+| excluded behavior | reason |
+|---|---|
+| worker publisher loop / real transport | `commit-05-b` only provides service/fake callable surfaces; worker and transport binding are later boundaries. |
+| real handoff delivery | Handoff outcome is body-free marker shell,not external delivery truth. |
+| durable distribution material table | Step 11 keeps `DistributionReadMaterial` builder output transient/reserved until a later owner adds a save/list surface. |
+| relation lifecycle implementation | Relation repository is read anchor only in this boundary; relation command ownership is not opened here. |
+| downstream runtime truth / marketplace transaction | Distribution/handoff semantics cannot replace definition/formalization/consumption truth or represent listing/order/install/fulfillment state. |

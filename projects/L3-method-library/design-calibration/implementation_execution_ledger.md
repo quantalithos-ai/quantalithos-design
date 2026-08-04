@@ -16,12 +16,12 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `current-design-with-commit-05-b-distribution-handoff-closure` |
 | current_boundary | `commit-05-b` |
-| gate_status | ready |
-| gate_reason | `commit-05-b` Design Gate closure is now published: formal `03` §6.3D plus Step 7 / Step 9 / Step 11 closure patches define exact distribution/handoff application facade, selector/source carriers, replay/support factory, builder/target/publisher/handoff ports, outcome shells, stored-result/UoW and fake parity; implementation must rerun required reads and gates before code. |
-| next_allowed_action | read_current_boundary_ledger |
-| current_recovery_point | `commit-05-b` design closure ready; implementation must read this project ledger, then `implementation-boundaries/commit-05-b.md`, then rerun required reads / Design Gate / Scope Gate before distribution/handoff service implementation. |
-| last_updated_by | design agent |
-| last_updated_at | 2026-07-05 16:53:34 +0800 |
+| gate_status | blocked |
+| gate_reason | `commit-05-b` rerun still finds an unclosed current-boundary helper/schema gap: formal `03-详细设计.md:879,899,902-903,906` requires `relation_ref`, `candidate_reason_ref`, `adjustment_reason_ref`, `degraded_decision_ref`, `target_registry_scope_ref`, `MethodAssetRelationRef`, `MethodAssetEventCandidateAssemblyRef`, availability-slot inputs and target-registry binding refs, but the required reads only give field mentions such as Step 6 `03_ddd_step_06_object_contracts.md:2503,3488,3583,3589,3930,4161,4206` and do not publish one exact `MethodLibraryTypedBoundaryRefKind` / wrapper / source-ownership closure for those current-boundary helper refs and service-input fields. |
+| next_allowed_action | wait_design |
+| current_recovery_point | `BLK-ML-05B-DESIGN-002` opened after the `commit-05-b` Design Gate rerun; implementation must wait for design to close the exact helper refs/source fields or explicitly carve them out before any distribution/handoff code edit. |
+| last_updated_by | implementation agent |
+| last_updated_at | 2026-07-05 19:26:37 +0800 |
 
 ---
 
@@ -39,7 +39,7 @@
 | `commit-04-a` | `current-design-with-commit-04-a-formalization-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-a` completed at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |
 | `commit-04-b` | `current-design-with-commit-04-b-service-replay-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-b` completed across `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; formalization/version services, duplicate replay and replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
 | `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-a` completed across `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; controlled-consumption contracts/domain carriers, pure-domain guards and targeted contract/domain checks are closed. |
-| `commit-05-b` | `current-design-with-commit-05-b-distribution-handoff-closure` | ready | design_gate | read_docs | Formal `03` §6.3D, Step 7 closure patch, Step 9 flow overlay, Step 11 persistence/UoW overlay and formal `07` now publish exact current-boundary distribution/handoff callable surfaces; implementation must rerun required reads from the current boundary ledger before code edits. |
+| `commit-05-b` | `current-design-with-commit-05-b-distribution-handoff-closure` | blocked | design_gate | wait_design | Design Gate rerun found that current-boundary helper refs/source fields used by `03-详细设计.md:879,899,902-903,906` still lack one exact Rust-facing closure inside the allowed contracts/application/infra scope; implementation stopped without editing code and requested new design closure under `BLK-ML-05B-DESIGN-002`. |
 
 ---
 
@@ -86,6 +86,7 @@
 | BLK-ML-05A-DESIGN-003 | `commit-05-a` | implementation | resolved | `current-design-with-commit-05-a-consumption-carrier-closure` | Formal `03` §6.3C, Step 6 `4C.2`, Step 10 `8.2` and Step 12 `6.1` now close `MethodAssetConsumptionAvailabilityMarker`, target/source enums, copy-only state transition and missing-source design-blocker rules. Implementation must copy this marker carrier and must not synthesize availability/degraded/unavailable from raw errors, runtime state or fake private enums. |
 | BLK-ML-05B-ACTIVATION-001 | `commit-05-b` | implementation | resolved | `6e4dd1a14111df1a1e4f10bc1db1d49bf9a941d4` | `commit-05-a` handoff is now closed, the project ledger advances to `commit-05-b`, and implementation must continue from `read_docs` and rerun the new current-boundary Design Gate before editing code. |
 | BLK-ML-05B-DESIGN-001 | `commit-05-b` | implementation | resolved | `current-design-with-commit-05-b-distribution-handoff-closure` | Formal `03` §6.3D, Step 7 design-side closure patch, Step 9 flow overlay, Step 11 persistence/UoW overlay and formal `07` now close exact `commit-05-b` distribution/handoff application facade, selector/source carriers, service inputs, replay/support ref factory, relation read anchor, non-durable distribution builder, target registry, publication outcome, handoff marker, stored-result/UoW, fake parity and carve-outs. Implementation must reread the current boundary ledger and rerun required reads / Design Gate / Scope Gate before editing code. |
+| BLK-ML-05B-DESIGN-002 | `commit-05-b` | implementation | blocked | `current-design-with-commit-05-b-distribution-handoff-closure` | Design Gate rerun still finds missing exact helper/source closure for `relation_ref`, `candidate_reason_ref`, `adjustment_reason_ref`, `degraded_decision_ref`, `target_registry_scope_ref`, `MethodAssetRelationRef`, `MethodAssetEventCandidateAssemblyRef`, `MethodAssetInfraSafeDiagnosticRef`, `MethodAssetAdapterAvailabilityStateRef`, `MethodAssetHandoffTargetRef` and the `required_slot_refs` / `publisher_binding_ref` / `handoff_binding_ref` port inputs used by formal `03-详细设计.md:879,899,902-903,906`; implementation must wait for design to close or carve out those current-boundary carriers instead of inventing them locally. |
 
 ---
 
@@ -99,7 +100,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory, marker source or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is now `commit-05-b`; design-side closure has been published in formal `03` §6.3D plus Step 7 / Step 9 / Step 11 closure patches. Implementation must start from `implementation-boundaries/commit-05-b.md`, rerun required reads, then execute Design Gate / Scope Gate before code. `commit-05-a` handoff remains closed at commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`.
+If any required design source is missing, contradicts the current boundary, or does not close a port name, shell carrier, enum label, dependency boundary, selected-input source map, lifecycle carrier, same-layer transition helper, opaque/truth-ref factory, marker source or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary remains `commit-05-b`, but `BLK-ML-05B-DESIGN-002` is now active because the Design Gate rerun found unresolved helper refs / source-field closure in formal `03-详细设计.md:879,899,902-903,906` versus Step 6 `03_ddd_step_06_object_contracts.md:2503,3488,3583,3589,3930,4161,4206` and Step 7 `03_ddd_step_07_trait_port_adapter.md:3266-3267`. Implementation must wait for design closure before editing code. `commit-05-a` handoff remains closed at commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`.
 
 ---
 

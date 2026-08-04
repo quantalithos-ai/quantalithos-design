@@ -7,9 +7,9 @@
 | phase | PH-05 controlled consumption and distribution semantics |
 | design_baseline | `current-design-with-commit-05-b-distribution-handoff-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | Design-side closure published in formal `03` §6.3D plus Step 7 / Step 9 / Step 11 closure patches; implementation must rerun required reads, Design Gate and Scope Gate before editing distribution/handoff code. |
+| status | blocked |
+| next_allowed_action | wait_design |
+| current_recovery_point | `BLK-ML-05B-DESIGN-002` opened after the Design Gate rerun: current-boundary helper refs/source fields used by formal `03` §6.3D and Step 7 still lack one exact Rust-facing closure inside the allowed scope, so implementation must stop and wait for design. |
 
 ---
 
@@ -110,8 +110,8 @@
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | `commit-05-a` handoff is closed and the project ledger now advances to `commit-05-b`; implementation must restart from `read_docs` before any code edits. | read_docs |
-| design_gate | pass | Formal `03` §6.3D, Step 7 design-side closure patch, Step 9 flow overlay and Step 11 persistence/UoW overlay now publish exact current-boundary application facade, selector/source carrier, replay/support factory, distribution builder, target registry, publication outcome, handoff marker, stored-result/UoW and fake parity closure for `commit-05-b`. | wait_design |
-| scope_gate | pass | Formal `07` §6.3 and this boundary now keep implementation inside distribution/handoff application services, infra fakes, narrow contracts/domain compile integration and run-scoped service/fake tests while explicitly excluding worker publisher loop, real handoff delivery, durable distribution material store, relation lifecycle implementation and transport/config/report bodies. | wait_design |
+| design_gate | blocked | Rerun found that formal `03-详细设计.md:879,899,902-903,906` requires helper refs/source fields (`relation_ref`, `candidate_reason_ref`, `adjustment_reason_ref`, `degraded_decision_ref`, `target_registry_scope_ref`, `MethodAssetRelationRef`, `MethodAssetEventCandidateAssemblyRef`, availability-slot inputs and target-registry binding refs) that the required reads still do not close with one exact Rust-facing kind/wrapper/source owner. | wait_design |
+| scope_gate | blocked | Current Allowed Scope only authorizes contracts ref-kind additions for selector labels plus `MethodAssetDistribution`, `DistributionContext`, `MethodAssetPublicationOutcome` and `MethodAssetHandoffMarker`; because the missing helper refs/fields above are still unclosed, implementation would have to invent or over-expand current-boundary schema to proceed. | wait_design |
 | worktree_gate | pass | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/application/infra checks and dependency boundary checks must pass or failure must be recorded after implementation. | fix_gate_failure |
 | test_gate | pending | Service-flow-fast distribution/handoff, infra-runtime-fake and VETO targeted checks must pass after implementation. | fix_gate_failure |
@@ -154,6 +154,7 @@
 |---|---|---|---|---|---|
 | BLK-ML-05B-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-05-a`; this future boundary could not be used for implementation yet. | `commit-05-a` handoff is now closed, the project ledger advances to `commit-05-b`, and implementation must continue from `read_docs` and rerun the current-boundary Design Gate before editing code. | read_docs |
 | BLK-ML-05B-DESIGN-001 | design_gate | resolved | Required reads previously found that formal `03-详细设计.md` lacked exact `commit-05-b` implementation-facing closure after `commit-05-a`, while Step 7/9/11 stayed family-level. | Formal `03` §6.3D plus Step 7 / Step 9 / Step 11 design-side closure patches now publish exact current-boundary application facade/service inputs, repository/UoW/stored-result callable surface, outcome shells, fake parity and carve-outs for `commit-05-b`. | read_docs |
+| BLK-ML-05B-DESIGN-002 | design_gate | blocked | Formal `03-详细设计.md:879,899,902-903,906` requires current-boundary helper refs/source fields for relation anchor, candidate reason, degraded decision, target scope, event candidate reload, adapter diagnostic/availability and publisher/handoff binding inputs, but Step 6 / Step 7 still leave them name-only or field-only (`03_ddd_step_06_object_contracts.md:2503,3488,3583,3589,3930,4161,4206`; `03_ddd_step_07_trait_port_adapter.md:3266-3267`) and do not publish one exact Rust-facing `MethodLibraryTypedBoundaryRefKind` / wrapper / source-owner closure or a carve-out. | Design must either close the exact helper ref family/source ownership for `MethodAssetRelationRef`, `MethodAssetEventCandidateAssemblyRef`, `MethodAssetEventCandidateReasonRef`, `MethodAssetDegradedDecisionRef`, `MethodAssetInfraSafeDiagnosticRef`, `MethodAssetAdapterAvailabilityStateRef`, `MethodAssetHandoffTargetRef`, `adjustment_reason_ref`, `target_registry_scope_ref`, `required_slot_refs`, `publisher_binding_ref` and `handoff_binding_ref`, or explicitly remove them from `commit-05-b`. | wait_design |
 
 ---
 
@@ -162,4 +163,13 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | This boundary was pre-created under the planned-ledger rule and is now activated from completed `commit-05-a`; future boundaries remain `planned / wait_until_current` until the project ledger advances to them. |
-| distribution/handoff guards | current-boundary design closure published | Formal `03` §6.3D and Step 7/9/11 patches now close the exact distribution/handoff callable surfaces; implementation must still stop if it needs anything beyond those surfaces, especially downstream truth, real delivery, durable distribution material storage, relation lifecycle implementation, config/transport keys, repository/UoW methods or fake-only mappings. |
+| distribution/handoff guards | helper/source closure still incomplete | Formal `03` §6.3D and Step 7/9/11 closed the top-level facade/service family, but the Design Gate rerun still found missing exact helper refs/source-field closure required by those same surfaces; implementation must stop until design closes or carves out the missing items under `BLK-ML-05B-DESIGN-002`. |
+
+## Blocker BLK-ML-05B-DESIGN-002
+
+- status: blocked at `current-design-with-commit-05-b-distribution-handoff-closure`.
+- Formal `03-详细设计.md:879` requires `MethodAssetDistributionHandoffCommandSource` fields `relation_ref`, `candidate_reason_ref`, `adjustment_reason_ref`, `degraded_decision_ref` and `target_registry_scope_ref`, but the required reads only provide field mentions such as `03_ddd_step_06_object_contracts.md:2503`, `:3488` and `:3589`; no exact current-boundary wrapper/kind/source owner was published for those helper refs/fields.
+- Formal `03-详细设计.md:899` and `:906` require `MethodAssetRelationRef` and `MethodAssetEventCandidateAssemblyRef`, while Step 6 only names them in object-field cards at `03_ddd_step_06_object_contracts.md:2503` and `:3583`; no current-boundary exact kind/export closure or carve-out was found.
+- Formal `03-详细设计.md:889,902-903` and Step 7 `03_ddd_step_07_trait_port_adapter.md:3266-3267` require `MethodAssetInfraSafeDiagnosticRef`, `MethodAssetAdapterAvailabilityStateRef`, `required_slot_refs`, `publisher_binding_ref` and `handoff_binding_ref`; Step 6 only exposes field-level references at `03_ddd_step_06_object_contracts.md:3930`, `:4114`, `:4160` and `:4206`, again without one exact current-boundary Rust-facing closure.
+- Formal `03_ddd_step_06_object_contracts.md:1923` closes `MethodAssetHandoffTargetRefSet`, but only as `refs: Vec<MethodAssetHandoffTargetRef>`; the member ref family still lacks an exact current-boundary kind/wrapper closure even though Step 6 later uses `MethodAssetHandoffTargetRef` at `:4161`.
+- `implementation-boundaries/commit-05-b.md` Allowed Scope only authorizes contracts ref-kind additions for selector labels plus `MethodAssetDistribution`, `DistributionContext`, `MethodAssetPublicationOutcome` and `MethodAssetHandoffMarker`. Without the missing helper closure above, any implementation would have to invent or over-expand current-boundary schema, which the ledger forbids.

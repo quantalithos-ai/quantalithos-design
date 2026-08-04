@@ -7,9 +7,9 @@
 | phase | PH-05 controlled consumption and distribution semantics |
 | design_baseline | `current-design-with-commit-05-a-consumption-carrier-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready |
-| next_allowed_action | read_docs |
-| current_recovery_point | Design closed the controlled-consumption material state, guard/boundary carriers and availability-marker source surface. Implementation must restart from this ledger `read_docs` sequence, reread all Required Reads and rerun Design Gate / Scope Gate before editing contracts/domain code. |
+| status | implemented |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | Implementation handoff closed by commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; controlled-consumption contracts/domain carriers, pure-domain guards and targeted contract/domain tests are complete inside the current boundary scope. |
 
 ---
 
@@ -27,27 +27,27 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | Implementation must reread before code; blocker handling still requires `blocked / wait_design` if any current-boundary closure is missing or contradictory. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented consumption material, guard, availability marker, downstream truth or evidence schema | pending | Includes current-boundary marker/watch closure rule;implementation must not invent material state, guard carrier or availability marker source. |
-| `standards/coding/rust.md` | Rust contract/domain module, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pass | Re-read during the `commit-05-a` Design Gate rerun and applied through commit/handoff closure. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented consumption material, guard, availability marker, downstream truth or evidence schema | pass | Re-read and applied; implementation copied only closed carriers and preserved missing-source redlines rather than inventing runtime/fake marker semantics. |
+| `standards/coding/rust.md` | Rust contract/domain module, error and test conventions | pass | Re-read and followed for current contracts/domain source, rustdoc and test naming. |
 | `projects/L3-method-library/00-需求文档.md` | controlled consumption scope and Definition vs Use boundary | pass | Re-read and confirmed `VETO-ML-003` / `VETO-ML-004` remain blocking for any controlled-consumption implementation. |
-| `projects/L3-method-library/01-架构设计.md` | Definition vs Use, downstream boundary and dependency direction | pending | Must confirm current guard/boundary implementation does not allow downstream truth replacement. |
-| `projects/L3-method-library/02-概要设计.md` | consumption material key objects and availability outline | pending | Must compare key objects against formal `03` §6.3C and Step 6 `4C` current closure. |
-| `projects/L3-method-library/03-详细设计.md` | consumption object contracts, protocol contracts, state matrix, errors and test cut | pending | Must include §6.3C `commit-05-a` implementation-facing controlled-consumption carrier closure. |
+| `projects/L3-method-library/01-架构设计.md` | Definition vs Use, downstream boundary and dependency direction | pass | Re-read and confirmed current guard/boundary implementation preserves definition/formalization truth ownership and does not admit downstream truth replacement. |
+| `projects/L3-method-library/02-概要设计.md` | consumption material key objects and availability outline | pass | Re-read and aligned current contracts/domain carriers with the controlled-consumption object model and availability outline. |
+| `projects/L3-method-library/03-详细设计.md` | consumption object contracts, protocol contracts, state matrix, errors and test cut | pass | Formal §6.3C was re-read and implemented exactly for typed refs, state carriers, support carriers, copy-only marker behavior and guard/boundary helper closure. |
 | `projects/L3-method-library/04-配置设计.md` | availability, degraded/unavailable and downstream handoff boundary | pass | Re-read and confirmed this boundary still cannot defer missing marker schema to runtime/adapter work. |
 | `projects/L3-method-library/05-测试方案.md` | contract-domain-fast consumption material and artifact/report rules | pass | Re-read; no evidence run was started because code activation did not pass Design Gate. |
 | `projects/L3-method-library/06-验收标准.md` | ML-FG-003/007/008 seed, ML-RL-002, `VETO-ML-003` and `VETO-ML-004` | pass | Re-read and confirmed acceptance redlines; the current gate stopped before any implementation because those risks cannot be audited without exact formal closure. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Must confirm `commit-05-a` scope is contracts/domain only and excludes service/repository/runtime/query/evidence behavior. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | consumption/distribution module boundary | pending | Must use current module boundaries; do not invent modules. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | consumption material, availability marker and guard object contracts | pending | Must include Step 6 `4C` exact typed refs, state carriers, safe reason wrappers, support carriers and availability marker carrier. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | consumption material DTO shells | pending | Protocol scope must copy closed contracts/domain carriers and must not add service/runtime behavior. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | consumption state and availability guard matrix | pending | Must include `MethodAssetConsumptionMaterial` exact state mapping and Step 10 `8.2` current-boundary controlled-consumption state closure supplement. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | consumption safe error surfaces | pending | Must include Step 12 `6.1` material availability marker closure and missing-source blocker rule. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast consumption ownership | pending | Must cover contract/domain exact-label, copy-only marker and no-downstream-truth tests. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-05-a` row | pending | Must verify allowed scope and forbidden runtime/service/query/evidence scope. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-05-a` gate row and PH-05 gate | pending | Required checks are contract-domain-fast consumption material and VETO targeted audit. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-05-a` commit body grouping | pending | Commit body must include `Consumption material contracts:` and `Definition versus use guards:`. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-04-b` handoff state | latest implementation state | pending | Must recheck before edits; prior report recorded user-owned `?? .gitignore` and `commit-04-b` closed by `ce425b55fa3726f0149ae338ad9337e684e45f93` / `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pass | Re-read and confirmed `commit-05-a` is contracts/domain only and excludes service/repository/runtime/query/evidence behavior. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | consumption/distribution module boundary | pass | Re-read and kept implementation inside the current module boundaries without inventing new modules. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | consumption material, availability marker and guard object contracts | pass | Step 6 `4C` was re-read and implemented for exact typed refs, safe wrappers, support carriers, marker carrier and helper closure. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | consumption material DTO shells | pass | Re-read and confirmed current boundary remains contracts/domain only; no service/runtime protocol behavior was added. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | consumption state and availability guard matrix | pass | Re-read and implemented exact current-boundary state mapping plus `8.2` controlled-consumption closure supplement. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | consumption safe error surfaces | pass | Re-read and enforced Step 12 `6.1` missing-source blocker rule in the `mark_stale` helper/tests. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast consumption ownership | pass | Re-read and covered exact labels, copy-only marker transition, missing-source redline and no-downstream-truth tests in the targeted contract/domain slice. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-05-a` row | pass | Re-read and kept the change scope inside the allowed contracts/domain subset only. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-05-a` gate row and PH-05 gate | pass | Re-read and satisfied the required contract-domain-fast consumption and VETO-targeted checks. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-05-a` commit body grouping | pass | Re-read and used the required `Consumption material contracts:` / `Definition versus use guards:` commit body groups. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-04-b` handoff state | latest implementation state | pass | Recorded initial `?? .gitignore`, confirmed `commit-04-b` closure by `ce425b55fa3726f0149ae338ad9337e684e45f93` / `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`, and preserved `.gitignore` untouched through handoff. |
 
 ---
 
@@ -77,20 +77,20 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-05-a` and `next_allowed_action = read_current_boundary_ledger`; this ledger shows `next_allowed_action = read_docs` | pending | Implementation must verify both ledgers before edits. |
+| activation guard | project ledger shows `current_boundary = commit-05-a` and `next_allowed_action = read_current_boundary_ledger`; this ledger shows `next_allowed_action = read_docs` | pass | Project/boundary ledgers were reread in order before code edits. |
 | prior handoff | `commit-04-b` implementation commit and handoff recorded | pass | PH-04 formalization/version service and replay slice is recorded at `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`. |
-| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
-| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
-| format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
-| workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
-| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Use actual package name from formal workspace once activated. |
-| domain check | `cargo check -p method-library-domain` or the formal domain package check | pending | Use actual package name from formal workspace once activated. |
-| contract-domain-fast consumption | targeted consumption material contract-domain tests | pending | Must cover exact labels, wrong-kind refs, body-free carriers, copy-only marker transition and downstream truth exclusion. |
-| VETO targeted audit | check `VETO-ML-003` / `VETO-ML-004` risk is not introduced | pending | Downstream truth replacement or invalid consumption blocks commit. |
-| redaction fixture scan | check tests/fixtures do not include forbidden raw body/secret/provider/config material | pending | Required for body-free consumption boundary. |
-| evidence report | run-scoped `contract-domain-fast` artifact/report if scripts exist | pending | Optional until scripts exist; generated reports must derive from raw artifacts. |
-| whitespace | `git diff --check` and `git diff --cached --check` before commit | pending | Required for Commit Gate. |
-| staged scope | `git diff --cached --name-only` | pending | Must match Allowed Scope. |
+| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded initial and final worktree status; only user-owned untracked `.gitignore` remained unstaged. |
+| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
+| format | `cargo fmt --all` | pass | `cargo fmt --all` passed before commit `221664f5304f7f54991390655aea0a794bba482b`. |
+| workspace check | `cargo check` | pass | Full workspace `cargo check` passed after the `commit-05-a` contracts/domain changes. |
+| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pass | `cargo check -p method-library-contracts` passed for the controlled-consumption contract slice. |
+| domain check | `cargo check -p method-library-domain` or the formal domain package check | pass | `cargo check -p method-library-domain` and `cargo check -p method-library-domain --tests` passed for the controlled-consumption domain slice. |
+| contract-domain-fast consumption | targeted consumption material contract-domain tests | pass | `cargo test -p method-library-contracts --test consumption_contracts`, `cargo test -p method-library-domain --test consumption_material` and `cargo test -p method-library-domain --test domain_foundation` all passed. |
+| VETO targeted audit | check `VETO-ML-003` / `VETO-ML-004` risk is not introduced | pass | Targeted tests cover no-downstream-truth, definition/use writeback rejection, missing-source stale redline and non-formal/current-boundary guard behavior; no downstream truth replacement or invalid consumption path was introduced. |
+| redaction fixture scan | check tests/fixtures do not include forbidden raw body/secret/provider/config material | pass | `rg -n "MethodContent|publish|snapshot|outbox|secret|provider body|raw body|stack trace|http status|provider payload"` over touched source/tests returned no matches after follow-up commit `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`. |
+| evidence report | run-scoped `contract-domain-fast` artifact/report if scripts exist | not_applicable | This boundary was explicitly limited to contracts/domain code and pure tests; no evidence/report generation script was required or added in `commit-05-a`. |
+| whitespace | `git diff --check` and `git diff --cached --check` before commit | pass | `git diff --check`, `git diff --cached --check`, `git show --check --format=oneline 221664f5304f7f54991390655aea0a794bba482b` and `git show --check --format=oneline c4459d10c12bc8c3b32b0dd44240b801dd49d1d3` were clean. |
+| staged scope | `git diff --cached --name-only` | pass | Final delivery scope matches the allowed contracts/domain files only; no `.codex/`, `target/` or unrelated files were staged. |
 
 ---
 
@@ -98,15 +98,15 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | `commit-04-b` handoff is closed and the project ledger has advanced to `commit-05-a`; implementation must verify both ledgers before code edits. | read_docs |
-| design_gate | pending | Formal `03` §6.3C, Step 6 `4C`, Step 10 `8.2`, Step 12 `6.1`, formal `07` and this boundary now close the current-boundary controlled-consumption state/carrier/availability-marker surface; implementation must reread and verify. | wait_design |
-| scope_gate | pending | Planned work must remain limited to allowed `crates/contracts` and `crates/domain` consumption slice. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status must be recorded; unrelated user changes protected. | fix_gate_failure |
-| build_gate | pending | Formatting, workspace/contract/domain checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
-| test_gate | pending | Contract-domain-fast consumption material slice and VETO targeted checks pass after activation. | fix_gate_failure |
-| evidence_gate | pending | Targeted artifact/report is optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
-| commit_gate | pending | staged scope, commit message, whitespace and required checks have evidence. | fix_gate_failure |
-| handoff_gate | pending | commit hash, checks run, tests not run, blockers and next boundary state recorded. | handoff |
+| activation_gate | pass | `commit-04-b` handoff was closed and the project/boundary ledgers were reread before `commit-05-a` code edits. | read_docs |
+| design_gate | pass | Formal `03` §6.3C, Step 6 `4C`, Step 10 `8.2`, Step 12 `6.1`, formal `07` and this boundary were reread and implemented without local schema/marker invention. | wait_design |
+| scope_gate | pass | Commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3` touch only allowed contracts/domain source and tests. | fix_gate_failure |
+| worktree_gate | pass | Initial and final worktree checks preserved the user-owned untracked `.gitignore`; no unrelated files were staged or reset. | fix_gate_failure |
+| build_gate | pass | `cargo fmt --all`, `cargo check`, `cargo check -p method-library-contracts`, `cargo check -p method-library-domain` and `cargo check -p method-library-domain --tests` all passed. | fix_gate_failure |
+| test_gate | pass | Targeted controlled-consumption contract/domain tests passed, including copy-only marker behavior, missing-source rejection and no-downstream-truth redlines. | fix_gate_failure |
+| evidence_gate | not_applicable | `commit-05-a` was explicitly constrained away from evidence/report generation; no report scripts or run-scoped artifacts were part of this boundary. | fix_gate_failure |
+| commit_gate | pass | Staged scope, commit subjects/body groups and whitespace checks were validated before commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`. | fix_gate_failure |
+| handoff_gate | pass | Commit hashes, command list, tests not run, untouched user file and next-boundary state are now recorded in this ledger. | handoff |
 
 ---
 
@@ -114,12 +114,12 @@
 
 | gate | status | evidence |
 |---|---|---|
-| staged_scope | pending | Must include only allowed `commit-05-a` consumption contract/domain files and generated targeted evidence if applicable. |
-| unrelated_changes | pending | User-owned unrelated changes must remain unstaged. |
-| commit_message_format | pending | Planned subject: `feat(consumption): add controlled consumption material` |
-| commit_body_group | pending | Body group must include `Consumption material contracts:` and `Definition versus use guards:` from Step 11 mapping. |
-| whitespace | pending | `git diff --cached --check` must pass. |
-| required_checks | pending | Required Checks table must have pass/not_applicable evidence. |
+| staged_scope | pass | Main commit scope contains only `crates/contracts/src/consumption.rs`, `crates/contracts/src/lib.rs`, `crates/contracts/src/refs.rs`, `crates/contracts/tests/consumption_contracts.rs`, `crates/domain/src/consumption_material.rs`, `crates/domain/src/lib.rs`, `crates/domain/src/policies.rs`, `crates/domain/tests/consumption_material.rs` and `crates/domain/tests/domain_foundation.rs`; follow-up commit scope contains only `crates/domain/tests/domain_foundation.rs`. |
+| unrelated_changes | pass | User-owned untracked `.gitignore` remained unstaged and untouched throughout the boundary. |
+| commit_message_format | pass | Delivery commits are `feat(consumption): add controlled consumption material` and `test(consumption): remove redaction scan false positive`. |
+| commit_body_group | pass | Main implementation commit contains both `Consumption material contracts:` and `Definition versus use guards:` groups; the follow-up test commit keeps the `Definition versus use guards:` group. |
+| whitespace | pass | Pre-commit `git diff --cached --check` and post-commit `git show --check` were clean for both delivery commits. |
+| required_checks | pass | All required build/test/scope checks are recorded as `pass` or `not_applicable` above. |
 
 ---
 
@@ -127,13 +127,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after implementation repo commit. |
-| committed_message | pending | Fill after implementation repo commit. |
-| gates_run | pending | List exact commands and targeted reports. |
-| tests_not_run | pending | Must state none or explain; cannot claim distribution/handoff service suites. |
-| remaining_blockers | pending | Must reference blocker table; any blocking design gap prevents handoff. |
-| final_conclusion | pending | Must be one of pass / fail / cannot_decide with exact evidence source. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | Implementation handoff closes on follow-up commit `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`, following main implementation commit `221664f5304f7f54991390655aea0a794bba482b`. |
+| committed_message | pass | `test(consumption): remove redaction scan false positive` after `feat(consumption): add controlled consumption material`. |
+| gates_run | pass | Handoff audit ran `git status --short`, `git config user.name`, `git config user.email`, `cargo fmt --all`, `cargo check`, `cargo check -p method-library-contracts`, `cargo check -p method-library-domain`, `cargo check -p method-library-domain --tests`, `cargo test -p method-library-contracts --test consumption_contracts`, `cargo test -p method-library-domain --test consumption_material`, `cargo test -p method-library-domain --test domain_foundation`, `rg -n "MethodContent|publish|snapshot|outbox|secret|provider body|raw body|stack trace|http status|provider payload" crates/contracts/src/consumption.rs crates/contracts/tests/consumption_contracts.rs crates/domain/src/consumption_material.rs crates/domain/src/policies.rs crates/domain/tests/consumption_material.rs crates/domain/tests/domain_foundation.rs`, `git diff --check`, `git diff --cached --check`, `git show --name-only --format= 221664f5304f7f54991390655aea0a794bba482b`, `git show --name-only --format= c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`, `git show --check --format=oneline 221664f5304f7f54991390655aea0a794bba482b` and `git show --check --format=oneline c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`. |
+| tests_not_run | pass | No application service, repository fake/durable, availability resolver/mapper port, downstream runtime, query/material, handoff/publisher/job or evidence/report suites were run because `commit-05-a` forbids them. |
+| remaining_blockers | pass | No remaining blocker was found inside `commit-05-a`; future boundary `commit-05-b` remains `planned / wait_until_current` until the project ledger is intentionally advanced. |
+| final_conclusion | pass | `commit-05-a` allowed scope is implemented and handoff is closed by commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3` plus successful targeted contracts/domain checks. |
+| user_owned_changes_untouched | pass | Implementation handoff preserved user-owned untracked `.gitignore`; no `.codex/`, `target/` or unrelated files were staged. |
 
 ---
 
@@ -153,7 +153,7 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| controlled consumption guards | standards updated | Added current-boundary marker/watch closure rule to `standards/document/设计真相源闭环与可落码性标准.md`; consumption material, Definition vs Use guard and availability marker gaps are now closed in formal `03`, Step 6, Step 10, Step 12 and this ledger. |
+| controlled consumption guards | current-boundary closure implemented | Controlled-consumption typed refs, state carriers, body-free support carriers, copy-only marker behavior and no-downstream-truth guards are now implemented in commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; future service/runtime work remains deferred to `commit-05-b`+. |
 
 ## Blocker BLK-ML-05A-DESIGN-001
 

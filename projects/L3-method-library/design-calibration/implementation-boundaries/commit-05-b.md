@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-05-b |
 | phase | PH-05 controlled consumption and distribution semantics |
-| design_baseline | `current-design-with-commit-05-b-helper-source-state-closure` |
+| design_baseline | `current-design-with-commit-05-b-disabled-outcome-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | in_progress |
-| next_allowed_action | implement |
-| current_recovery_point | Fresh Required Reads and Design/Scope Gate passed against design commit `8e31a2f`;implement only the exact contracts/application/infra distribution-handoff slice, then run Required Checks. |
+| status | ready_for_design_gate |
+| next_allowed_action | read_docs |
+| current_recovery_point | Design commit `e12f092` closes disabled diagnostic ownership and safe outcome mapping;preserve implementation WIP and reread all Required Reads before rerunning Design/Scope Gate. |
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | project ledger current_boundary must equal `commit-05-b` | pass | Project ledger now points to `commit-05-b`; implementation may use this file only after completing the required reads and current-boundary gates. |
 | `commit-05-a` handoff must be closed | pass | Controlled consumption material contracts/domain are closed by implementation commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`. |
-| project and boundary ledgers had to show `ready_for_design_gate / read_docs` before the fresh gate rerun | pass | Both ledgers were read in that state;the fresh Design/Scope Gate has now advanced this boundary to `in_progress / implement`. |
+| project and boundary ledgers must show `ready_for_design_gate / read_docs` before the fresh gate rerun | pass | Both ledgers now require a fresh read/gate cycle against design commit `e12f092`;prior gate evidence may not be reused. |
 
 ---
 
@@ -27,31 +27,31 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | current boundary activation, gate matrix, commit and handoff rules | pass | This boundary is now current; implementation must still rerun required reads and gates before code edits. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented service port, mapper, fake, marker, downstream truth or evidence schema | pass | Missing distribution/handoff field, port, mapper or marker must return to design. |
-| `standards/coding/rust.md` | Rust application/infra module, fake runtime, error and test conventions | pass | Source identifiers, comments, rustdoc, errors and test names must be English. |
-| `projects/L3-method-library/00-需求文档.md` | controlled consumption, downstream use and handoff expectations | pass | Handoff is use-side semantics only; it must not replace definition/formalization truth. |
-| `projects/L3-method-library/01-架构设计.md` | downstream boundary, availability/degraded semantics and dependency direction | pass | `VETO-ML-003` / `VETO-ML-004` apply to downstream truth replacement and invalid use. |
-| `projects/L3-method-library/02-概要设计.md` | distribution context, handoff shell and availability mapper outline | pass | Use the current service shape; do not invent additional downstream runtime surfaces. |
-| `projects/L3-method-library/03-详细设计.md` | distribution/handoff object, port, protocol, flow, state and error contracts | pass | Formal source for distribution context, handoff shell, availability mapper and fake behavior. |
-| `projects/L3-method-library/04-配置设计.md` | disabled/degraded handoff seams, safe fallback and downstream adapter boundary | pass | This boundary may add fake/seam configuration only if formally defined; no real transport. |
-| `projects/L3-method-library/05-测试方案.md` | service-flow-fast, infra-runtime-fake and artifact/report rules | pass | Targeted report must derive from raw artifact if generated. |
-| `projects/L3-method-library/06-验收标准.md` | ML-FG-003/007/008, ML-RL-002, ML-SYNC-007, `VETO-ML-003` and `VETO-ML-004` | pass | Distribution/handoff cannot count as release acceptance. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pass | Current source for phase, boundary, allowed scope, checks and commit discipline. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | consumption/distribution module boundary | pass | Distribution/handoff must stay inside the PH-05 module boundary. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | distribution context, handoff shell, availability/degraded state objects | pass | Required typed refs, marker source and state fields must be formal. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | distribution service ports, handoff fake/seam ports and mapper contracts | pass | Do not add ports/fakes beyond formal contracts. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | distribution/handoff command/result and safe public shells | pass | DTOs may be wired only where already formal; no release handoff verdict. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | distribution/handoff service flows and availability mapper flow | pass | Service behavior must follow formal flow order and safe failure branches. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | distribution, availability, degraded and handoff state transitions | pass | No implicit success, truth replacement or unavailable-as-accepted transition. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | service transaction, fake repository and UoW consistency | pass | Fake stores must preserve version/UoW semantics if used. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | distribution/handoff safe error and degraded recovery surfaces | pass | Errors must be safe, refs-only and body-free. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | duplicate replay and handoff consistency expectations | pass | Duplicate/replay must not rerun downstream delivery. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | service-flow-fast and infra-runtime-fake ownership | pass | Use distribution/handoff service slice only. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-05-b` row | pass | Allowed scope is distribution context, handoff shell, availability mapper/fake. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-05-b` gate row and PH-05 gate | pass | Required checks are service-flow-fast distribution/handoff and infra-runtime-fake. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-05-b` commit body grouping | pass | Commit body must include `Distribution and handoff services:` and `Availability seam fakes:`. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-05-a` handoff state | latest implementation state | pass | Confirmed worktree still only shows user-owned `?? .gitignore`; `commit-05-a` handoff remains closed by implementation commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`. |
+| `standards/document/代码实施台账与门禁规范.md` | current boundary activation, gate matrix, commit and handoff rules | pending | Reread from `read_docs` against the new baseline before further code edits. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented service port, mapper, fake, marker, downstream truth or evidence schema | pending | Missing distribution/handoff field, port, mapper, marker or diagnostic must return to design. |
+| `standards/coding/rust.md` | Rust application/infra module, fake runtime, error and test conventions | pending | Reread before implementation edits;source identifiers, comments, rustdoc, errors and test names must be English. |
+| `projects/L3-method-library/00-需求文档.md` | controlled consumption, downstream use and handoff expectations | pending | Reread use-side semantics and truth ownership;handoff must not replace definition/formalization truth. |
+| `projects/L3-method-library/01-架构设计.md` | downstream boundary, availability/degraded semantics and dependency direction | pending | Reread `VETO-ML-003` / `VETO-ML-004` before gate decision. |
+| `projects/L3-method-library/02-概要设计.md` | distribution context, handoff shell and availability mapper outline | pending | Reread the current service shape;do not invent additional downstream runtime surfaces. |
+| `projects/L3-method-library/03-详细设计.md` | distribution/handoff object, port, protocol, flow, state and error contracts | pending | Reread §6.3D disabled diagnostic and adapter-first publication outcome mapping from design commit `e12f092`. |
+| `projects/L3-method-library/04-配置设计.md` | disabled/degraded handoff seams, safe fallback and downstream adapter boundary | pending | Reread config carve-out;this boundary adds no config or real transport. |
+| `projects/L3-method-library/05-测试方案.md` | service-flow-fast, infra-runtime-fake and artifact/report rules | pending | Reread targeted test/evidence rules;reports remain optional and raw-artifact-derived only. |
+| `projects/L3-method-library/06-验收标准.md` | ML-FG-003/007/008, ML-RL-002, ML-SYNC-007, `VETO-ML-003` and `VETO-ML-004` | pending | Reread acceptance redlines;distribution/handoff cannot count as release acceptance. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Reread current source for phase, disabled outcome scope, checks and commit discipline. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | consumption/distribution module boundary | pending | Reread PH-05 module boundary before Scope Gate. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | distribution context, handoff shell, availability/degraded state objects | pending | Reread exact `Disabled.diagnostic_ref` fields and owning-port source rules. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | distribution service ports, handoff fake/seam ports and mapper contracts | pending | Reread port-owned diagnostic and adapter-first outcome mapping;do not add ports/fakes beyond formal contracts. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | distribution/handoff command/result and safe public shells | pending | Reread protocol boundaries;no new DTO body or release handoff verdict. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | distribution/handoff service flows and availability mapper flow | pending | Reread target-set resolution, precheck mapping, outcome persistence and no-call branches. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | distribution, availability, degraded and handoff state transitions | pending | Reread exact disabled publication disposition matrix. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | service transaction, fake repository and UoW consistency | pending | Reread safe outcome UoW, consistency-unknown and fake diagnostic parity. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | distribution/handoff safe error and degraded recovery surfaces | pending | Reread disabled/degraded/unavailable mapping and no local diagnostic recovery. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | duplicate replay and handoff consistency expectations | pending | Reread disabled outcome reentry and commit-unknown rules. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | service-flow-fast and infra-runtime-fake ownership | pending | Reread exact disabled outcome/no-call/no-rollback/fake-parity assertions. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-05-b` row | pending | Reread Allowed Scope and exclusions before Scope Gate. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-05-b` gate row and PH-05 gate | pending | Reread service-flow-fast and infra-runtime-fake requirements. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-05-b` commit body grouping | pending | Reread commit grouping and delivery discipline before Commit Gate. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-05-a` handoff state | latest implementation state | pending | Re-record current WIP plus user-owned `?? .gitignore` before further implementation edits;`commit-05-a` handoff remains closed. |
 
 ---
 
@@ -69,11 +69,11 @@
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/artifacts/test/<run_id>/suites/infra-runtime-fake/**` only if generated by an actual targeted run after activation | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/reports/runs/<run_id>/suites/service-flow-fast.md` only if generated from raw artifact after activation | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/reports/runs/<run_id>/suites/infra-runtime-fake.md` only if generated from raw artifact after activation | planned |
-| allowed_rule | Implement distribution context service flow, handoff shell service flow, availability mapper copy-only behavior, disabled/degraded branch and safe failure semantics explicitly defined by formal design. | planned |
+| allowed_rule | Implement distribution context service flow, handoff shell service flow, availability mapper copy-only behavior and exact adapter-first disabled/degraded/unavailable mapping;both `Disabled` branches copy owning-port diagnostics into factory-issued safe publication outcomes and call neither publisher nor handoff. | planned |
 | allowed_rule | Implement application-owned `MethodAssetDistributionRecord` and `MethodAssetDistributionRepository` exactly as Step 6 `3B.4A` / Step 7 define;persist record + stored result + optional candidate in one accepted-command UoW, with no durable read-material body or relation mutation. | planned |
 | allowed_rule | Add in-memory/fake seam behavior only where formal Step 7/11 contracts define the fake/repository/adapter surface. | planned |
 | allowed_rule | Add minimal contracts registry/newtype/ref-set/export support exactly for `MethodAssetDistribution`, `DistributionContext`, `MethodAssetPublicationOutcome`, `MethodAssetHandoffMarker`, `MethodAssetRelation`, `MethodAssetEventCandidateAssembly`, `MethodAssetDegradedDecision`, `MethodAssetInfraSafeDiagnostic`, `MethodAssetAdapterAvailabilityState`, `MethodAssetAdapterSlot`, `MethodAssetPublisherBindingState`, `MethodAssetHandoffBindingState`, `MethodAssetHandoffTarget`, `MethodAssetTargetRegistryScope`, the two Step 6 `3B.4A` safe-reason wrappers and the three selector intent labels. | planned |
-| allowed_rule | Add focused service and fake tests for formalized consumption input, downstream truth exclusion, unavailable/degraded material handling, handoff disabled/failure branch and no real delivery. | planned |
+| allowed_rule | Add focused service and fake tests for formalized consumption input, downstream truth exclusion, adapter/target disabled diagnostics, `Blocked` / `Unavailable` outcome persistence, publisher/handoff no-call, accepted-truth no-rollback and no real delivery. | planned |
 | forbidden_rule | Do not implement worker publisher, event bus delivery, real handoff delivery, real downstream adapter, external transport, marketplace transaction, release handoff verdict or acceptance report. | active |
 | forbidden_rule | Do not add trace/audit/impact, external/provider, peripheral package/set, query/read material, inbound/outbound worker, operations job, report generator or release smoke behavior. | active |
 | forbidden_rule | Do not create new consumption material contracts/domain beyond narrow compile integration; missing DTO/object/marker/schema closure must return to design or prior boundary. | active |
@@ -88,16 +88,16 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-05-b` and current boundary activation from completed `commit-05-a` | pass | Project ledger activates this boundary and required reads were completed before the Design Gate decision. |
+| activation guard | project ledger shows `current_boundary = commit-05-b` and current boundary activation from completed `commit-05-a` | pass | Project ledger activates this boundary;fresh Required Reads remain pending before the new Design Gate decision. |
 | prior handoff | `commit-05-a` implementation commit and handoff recorded | pass | Controlled consumption material and availability marker contracts/domain handoff is closed by implementation commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`. |
-| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded `?? .gitignore`; the user-owned file remains untouched and unstaged. |
+| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Current WIP includes modified application/contracts/infra exports and untracked distribution/handoff source/tests plus user-owned `?? .gitignore`;re-record and protect all entries before further edits. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run after implementation edits inside the allowed scope. |
 | workspace check | `cargo check` | pending | Run after implementation edits inside the allowed scope. |
 | application check | `cargo check -p method-library-application` or the formal application package check | pending | Required because this boundary opens application distribution/handoff services. |
 | infra check | `cargo check -p method-library-infra` or the formal infra package check | pending | Required because this boundary opens infra fake/runtime seam support. |
-| service-flow-fast distribution/handoff | targeted distribution and handoff service tests | pending | Must cover `PrepareMethodAssetDistributionRefFlow`, `AdjustMethodAssetDistributionContextFlow`, `MarkMethodAssetDistributionAvailabilityFlow`, stored replay and safe failure branches. |
-| infra-runtime-fake availability seam | targeted fake runtime tests | pending | Must cover builder/availability/target registry/publisher/handoff fake parity and no real delivery. |
+| service-flow-fast distribution/handoff | targeted distribution and handoff service tests | pending | Must cover the three command flows, stored replay, adapter/target disabled typed diagnostics, factory-issued `Blocked` / `Unavailable` outcomes, no publisher/handoff call and no accepted-truth rollback. |
+| infra-runtime-fake availability seam | targeted fake runtime tests | pending | Must cover builder/availability/target registry/publisher/handoff fake parity, both exact `Disabled.diagnostic_ref` fixtures and no real delivery/private diagnostic source. |
 | VETO targeted audit | check `VETO-ML-003` / `VETO-ML-004` risk is not introduced | pending | Verify downstream truth cannot replace definition/formalization truth and unavailable/degraded handoff is not accepted delivery. |
 | redaction fixture scan | check tests/fixtures do not include forbidden raw body/secret/provider/config material | pending | Must scan touched source/tests/reports after implementation. |
 | evidence report | run-scoped `service-flow-fast` and `infra-runtime-fake` artifacts/reports if scripts exist | pending | Generate only from real targeted runs, never static pass material. |
@@ -111,9 +111,9 @@
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | `commit-05-a` handoff is closed and the project ledger now advances to `commit-05-b`; implementation must restart from `read_docs` before any code edits. | read_docs |
-| design_gate | pass | Required Reads were reread against design commit `8e31a2f`;Step 6 `3B.4/3B.4A`, formal `03` §6.3D and Step 7/9/11 provide exact wrappers, sources, state owner, helper/factory signatures, repository/error/UoW surface and fake parity without local schema invention. | wait_design |
-| scope_gate | pass | The implementation slice fits the listed contracts/application/infra paths;no public DTO body, full relation lifecycle/page/list, durable read material, PH-06 lineage/event payload, worker, transport, config or report-generator work is required. | wait_design |
-| worktree_gate | pass | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
+| design_gate | pending | Must reread all Required Reads and rerun against design commit `e12f092`;prior `8e31a2f` gate evidence is superseded. | wait_design |
+| scope_gate | pending | Must confirm the exact disabled diagnostic/outcome implementation fits existing allowed contracts/application/infra paths without new schema/port/config/evidence. | wait_design |
+| worktree_gate | pending | Re-record current implementation WIP and protect unrelated user changes before further edits. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/application/infra checks and dependency boundary checks must pass or failure must be recorded after implementation. | fix_gate_failure |
 | test_gate | pending | Service-flow-fast distribution/handoff, infra-runtime-fake and VETO targeted checks must pass after implementation. | fix_gate_failure |
 | evidence_gate | pending | Targeted artifacts/reports are optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
@@ -156,6 +156,7 @@
 | BLK-ML-05B-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-05-a`; this future boundary could not be used for implementation yet. | `commit-05-a` handoff is now closed, the project ledger advances to `commit-05-b`, and implementation must continue from `read_docs` and rerun the current-boundary Design Gate before editing code. | read_docs |
 | BLK-ML-05B-DESIGN-001 | design_gate | resolved | Required reads previously found that formal `03-详细设计.md` lacked exact `commit-05-b` implementation-facing closure after `commit-05-a`, while Step 7/9/11 stayed family-level. | Formal `03` §6.3D plus Step 7 / Step 9 / Step 11 design-side closure patches now publish exact current-boundary application facade/service inputs, repository/UoW/stored-result callable surface, outcome shells, fake parity and carve-outs for `commit-05-b`. | read_docs |
 | BLK-ML-05B-DESIGN-002 | design_gate | resolved | The prior baseline left helper refs/source fields, unnamed port inputs and the persisted owner for distribution context/availability updates without one exact Rust-facing closure. | Step 6 `3B.4A` closes wrappers, source/seam/service inputs, relation anchor, `MethodAssetDistributionRecord`, candidate/outcome inputs and support-factory minting;formal `03`, Step 7/9/11 and formal `07` close the distribution repository/UoW and callable signatures while carving full relation lifecycle/list/page plus PH-06 lineage/event payload out. | read_docs |
+| BLK-ML-05B-DESIGN-003 | design_gate | resolved | Adapter/target `Disabled` summaries lacked the typed diagnostic required by stored `Blocked` / `Unavailable` publication outcomes, leaving implementation to stop silently or invent a diagnostic/outcome mapping. | Design commit `e12f092` adds port-owned `Disabled.diagnostic_ref`, exact adapter-first mapping, target-set source, factory-issued outcome persistence, no publisher/handoff calls, no local synthesis and no accepted-truth rollback. | read_docs |
 
 ---
 
@@ -175,3 +176,10 @@
 - `MethodAssetDistributionRecord` / `MethodAssetDistributionRepository` are the body-free persisted owner for prepare/context-adjust/availability-mark flows. `expected_distribution_version` protects the record being updated;relation remains read-only.
 - Formal `03` §6.3D and Step 7 publish exact builder/resolver/mapper/availability/target-registry/publisher/handoff/repository signatures. Step 9 fixes ordering and Step 11 fixes persistence/factory identity ownership.
 - Implementation must restart from `read_docs`, rerun Design Gate / Scope Gate and return to `blocked / wait_design` if any new exact schema/port/state/mapper/config/test-evidence gap remains.
+
+## Blocker BLK-ML-05B-DESIGN-003
+
+- status: resolved at design commit `e12f0927158a10a1108c838b1bd8819857fea0d0` / `current-design-with-commit-05-b-disabled-outcome-closure`.
+- Step 6 `3B.4` adds exact `diagnostic_ref: MethodAssetInfraSafeDiagnosticRef` to both adapter and target `Disabled` branches;the diagnostic is emitted by the owning port and cannot be synthesized by service/fake code.
+- Formal `03`, Step 7/9/10/11/12/13/16 and formal `07` fix adapter-first mapping, one body-free target resolution for factory identity, factory-issued `Blocked` / `Unavailable` outcome persistence, no publisher/handoff calls, no rollback, replay/commit-unknown behavior and focused test assertions.
+- Implementation must restart from `read_docs`, preserve current WIP and user-owned `.gitignore`, rerun Design/Scope Gate and return to `blocked / wait_design` if any new exact gap remains.

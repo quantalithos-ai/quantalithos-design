@@ -15,7 +15,7 @@
 | 当前模块 | `R13.1 formal document assembly:正式装配` |
 | 当前状态 | completed |
 | 正式文档状态 | full-restart formal assembly completed |
-| 当前设计基线 | `current-design-with-commit-05-b-distribution-handoff-closure` |
+| 当前设计基线 | `current-design-with-commit-05-b-helper-source-state-closure` |
 | 当前输入形态 | `00`~`06` 已完成 full-restart 装配并可作为新版 `07` 输入 |
 | 目标实现仓 | `/home/aris/Projects/quantalithos-method-library`;Step 3 已确认存在、干净且 git config 正确,但当前 layout 属旧实现形态,需在 PH-01 / 首个 boundary 迁移 |
 
@@ -98,7 +98,7 @@
 4. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
 5. 读取 `design-calibration/implementation_execution_ledger.md`
 6. 读取 `design-calibration/implementation-boundaries/commit-05-b.md`
-7. 确认当前 implementation ledger 已推进到 `commit-05-b` / `read_current_boundary_ledger`,并读取最新 `commit-05-b` current boundary ledger
+7. 确认当前 implementation ledger 已推进到 `commit-05-b` / `ready_for_design_gate` / `read_docs`,并读取最新 `commit-05-b` current boundary ledger
 8. 不得用旧 `07` 的 MethodContent / publish / snapshot / outbox / PostgreSQL / GATE-T 口径定义当前实施计划
 9. 若当前 boundary ledger 指向的 distribution/handoff facade、selector/source map、service inputs、port/outcome shells、stored-result/UoW、fake parity、allowed scope 或 tests 在重跑时仍出现未闭口矛盾,立即回写 `blocked / wait_design`;未通过前不得创建代码、tests 或 evidence
 10. 当前 `commit-05-b` 已重新回到 ready/current 状态;实现侧必须从最新 implementation ledger 与 boundary ledger 重新重跑 Design Gate / Scope Gate 后才能进入代码落码
@@ -114,7 +114,7 @@ implementation handoff 台账已推进:
 - `design-calibration/implementation-boundaries/commit-04-a.md`
 - `design-calibration/implementation-boundaries/commit-05-b.md`
 `commit-05-b` current-boundary exact distribution/handoff callable-surface closure 已由设计侧补齐;
-当前 `commit-05-b` distribution/handoff services boundary 是 current boundary,并已推进到 `read_current_boundary_ledger`;
+当前 `commit-05-b` distribution/handoff services boundary 是 current boundary,并已推进到 `ready_for_design_gate` / `read_docs`;
 下一步由实现侧从最新 project ledger / `commit-05-b` boundary ledger / required reads 重新重跑 Design Gate 和 Scope Gate,随后只在 allowed application / infra / narrow contracts-domain integration scope 内继续落码;
 实现侧仍不得创建超出 `commit-05-b` allowed scope 的代码、tests 或 evidence,也不得在实现仓私补 selector/source map、repository/UoW/stored-result method、fake-only marker、downstream truth、real delivery、durable distribution material store、relation lifecycle、transport/config key、handoff body 或 evidence schema.
 ```

@@ -1914,12 +1914,12 @@ This resolves `BLK-ML-03B-DESIGN-003` Step 6 support carrier half. Step 7 `R7.10
 | `DistributionContextRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | exact kind `DistributionContext` | `DistributionContext` is the only distribution context ref kind for `commit-05-b`; it may only come from accepted source carrier or formal loaded context identity. |
 | `MethodAssetPublicationOutcomeRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | exact kind `MethodAssetPublicationOutcome` | outcome ref for the publication outcome shell; service code may not fabricate a local publication outcome id, derive it from target body or parse a route/config string. |
 | `MethodAssetHandoffMarkerRef` | named newtype wrapper over `MethodLibraryTypedBoundaryRef` | exact kind `MethodAssetHandoffMarker` | outcome ref for the handoff marker shell; service code may not fabricate a local handoff marker id, derive it from report/archive/package body or parse a route/config string. |
-| `MethodAssetPublicationBoundaryMarkerRef` | body-free marker ref | `MethodLibrarySafeMarker` carrier | boundary marker only, not delivery truth; copied into event candidate / publisher binding summaries and publication outcome shells. |
-| `MethodAssetHandoffBoundaryMarkerRef` | body-free marker ref | `MethodLibrarySafeMarker` carrier | boundary marker only, not delivery truth; copied into handoff binding summaries and handoff outcome shells. |
-| `MethodAssetPublicationOutcome` | body-free struct | `Published { publication_ref, candidate_ref, target_ref_set, boundary_marker_ref }`;`Blocked { publication_ref, candidate_ref, target_ref_set, reason_ref, diagnostic_ref }`;`Unavailable { publication_ref, candidate_ref, target_ref_set, reason_ref, diagnostic_ref }`;`Failed { publication_ref, candidate_ref, target_ref_set, reason_ref, diagnostic_ref }` | publication outcome is a stored safe shell only; it must never contain payload body, topic, URL, delivery receipt, subscriber ack or downstream system state. |
-| `MethodAssetHandoffOutcome` | body-free struct | `Prepared { handoff_ref, target_ref, boundary_marker_ref, hint_ref }`;`Delivered { handoff_ref, target_ref, boundary_marker_ref, receipt_marker_ref }`;`Blocked { handoff_ref, target_ref, boundary_marker_ref, reason_ref, diagnostic_ref }`;`Unavailable { handoff_ref, target_ref, boundary_marker_ref, reason_ref, diagnostic_ref }`;`Failed { handoff_ref, target_ref, boundary_marker_ref, reason_ref, diagnostic_ref }` | handoff outcome is a body-free marker shell only; `Delivered` means the local handoff seam accepted the marker, not that any external system truth changed. |
-| `MethodAssetAdapterAvailabilitySummary` | body-free struct | `Available { availability_state_ref, marker_ref }`;`Degraded { availability_state_ref, marker_ref, diagnostic_ref }`;`Unavailable { availability_state_ref, marker_ref, diagnostic_ref }`;`Disabled { availability_state_ref, marker_ref, reason_ref }` | adapter availability summary is a slot-level precheck shell only; it must not become downstream runtime truth or material state. |
-| `MethodAssetCollaborationTargetSummary` | body-free struct | `Enabled { target_ref_set, summary_marker_ref }`;`Disabled { target_ref_set, reason_ref }`;`Blocked { target_ref_set, reason_ref, diagnostic_ref }`;`Unavailable { target_ref_set, reason_ref, diagnostic_ref }` | target summary is a body-free target routing shell only; it must not expose config key, URL, topic, secret or target body. |
+| `MethodAssetPublicationBoundaryMarkerRef` | named safe-marker wrapper | wraps `MethodLibrarySafeMarker` | boundary marker only, not delivery truth;copied from seam source into candidate and publication outcome. |
+| `MethodAssetHandoffBoundaryMarkerRef` | named safe-marker wrapper | wraps `MethodLibrarySafeMarker` | boundary marker only, not delivery truth;copied from seam source into candidate and handoff outcome. |
+| `MethodAssetPublicationOutcome` | body-free enum | `Published { publication_ref: MethodAssetPublicationOutcomeRef, candidate_ref: MethodAssetEventCandidateAssemblyRef, target_ref_set: MethodAssetHandoffTargetRefSet, boundary_marker_ref: MethodAssetPublicationBoundaryMarkerRef }`;`Blocked | Unavailable | Failed` carry the same four fields plus `reason_ref: MethodLibrarySafeMarker` and `diagnostic_ref: MethodAssetInfraSafeDiagnosticRef` | publication outcome is a stored safe shell only;it never contains payload/topic/URL/receipt/ack/downstream state. |
+| `MethodAssetHandoffOutcome` | body-free enum | `Prepared { handoff_ref: MethodAssetHandoffMarkerRef, target_ref: MethodAssetHandoffTargetRef, boundary_marker_ref: MethodAssetHandoffBoundaryMarkerRef, hint_ref: Option<MethodLibrarySafeMarker> }`;`Delivered` replaces hint with `receipt_marker_ref: MethodLibrarySafeMarker`;`Blocked | Unavailable | Failed` carry identity/target/boundary plus `reason_ref: MethodLibrarySafeMarker` and `diagnostic_ref: MethodAssetInfraSafeDiagnosticRef` | no additional hint/receipt/reason ref family is introduced;all such values are safe markers. `Delivered` remains local seam acceptance only. |
+| `MethodAssetAdapterAvailabilitySummary` | body-free enum | `Available { availability_state_ref: MethodAssetAdapterAvailabilityStateRef, marker_ref: MethodLibrarySafeMarker }`;`Degraded | Unavailable` add `diagnostic_ref: MethodAssetInfraSafeDiagnosticRef`;`Disabled` adds `reason_ref: MethodLibrarySafeMarker` | adapter-slot precheck only;not downstream runtime truth or material state. |
+| `MethodAssetCollaborationTargetSummary` | body-free enum | `Enabled { target_ref_set: MethodAssetHandoffTargetRefSet, summary_marker_ref: MethodLibrarySafeMarker }`;`Disabled` uses `reason_ref: MethodLibrarySafeMarker`;`Blocked | Unavailable` add `diagnostic_ref: MethodAssetInfraSafeDiagnosticRef` | body-free target routing shell only;no config key/URL/topic/secret/target body. |
 | `MethodAssetHandoffTargetRefSet` | deterministic ref-set struct | `refs: Vec<MethodAssetHandoffTargetRef>`;ordered by insertion after canonical dedup;empty allowed | only body-free handoff target refs are allowed; the set may not contain target body, package body or archive body. |
 
 `commit-05-b` boundary rules:
@@ -1931,6 +1931,171 @@ This resolves `BLK-ML-03B-DESIGN-003` Step 6 support carrier half. Step 7 `R7.10
 - `MethodAssetAdapterAvailabilitySummary` and `MethodAssetCollaborationTargetSummary` are current-boundary adapter summary shells only. They may block or degrade service before publisher / handoff calls, but they may not become delivery truth or downstream runtime truth.
 - `MethodAssetHandoffTargetRefSet` is the current-boundary target carrier for handoff inputs and summaries. It must remain opaque, typed and body-free; implementation must not replace it with raw strings or private map keys.
 - The exact publication / handoff repo and UoW surfaces in Step 7 / Step 11 must consume these carriers as-is; if implementation needs any additional field, kind or carrier for this boundary, it must return to design instead of inventing a local substitute.
+
+#### 3B.4A `commit-05-b` helper ref, source and seam carrier closure
+
+This subsection resolves `BLK-ML-05B-DESIGN-002`. The following helper refs are the only current-boundary Rust-facing definitions. A named typed ref is a newtype over `MethodLibraryTypedBoundaryRef` and must validate the exact `MethodLibraryTypedBoundaryRefKind`;a safe reason ref is a newtype over `MethodLibrarySafeMarker` and must not parse or expose marker text.
+
+| named ref | carrier family | exact kind / wrapped carrier | only current-boundary source |
+|---|---|---|---|
+| `MethodAssetRelationRef` | named typed-ref wrapper | `MethodAssetRelation` | accepted command source;repository fake fixtures may only copy a supplied valid wrapper |
+| `MethodAssetEventCandidateAssemblyRef` | named typed-ref wrapper | `MethodAssetEventCandidateAssembly` | `MethodAssetDistributionHandoffSupportRefFactory.new_event_candidate_assembly_ref(...)` |
+| `MethodAssetDegradedDecisionRef` | named typed-ref wrapper | `MethodAssetDegradedDecision` | `MethodAssetDegradedDecisionMapperPort`;command/API/fake setup must not supply or mint it |
+| `MethodAssetInfraSafeDiagnosticRef` | named typed-ref wrapper | `MethodAssetInfraSafeDiagnostic` | adapter availability, target registry, publisher or handoff safe outcome |
+| `MethodAssetAdapterAvailabilityStateRef` | named typed-ref wrapper | `MethodAssetAdapterAvailabilityState` | `MethodAssetAdapterAvailabilityPort` summary |
+| `MethodAssetAdapterSlotRef` | named typed-ref wrapper | `MethodAssetAdapterSlot` | application-owned seam source copied from a validated runtime-precheck fixture |
+| `MethodAssetPublisherBindingStateRef` | named typed-ref wrapper | `MethodAssetPublisherBindingState` | application-owned seam source copied from a validated runtime-precheck fixture |
+| `MethodAssetHandoffBindingStateRef` | named typed-ref wrapper | `MethodAssetHandoffBindingState` | application-owned seam source copied from a validated runtime-precheck fixture |
+| `MethodAssetHandoffTargetRef` | named typed-ref wrapper | `MethodAssetHandoffTarget` | `MethodAssetCollaborationTargetRegistryPort` summary |
+| `MethodAssetTargetRegistryScopeRef` | named typed-ref wrapper | `MethodAssetTargetRegistryScope` | application-owned seam source;not config text or registry-private state |
+| `MethodAssetEventCandidateReasonRef` | named safe-marker wrapper | `MethodLibrarySafeMarker` | matched command source variant |
+| `MethodAssetDistributionAdjustmentReasonRef` | named safe-marker wrapper | `MethodLibrarySafeMarker` | `AdjustDistributionContext` command source variant |
+
+`MethodAssetAdapterSlotRefSet` is a deterministic body-free ref-set with exact shape `refs: Vec<MethodAssetAdapterSlotRef>`. It preserves first insertion order after canonical typed-ref dedup. An empty set is allowed only when `MethodAssetDistributionHandoffSeamSource` is absent;when the seam source is present it must contain at least one required slot.
+
+The exact current-boundary application-owned seam carrier is:
+
+```rust
+pub struct MethodAssetDistributionHandoffSeamSource {
+    pub target_registry_scope_ref: MethodAssetTargetRegistryScopeRef,
+    pub required_slot_refs: MethodAssetAdapterSlotRefSet,
+    pub publisher_binding_ref: MethodAssetPublisherBindingStateRef,
+    pub handoff_binding_ref: Option<MethodAssetHandoffBindingStateRef>,
+    pub publication_boundary_marker_ref: MethodAssetPublicationBoundaryMarkerRef,
+    pub handoff_boundary_marker_ref: Option<MethodAssetHandoffBoundaryMarkerRef>,
+}
+```
+
+`publisher_binding_ref` and `publication_boundary_marker_ref` are required because every seam-enabled flow attempts publication first. `handoff_boundary_marker_ref` must be present exactly when `handoff_binding_ref` is present. The carrier is supplied as `seam_source: Option<MethodAssetDistributionHandoffSeamSource>` on `MethodAssetDistributionHandoffCommandDispatchInput`, is copied into the selected service input and participates in the canonical duplicate digest. `None` means the accepted command records no candidate and no post-commit publication/handoff side effect. The carrier must not be reconstructed from config keys, route/RPC names, topic/URL, typed-ref order, runtime health text, timestamps, counters or fake-private maps.
+
+The exact command source variants are:
+
+```rust
+pub enum MethodAssetDistributionHandoffCommandSource {
+    PrepareDistributionRef {
+        relation_ref: MethodAssetRelationRef,
+        requested_distribution_ref: Option<MethodAssetDistributionRef>,
+        distribution_context_ref: DistributionContextRef,
+        consumption_context_ref: ConsumptionContextRef,
+        boundary_ref: DownstreamConsumptionBoundaryRef,
+        availability_marker: MethodAssetConsumptionAvailabilityMarker,
+        candidate_reason_ref: MethodAssetEventCandidateReasonRef,
+    },
+    AdjustDistributionContext {
+        relation_ref: MethodAssetRelationRef,
+        distribution_ref: MethodAssetDistributionRef,
+        previous_context_ref: DistributionContextRef,
+        new_context_ref: DistributionContextRef,
+        adjustment_reason_ref: MethodAssetDistributionAdjustmentReasonRef,
+        candidate_reason_ref: MethodAssetEventCandidateReasonRef,
+        expected_distribution_version: MethodAssetExpectedVersion,
+    },
+    MarkDistributionAvailability {
+        relation_ref: MethodAssetRelationRef,
+        distribution_ref: MethodAssetDistributionRef,
+        distribution_context_ref: DistributionContextRef,
+        availability_marker: MethodAssetConsumptionAvailabilityMarker,
+        candidate_reason_ref: MethodAssetEventCandidateReasonRef,
+    },
+}
+```
+
+`degraded_decision_ref` is deliberately not a command-source field. When the copied availability marker requires a degraded decision, only `MethodAssetDegradedDecisionMapperPort` may return `Option<MethodAssetDegradedDecisionRef>` from that marker and an optional safe diagnostic. Missing mapper output for a required degraded branch is a safe rejection/design fault;the service must not synthesize a ref or trust one supplied by API/config/fake input. `expected_distribution_version` is the optimistic version of the persisted distribution record;the read-only relation anchor has no save/version-update role in this boundary.
+
+The current-boundary relation and candidate carriers are body-free application support structs, not full relation lifecycle or PH-06 lineage contracts:
+
+```rust
+pub struct MethodAssetRelationReadAnchor {
+    pub relation_ref: MethodAssetRelationRef,
+    pub distribution_context_ref: Option<DistributionContextRef>,
+}
+
+pub struct MethodAssetDistributionRecord {
+    pub distribution_ref: MethodAssetDistributionRef,
+    pub relation_ref: MethodAssetRelationRef,
+    pub distribution_context_ref: DistributionContextRef,
+    pub consumption_context_ref: ConsumptionContextRef,
+    pub boundary_ref: DownstreamConsumptionBoundaryRef,
+    pub availability_marker: MethodAssetConsumptionAvailabilityMarker,
+}
+
+pub struct MethodAssetDistributionEventCandidateAssembly {
+    pub assembly_ref: MethodAssetEventCandidateAssemblyRef,
+    pub operation_context_ref: MethodAssetOperationContextRef,
+    pub distribution_ref: MethodAssetDistributionRef,
+    pub distribution_context_ref: DistributionContextRef,
+    pub candidate_reason_ref: MethodAssetEventCandidateReasonRef,
+    pub availability_marker: Option<MethodAssetConsumptionAvailabilityMarker>,
+    pub publication_boundary_marker_ref: MethodAssetPublicationBoundaryMarkerRef,
+    pub handoff_boundary_marker_ref: Option<MethodAssetHandoffBoundaryMarkerRef>,
+}
+```
+
+`MethodAssetRelationReadAnchor` is returned by the read-only current-boundary repository method and carries no endpoint body, relation-kind matrix, lifecycle mutation helper or graph truth. `MethodAssetDistributionRecord` is an application-owned body-free persistence record, not domain truth and not `DistributionReadMaterial`. Its exact helpers are `prepare(distribution_ref, relation_ref, distribution_context_ref, consumption_context_ref, boundary_ref, availability_marker)`, `adjust_context(previous_context_ref, new_context_ref)` and `apply_availability_marker(availability_marker)`. `adjust_context` must require the stored context to equal `previous_context_ref`;both update helpers preserve `distribution_ref`, `relation_ref`, `consumption_context_ref` and `boundary_ref`. `MethodAssetDistributionEventCandidateAssembly` is the complete `commit-05-b` persisted value for identity `MethodAssetEventCandidateAssemblyRef`;the later generic `MethodAssetEventCandidateAssembly` object card remains a future-family design and is not implementable in this boundary. `MethodAssetEventFamilyKind`, subject/fact/lineage ref sets, event payload and worker publisher schema remain outside this boundary.
+
+The remaining port input carriers are exact body-free structs:
+
+```rust
+pub struct DistributionReadMaterialBuilderInput {
+    pub relation_anchor: MethodAssetRelationReadAnchor,
+    pub distribution_ref: MethodAssetDistributionRef,
+    pub distribution_context_ref: DistributionContextRef,
+    pub consumption_context_ref: ConsumptionContextRef,
+    pub boundary_ref: DownstreamConsumptionBoundaryRef,
+    pub availability_marker: MethodAssetConsumptionAvailabilityMarker,
+}
+
+pub struct MethodAssetEventCandidatePublicationInput {
+    pub publication_ref: MethodAssetPublicationOutcomeRef,
+    pub candidate: MethodAssetDistributionEventCandidateAssembly,
+    pub target_summary: MethodAssetCollaborationTargetSummary,
+    pub boundary_marker_ref: MethodAssetPublicationBoundaryMarkerRef,
+}
+
+pub struct MethodAssetDistributionHandoffInput {
+    pub handoff_ref: MethodAssetHandoffMarkerRef,
+    pub distribution_ref: MethodAssetDistributionRef,
+    pub distribution_context_ref: DistributionContextRef,
+    pub candidate_ref: MethodAssetEventCandidateAssemblyRef,
+    pub target_ref: MethodAssetHandoffTargetRef,
+    pub boundary_marker_ref: MethodAssetHandoffBoundaryMarkerRef,
+    pub diagnostic_ref: Option<MethodAssetInfraSafeDiagnosticRef>,
+    pub follow_up_hint_ref: Option<MethodLibrarySafeMarker>,
+}
+```
+
+`MethodAssetPublicationBoundaryMarkerRef` and `MethodAssetHandoffBoundaryMarkerRef` are the only named marker wrappers added here. Outcome reason, hint and receipt fields use `MethodLibrarySafeMarker` directly;diagnostic fields use `MethodAssetInfraSafeDiagnosticRef` exactly and are required on blocked/unavailable/failed branches. No helper input or outcome contains package/report/archive body, external receipt body, topic, URL, secret, provider response or runtime product state.
+
+The support ref factory is the only current-boundary minting surface for distribution/candidate/outcome identities. In addition to replay/stored-result refs it exposes:
+
+```rust
+fn new_distribution_ref(
+    relation_ref: MethodAssetRelationRef,
+    distribution_context_ref: DistributionContextRef,
+    operation_context_ref: MethodAssetOperationContextRef,
+    operation_digest_ref: MethodAssetOperationDigestRef,
+    dedup_scope_ref: MethodAssetDedupScopeRef,
+) -> MethodAssetDistributionRef;
+
+fn new_event_candidate_assembly_ref(
+    distribution_ref: MethodAssetDistributionRef,
+    operation_context_ref: MethodAssetOperationContextRef,
+    operation_digest_ref: MethodAssetOperationDigestRef,
+    dedup_scope_ref: MethodAssetDedupScopeRef,
+) -> MethodAssetEventCandidateAssemblyRef;
+
+fn new_publication_outcome_ref(
+    candidate_ref: MethodAssetEventCandidateAssemblyRef,
+    target_ref_set: MethodAssetHandoffTargetRefSet,
+) -> MethodAssetPublicationOutcomeRef;
+
+fn new_handoff_marker_ref(
+    candidate_ref: MethodAssetEventCandidateAssemblyRef,
+    target_ref: MethodAssetHandoffTargetRef,
+) -> MethodAssetHandoffMarkerRef;
+```
+
+Implementations and fakes must copy these factory outputs. Generic `IdGenerator`, raw strings, route/request ids, timestamp/counter values, repository row ids, typed-ref text, config values and fake-private maps are forbidden identity sources.
 
 ### 4. 对象卡片: `FormalizationBasisSummary`
 

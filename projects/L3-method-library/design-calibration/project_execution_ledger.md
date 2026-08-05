@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-08-05
-> 当前任务: `commit-05-b` distribution/handoff current-boundary exact closure 已完成。项目级 implementation ledger 和当前 boundary ledger 已推进到 `ready_for_design_gate / read_docs`;实现侧现在必须按最新台账从 `read_docs` 重新跑 Design Gate / Scope Gate 后再改 application / infra / narrow contracts-domain integration 代码。
+> 当前任务: `commit-05-b` distribution/handoff current-boundary exact closure 已完成,Fresh Design Gate / Scope Gate 已通过。项目级 implementation ledger 和当前 boundary ledger 已推进到 `in_progress / implement`;实现侧只允许修改 application / infra / narrow contracts-domain integration scope。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-05-b design gate ready` | ready_for_design_gate | `commit-05-b` 所需 distribution/handoff facade、selector/source carriers、service inputs、replay/support factory、relation read anchor、non-durable distribution builder、target registry、publication outcome、handoff marker、stored-result/UoW 和 fake parity 已在 formal `03` §6.3D、Step 7/9/11 closure patches、formal `07` 闭口。 | read_docs:实现侧必须从最新 implementation ledger / `commit-05-b` boundary ledger 重新开始,按 required reads 重跑 Design Gate / Scope Gate 后再进入 application / infra / narrow contracts-domain integration 代码修改。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-05-b.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-05-b implementation active` | in_progress | Fresh Design/Scope Gate 已在 design commit `8e31a2f` 上通过;exact distribution/handoff facade、selector/source/seam carriers、state owner、ports、UoW 和 fake parity 已闭口。 | implement:只在 boundary Allowed Scope 内实现,然后运行 Required Checks。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-05-b.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-05-b` ready | read_docs | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-05-b` 当前基线已闭合 distribution/handoff exact callable-surface closure,实现侧应回到最新 implementation ledger / boundary ledger 重新开工。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-05-b` in progress | implement | 正式 `07-实施计划.md` 已完成 full-restart 装配;`commit-05-b` Fresh Design/Scope Gate 已通过,实现侧只允许在 Allowed Scope 内落码。 |
 
 ---
 
@@ -102,8 +102,8 @@
 4. 读取 `design-calibration/implementation_execution_ledger.md`
 5. 读取 `design-calibration/implementation-boundaries/commit-05-b.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前已推进到 `commit-05-b` / `read_docs`,并读取 `commit-05-b` 最新 current boundary ledger
-8. 按 boundary ledger 的 required reads 重新重跑 Design Gate / Scope Gate;只有在 `read_docs` 检查通过后才能开始代码、tests 或 evidence
+7. 确认 implementation ledger 当前已推进到 `commit-05-b` / `in_progress` / `implement`,并保持 design commit `8e31a2f` 的 gate 证据
+8. 只在 boundary ledger Allowed Scope 内继续代码与 tests;落码完成后运行 Required Checks
 9. 若重跑时再次发现 distribution/handoff facade、selector/source map、port、outcome shell、stored-result/UoW、fake parity、allowed scope 或 tests 仍有未闭口矛盾,实现侧必须重新回写 `blocked / wait_design`,然后从项目级 implementation ledger 和当前 boundary ledger 重新开始
 ```
 
@@ -114,6 +114,6 @@
 ```text
 `commit-05-b` distribution/handoff helper/source exact closure 已完成;
 当前 boundary 是 `commit-05-b`,其 baseline 已推进到 `current-design-with-commit-05-b-helper-source-state-closure`;
-下一步由实现侧读取最新 implementation ledger 和 `commit-05-b` boundary ledger,按 required reads 重新开始 Design Gate / Scope Gate,然后只在 allowed application / infra / narrow contracts-domain integration scope 内改代码;
+当前 Fresh Design Gate / Scope Gate 已在 design commit `8e31a2f` 上通过;下一步由实现侧只在 allowed application / infra / narrow contracts-domain integration scope 内改代码,然后运行 Required Checks;
 实现侧仍不得私补 distribution/handoff selector/source/seam map、helper ref kind、outcome shell、repository/UoW method、fake-only marker、downstream truth、real delivery、transport/config key、durable distribution material store、full relation lifecycle/list/page、PH-06 lineage/event payload or evidence schema;若重跑 gate 时发现新缺口,必须按规范重新回写 blocker.
 ```

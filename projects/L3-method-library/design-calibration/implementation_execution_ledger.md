@@ -16,12 +16,12 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `current-design-with-commit-05-b-helper-source-state-closure` |
 | current_boundary | `commit-05-b` |
-| gate_status | ready_for_design_gate |
-| gate_reason | Design closure for `BLK-ML-05B-DESIGN-002` now publishes exact helper refs, source/seam/service inputs, relation read-anchor, body-free distribution state owner/repository, current-boundary candidate/outcomes, port signatures, support-factory minting and explicit relation/PH-06 carve-outs. |
-| next_allowed_action | read_docs |
-| current_recovery_point | Restart `commit-05-b` from the project ledger, boundary ledger and all Required Reads;rerun Design Gate / Scope Gate against `current-design-with-commit-05-b-helper-source-state-closure` before any implementation edit. |
-| last_updated_by | design agent |
-| last_updated_at | 2026-08-05 12:50:27 +0800 |
+| gate_status | in_progress |
+| gate_reason | Fresh `commit-05-b` Required Reads, Design Gate and Scope Gate passed against design commit `8e31a2fb8d944c385377c0216f4ae9a542621ee0`;the exact helper/source/state-owner/port/fake closure is implementable without adding worker, transport, durable read material, full relation lifecycle or PH-06 schema. |
+| next_allowed_action | implement |
+| current_recovery_point | Implement only the allowed contracts/application/infra distribution-handoff slice, preserve user-owned `.gitignore`, then run the boundary Required Checks. |
+| last_updated_by | implementation agent |
+| last_updated_at | 2026-08-05 12:55:43 +0800 |
 
 ---
 
@@ -39,7 +39,7 @@
 | `commit-04-a` | `current-design-with-commit-04-a-formalization-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-a` completed at `821ba8bfce080164a2a8b081c32f32e4ad7d6f0a`; formalization/version contracts, typed refs, support / requirement carriers, domain state guards and targeted contract/domain tests are closed. |
 | `commit-04-b` | `current-design-with-commit-04-b-service-replay-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-b` completed across `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; formalization/version services, duplicate replay and replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
 | `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-a` completed across `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; controlled-consumption contracts/domain carriers, pure-domain guards and targeted contract/domain checks are closed. |
-| `commit-05-b` | `current-design-with-commit-05-b-helper-source-state-closure` | ready_for_design_gate | design_gate | read_docs | Step 6 `3B.4A`, formal `03` §6.3D, Step 7/9/11 and formal `07` now close helper/source ownership, body-free distribution state owner, relation/candidate carve-outs, port signatures and factory minting;implementation must reread and rerun Design/Scope Gate. |
+| `commit-05-b` | `current-design-with-commit-05-b-helper-source-state-closure` | in_progress | scope_gate | implement | Required Reads and fresh Design/Scope Gate passed against design commit `8e31a2f`;implementation is restricted to the boundary Allowed Scope and formal service/fake surfaces. |
 
 ---
 

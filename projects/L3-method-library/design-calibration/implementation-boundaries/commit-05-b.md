@@ -7,9 +7,9 @@
 | phase | PH-05 controlled consumption and distribution semantics |
 | design_baseline | `current-design-with-commit-05-b-helper-source-state-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready_for_design_gate |
-| next_allowed_action | read_docs |
-| current_recovery_point | `BLK-ML-05B-DESIGN-002` is closed by Step 6 `3B.4A`, formal `03` §6.3D and Step 7/9/11 exact helper/source/state-owner/callable closure;implementation must restart from all Required Reads and rerun Design Gate / Scope Gate before editing code. |
+| status | in_progress |
+| next_allowed_action | implement |
+| current_recovery_point | Fresh Required Reads and Design/Scope Gate passed against design commit `8e31a2f`;implement only the exact contracts/application/infra distribution-handoff slice, then run Required Checks. |
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | project ledger current_boundary must equal `commit-05-b` | pass | Project ledger now points to `commit-05-b`; implementation may use this file only after completing the required reads and current-boundary gates. |
 | `commit-05-a` handoff must be closed | pass | Controlled consumption material contracts/domain are closed by implementation commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`. |
-| project and boundary ledgers must set `status = ready_for_design_gate` and `next_allowed_action = read_docs` for `commit-05-b` | pass | Both ledgers now require restarting from the current boundary ledger and all Required Reads before rerunning Design Gate / Scope Gate. |
+| project and boundary ledgers had to show `ready_for_design_gate / read_docs` before the fresh gate rerun | pass | Both ledgers were read in that state;the fresh Design/Scope Gate has now advanced this boundary to `in_progress / implement`. |
 
 ---
 
@@ -111,8 +111,8 @@
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | `commit-05-a` handoff is closed and the project ledger now advances to `commit-05-b`; implementation must restart from `read_docs` before any code edits. | read_docs |
-| design_gate | pending | Design-side closure now exists at `current-design-with-commit-05-b-helper-source-state-closure`;implementation must reread all Required Reads and independently verify exact refs/source ownership, distribution state owner, callable signatures, factory minting, relation/candidate carve-outs and fake parity. | wait_design |
-| scope_gate | pending | Allowed Scope now names the exact Step 6 `3B.4A` contracts wrappers/ref-sets plus application/infra surfaces;implementation must verify no public DTO body, full relation lifecycle/page/list, PH-06 lineage/event payload, worker or transport work is required. | wait_design |
+| design_gate | pass | Required Reads were reread against design commit `8e31a2f`;Step 6 `3B.4/3B.4A`, formal `03` §6.3D and Step 7/9/11 provide exact wrappers, sources, state owner, helper/factory signatures, repository/error/UoW surface and fake parity without local schema invention. | wait_design |
+| scope_gate | pass | The implementation slice fits the listed contracts/application/infra paths;no public DTO body, full relation lifecycle/page/list, durable read material, PH-06 lineage/event payload, worker, transport, config or report-generator work is required. | wait_design |
 | worktree_gate | pass | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/application/infra checks and dependency boundary checks must pass or failure must be recorded after implementation. | fix_gate_failure |
 | test_gate | pending | Service-flow-fast distribution/handoff, infra-runtime-fake and VETO targeted checks must pass after implementation. | fix_gate_failure |

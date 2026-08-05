@@ -2401,7 +2401,7 @@ All newly minted distribution, candidate, publication and handoff refs written b
 | boundary | writes allowed inside boundary | rollback / failure rule | forbidden side effects |
 |---|---|---|---|
 | accepted distribution command UoW | `MethodAssetDistributionRecord`;stored accepted/rejected result;optional body-free event candidate shell when `seam_source` exists;authorized effect summary refs;safe diagnostic refs。 | If command UoW rolls back, no distribution record, accepted stored result or optional candidate shell becomes durable. | publisher delivery, handoff delivery, real adapter calls, query refresh, report generation, transport retry, raw body read. |
-| publication outcome UoW | load candidate shell;save `MethodAssetPublicationOutcome` shell。 | Publication failure saves safe outcome only and never rolls back accepted command result/candidate. | reread current truth to rebuild payload, store topic/payload/delivery receipt/subscriber ack. |
+| publication outcome UoW | load candidate shell;check adapter slots;resolve one body-free target summary;factory-mint publication ref;save `MethodAssetPublicationOutcome` shell. Non-available adapter or non-enabled target branches save `Blocked` / `Unavailable` without calling publisher. | Publication/precheck failure saves the exact safe outcome copied from port-owned reason/diagnostic and never rolls back accepted command result/candidate. Outcome-save failure is consistency unknown and must not trigger blind publisher/handoff execution. | reread current truth to rebuild payload, synthesize diagnostic, store topic/payload/delivery receipt/subscriber ack, call publisher/handoff for a disabled/degraded/unavailable precheck. |
 | handoff marker UoW | load body-free handoff input refs;save `MethodAssetHandoffOutcome` marker shell。 | Handoff failure saves safe marker only and never rolls back accepted command result/candidate/report shell. | persist package body, report body, archive body, external receipt body, external system state or raw exception. |
 | duplicate replay | read stored result/candidate/outcome/marker refs as needed。 | No mutation or external side effect rerun. | rerun builder, target registry, publisher, handoff, real adapter or fake side effect. |
 
@@ -2413,13 +2413,13 @@ All newly minted distribution, candidate, publication and handoff refs written b
 | candidate repository fake | append-only candidate shell;candidate reload by `assembly_ref`;no current truth reread. |
 | publication outcome repository fake | versioned publication shell;safe outcome labels only;no delivery receipt or topic state. |
 | handoff marker repository fake | versioned handoff marker shell;safe marker/receipt/failure refs only;no package/report/archive body. |
-| builder / target / publisher / handoff fake | same input/output labels as application ports;no fake-only enum, raw error string, URL/topic/config key or implicit success by missing failure. |
+| builder / availability / target / publisher / handoff fake | same input/output labels and exact branch fields as application ports;`Disabled` availability/target fixtures include their port-owned typed diagnostic;no fake-only enum/ref/map, raw error string, URL/topic/config key or implicit success by missing failure. |
 | stored result / UoW fake | reservation/replay semantics, rollback invisibility and no side-effect rerun on duplicate. |
 
 ### 5. Current-boundary persistence blockers if missing
 
 | missing item | gate result |
 |---|---|
-| availability marker source, target summary label, publication outcome label or handoff outcome label cannot be traced to formal §6.3D | Design Gate blocked;implementation must not synthesize locally. |
+| availability marker source, adapter/target `Disabled.diagnostic_ref`, target summary label, publication outcome label or handoff outcome label cannot be traced to formal §6.3D | Design Gate blocked;implementation must not synthesize locally. |
 | implementation needs durable distribution material save/list surface | Design Gate blocked;current Step 11 explicitly excludes it. |
 | implementation needs topic, URL, transport, retry/dead-letter, external receipt body, package/report/archive body or downstream runtime state | Scope Gate blocked;belongs to later config/worker/report boundaries or is forbidden. |

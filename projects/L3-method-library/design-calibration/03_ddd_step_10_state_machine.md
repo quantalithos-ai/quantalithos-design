@@ -3845,3 +3845,20 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.24 正式 §9 候�
 | 下一步禁止动作 | 不得跳过 R11.1;不得直接写 persistence schema 正文;不得同时推进 Step 11 多个模块;不得修改正式 `03-详细设计.md`。 |
 
 next_allowed_action: 等待用户确认后进入 Step 11 `R11.1 开工与必读文档:先思考`;只允许思考 Step 11 持久化、事务与一致性契约的开工边界、必读文档、L1-governance 框架参考、Step 10 handoff 承接方式和模块计划;不得直接修改正式 `03-详细设计.md`;不得写完整 persistence schema、DDL、index、transaction order、error taxonomy、config key、test case schema 或 implementation code。
+
+---
+
+## Design-side closure supplement: `commit-05-b` disabled publication disposition
+
+This supplement closes the current-boundary state/disposition gap without adding a business truth state machine. `MethodAssetAdapterAvailabilitySummary`, `MethodAssetCollaborationTargetSummary` and `MethodAssetPublicationOutcome` remain body-free technical shells;they do not become downstream runtime or delivery truth.
+
+| adapter summary | target summary | publication disposition | allowed side effect |
+|---|---|---|---|
+| `Degraded` | any formal target summary | `Blocked`, copying adapter `marker_ref` as reason and adapter `diagnostic_ref` | factory-mint and persist publication outcome only |
+| `Unavailable` | any formal target summary | `Unavailable`, copying adapter `marker_ref` as reason and adapter `diagnostic_ref` | factory-mint and persist publication outcome only |
+| `Disabled` | any formal target summary | `Blocked`, copying adapter `reason_ref` and adapter `diagnostic_ref` | factory-mint and persist publication outcome only |
+| `Available` | `Disabled` / `Blocked` | `Blocked`, copying target `reason_ref` and target `diagnostic_ref` | factory-mint and persist publication outcome only |
+| `Available` | `Unavailable` | `Unavailable`, copying target `reason_ref` and target `diagnostic_ref` | factory-mint and persist publication outcome only |
+| `Available` | `Enabled` | publisher-owned `Published | Blocked | Unavailable | Failed` | publisher may be called;handoff only after `Published` |
+
+The target registry is resolved once after the adapter check so every branch has the formal target ref set required by the publication outcome identity and shell. Adapter disposition has precedence over target disposition. `Disabled`, `Degraded`, `Unavailable` and non-enabled target branches are never accepted publication or handoff states, call neither publisher nor handoff, and never roll back or rewrite the committed distribution record, candidate or stored command result. Missing port-owned diagnostic is a design blocker;service/fake code must not synthesize one.

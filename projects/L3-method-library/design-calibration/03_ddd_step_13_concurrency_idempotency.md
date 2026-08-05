@@ -1569,6 +1569,8 @@ Lock 在本 Step 只表达“single writer / in-flight guard / expected-version 
 | job run/checkpoint guard | prevents two job workers from advancing same checkpoint/report without formal run boundary。 | scheduler lease implementation or queue locking details。 |
 | runtime entry guard | entry must call application facade;runtime-local state is not lock owner for truth。 | entry-owned repository/UoW or concrete adapter lock。 |
 
+`commit-05-b` disabled outcome re-entry is governed by the same publication outcome identity. A persisted factory-issued `Blocked` / `Unavailable` outcome for adapter `Degraded | Unavailable | Disabled` or target `Disabled | Blocked | Unavailable` is replayed/read back;the service must not rerun adapter/target resolution merely to manufacture a different diagnostic and must never call publisher/handoff for that completed precheck disposition. If the port result exists but the outcome shell commit is unknown or absent, recovery is consistency/manual and cannot use a fake map, timestamp, current config, reason text or blind publisher retry to reconstruct success.
+
 ### 4. lease boundary 思考
 
 Lease 是 runtime/scheduler ownership concept,not business truth,not checkpoint,not stored replay proof。Step 13 可以定义 lease 的禁止混用和 handoff,但具体 lease duration/renewal/config belongs to Step 14 or implementation plan later。

@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `current-design-with-commit-06-a-lineage-link-state-closure` |
-| current_boundary | `commit-06-a` |
-| gate_status | pass |
-| gate_reason | `commit-06-a` implementation is complete in `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;Design,Scope,Worktree,Build,Test,Evidence,Commit and Handoff Gates pass with run-scoped `contract-domain-fast` evidence `20260807T034327Z-commit-06-a`. |
-| next_allowed_action | start_next_boundary |
-| current_recovery_point | `commit-06-a` handoff is closed by implementation commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;future boundary activation must restart from the project ledger and the then-current boundary ledger,while user-owned `?? .gitignore` remains untouched and unstaged. |
+| current_design_baseline | `2256ba87a3697660a413a00ed5bab7d1f6f680e4` |
+| current_boundary | `commit-06-b` |
+| gate_status | ready_for_design_gate |
+| gate_reason | `commit-06-a` handoff is closed at implementation commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;`commit-06-b` is activated only for fresh Required Reads and independent Design/Scope/Worktree Gates against exact design commit `2256ba87a3697660a413a00ed5bab7d1f6f680e4`,without asserting service/store closure. |
+| next_allowed_action | read_docs |
+| current_recovery_point | Read this ledger,`implementation-boundaries/commit-06-b.md`,formal `07` and every Required Read;protect user-owned `?? .gitignore`,then either record exact gate pass or return to `blocked / wait_design` before any implementation edit. |
 | last_updated_by | implementation agent |
-| last_updated_at | 2026-08-07 12:11:35 +0800 |
+| last_updated_at | 2026-08-07 13:00:59 +0800 |
 
 ---
 
@@ -41,6 +41,7 @@
 | `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-a` completed across `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; controlled-consumption contracts/domain carriers, pure-domain guards and targeted contract/domain checks are closed. |
 | `commit-05-b` | `current-design-with-commit-05-b-disabled-outcome-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-b` completed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`; distribution/handoff services, disabled diagnostic mapping, fake parity and run-scoped `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
 | `commit-06-a` | `current-design-with-commit-06-a-lineage-link-state-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-a` completed at `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;PH-06 trace/impact/audit/evidence-lineage contracts,domain guards and run-scoped `contract-domain-fast` evidence are closed. |
+| `commit-06-b` | `2256ba87a3697660a413a00ed5bab7d1f6f680e4` | ready_for_design_gate | activation_gate | read_docs | Prior handoff is closed;this boundary is activated only for fresh verification of exact service/store/replay/redaction closure and remains unauthorized for code edits until Design/Scope/Worktree Gates pass. |
 
 ---
 
@@ -93,6 +94,7 @@
 | BLK-ML-06A-DESIGN-002 | `commit-06-a` | implementation | resolved | `current-design-with-commit-06-a-ph06-contract-domain-closure` | Formal `03` §6.3E plus Step 7/11 overrides close pure helper mutations, existing error ownership and the explicit no application/service/repository/fake/resolver/mapper/UoW/persistence surface for this boundary;future callable work is reserved for `commit-06-b`. Resume from `read_docs`. |
 | BLK-ML-06A-DESIGN-003 | `commit-06-a` | implementation | resolved | `current-design-with-commit-06-a-ph06-contract-domain-closure` | Step 10/12/16 overrides and formal `07` close lifecycle/category separation, legal/illegal state guards, safe-reason writes, exact focused test cuts, targeted redaction and six run-scoped raw artifact names. Resume from `read_docs`. |
 | BLK-ML-06A-DESIGN-004 | `commit-06-a` | implementation | resolved | `current-design-with-commit-06-a-lineage-link-state-closure` | Design commit `1b67753504024709a9e5092224aec18f445f8bd2` makes linking legal only from linked/partial,preserves state and complete summary,defines first-seen duplicate success no-op,rejects unavailable/body-rejected with `InvalidTransition` and no mutation,and closes focused tests. Resume from `read_docs`. |
+| BLK-ML-06B-ACTIVATION-001 | `commit-06-b` | implementation | resolved | `2256ba87a3697660a413a00ed5bab7d1f6f680e4` | `commit-06-a` handoff is closed and the project ledger advances to `commit-06-b`;implementation must continue from `read_docs` and independently verify exact service/store closure before any code edit. |
 
 ---
 
@@ -101,12 +103,12 @@
 Any implementation agent resuming `L3-method-library` must read files in this order:
 
 1. `projects/L3-method-library/design-calibration/implementation_execution_ledger.md`
-2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-06-a.md`
+2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-06-b.md`
 3. `projects/L3-method-library/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a wrapper field, enum label, ref-set rule, carrier field, lifecycle/state owner, same-layer pure helper, marker source, error mapping, carve-out or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. The latest closed boundary is `commit-06-a` at implementation commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;before any future implementation,the project ledger must intentionally advance to the next boundary and the agent must reread that boundary and rerun all gates. The prior `commit-05-b` handoff remains closed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`.
+If any required design source is missing, contradicts the current boundary, or does not close an exact facade/input/output field,repository method,error variant,UoW/version/stored-result carrier,replay rule,fake parity,redaction rule or test-evidence source needed for implementation,set `gate_status = blocked`,set `next_allowed_action = wait_design`,and stop implementation. Current boundary is `commit-06-b` at exact design commit `2256ba87a3697660a413a00ed5bab7d1f6f680e4`;activation authorizes only `read_docs` until gates independently pass. The latest closed boundary is `commit-06-a` at implementation commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`.
 
 ---
 
@@ -138,3 +140,4 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-05-a` | implemented handoff closed | Implementation handoff records controlled-consumption contracts/domain commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; typed refs, state carriers, availability marker closure, pure-domain guards and targeted contract/domain tests are closed. |
 | `commit-05-b` | implemented handoff closed | Implementation handoff records distribution/handoff implementation commit `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`; disabled diagnostic ownership, adapter-first `Blocked` / `Unavailable` outcome persistence, no-call/no-rollback behavior, fake parity and run-scoped service-flow-fast / infra-runtime-fake evidence are closed. |
 | `commit-06-a` | implemented handoff closed | Implementation handoff records PH-06 traceability,impact,audit and evidence-lineage contracts/domain commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;exact typed refs,body-free carriers,first-seen sets,pure state guards,terminal/no-mutation redlines and run-scoped `contract-domain-fast` evidence are closed. |
+| `commit-06-b` | activated,gate reread required | Project ledger points to `commit-06-b` at exact design commit `2256ba87a3697660a413a00ed5bab7d1f6f680e4`;implementation must complete every Required Read and independently rerun Design/Scope/Worktree Gates before editing code. |

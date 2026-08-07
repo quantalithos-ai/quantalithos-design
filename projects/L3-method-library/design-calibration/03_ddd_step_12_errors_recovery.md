@@ -1794,3 +1794,22 @@ Wrong-kind conversion for the multi-kind `MethodAssetTraceSourceRef` uses the co
 from raw reason/error text, HTTP/SQL status, config value, timestamp, route, provider response,
 stack trace or fake-private state. Missing such a formal marker is a Design Gate blocker, not a
 reason to add a fallback error payload.
+## `commit-06-b` safe error/recovery closure patch
+
+No PH-06-specific service or repository error enum is added. Mapping is exact:
+
+| condition | result/storage behavior |
+|---|---|
+| capability/selector/source/kind/marker invalid, missing truth, natural-key collision, domain guard failure, version conflict or duplicate-key race | body-free `Rejected` stored result in a fresh UoW when replay envelope exists; no truth mutation |
+| existing audit/lineage owner receives no new relation | body-free `Ignored` stored result; no owner save/version advance |
+| same idempotency/dedup + same digest | replay exact stored result before UoW |
+| same idempotency/dedup + different digest | ephemeral `Conflict`; prior stored result unchanged |
+| `StorageUnavailable` / `TransactionNotActive` | ephemeral safe `Rejected`; rollback staged work |
+| `StoredResultIntegrityViolation`, missing required CommitUnknown stored result or mismatched accepted read-back | ephemeral safe `Conflict` using existing repository error surface; never rerun mutation |
+| `CommitUnknown` with committed rejected/ignored/consistency result | verify stored result only; no fabricated truth read-back |
+
+`VersionConflict` and `DuplicateKeyConflict` expose only their existing safe markers;
+storage errors expose no SQL/status/stack/path/config detail. Recovery, consistency repair,
+query refresh, report generation and jobs remain deferred. Raw reason, provider/method/
+archive/report body, secret, full sensitive ref and canonical digest material must not be
+logged, persisted in an error or written to evidence.

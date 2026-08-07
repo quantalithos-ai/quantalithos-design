@@ -2038,3 +2038,25 @@ Step 13 已覆盖 Step 6~12 到并发、幂等与重入保护的主要闭环: ob
 | 是否形成 Step 13 completed_wait_user_confirm 与 Step 14 R14.1 等待确认状态 | pass |
 
 next_allowed_action: 等待用户确认后进入 Step 14 `R14.1 开工与必读文档:先思考`;只允许思考 Step 14 的必读文档、配置引用与外部依赖绑定输入边界、Step 13 handoff 承接、L1-governance 框架参考、旧 Step 14 污染隔离和 R14 模块计划;不得直接修改正式 `03-详细设计.md`;不得提前写完整 config key 表、secret/topic/URL binding、observability schema、test case schema 或 implementation code。
+## `commit-06-b` replay/concurrency closure patch
+
+The replay envelope is built after selector/source validation and before UoW creation.
+Canonical digest includes exact selector and source variant, all source fields with
+explicit option tags and first-seen set order, both actor contexts where present, ordered
+shell refs/markers, API-entry/application-dispatch refs and formal idempotency metadata.
+It excludes current truth and all raw/free-text/runtime/config material. The dedup scope
+uses the exact selected natural owner stated in formal §6.3F.
+
+| scenario | required behavior |
+|---|---|
+| same key/scope/digest | replay stored result; no UoW, repository load/save, factory truth-ref call or domain helper call |
+| same key/scope/different digest | ephemeral conflict; no UoW and no stored-result replacement |
+| concurrent trace/impact create | one unique natural-key owner may commit; duplicate-key loser stores rejected result if its UoW remains active |
+| concurrent audit/lineage update | optimistic expected version admits one owner update; loser stores rejected result without overwriting refs/cursor |
+| all-duplicate audit/lineage links | stored `Ignored`; no owner version advance |
+| rollback | no truth row/index/version/stored result becomes visible |
+| CommitUnknown | committed writes are read back as formal §6.3F specifies; no blind retry or post-commit side effect |
+
+Fakes and durable adapters must agree on these branches. Array position, map iteration,
+counter/time, repository row id, ref text parsing, raw body, route, config and failure
+injection state are never business identity, digest input or append proof.

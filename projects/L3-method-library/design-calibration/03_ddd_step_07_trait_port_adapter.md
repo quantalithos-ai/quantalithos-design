@@ -3331,3 +3331,34 @@ trait declaration, method signature, fake map, durable schema, lookup helper or 
 `commit-06-a`. If contracts/domain implementation requires any callable port to construct, load,
 save, mint, resolve or map a PH-06 carrier, Design Gate must return to `wait_design` rather than
 adding that port locally.
+## `commit-06-b` implementation-facing port/adapter closure patch
+
+Formal `03-详细设计.md` §6.3F owns the exact Rust signatures. The current boundary exposes
+one facade, four new repositories and one support-ref factory; it reuses the existing
+formal-version repository, stored-result repository, `Versioned<T>`, expected-version,
+repository error and UoW surfaces without adding variants or fields.
+
+| surface | exact callable set |
+|---|---|
+| facade | `MethodAssetTraceConsistencyCommandFacade::dispatch_trace_consistency_command(input) -> MethodAssetTraceConsistencyCommandDispatchOutput` |
+| trace repository | `get_trace_material_with_version`, `find_trace_material_by_subject`, `save_trace_material` |
+| impact repository | `get_impact_summary_with_version`, `find_impact_summary_by_source`, `save_impact_summary` |
+| audit repository | `get_audit_trail_with_version`, `find_audit_trail_by_subject`, `save_audit_trail` |
+| lineage repository | `get_evidence_lineage_with_version`, `find_evidence_lineage_by_subject`, `save_evidence_lineage` |
+| read-only reused port | `FormalMethodAssetVersionRepository::get_formal_method_asset_version_with_version` for consistency validation only |
+| replay/UoW reuse | existing `MethodAssetStoredOperationResultRepository` and `CommandUnitOfWork` methods exactly as already implemented |
+| support factory | replay-envelope builder, stored/accepted/rejected/ignored/effect/replay ref methods, and `new_trace_material_ref`, `new_impact_summary_ref`, `new_audit_trail_ref`, `new_evidence_lineage_ref` exactly as formal §6.3F |
+
+Repository missing is `Ok(None)`; optimistic conflict, duplicate key, inactive UoW,
+storage unavailable and stored-result integrity reuse only existing
+`MethodAssetRepositoryError`. Trace/impact natural-key collision is a service-level
+replayable rejection. Audit/lineage natural-key lookup returns the authoritative
+identity/version. No fifth decision repository, resolver/mapper, scan/list/page helper,
+new error variant or fake-only port is authorized.
+
+The in-memory adapter must stage truth and stored result in the supplied UoW, expose no
+staged value before commit, discard all staged writes on rollback, enforce exact expected
+version and natural-key uniqueness, and apply committed writes before returning a
+configured `CommitUnknown`. Its fake behavior must equal a future durable adapter; typed
+objects and safe markers may configure failures, but strings/config/status/private maps
+may not define business semantics.

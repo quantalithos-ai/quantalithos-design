@@ -3897,3 +3897,23 @@ Illegal transition maps to existing `InvalidTransition`;missing required typed i
 unsafe policy input maps to `PolicyRejected`;a rejected body candidate maps to
 `BodyFreeBoundaryViolation`. State guards must not call repositories, repair source truth, infer
 markers from raw errors/config/runtime state, or implement the earlier service/job trigger flows.
+## `commit-06-b` state/helper closure patch
+
+This patch does not add state labels. It binds the current service methods to the exact
+`commit-06-a` states and two minimal helpers.
+
+| owner/helper | legal source | result | illegal/no-op rule |
+|---|---|---|---|
+| trace constructor | virtual absent | `Organized` for non-empty source set, otherwise `Partial`; no safe reason | existing subject owner is service rejection; reorganization deferred |
+| `mark_state` | any persisted trace state subject to existing guard | exact requested trace state; non-organized requires reason, organized clears reason | empty-source -> organized rejects; identity/source/cursor/freshness remain unchanged |
+| impact constructor | virtual absent | `Current`, immutable supplied impact kind, no disposition/reason | existing impact-source owner rejects; registration cannot replace immutable kind |
+| `mark_disposition` | `Current` | `DispositionMarked` with explicit marker/reason | `DispositionMarked | Superseded` reject without mutation |
+| consistency `reconcile` | fixed service initial `UnknownImpactPending` | `ProtectionEstablished | UnknownImpactPending | ProtectionConstrained` according to existing matrix | `InputRejected` is a rejected command result, never an accepted policy state |
+| audit `link_trace_material` | `TrailOwnerPresent | SafeEntryRefsAppended` | first-seen insert, state unchanged | duplicate is no-op; partial/unavailable reject unchanged |
+| audit `append_entry` | `TrailOwnerPresent | SafeEntryRefsAppended` | first-seen entry insert, supplied cursor, `SafeEntryRefsAppended` | service skips already stored entries so duplicate cannot rewrite cursor |
+| lineage `link_trace_material` | `LineageLinked | LineagePartial` | first-seen insert, state/summary unchanged | duplicate no-op; unavailable/body-rejected reject unchanged |
+| lineage `link_audit_trail` | `LineageLinked | LineagePartial` | absent -> supplied; same -> no-op | different existing ref or terminal state rejects unchanged |
+
+An audit/lineage existing owner with no newly inserted relation is an application-level
+`Ignored` result and does not advance repository version. State is never inferred from
+stored-result kind, map membership, route/config/error text or fake-private flags.

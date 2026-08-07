@@ -6445,3 +6445,58 @@ This correction resolves the remaining source/constructor portions of
 the repositories, resolver/mapper ports, application services, query projections, refresh flows,
 stored replay, jobs, reports, or external/provider body handling reserved for `commit-06-b` and
 later boundaries.
+## `commit-06-b` exact carrier and helper closure patch
+
+Formal `03-详细设计.md` §6.3F is the unique schema owner. This Step 6 patch records the
+same implementation-facing object boundary so no carrier can be inferred locally.
+
+### Selector labels
+
+The only new `MethodLibraryTypedBoundaryRefKind` variants are:
+
+- `MethodAssetTraceMaterialOrganizeIntent`
+- `MethodAssetTraceMaterialStateMarkIntent`
+- `ConsumptionImpactSummaryRegisterIntent`
+- `ConsumptionImpactDispositionMarkIntent`
+- `ConsistencyProtectionDecisionEstablishIntent`
+- `MethodAssetAuditTrailOrganizeIntent`
+- `MethodAssetEvidenceLineageLinkIntent`
+
+No `ConsistencyProtectionPolicyRef`, decision-truth ref, audit-subject ref or additional
+PH-06 marker kind is authorized. `policy_ref` keeps the existing generic
+`MethodLibraryTypedBoundaryRef` pure-policy carve-out; `protected_version_ref` is the
+existing named `FormalMethodAssetVersionRef`.
+
+### Application-owned body-free carriers
+
+| source variant | exact source fields |
+|---|---|
+| `OrganizeTraceMaterial` | `trace_subject_ref`, `source_object_refs`, `trace_summary`, `source_cursor_ref`, `freshness_marker_ref`, `external_summary_refs` |
+| `MarkTraceMaterialState` | `trace_material_ref`, `next_state`, `safe_reason_ref` |
+| `RegisterImpactSummary` | `impact_source_ref`, optional `consumption_material_ref`, optional `consumption_context_ref`, `impact_kind`, `impact_safe_summary`, optional `trace_material_ref` |
+| `MarkImpactDisposition` | `impact_summary_ref`, `disposition_marker_ref`, `safe_reason_ref` |
+| `EstablishConsistencyProtectionDecision` | generic `policy_ref`, named `protected_version_ref`, optional `impact_summary_ref`, optional `trace_material_ref`, `decision_marker_ref`, `target_judgement` |
+| `OrganizeAuditTrail` | `audit_subject_ref`, `trace_material_refs`, `actor_context`, `safe_reason_ref`, `audit_entry_refs`, optional `source_cursor_ref` |
+| `LinkEvidenceLineage` | `lineage_subject_ref`, `external_summary_refs`, `basis_summary_refs`, `trace_material_refs`, optional `audit_trail_ref`, `lineage_summary` |
+
+Each selected service input prepends exactly `operation_context_ref`,
+`idempotency_key_ref`, `operation_digest_ref`, and `dedup_scope_ref`. Trace/impact create
+inputs additionally carry only their factory-issued truth ref. Trace-state and
+impact-disposition inputs carry the loaded exact expected version. Audit/lineage inputs
+carry the resolved truth ref and optional expected version. No source carries an
+optional caller truth identity.
+
+Trace organize and impact register are create-only after natural-key lookup; an existing
+owner is a replayable safe rejection. Audit organize and lineage link are create-or-load
+and preserve loaded identity/version. New identities come only from
+`MethodAssetTraceConsistencySupportRefFactory`.
+
+### Minimal domain helpers
+
+`MethodAssetAuditTrail::link_trace_material(ref)` is legal only in
+`TrailOwnerPresent | SafeEntryRefsAppended`, inserts by first-seen typed equality and
+preserves every other field and state. `MethodAssetEvidenceLineage::link_audit_trail(ref)`
+is legal only in `LineageLinked | LineagePartial`; absent becomes supplied, identical is
+a no-op, and a different existing ref rejects without mutation. Existing
+`append_entry` and `link_trace_material` remain the only other mutations used by this
+boundary. No trace reorganization or impact replacement helper is added.

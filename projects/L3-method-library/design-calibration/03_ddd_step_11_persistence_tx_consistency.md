@@ -2439,3 +2439,31 @@ present only when the pure `append_entry` helper copies an explicit `MethodAsset
 Audit and lineage subjects use `TraceSubjectRef`;no repository key, row id, path, timestamp, raw
 body, config value or private fake map may substitute for it. All PH-06 persistence and fake parity
 work remains reserved for `commit-06-b` after a fresh boundary-specific callable closure.
+## `commit-06-b` exact store/UoW closure patch
+
+Formal `03-详细设计.md` §6.3F narrows the earlier logical-store direction to four exact
+versioned repositories. Natural keys are unique: trace/audit/lineage use their exact
+`TraceSubjectRef`; impact uses exact `ConsumptionImpactSourceRef`. Primary keys remain
+their named truth refs; opaque text is never parsed to construct either key.
+
+| store | create/update rule | CommitUnknown accepted read-back |
+|---|---|---|
+| trace material | create with factory ref and `None`; existing subject or duplicate-key race is rejection; state mark loads exact owner and saves loaded expected version | stored result + exact ref, subject, source set, summary, state/reason, cursor, freshness and external refs |
+| impact summary | create with factory ref and `None`; existing source or duplicate-key race is rejection; disposition loads exact owner and saves loaded expected version | stored result + exact ref, source, optional links, immutable kind, safe summary and state |
+| audit trail | create with factory ref/`None`, or update authoritative subject owner with loaded expected version; only new trace/entry refs are inserted | stored result + exact ref, subject, actor/reason, merged trace/entry sets, cursor and state |
+| evidence lineage | create with factory ref/`None`, or update authoritative subject owner with loaded expected version; external/basis/summary equality is required before links | stored result + exact ref, subject, external/basis/trace sets, audit ref, summary and state |
+| consistency decision | no truth store and no fifth repository | stored result only |
+
+Fresh execution ordering is duplicate lookup -> begin UoW -> loads/guards -> staged truth
+save when any -> staged stored-result save -> commit. Rejected/ignored commands stage only
+the stored result. All repository methods require the exact current-boundary UoW type;
+staged data is invisible to repository reads until commit. Rollback discards truth,
+natural-key index, version and stored-result changes together. A configured
+`CommitUnknown` applies all staged writes first and then returns unknown observation.
+
+Expected version is always derived from the corresponding `Versioned<T>` load. It is
+never a cursor, digest, idempotency key, timestamp or caller source field. Duplicate
+same-digest execution never begins a UoW. Audit/lineage all-duplicate fresh commands save
+an `Ignored` stored result without owner save/version advance. Stored-result lookup/save
+reuses the existing repository schema and no replay response may be reconstructed from
+current truth alone.

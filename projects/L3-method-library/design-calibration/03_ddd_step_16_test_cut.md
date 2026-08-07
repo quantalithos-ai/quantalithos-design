@@ -1704,3 +1704,30 @@ Run-scoped raw artifacts are exactly
 An optional summary is derived only from those raw files at
 `reports/runs/<run_id>/suites/contract-domain-fast.md`;no static pass artifact or `latest` alias is
 valid. No service/store/query/API/worker/job/report/replay coverage may be claimed by this slice.
+## `commit-06-b` focused service/store test closure patch
+
+Required focused coverage is exact:
+
+- all seven selector/source mappings, capability rejection and mismatch rejection;
+- support-factory-only truth/operation refs and digest sensitivity to selector, source
+  variant, option tags, ordered sets, actor context and every source field;
+- trace/impact create, natural-key collision rejection and no unauthorized replacement;
+- trace-state and impact-disposition legal/illegal transitions with identity/version
+  preservation;
+- consistency formal-version/optional anchor validation, fixed pending initial judgement,
+  pure reconcile, `InputRejected` rejection and no fifth repository;
+- audit/lineage create-or-load, first-seen insertion, cursor iff entries, actor/reason or
+  external/basis/summary mismatch rejection, duplicate-link `Ignored`, terminal rejection
+  and no version advance for ignored input;
+- expected-version conflict, duplicate-key race, rollback invisibility, same-digest
+  no-rerun, different-digest conflict and each exact CommitUnknown read-back;
+- no raw body/provider/archive/report content, secret, path, raw reason, stack/config
+  detail, full sensitive ref, canonical digest text or fake-only marker/state.
+
+The fixed raw outputs are
+`artifacts/test/<run_id>/suites/service-flow-fast/{cargo-fmt-check.txt,cargo-check-workspace.txt,cargo-check-application.txt,cargo-check-infra.txt,cargo-test-application.txt,cargo-test-infra.txt,trace-consistency-redline.txt}`
+and `artifacts/test/<run_id>/redaction-check.txt`. Derived summaries, if produced by the
+implementation run rather than a new generator, are
+`reports/runs/<run_id>/suites/service-flow-fast.md` and
+`reports/runs/<run_id>/redaction-check.md`. `latest`, static pass artifacts, release EV
+verdicts and report-generator code are forbidden.

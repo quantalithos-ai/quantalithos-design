@@ -2630,3 +2630,23 @@ next_allowed_action: 等待用户确认后进入 Step 8 `R8.26 自检与停审:�
 | 是否写 Step 9 flow | 否。 |
 
 next_allowed_action: 等待用户确认后进入 Step 9 `R9.1 开工与必读文档:先思考`;只允许思考 Step 9 开工边界、必读文档、Step 8 承接、旧 Step 9 historical_material 污染隔离和 Step 9 模块计划;不得直接修改正式 `03-详细设计.md`;不得继承旧 `03_ddd_step_09_function_flows.md` 的 `[x] 已确认` 状态;不得写 L3-method-library 具体 function flow、状态矩阵、persistence schema、config key、test case schema、DTO 字段 schema、HTTP route、RPC name、event topic、job trigger、scheduler、queue 或 Rust / JSON schema;不得进入 `R9.2`、Step 10 或后续 Step。
+## `commit-06-b` protocol boundary closure patch
+
+This boundary adds no route, RPC, HTTP body or public command DTO. The existing
+`MethodLibraryCommandShell` is reused; `boundary_ref.kind` is the sole selector and maps
+one-to-one to the seven labels in Step 6. `MethodAssetTraceConsistencyCommandSource` is
+application-owned and body-free, not a contracts protocol body.
+
+The facade input is exactly `{ command_shell, command_source, api_entry_context_ref,
+application_dispatch_ref }`. The output is exactly the existing refs-only stored-result
+projection `{ stored_result_ref, result_kind, replay_marker_ref, accepted_summary_ref,
+rejected_reason_ref, ignored_reason_ref, effect_summary_refs }`. Capability mismatch,
+unknown selector, selector/source mismatch, wrong named ref kind and unsafe/missing
+marker are rejected before truth mutation. No API handler or transport response mapping
+is in `commit-06-b`.
+
+Duplicate digest includes capability, selector, source variant, every canonical source
+field, actor context, ordered shell typed refs/markers, API-entry/application-dispatch
+refs and formal idempotency key. Request/trace id, timestamp, free text, external-ref
+text, route/body/config/current truth are excluded. Every option tag and first-seen set
+order is material; the canonical text is never logged or persisted.

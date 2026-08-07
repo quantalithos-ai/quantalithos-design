@@ -1675,3 +1675,26 @@ next_allowed_action: 等待用户确认后进入 Step 10 `R10.1 开工与必读�
 | durable distribution material table | Step 11 keeps `DistributionReadMaterial` builder output transient/reserved until a later owner adds a save/list surface. |
 | relation lifecycle implementation | Relation repository is read anchor only in this boundary; relation command ownership is not opened here. |
 | downstream runtime truth / marketplace transaction | Distribution/handoff semantics cannot replace definition/formalization/consumption truth or represent listing/order/install/fulfillment state. |
+## `commit-06-b` seven-flow execution closure patch
+
+Formal `03-详细设计.md` §6.3F owns the exact carriers and signatures. Every flow first
+validates capability/selector/source/kinds/markers, builds the replay envelope, and does
+same-key duplicate lookup before beginning a UoW. Same digest replays the stored result;
+different digest returns ephemeral `Conflict`; only a fresh command begins a UoW.
+
+| flow | exact fresh-command sequence | safe branch |
+|---|---|---|
+| `OrganizeMethodAssetTraceMaterialFlow` | lookup by `trace_subject_ref`; existing owner -> stored rejection; missing owner -> factory `new_trace_material_ref` -> `from_source_objects` -> save with `None` -> save accepted result -> commit | no reorganization/update helper; duplicate key race becomes stored rejection |
+| `MarkMethodAssetTraceMaterialStateFlow` | exact load by ref -> copy loaded expected version -> `mark_state(next_state,safe_reason_ref)` -> save with expected version -> save accepted result -> commit | missing/invalid transition/unsafe reason/version conflict becomes stored rejection |
+| `RegisterConsumptionImpactSummaryFlow` | require incoming summary has no disposition/reason -> lookup by `impact_source_ref`; existing owner -> stored rejection; missing owner -> factory `new_impact_summary_ref` -> `register` -> save with `None` -> save accepted result -> commit | immutable impact kind is never rewritten; unknown/pending/no-effect remain distinct |
+| `MarkConsumptionImpactDispositionFlow` | exact load by ref -> copy expected version -> `mark_disposition` -> save -> save accepted result -> commit | non-current/missing/unsafe marker/version conflict becomes stored rejection |
+| `EstablishConsistencyProtectionDecisionFlow` | exact formal-version read -> optional exact impact/trace reads -> construct policy at `UnknownImpactPending` -> `reconcile(target)` -> save accepted result only -> commit | `InputRejected`,missing anchor,kind mismatch or illegal transition saves rejected result only; no decision truth/repository |
+| `OrganizeMethodAssetAuditTrailFlow` | require cursor option iff entry set non-empty -> lookup by subject -> create via factory/`for_subject` or preserve loaded owner/version after actor/reason equality -> link only new trace refs -> append only new entry refs with supplied cursor -> save changed/new owner plus accepted result | existing owner with no new trace/entry ref saves `Ignored` result only; duplicate entries preserve existing cursor |
+| `LinkMethodAssetEvidenceLineageFlow` | lookup by subject -> create via factory/`from_external_and_basis` or preserve loaded owner/version after external/basis/summary equality -> link only new trace refs -> optional `link_audit_trail` -> save changed/new owner plus accepted result | existing owner with no new trace/audit link saves `Ignored` result only;terminal/different audit ref rejects without mutation |
+
+Business rejection and ignored outcomes are body-free stored results and commit without
+truth mutation. Repository/storage/stored-surface failures return ephemeral safe output
+and rollback. Accepted `CommitUnknown` verifies stored result and the exact changed truth;
+rejected/ignored/consistency results verify stored result only. No path blindly retries,
+scans sibling truth, derives refs from text, runs recovery, emits events, refreshes query
+material, or calls API/worker/job/report code.

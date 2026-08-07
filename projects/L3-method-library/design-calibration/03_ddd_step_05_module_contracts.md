@@ -1857,3 +1857,21 @@ Step 6 可以在用户确认后启动,但必须遵守:
 | 是否明确旧 Step 6 文件仍为 historical_material | pass |
 
 next_allowed_action: 等待用户确认后进入 `03-详细设计` Step 6 `R6.1 开工与必读文档:先思考`;只允许思考 Step 6 必读文档、输入边界、对象家族整体框架和模块顺序;不得直接修改正式 `03-详细设计.md`;不得继承旧 Step 6 completed 状态;不得进入 `R6.2`、Step 7 或后续 Step。
+## `commit-06-b` PH-06 service/store module closure patch
+
+This patch is subordinate to formal `03-详细设计.md` §6.3F and closes only module
+ownership for the current implementation boundary.
+
+| module | current-boundary ownership | forbidden expansion |
+|---|---|---|
+| `contracts` | add the seven exact trace/impact/consistency/audit/lineage selector kind labels and narrow export/fixture plumbing only | no public command body, route/RPC binding, report/evidence schema or extra marker/ref family |
+| `domain` | add only `MethodAssetAuditTrail::link_trace_material` and `MethodAssetEvidenceLineage::link_audit_trail` with the formal state/invariant rules | no trace refresh helper, impact replacement helper, fifth truth owner or policy repository |
+| `application` | own `MethodAssetTraceConsistencyCommandFacade`, body-free source/input/replay carriers, four repository ports, orchestration and stored-result replay | no API/query/material/worker/publisher/job/report generator and no local opaque-ref minting |
+| `infra` | implement one in-memory current-boundary runtime with four versioned repositories, shared stored-result/UoW behavior and support-ref factory | no durable schema, external body adapter, runtime config, private semantic map or fake-only result rule |
+| `api` / `worker` / `jobs` | no current-boundary implementation | entry/runtime/report ownership remains deferred |
+
+Dependency direction remains `contracts <- domain <- application <- infra`. The
+application source carrier is not a public protocol DTO. `ConsistencyProtectionPolicy`
+remains a pure domain shell and does not create a fifth repository or durable decision
+truth. Fixed run-scoped raw evidence belongs to actual implementation checks only; this
+design patch does not generate evidence or a report.

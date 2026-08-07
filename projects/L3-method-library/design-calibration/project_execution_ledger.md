@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-08-07
-> 当前任务: `commit-06-a` lineage-link state closure 已由设计提交 `1b67753504024709a9e5092224aec18f445f8bd2` 完成。三层台账重置为 `ready_for_design_gate / read_docs`;实现侧必须保护用户未跟踪 `.gitignore`,全量重读 Required Reads 并独立重跑 Design/Scope/Worktree Gate。
+> 当前任务: `commit-06-a` fresh Required Reads 与 Design/Scope/Worktree Gate 已通过。当前状态为 `in_progress / implement`;实现仅限 PH-06 contracts/domain/direct tests 和真实 run-scoped raw artifacts,用户未跟踪 `.gitignore` 继续保持 untouched/unstaged。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-06-a lineage-link state closure ready for gate` | ready_for_design_gate | Design commit `1b67753504024709a9e5092224aec18f445f8bd2` closes exact legal source states,state/summary preservation,first-seen duplicate no-op,unavailable/terminal `InvalidTransition` and failure no-mutation tests for `link_trace_material(...)`;the blocked conclusion is superseded. | read_docs:保护用户未跟踪 `.gitignore`,全量重读 Required Reads,再独立重跑 Design/Scope/Worktree Gate。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-06-a.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-06-a contracts/domain implementation` | in_progress | Fresh Required Reads against design `1b67753504024709a9e5092224aec18f445f8bd2` and ledger `cc07cc9` found exact wrapper/set/carrier/object/helper/error/test closure;Design,Scope and Worktree Gates pass. | implement:只落 PH-06 contracts/domain/direct tests,保护用户 `.gitignore`,随后生成六个真实 run-scoped raw artifacts 并进入 Commit Gate。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-06-a.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-06-a` ready for fresh gate | read_docs | PH-06 contracts/domain closure 和 lineage-link exact matrix 已发布;实现侧须从新 baseline 重读 Required Reads / 重跑 Design/Scope/Worktree Gate。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-06-a` implementation in progress | implement | Fresh gate 已通过;只允许 PH-06 contracts/domain/direct tests 和 run-scoped raw artifacts,其余 surface 继续后移。 |
 
 ---
 
@@ -107,8 +107,8 @@
 4. 读取 `design-calibration/implementation_execution_ledger.md`
 5. 读取 `design-calibration/implementation-boundaries/commit-06-a.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前是 `commit-06-a` / `ready_for_design_gate` / `read_docs`,baseline 为 `current-design-with-commit-06-a-lineage-link-state-closure`,设计提交为 `1b67753504024709a9e5092224aec18f445f8bd2`
-8. 保护实现仓用户未跟踪 `.gitignore`,全量重读 Required Reads,独立重跑 Design/Scope/Worktree Gate;gate pass 后才可继续 Allowed Scope 代码与 tests
+7. 确认 implementation ledger 当前是 `commit-06-a` / `in_progress` / `implement`,baseline 为 `current-design-with-commit-06-a-lineage-link-state-closure`,设计提交为 `1b67753504024709a9e5092224aec18f445f8bd2`,台账 reopen commit 为 `cc07cc9`
+8. Fresh Required Reads 与 Design/Scope/Worktree Gate 已通过;保护实现仓用户未跟踪 `.gitignore`,只实现 Allowed Scope 代码与 tests,随后运行六个 exact run-scoped raw checks
 9. 若重跑时发现 exact kind/wrapper/set、carrier field、state/helper/error/source、test artifact、no-port/no-persistence carve-out 或 allowed scope 仍有未闭口矛盾,实现侧必须重新回写 `blocked / wait_design`,然后从项目级 implementation ledger 和当前 boundary ledger 重新开始
 ```
 
@@ -117,8 +117,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`commit-06-a` lineage-link state closure 已由 `1b67753504024709a9e5092224aec18f445f8bd2` 完成;
-当前 boundary 是 `commit-06-a`,baseline 是 `current-design-with-commit-06-a-lineage-link-state-closure`,状态为 `ready_for_design_gate / read_docs`;
-下一步由实现侧保护用户未跟踪 `.gitignore`,按 boundary 全量重读 Required Reads 并重跑 Design/Scope/Worktree Gate;不得沿用旧 blocked 结论;
-实现侧只允许 contracts/domain pure carriers、state guards 和 direct tests,并须复制 exact lineage-link matrix;不得私补 application/service/repository/fake/durable/resolver/mapper/UoW/replay/persistence/query/refresh/API/worker/publisher/job/report、raw body、config 或 evidence schema.
+`commit-06-a` fresh Required Reads 与 Design/Scope/Worktree Gate 已通过;
+当前 boundary 是 `commit-06-a`,baseline 是 `current-design-with-commit-06-a-lineage-link-state-closure`,状态为 `in_progress / implement`;
+下一步由实现侧保护用户未跟踪 `.gitignore`,只实现 exact contracts/domain pure carriers、state guards 和 direct tests,再运行六个真实 run-scoped raw checks;
+不得私补 application/service/repository/fake/durable/resolver/mapper/UoW/replay/persistence/query/refresh/API/worker/publisher/job/report、raw body、config 或 evidence schema.
 ```

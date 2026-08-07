@@ -16,11 +16,11 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `current-design-with-commit-06-a-lineage-link-state-closure` |
 | current_boundary | `commit-06-a` |
-| gate_status | ready_for_design_gate |
-| gate_reason | Design commit `1b67753504024709a9e5092224aec18f445f8bd2` closes `BLK-ML-06A-DESIGN-004` with one exact lineage-link source-state/result/duplicate/terminal matrix and focused no-mutation tests;the prior blocked conclusion is superseded. |
-| next_allowed_action | read_docs |
-| current_recovery_point | Restart `commit-06-a` from this ledger,current boundary ledger,formal `07` and all Required Reads at `current-design-with-commit-06-a-lineage-link-state-closure`;protect user-owned `?? .gitignore`,then independently rerun Design/Scope/Worktree Gate before implementation edits. |
-| last_updated_by | design closure agent |
+| gate_status | in_progress |
+| gate_reason | Fresh Required Reads against design commit `1b67753504024709a9e5092224aec18f445f8bd2` and reopened ledger commit `cc07cc9` found exact PH-06 wrapper/set/carrier/object/helper/error/test closure;Design,Scope and Worktree Gates pass without adding callable or persistence surface. |
+| next_allowed_action | implement |
+| current_recovery_point | Implement only `commit-06-a` contracts/domain carriers,pure state guards and direct tests;protect user-owned `?? .gitignore`,then run the six exact run-scoped `contract-domain-fast` raw checks before Commit Gate. |
+| last_updated_by | implementation agent |
 | last_updated_at | 2026-08-07 |
 
 ---
@@ -40,7 +40,7 @@
 | `commit-04-b` | `current-design-with-commit-04-b-service-replay-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-b` completed across `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; formalization/version services, duplicate replay and replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
 | `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-a` completed across `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; controlled-consumption contracts/domain carriers, pure-domain guards and targeted contract/domain checks are closed. |
 | `commit-05-b` | `current-design-with-commit-05-b-disabled-outcome-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-b` completed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`; distribution/handoff services, disabled diagnostic mapping, fake parity and run-scoped `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
-| `commit-06-a` | `current-design-with-commit-06-a-lineage-link-state-closure` | ready_for_design_gate | design_closure | read_docs | Design commit `1b67753504024709a9e5092224aec18f445f8bd2` closes the remaining lineage-link state/duplicate/terminal semantics;implementation must reread all sources and independently rerun gates. |
+| `commit-06-a` | `current-design-with-commit-06-a-lineage-link-state-closure` | in_progress | worktree_gate | implement | Fresh Design/Scope/Worktree Gate passed against design `1b67753504024709a9e5092224aec18f445f8bd2` and ledger `cc07cc9`;implementation is limited to contracts/domain/direct tests and exact run-scoped raw artifacts. |
 
 ---
 

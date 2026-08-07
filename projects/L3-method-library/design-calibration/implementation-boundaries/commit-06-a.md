@@ -7,9 +7,9 @@
 | phase | PH-06 traceability, impact, audit and evidence lineage |
 | design_baseline | `current-design-with-commit-06-a-lineage-link-state-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | in_progress |
-| next_allowed_action | implement |
-| current_recovery_point | Fresh Required Reads and Design/Scope/Worktree Gate passed against design `1b67753504024709a9e5092224aec18f445f8bd2` plus ledger reopen `cc07cc9`;implement only exact PH-06 contracts/domain/direct tests,protect user-owned `?? .gitignore`,then run the six required run-scoped raw checks. |
+| status | implemented |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | `commit-06-a` is closed by implementation commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316` and run `20260807T034327Z-commit-06-a`;future work must return to the project ledger for explicit next-boundary activation,and user-owned `?? .gitignore` remains untouched and unstaged. |
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | project ledger current_boundary must equal `commit-06-a` | pass | Project ledger now points to `commit-06-a`;implementation may use this file only within the trace/audit/impact/lineage contracts-domain scope. |
 | `commit-05-b` handoff must be closed | pass | Distribution/handoff services and run-scoped evidence are closed by implementation commit `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73` and design-ledger handoff `95c7eeaaba9f71f0063b48c80b33d9519350a487`. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-06-a` | pass | Project and implementation ledgers require a fresh read cycle against design commit `1b67753504024709a9e5092224aec18f445f8bd2`;no prior blocked/pass conclusion may be reused. |
+| project ledger must set `next_allowed_action = read_docs` for `commit-06-a` | pass | The fresh read cycle against design commit `1b67753504024709a9e5092224aec18f445f8bd2` was completed before implementation;no prior blocked/pass conclusion was reused. |
 
 ---
 
@@ -29,7 +29,7 @@
 |---|---|---|---|
 | `standards/document/代码实施台账与门禁规范.md` | current boundary activation, gate matrix, commit and handoff rules | pass | Fixed read order,gated state transitions,staged-scope protection and handoff evidence confirmed. |
 | `standards/document/设计真相源闭环与可落码性标准.md` | no invented trace carrier, state, port, marker, config or evidence schema | pass | Exact current-boundary wrappers,sets,helpers,errors and artifacts have formal sources;no local schema is required. |
-| `standards/coding/rust.md` | Rust contracts/domain module, error and test conventions | pass | Implementation will use English identifiers,rustdoc,comments,error text and test names plus rustfmt. |
+| `standards/coding/rust.md` | Rust contracts/domain module, error and test conventions | pass | Implementation uses English identifiers,rustdoc,comments,error text and test names and passes rustfmt. |
 | `projects/L3-method-library/00-需求文档.md` | traceability, impact, audit and evidence lineage P0 scope | pass | FR-ML-007~009 and BR-ML-020~022 require traceability while keeping external/evidence bodies out. |
 | `projects/L3-method-library/01-架构设计.md` | trace/audit ownership, evidence lineage and redaction boundary | pass | Domain owns trace/impact/audit/lineage semantics;refs-only and `VETO-ML-005/006` remain blocking. |
 | `projects/L3-method-library/02-概要设计.md` | trace material, audit trail, impact summary and lineage object outline | pass | Outline is consistent with the formal §6.3E overlay and does not override its exact labels. |
@@ -50,7 +50,7 @@
 | `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-06-a` exact row | pass | Allowed and forbidden paths match the boundary ledger. |
 | `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-06-a` exact gate row | pass | Contracts/domain checks,targeted redaction and run-scoped artifact requirements are exact. |
 | `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-06-a` commit body grouping | pass | Planned title and body groups are `feat(trace): add audit lineage contracts`,`Trace and audit contracts:` and `Evidence lineage state:`. |
-| `/home/aris/Projects/quantalithos-method-library` git status, identity and `commit-05-b` handoff | latest implementation state | pass | HEAD is `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`,identity is `quantalithos-labs <quantalithos.ai@gmail.com>`,and only user-owned `?? .gitignore` exists. |
+| `/home/aris/Projects/quantalithos-method-library` git status, identity and `commit-05-b` handoff | latest implementation state | pass | Pre-edit HEAD was `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`,identity was `quantalithos-labs <quantalithos.ai@gmail.com>`,and only user-owned `?? .gitignore` existed;final HEAD is `997b7b02331e11fdc3222f4d0839ab8ce9ea0316` with the same protected worktree state. |
 
 ---
 
@@ -84,16 +84,16 @@
 | prior handoff | `commit-05-b` implementation commit and handoff recorded | pass | PH-05 distribution/handoff service slice is recorded at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`, with handoff closed in the design ledger. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded before any implementation edit as only user-owned `?? .gitignore`;file remains untouched and unstaged. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
-| format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
-| workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
-| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Use actual package name from formal workspace once activated. |
-| domain check | `cargo check -p method-library-domain` or the formal domain package check | pending | Use actual package name from formal workspace once activated. |
-| contract-domain-fast trace/audit/impact/lineage | targeted trace/audit/impact/lineage contract-domain tests | pending | Must cover refs-only behavior, evidence ref integrity and safe marker semantics. |
-| redaction targeted seed | targeted scan or test for raw body/secret/provider/config material leakage | pending | Required because PH-06 starts redaction targeted ownership. |
-| VETO targeted audit | check `VETO-ML-005` / `VETO-ML-006` risk is not introduced | pending | Raw body leak or untraceable evidence blocks commit. |
-| evidence report | run-scoped `contract-domain-fast` artifact/report if scripts exist | pending | Optional until scripts exist; generated reports must derive from raw artifacts. |
-| whitespace | `git diff --check` and `git diff --cached --check` before commit | pending | Required for Commit Gate. |
-| staged scope | `git diff --cached --name-only` | pending | Must match Allowed Scope. |
+| format | `cargo fmt --all -- --check` | pass | Run `20260807T034327Z-commit-06-a`;raw result is `artifacts/test/20260807T034327Z-commit-06-a/suites/contract-domain-fast/cargo-fmt-check.txt`. |
+| workspace check | `cargo check` | pass | Full workspace check passed again during handoff verification after implementation commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`. |
+| contracts check | `cargo check -p method-library-contracts` | pass | Run `20260807T034327Z-commit-06-a`;raw result is `artifacts/test/20260807T034327Z-commit-06-a/suites/contract-domain-fast/cargo-check-contracts.txt`. |
+| domain check | `cargo check -p method-library-domain` | pass | Run `20260807T034327Z-commit-06-a`;raw result is `artifacts/test/20260807T034327Z-commit-06-a/suites/contract-domain-fast/cargo-check-domain.txt`. |
+| contract-domain-fast trace/audit/impact/lineage | `cargo test -p method-library-contracts` and `cargo test -p method-library-domain` | pass | Run `20260807T034327Z-commit-06-a`;29 contract integration tests,41 domain integration tests and 3 compile-fail doctests pass,including 5 focused contract and 10 focused domain trace/audit assertions. |
+| redaction targeted seed | targeted scan for raw body/secret/provider/config material leakage | pass | `redaction-scan.txt` for run `20260807T034327Z-commit-06-a` reports `forbidden_field_match=false`. |
+| VETO targeted audit | check `VETO-ML-005` / `VETO-ML-006` risk is not introduced | pass | The targeted redaction scan is clean;typed evidence/lineage ref integrity and body-candidate compile-fail redline pass in the contract/domain test artifacts. |
+| evidence report | run-scoped `contract-domain-fast` artifact/report | pass | Six raw artifacts and `reports/runs/20260807T034327Z-commit-06-a/suites/contract-domain-fast.md` are committed and report status `pass`. |
+| whitespace | `git diff --check`,`git diff --cached --check` and post-commit `git show --check` | pass | Pre-commit whitespace checks passed;`git show --check 997b7b02331e11fdc3222f4d0839ab8ce9ea0316` also passes. |
+| staged scope | pre-commit `git diff --cached --name-only` and committed file list | pass | Commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316` contains only allowed contracts/domain sources/tests and run-scoped `contract-domain-fast` artifacts/report. |
 
 ---
 
@@ -105,11 +105,11 @@
 | design_gate | pass | Fresh Required Reads against design `1b67753504024709a9e5092224aec18f445f8bd2` and ledger `cc07cc9` close every exact wrapper,set,carrier,object,helper,error and focused test input;no unresolved blocker remains. | wait_design |
 | scope_gate | pass | Planned implementation touches only contracts/domain/direct tests and actual run-scoped raw artifacts;no callable,persistence,query,entry,job or report-generator surface is needed. | wait_design |
 | worktree_gate | pass | Initial status recorded as only user-owned `?? .gitignore`;it remains untouched and unstaged. | fix_gate_failure |
-| build_gate | pending | Formatting, workspace/contract/domain checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
-| test_gate | pending | Contract-domain-fast trace/audit/impact/lineage, redaction targeted seed and VETO targeted checks pass after activation. | fix_gate_failure |
-| evidence_gate | pending | Targeted artifact/report is optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
-| commit_gate | pending | staged scope, commit message, whitespace and required checks have evidence. | fix_gate_failure |
-| handoff_gate | pending | commit hash, checks run, tests not run, blockers and next boundary state recorded. | handoff |
+| build_gate | pass | `cargo fmt --all -- --check`,`cargo check`,`cargo check -p method-library-contracts` and `cargo check -p method-library-domain` pass. | fix_gate_failure |
+| test_gate | pass | Contract/domain package tests,focused trace/audit/impact/lineage assertions,targeted redaction and VETO redlines pass in run `20260807T034327Z-commit-06-a`. | fix_gate_failure |
+| evidence_gate | pass | Six fixed-name raw artifacts and the raw-derived run-scoped `contract-domain-fast` report are committed under run `20260807T034327Z-commit-06-a`. | fix_gate_failure |
+| commit_gate | pass | Implementation commit,allowed staged scope,required subject/body groups and whitespace checks pass. | fix_gate_failure |
+| handoff_gate | pass | Commit hash,checks,evidence,out-of-scope suites,blocker status and user-owned-file protection are recorded below. | handoff |
 
 ---
 
@@ -117,12 +117,12 @@
 
 | gate | status | evidence |
 |---|---|---|
-| staged_scope | pending | Must include only allowed `commit-06-a` trace/audit/impact/lineage contract/domain files and generated targeted evidence if applicable. |
-| unrelated_changes | pending | User-owned unrelated changes must remain unstaged. |
-| commit_message_format | pending | Planned subject: `feat(trace): add audit lineage contracts` |
-| commit_body_group | pending | Body group must include `Trace and audit contracts:` and `Evidence lineage state:` from Step 11 mapping. |
-| whitespace | pending | `git diff --cached --check` must pass. |
-| required_checks | pending | Required Checks table must have pass/not_applicable evidence. |
+| staged_scope | pass | `997b7b02331e11fdc3222f4d0839ab8ce9ea0316` contains only allowed trace/audit/impact/lineage contract/domain sources/tests and run-scoped suite artifacts/report;`.gitignore` and unrelated files are absent. |
+| unrelated_changes | pass | User-owned untracked `.gitignore` remains untouched and unstaged. |
+| commit_message_format | pass | Subject is `feat(trace): add audit lineage contracts`. |
+| commit_body_group | pass | Commit body contains `Trace and audit contracts:` and `Evidence lineage state:` groups. |
+| whitespace | pass | `git diff --check`,`git diff --cached --check` and `git show --check 997b7b02331e11fdc3222f4d0839ab8ce9ea0316` passed. |
+| required_checks | pass | All required build,test,evidence,redaction,VETO and scope checks are recorded as pass. |
 
 ---
 
@@ -130,13 +130,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after implementation repo commit. |
-| committed_message | pending | Fill after implementation repo commit. |
-| gates_run | pending | List exact commands and targeted reports. |
-| tests_not_run | pending | Must state none or explain; cannot claim service/report/query/release suites. |
-| remaining_blockers | pending | Must reference blocker table; any blocking design gap prevents handoff. |
-| final_conclusion | pending | Must be one of pass / fail / cannot_decide with exact evidence source. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | pass | `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`. |
+| committed_message | pass | `feat(trace): add audit lineage contracts`,with the required trace/audit contracts and evidence-lineage state body groups. |
+| gates_run | pass | Ran/reported `cargo fmt --all -- --check`,`cargo check`,`cargo check -p method-library-contracts`,`cargo check -p method-library-domain`,`cargo test -p method-library-contracts`,`cargo test -p method-library-domain`,targeted redaction/VETO scan,run-scoped report checks and whitespace/staged-scope checks. |
+| tests_not_run | pass | Application service,repository/fake,persistence/UoW/replay,query/API/worker/publisher/job,external/downstream runtime,report-generator and release suites were not run or implemented because they are outside `commit-06-a`. |
+| remaining_blockers | pass | No implementation blocker remains inside `commit-06-a`;`commit-06-b` and later boundaries remain planned and are not activated by this handoff. |
+| final_conclusion | pass | `commit-06-a` allowed scope is implemented and delivered with passing required checks and run-scoped evidence `20260807T034327Z-commit-06-a`. |
+| user_owned_changes_untouched | pass | Final implementation worktree contains only user-owned `?? .gitignore`;it was neither modified nor staged,and no `.codex/`,`target/` or unrelated files were staged. |
 
 ---
 
@@ -172,4 +172,4 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| trace/audit redaction closure | ready_for_design_gate | Design commits `ea99688411602fc73c24d011507042b271fac755` and `1b67753504024709a9e5092224aec18f445f8bd2` close the current contracts/domain semantics;implementation must still reread and independently validate before code. |
+| trace/audit redaction closure | implemented handoff closed | Design commits `ea99688411602fc73c24d011507042b271fac755` and `1b67753504024709a9e5092224aec18f445f8bd2` were implemented without adding callable or persistence surface;commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316` and run `20260807T034327Z-commit-06-a` close this boundary. |

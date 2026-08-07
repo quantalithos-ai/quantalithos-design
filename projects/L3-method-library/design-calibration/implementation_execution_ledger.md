@@ -16,12 +16,12 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `current-design-with-commit-06-a-lineage-link-state-closure` |
 | current_boundary | `commit-06-a` |
-| gate_status | in_progress |
-| gate_reason | Fresh Required Reads against design commit `1b67753504024709a9e5092224aec18f445f8bd2` and reopened ledger commit `cc07cc9` found exact PH-06 wrapper/set/carrier/object/helper/error/test closure;Design,Scope and Worktree Gates pass without adding callable or persistence surface. |
-| next_allowed_action | implement |
-| current_recovery_point | Implement only `commit-06-a` contracts/domain carriers,pure state guards and direct tests;protect user-owned `?? .gitignore`,then run the six exact run-scoped `contract-domain-fast` raw checks before Commit Gate. |
+| gate_status | pass |
+| gate_reason | `commit-06-a` implementation is complete in `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;Design,Scope,Worktree,Build,Test,Evidence,Commit and Handoff Gates pass with run-scoped `contract-domain-fast` evidence `20260807T034327Z-commit-06-a`. |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | `commit-06-a` handoff is closed by implementation commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;future boundary activation must restart from the project ledger and the then-current boundary ledger,while user-owned `?? .gitignore` remains untouched and unstaged. |
 | last_updated_by | implementation agent |
-| last_updated_at | 2026-08-07 |
+| last_updated_at | 2026-08-07 12:11:35 +0800 |
 
 ---
 
@@ -40,7 +40,7 @@
 | `commit-04-b` | `current-design-with-commit-04-b-service-replay-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-b` completed across `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; formalization/version services, duplicate replay and replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
 | `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-a` completed across `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; controlled-consumption contracts/domain carriers, pure-domain guards and targeted contract/domain checks are closed. |
 | `commit-05-b` | `current-design-with-commit-05-b-disabled-outcome-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-b` completed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`; distribution/handoff services, disabled diagnostic mapping, fake parity and run-scoped `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
-| `commit-06-a` | `current-design-with-commit-06-a-lineage-link-state-closure` | in_progress | worktree_gate | implement | Fresh Design/Scope/Worktree Gate passed against design `1b67753504024709a9e5092224aec18f445f8bd2` and ledger `cc07cc9`;implementation is limited to contracts/domain/direct tests and exact run-scoped raw artifacts. |
+| `commit-06-a` | `current-design-with-commit-06-a-lineage-link-state-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-a` completed at `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;PH-06 trace/impact/audit/evidence-lineage contracts,domain guards and run-scoped `contract-domain-fast` evidence are closed. |
 
 ---
 
@@ -106,7 +106,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a wrapper field, enum label, ref-set rule, carrier field, lifecycle/state owner, same-layer pure helper, marker source, error mapping, carve-out or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is `commit-06-a` at baseline `current-design-with-commit-06-a-lineage-link-state-closure`,published by design commit `1b67753504024709a9e5092224aec18f445f8bd2`;implementation must restart from `read_docs` and independently rerun gates. The prior `commit-05-b` handoff remains closed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`.
+If any required design source is missing, contradicts the current boundary, or does not close a wrapper field, enum label, ref-set rule, carrier field, lifecycle/state owner, same-layer pure helper, marker source, error mapping, carve-out or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. The latest closed boundary is `commit-06-a` at implementation commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;before any future implementation,the project ledger must intentionally advance to the next boundary and the agent must reread that boundary and rerun all gates. The prior `commit-05-b` handoff remains closed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`.
 
 ---
 
@@ -137,4 +137,4 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-04-b` | implemented handoff closed | Implementation handoff records formalization/version service and replay commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; duplicate replay, version conflict, commit-unknown read-back, replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
 | `commit-05-a` | implemented handoff closed | Implementation handoff records controlled-consumption contracts/domain commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; typed refs, state carriers, availability marker closure, pure-domain guards and targeted contract/domain tests are closed. |
 | `commit-05-b` | implemented handoff closed | Implementation handoff records distribution/handoff implementation commit `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`; disabled diagnostic ownership, adapter-first `Blocked` / `Unavailable` outcome persistence, no-call/no-rollback behavior, fake parity and run-scoped service-flow-fast / infra-runtime-fake evidence are closed. |
-| `commit-06-a` | design closure published,gate reread required | Design commit `1b67753504024709a9e5092224aec18f445f8bd2` closes the remaining lineage-link state matrix;implementation must restart Required Reads plus Design/Scope/Worktree Gate before editing code. |
+| `commit-06-a` | implemented handoff closed | Implementation handoff records PH-06 traceability,impact,audit and evidence-lineage contracts/domain commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;exact typed refs,body-free carriers,first-seen sets,pure state guards,terminal/no-mutation redlines and run-scoped `contract-domain-fast` evidence are closed. |

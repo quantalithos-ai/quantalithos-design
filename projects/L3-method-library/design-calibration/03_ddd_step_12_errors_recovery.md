@@ -1770,3 +1770,27 @@ Step 12 到此完成到 `completed_wait_user_confirm`。进入 Step 13 前,下�
 | 是否未写 Step 13 retry/lock/TTL/idempotency 算法、Step 14/15/16 具体内容、test schema 或 implementation code | pass |
 
 next_allowed_action: 等待用户确认后进入 Step 13 `R13.1 开工与必读文档:先思考`;只允许思考 Step 13 的必读文档、并发/幂等/重入输入边界、Step 12 handoff 承接、L1-governance 框架参考、旧 Step 13 污染隔离方式和 R13 模块计划;不得直接修改正式 `03-详细设计.md`;不得提前写 reserve/complete 状态机、retry/lock/TTL/lease/checkpoint resume 算法、config key、observability schema、test case schema 或 implementation code。
+
+---
+
+## Design-side boundary override: `commit-06-a` PH-06 safe errors
+
+`commit-06-a` does not add a PH-06 domain error enum, repository error, service rejection code,
+transport status or recovery surface. Pure domain behavior reuses exactly:
+
+| condition | `MethodLibraryDomainErrorKind` |
+|---|---|
+| required typed ref, cursor or marker absent at a guarded boundary | `MissingRequiredTypedInput` |
+| source/subject/ref mismatch or body-free invariant failure | `InvariantViolation` |
+| illegal state transition, append from partial/unavailable, or mutation after superseded | `InvalidTransition` |
+| unsafe marker or unsupported policy input | `PolicyRejected` |
+| raw method/provider/archive/report/log body candidate | `BodyFreeBoundaryViolation` |
+
+Wrong-kind conversion for the multi-kind `MethodAssetTraceSourceRef` uses the contracts-only
+`MethodAssetTraceSourceRefKindMismatch { actual_kind }`;single-kind wrappers retain the shared
+`MethodLibraryTypedBoundaryRefKindMismatch`. Neither error may inspect or expose opaque ref text.
+
+`MethodAssetSafeReasonRef` can only copy an existing `MethodLibrarySafeMarker`. It cannot be minted
+from raw reason/error text, HTTP/SQL status, config value, timestamp, route, provider response,
+stack trace or fake-private state. Missing such a formal marker is a Design Gate blocker, not a
+reason to add a fallback error payload.

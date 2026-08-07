@@ -1598,7 +1598,7 @@ This section resolves `BLK-ML-04B-DESIGN-001` and the callable-surface half of `
 | `02_hld_step_07_api_interface_skeleton.md` | `GetFormalizationBasisSummary`、`ResolveConsumptionMaterialForVersion`、`GetTraceBySubject`、`ListPendingConsumptionImpacts`、`GetExternalSummaryBySourceRef`、`ListMethodPackages`、`ListMethodSetAssemblies` 等 Query 已要求稳定 lookup / page helper。 |
 | `02_hld_step_08_processing_flows.md` | basis summary inbound、trace / impact / audit / lineage 组织、external summary accepted、package / method set 生命周期都要求本地 exact read / save,但不得在 Query 中现场创建材料或补写 summary。 |
 | `03_ddd_step_05_module_contracts.md` | 正式化与版本走 `version store + basis resolver adapter`;受控消费走 `material store + availability resolver`;追溯走 `trace material store + safe diagnostic adapter`;关系走 `relation store + distribution material adapter`;外围走 `package store + peripheral view adapter + marketplace context ref adapter`。 |
-| Step 7 暂停规则 | `TraceSubjectRef`、`MethodAssetAuditSubjectRef`、`ConsumptionImpactSourceRef`、`MarketplaceContextRef`、freshness marker、source cursor 和 stable lookup 若没有正式来源,必须停在设计侧,不得靠字符串、payload、path、topic、private map 或搜索结果反推。 |
+| Step 7 暂停规则 | `TraceSubjectRef`、`ConsumptionImpactSourceRef`、`MarketplaceContextRef`、freshness marker、source cursor 和 stable lookup 若没有正式来源,必须停在设计侧,不得靠字符串、payload、path、topic、private map 或搜索结果反推。`MethodAssetAuditSubjectRef` / `MethodAssetAuditSubject` 不是当前 boundary 类型。 |
 
 ### 3. support / material / relation 范围裁决
 
@@ -3308,3 +3308,26 @@ Disabled/degraded/unavailable precheck mapping is owned by the application orche
 | publisher fake | candidate ref + target summary in, safe publication outcome out;no payload, topic, ack, delivery receipt or current-truth reread. |
 | handoff fake | body-free handoff input in, safe handoff outcome out;no report/archive/package body, external receipt body or external system state. |
 | stored result / UoW fake | duplicate replay no-rerun;rollback hides staged writes;commit unknown resolved by stored-result/read-back,not blind retry. |
+
+---
+
+## Design-side boundary override: `commit-06-a` has no callable port surface
+
+This override is normative for `commit-06-a` over the earlier candidate repository, resolver,
+mapper, facade and adapter tables in this Step. Formal `03` §6.3E and the Step 6 PH-06 closure are
+the current implementation source.
+
+| question | current-boundary decision |
+|---|---|
+| application facade / service | none;no trace, impact, audit or lineage application method is callable in `commit-06-a`。 |
+| repository / fake / durable adapter | none;`MethodAssetTraceMaterialRepository`, `ConsumptionImpactSummaryRepository`, `MethodAssetAuditTrailRepository` and `MethodAssetEvidenceLineageRepository` are reserved for `commit-06-b`。 |
+| resolver / mapper | none;subject resolver, degraded mapper, freshness resolver and safe-diagnostic builder behavior remain future-owned。 |
+| UoW / stored replay / version carrier | no new PH-06 surface;current objects are pure contracts/domain carriers only。 |
+| protocol / entry / runtime | none;no API, query, worker, publisher, job, report or refresh entry is authorized。 |
+| subject source | `TraceSubjectRef` is the exact audit and lineage subject wrapper;`MethodAssetAuditSubjectRef` / `MethodAssetAuditSubject` must not be implemented。 |
+
+The earlier Step 7 repository tables remain future design direction only. They do not authorize a
+trait declaration, method signature, fake map, durable schema, lookup helper or test-only source in
+`commit-06-a`. If contracts/domain implementation requires any callable port to construct, load,
+save, mint, resolve or map a PH-06 carrier, Design Gate must return to `wait_design` rather than
+adding that port locally.

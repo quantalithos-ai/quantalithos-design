@@ -3862,3 +3862,29 @@ This supplement closes the current-boundary state/disposition gap without adding
 | `Available` | `Enabled` | publisher-owned `Published | Blocked | Unavailable | Failed` | publisher may be called;handoff only after `Published` |
 
 The target registry is resolved once after the adapter check so every branch has the formal target ref set required by the publication outcome identity and shell. Adapter disposition has precedence over target disposition. `Disabled`, `Degraded`, `Unavailable` and non-enabled target branches are never accepted publication or handoff states, call neither publisher nor handoff, and never roll back or rewrite the committed distribution record, candidate or stored command result. Missing port-owned diagnostic is a design blocker;service/fake code must not synthesize one.
+
+---
+
+## Design-side boundary override: `commit-06-a` PH-06 pure state guards
+
+This override is normative for `commit-06-a` wherever the earlier flow-oriented matrices combine
+impact category and lifecycle state or imply application/repository behavior. It authorizes only
+the pure helpers closed by formal `03` §6.3E and Step 6.
+
+| owner | exact state carrier | current-boundary legal guard |
+|---|---|---|
+| `MethodAssetTraceMaterial` | `Organized | Partial | Stale | Unavailable` | construction is `Organized` for a non-empty source set and `Partial` for an empty set with no reason;marking `Organized` requires existing source/cursor/freshness refs and clears reason;marking `Partial | Stale | Unavailable` requires/stores an explicit `MethodAssetSafeReasonRef`。 |
+| `ConsumptionImpactSummary` | `Current | DispositionMarked | Superseded` | register initializes `Current`;disposition writes marker/reason and is only `Current -> DispositionMarked`;supersession requires a different next ref and is only `Current | DispositionMarked -> Superseded`;the next ref is guard-only and `Superseded` is terminal。 |
+| `MethodAssetAuditTrail` | `TrailOwnerPresent | SafeEntryRefsAppended | PartialAuditAvailable | AuditUnavailable` | create initializes `TrailOwnerPresent` with no cursor;append is legal only from owner-present/appended, preserves prior refs and copies the supplied cursor;partial/unavailable reject append。 |
+| `MethodAssetEvidenceLineage` | `LineageLinked | LineagePartial | LineageUnavailable | BodyCandidateRejected` | create initializes `LineageLinked`;trace linking is refs-only;partial from linked/partial stores the summary reason;body rejection from linked/partial/unavailable stores only that reason and enters terminal `BodyCandidateRejected`, never accepting the candidate body。 |
+
+`ConsumptionImpactKind = KnownImpact | UnknownImpact | PendingDownstreamSummary | NoKnownEffect`
+is a separate immutable category field, not a lifecycle state. Disposition and supersession preserve
+the exact kind;`UnknownImpact` and `PendingDownstreamSummary` must never collapse to
+`NoKnownEffect`.
+
+Illegal transition maps to existing `InvalidTransition`;missing required typed input maps to
+`MissingRequiredTypedInput`;identity/body-free invariant failure maps to `InvariantViolation`;
+unsafe policy input maps to `PolicyRejected`;a rejected body candidate maps to
+`BodyFreeBoundaryViolation`. State guards must not call repositories, repair source truth, infer
+markers from raw errors/config/runtime state, or implement the earlier service/job trigger flows.

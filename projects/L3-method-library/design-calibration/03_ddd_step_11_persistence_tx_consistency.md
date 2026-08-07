@@ -1078,7 +1078,7 @@ next_allowed_action: 等待用户确认后进入 Step 11 `R11.12 trace/audit/lin
 | impact unknown / pending | unknown and pending are durable impact kinds | converting unknown to no-effect from delivery/read receipt/publication success |
 | impact disposition | disposition marker must come from formal diagnostic builder | service-generated safe reason from error text or downstream state |
 | audit entry refs | append-only ref set with cursor;historical refs are immutable | overwriting/deleting entries or storing raw audit event body |
-| audit subject | formal typed `MethodAssetAuditSubjectRef` only | deriving subject from log string,route,SQL key,request body or stack trace |
+| audit subject | formal typed `TraceSubjectRef` only | deriving subject from log string,route,SQL key,request body or stack trace |
 | lineage linked refs | only typed external/basis/trace/audit refs are linked | deriving lineage from file path,object store path,provider id or archive body |
 | partial/degraded markers | copy formal degraded/partial marker only | synthesizing marker from missing linked ref text |
 | protection/integrity judgement | store/copy marker only where an existing result/store owner exists | creating policy/rule table or storing recovery plan/rule matrix |
@@ -2423,3 +2423,19 @@ All newly minted distribution, candidate, publication and handoff refs written b
 | availability marker source, adapter/target `Disabled.diagnostic_ref`, target summary label, publication outcome label or handoff outcome label cannot be traced to formal §6.3D | Design Gate blocked;implementation must not synthesize locally. |
 | implementation needs durable distribution material save/list surface | Design Gate blocked;current Step 11 explicitly excludes it. |
 | implementation needs topic, URL, transport, retry/dead-letter, external receipt body, package/report/archive body or downstream runtime state | Scope Gate blocked;belongs to later config/worker/report boundaries or is forbidden. |
+
+---
+
+## Design-side boundary override: `commit-06-a` persistence carve-out
+
+The PH-06 logical-store and repository tables above are future design direction and are not an
+implementation surface for `commit-06-a`. The current boundary adds no table, row schema, index,
+repository trait, fake/durable adapter, optimistic version, UoW, transaction, stored result,
+cursor store, refresh plan or read-back flow.
+
+Contracts/domain serialization and roundtrip tests do not establish durable persistence semantics.
+`MethodAssetAuditTrail.source_cursor_ref` is optional on a newly created empty trail and becomes
+present only when the pure `append_entry` helper copies an explicit `MethodAssetAuditCursorRef`.
+Audit and lineage subjects use `TraceSubjectRef`;no repository key, row id, path, timestamp, raw
+body, config value or private fake map may substitute for it. All PH-06 persistence and fake parity
+work remains reserved for `commit-06-b` after a fresh boundary-specific callable closure.

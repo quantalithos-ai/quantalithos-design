@@ -2579,12 +2579,12 @@ pub struct MethodAssetAuditTrail;
 | 字段骨架 | 类型 | 字段来源 |
 |---|---|---|
 | `audit_trail_ref` | `MethodAssetAuditTrailRef` | domain 创建的审计轨迹稳定引用。 |
-| `audit_subject_ref` | `MethodAssetAuditSubjectRef` | 当前被审计对象的 typed subject ref。 |
+| `audit_subject_ref` | `TraceSubjectRef` | 当前被审计对象的 typed subject ref;`MethodAssetAuditSubjectRef` / `MethodAssetAuditSubject` 不属于 `commit-06-a`。 |
 | `trace_material_refs` | `MethodAssetTraceMaterialRefSet` | 与审计轨迹关联的追溯材料 refs。 |
-| `actor_context_ref` | `ActorContextRef` | command / inbound / job metadata 中的安全 actor context;`commit-02-a` 仅按 `6A` 归一化为 `core-contracts::actor::ActorContext`,不得据此新增 local wrapper。 |
+| `actor_context` | `core_contracts::actor::ActorContext` | command / inbound / job metadata 中复制的安全 actor context;不得新增 local wrapper。 |
 | `safe_reason_ref` | `MethodAssetSafeReasonRef` | 安全原因引用,不保存原始错误或请求正文。 |
 | `audit_entry_refs` | `MethodAssetAuditEntryRefSet` | append-only 审计条目引用集合。 |
-| `source_cursor_ref` | `MethodAssetAuditCursorRef` | 审计条目对应的提交位置或来源 cursor。 |
+| `source_cursor_ref` | `Option<MethodAssetAuditCursorRef>` | 新建空 trail 没有 committed cursor;append 时必须复制正式 cursor,不得由 actor、request、timestamp、route、row id 或 fake state 推导。 |
 
 | 成员能力 | 作用 |
 |---|---|
@@ -2595,9 +2595,8 @@ pub struct MethodAssetAuditTrail;
 
 | 工厂边界 | 作用 |
 |---|---|
-| `for_subject(audit_subject_ref, actor_context_ref)` | 为业务 subject 建立审计轨迹。 |
-| `from_trace_material(audit_subject_ref, trace_material_ref, safe_reason_ref)` | 从追溯材料建立审计轨迹线索。 |
-| `partial(audit_subject_ref, reason_ref)` | 表达只有部分审计线索可安全返回。 |
+| `for_subject(audit_trail_ref, audit_subject_ref, actor_context, safe_reason_ref)` | 为业务 subject 建立空审计轨迹;初始化 `source_cursor_ref = None`、`state = TrailOwnerPresent`。 |
+| `append_entry(entry_ref, source_cursor_ref)` | 追加 typed audit entry ref,保留既有 first-seen refs 并复制正式 cursor;仅允许 `TrailOwnerPresent` / `SafeEntryRefsAppended`。 |
 
 | 不变量 / 禁止事项 | 说明 |
 |---|---|
@@ -6064,3 +6063,363 @@ Step 7 可以在用户确认后启动,但必须遵守:
 | 是否未进入 Step 7 正文 | pass |
 
 next_allowed_action: 等待用户确认后进入 `03-详细设计` Step 7 `R7.1 开工与必读文档:先思考`;只允许思考 Step 7 必读文档、Step 6 承接边界、trait / port / adapter 分组框架、旧 Step 7 污染隔离和 `R7.2` 写入边界;不得直接修改正式 `03-详细设计.md`;不得继承旧 Step 7 completed 状态;不得写具体 trait / port 方法签名、adapter method、protocol DTO、function flow、state matrix、persistence schema、config key 或 test case schema;不得进入 `R7.2`、Step 8 或后续 Step。
+
+---
+
+## Design-side closure supplement: `commit-06-a` exact PH-06 contracts/domain schema
+
+### 1. Closure status and authority
+
+This supplement is normative for the `commit-06-a` implementation boundary. It resolves the
+implementation-facing PH-06 schema gap without opening service, repository, query, external-body,
+job or report behavior. The names, fields, labels, sources and transition helpers below are exact;
+implementation may copy them but may not add local aliases, private maps, raw-reason carriers or
+future-boundary ports.
+
+### 2. Exact typed refs and named wrappers
+
+The following named wrappers remain members of the `MethodLibraryTypedBoundaryRef` family. Each
+wrapper has the listed exact `MethodLibraryTypedBoundaryRefKind` and must reject every other kind
+through the shared wrong-kind conversion surface.
+
+| named wrapper | exact kind | owner / use |
+|---|---|---|
+| `MethodAssetTraceMaterialRef` | `MethodAssetTraceMaterial` | trace material identity |
+| `MethodAssetTraceCursorRef` | `MethodAssetTraceCursor` | committed trace source cursor |
+| `MethodAssetTraceFreshnessMarkerRef` | `MethodAssetTraceFreshnessMarker` | trace freshness source |
+| `ConsumptionImpactSummaryRef` | `ConsumptionImpactSummary` | impact summary identity |
+| `MethodAssetAuditTrailRef` | `MethodAssetAuditTrail` | append-only audit trail identity |
+| `TraceSubjectRef` | `TraceSubjectRef` | formal audit subject identity |
+| `MethodAssetAuditEntryRef` | `MethodAssetAuditEntry` | safe audit entry identity |
+| `MethodAssetAuditCursorRef` | `MethodAssetAuditCursor` | committed audit source cursor |
+| `MethodAssetEvidenceLineageRef` | `MethodAssetEvidenceLineage` | body-free lineage identity |
+
+`MethodAssetSafeReasonRef` is deliberately not another opaque identity family. It is a named
+newtype wrapper over an already-produced `MethodLibrarySafeMarker`. Its only constructor input is
+that marker carrier; the wrapper has no raw string, error text, HTTP status, config value, provider
+body or test-only marker field. The only legal source is a safe marker copied from a formal domain
+policy, formal diagnostic/mapper, or already accepted body-free source.
+
+`MethodAssetTraceSourceRef` is a named wrapper over a verified
+`MethodLibraryTypedBoundaryRef`. Its allowed source kinds are exactly
+`MethodAssetDefinition`, `MethodAssetCatalogEntry`, `FormalMethodAssetVersion`,
+`MethodAssetConsumptionMaterial`, `MethodAssetRelation` and `ExternalSourceSummary`.
+It is not a new identity kind and must not parse the opaque ref body. A wrong source kind is a
+safe rejection. `MethodAssetTraceSourceRefSet` stores only this wrapper family.
+
+### 3. Exact deterministic ref sets
+
+The following sets are exact Rust-facing carriers. Each has `refs: Vec<T>`, `new()`,
+`from_refs(...)`, `insert(...)` and `is_empty()`. `insert` performs canonical typed-ref equality
+deduplication and preserves first-seen insertion order; it never sorts, parses, hashes or compares
+opaque ref text. Empty is legal for all four sets when the enclosing field is optional or the state
+is explicitly partial/unavailable.
+
+| set | member type |
+|---|---|
+| `MethodAssetTraceSourceRefSet` | `MethodAssetTraceSourceRef` |
+| `MethodAssetTraceMaterialRefSet` | `MethodAssetTraceMaterialRef` |
+| `MethodAssetAuditEntryRefSet` | `MethodAssetAuditEntryRef` |
+| `MethodAssetEvidenceLineageRefSet` | `MethodAssetEvidenceLineageRef` |
+
+Existing `ExternalSourceSummaryRefSet` and `FormalizationBasisSummaryRefSet` retain their already
+closed first-seen ordering contract and are reused without a second set implementation.
+
+### 4. Exact body-free summary and state carriers
+
+The following fields are the complete current-boundary object shapes. No field may contain method
+content, external/provider body, archive/report body, raw log, stack trace, secret, path or
+downstream runtime truth.
+
+| carrier | exact fields |
+|---|---|
+| `MethodAssetTraceSummary` | `summary_marker_ref: MethodLibrarySafeMarker`; `coverage_marker_ref: MethodLibrarySafeMarker` |
+| `ConsumptionImpactSafeSummary` | `summary_marker_ref: MethodLibrarySafeMarker`; `disposition_marker_ref: Option<MethodLibrarySafeMarker>`; `safe_reason_ref: Option<MethodAssetSafeReasonRef>` |
+| `MethodAssetEvidenceLineageSummary` | `summary_marker_ref: MethodLibrarySafeMarker`; `safe_reason_ref: Option<MethodAssetSafeReasonRef>` |
+| `MethodAssetTraceMaterial` | `trace_material_ref`; `trace_subject_ref`; `source_object_refs`; `trace_summary`; `source_cursor_ref`; `freshness_marker_ref`; `external_summary_refs`; `state: MethodAssetTraceMaterialState`; `safe_reason_ref: Option<MethodAssetSafeReasonRef>` |
+| `ConsumptionImpactSummary` | `impact_summary_ref`; `impact_source_ref`; `consumption_material_ref: Option<MethodAssetConsumptionMaterialRef>`; `consumption_context_ref: Option<ConsumptionContextRef>`; `impact_kind: ConsumptionImpactKind`; `impact_safe_summary`; `trace_material_ref: Option<MethodAssetTraceMaterialRef>`; `state: ConsumptionImpactSummaryState` |
+| `MethodAssetAuditTrail` | `audit_trail_ref`; `audit_subject_ref`; `trace_material_refs`; `actor_context: core_contracts::actor::ActorContext`; `safe_reason_ref`; `audit_entry_refs`; `source_cursor_ref`; `state: MethodAssetAuditTrailState` |
+| `MethodAssetEvidenceLineage` | `evidence_lineage_ref`; `lineage_subject_ref`; `external_summary_refs`; `basis_summary_refs`; `trace_material_refs`; `audit_trail_ref: Option<MethodAssetAuditTrailRef>`; `lineage_summary`; `state: MethodAssetEvidenceLineageState` |
+
+`MethodAssetTraceMaterialState` has exactly `Organized`, `Partial`, `Stale` and `Unavailable`.
+`ConsumptionImpactKind` has exactly `KnownImpact`, `UnknownImpact`, `PendingDownstreamSummary` and
+`NoKnownEffect`; `UnknownImpact` and `PendingDownstreamSummary` are never folded into
+`NoKnownEffect`. `ConsumptionImpactSummaryState` has exactly `Current`, `DispositionMarked` and
+`Superseded`; disposition/supersession changes preserve the original `impact_kind`.
+
+`MethodAssetAuditTrailState` has exactly `TrailOwnerPresent`, `SafeEntryRefsAppended`,
+`PartialAuditAvailable` and `AuditUnavailable`. `MethodAssetEvidenceLineageState` has exactly
+`LineageLinked`, `LineagePartial`, `LineageUnavailable` and `BodyCandidateRejected`.
+
+### 5. Exact pure-domain helper surface and source rules
+
+The current boundary implements only pure constructors, invariant checks and state guards. The
+following signatures are normative (error type is the existing `MethodLibraryDomainError`):
+
+```rust
+MethodAssetTraceMaterial::from_source_objects(
+    trace_material_ref,
+    trace_subject_ref,
+    source_object_refs,
+    trace_summary,
+    source_cursor_ref,
+    freshness_marker_ref,
+    external_summary_refs,
+) -> Self
+MethodAssetTraceMaterial::mark_state(
+    &mut self,
+    next_state: MethodAssetTraceMaterialState,
+    reason_ref: Option<MethodAssetSafeReasonRef>,
+) -> Result<(), MethodLibraryDomainError>
+ConsumptionImpactSummary::register(
+    impact_summary_ref,
+    impact_source_ref,
+    consumption_material_ref,
+    consumption_context_ref,
+    impact_kind,
+    impact_safe_summary,
+    trace_material_ref,
+) -> Self
+ConsumptionImpactSummary::mark_disposition(
+    &mut self,
+    disposition_marker_ref: MethodLibrarySafeMarker,
+    safe_reason_ref: MethodAssetSafeReasonRef,
+) -> Result<(), MethodLibraryDomainError>
+ConsumptionImpactSummary::supersede_with(
+    &mut self,
+    next_impact_summary_ref: ConsumptionImpactSummaryRef,
+) -> Result<(), MethodLibraryDomainError>
+MethodAssetAuditTrail::for_subject(
+    audit_trail_ref,
+    audit_subject_ref,
+    actor_context: core_contracts::actor::ActorContext,
+    safe_reason_ref,
+) -> Self
+MethodAssetAuditTrail::append_entry(
+    &mut self,
+    entry_ref: MethodAssetAuditEntryRef,
+    source_cursor_ref: MethodAssetAuditCursorRef,
+) -> Result<(), MethodLibraryDomainError>
+MethodAssetEvidenceLineage::from_external_and_basis(
+    evidence_lineage_ref,
+    lineage_subject_ref,
+    external_summary_refs,
+    basis_summary_refs,
+    lineage_summary,
+) -> Self
+MethodAssetEvidenceLineage::link_trace_material(
+    &mut self,
+    trace_material_ref: MethodAssetTraceMaterialRef,
+) -> Result<(), MethodLibraryDomainError>
+MethodAssetEvidenceLineage::mark_partial(
+    &mut self,
+    reason_ref: MethodAssetSafeReasonRef,
+) -> Result<(), MethodLibraryDomainError>
+MethodAssetEvidenceLineage::reject_body_candidate(
+    &mut self,
+    reason_ref: MethodAssetSafeReasonRef,
+) -> Result<(), MethodLibraryDomainError>
+```
+
+Trace state guards allow organization to produce `Organized`, `Partial` or `Unavailable`; an
+existing `Stale` material may be refreshed to `Organized`, `Partial` or `Unavailable`. A material
+cannot become `Organized` without source refs, cursor and freshness marker, and no state guard may
+repair source truth. Impact disposition is legal only from `Current`; supersession is legal only
+from `Current` or `DispositionMarked`, and `Superseded` is terminal. Audit append is legal only
+for `TrailOwnerPresent` or `SafeEntryRefsAppended`, preserves all prior entry refs and uses the
+provided cursor. Lineage linking is refs-only; body rejection never stores the rejected body.
+
+### 6. Port and later-boundary ownership
+
+`commit-06-a` has no application service, repository, resolver, mapper, UoW, persistence or public
+protocol callable surface. The following names are reserved for `commit-06-b` and must not be
+implemented now: `MethodAssetTraceMaterialRepository`, `ConsumptionImpactSummaryRepository`,
+`MethodAssetAuditTrailRepository`, `MethodAssetEvidenceLineageRepository`,
+`MethodAssetTraceSubjectResolverPort`, `MethodAssetDegradedDecisionMapperPort`, trace/impact/audit
+facades, query projection and refresh/store flows. The current boundary only defines the domain
+objects and contracts that those later ports will consume.
+
+### 7. Error mapping and redlines
+
+| condition | existing error |
+|---|---|
+| absent required typed ref, cursor or marker | `MissingRequiredTypedInput` |
+| source/subject/ref identity mismatch or body-free carrier invariant failure | `InvariantViolation` |
+| illegal state transition, append after unavailable, or mutation after superseded | `InvalidTransition` |
+| unsafe marker or unsupported policy input | `PolicyRejected` |
+| raw body/provider/archive/report/log candidate | `BodyFreeBoundaryViolation` |
+
+No PH-06-specific error enum or raw diagnostic payload is authorized. A safe reason is always
+copied through `MethodAssetSafeReasonRef`; it is never minted from an exception string, HTTP/SQL
+status, config value, timestamp, route, provider response or private fake state.
+
+### 8. Contract/domain test and evidence closure
+
+`contract-domain-fast` must include focused tests for: every exact kind and wrong-kind conversion;
+first-seen ref-set dedup/order; marker-only safe-reason construction; exact enum serialization;
+body-free summary field roundtrip; trace source-kind rejection; explicit unknown/pending impact;
+append-only audit refs; lineage partial/body-rejection state; legal and illegal transitions; and
+identity/ref preservation after every transition. Tests must assert that no raw body, provider body,
+path, secret, stack trace or raw reason field exists on the carriers.
+
+The run-scoped raw artifact names for this boundary are fixed as
+`artifacts/test/<run_id>/suites/contract-domain-fast/{cargo-fmt-check.txt,cargo-check-contracts.txt,cargo-check-domain.txt,cargo-test-contracts.txt,cargo-test-domain.txt,redaction-scan.txt}`.
+If a summary is generated it must be derived only from those raw files at
+`reports/runs/<run_id>/suites/contract-domain-fast.md`; no static pass file or `latest` alias is
+valid. Service/store/query/report coverage remains explicitly unclaimed until `commit-06-b` or a
+later boundary.
+
+### 9. Closure stop-review
+
+| check | result |
+|---|---|
+| exact typed refs, wrappers and ref sets | closed |
+| body-free summary fields and marker source | closed |
+| pure-domain state/helper/error mapping | closed |
+| application/repository ownership | explicitly deferred to `commit-06-b` |
+| contract/domain tests and raw evidence paths | closed |
+| external body, query projection, service, job and report behavior | forbidden in `commit-06-a` |
+
+This supplement resolves `BLK-ML-06A-DESIGN-001`, `BLK-ML-06A-DESIGN-002` and
+`BLK-ML-06A-DESIGN-003`. Implementation may resume only after the implementation agent rereads the
+current boundary ledger and all Required Reads from the new published design baseline.
+
+---
+
+## Design-side closure correction: `commit-06-a` source and constructor ownership
+
+The following correction is normative over the preceding supplement wherever names, field
+optionality, or constructor inputs differ. It closes the final source-ownership ambiguities found
+during the PH-06 Design Gate. No new application, repository, query, mapper, UoW, persistence, job,
+or report behavior is opened.
+
+### 1. Subject and impact source refs
+
+`TraceSubjectRef` and `ConsumptionImpactSourceRef` are the existing typed-boundary families and
+remain the only subject/source kinds for this boundary. They are exposed to Rust as named wrappers
+over `MethodLibraryTypedBoundaryRef` with exact kinds `TraceSubjectRef` and
+`ConsumptionImpactSourceRef`, respectively. `MethodAssetAuditSubjectRef` and the
+`MethodAssetAuditSubject` kind are not part of `commit-06-a` and must not be implemented. The
+`audit_subject_ref` and `lineage_subject_ref` fields both use `TraceSubjectRef`.
+
+`MethodAssetTraceSourceRef` is a wrapper over a verified `MethodLibraryTypedBoundaryRef` and
+accepts exactly these source kinds: `MethodAssetDefinition`, `MethodAssetCatalogEntry`,
+`FormalMethodAssetVersion`, `MethodAssetConsumptionMaterial`, `MethodAssetRelation`, and
+`ExternalSourceSummary`. Its `TryFrom<MethodLibraryTypedBoundaryRef>` implementation returns the
+dedicated contract error `MethodAssetTraceSourceRefKindMismatch { actual_kind }`; it must not reuse
+the single-kind `MethodLibraryTypedBoundaryRefKindMismatch` or inspect opaque ref text.
+
+`MethodAssetTraceSourceRefKindMismatch` has the exact body-free shape below:
+
+```rust
+pub struct MethodAssetTraceSourceRefKindMismatch {
+    actual_kind: MethodLibraryTypedBoundaryRefKind,
+}
+```
+
+It exposes `new(actual_kind)` and `actual_kind()` only. The allowed-kind family is fixed by the
+wrapper type and is not carried as a runtime string or collection.
+
+`MethodAssetTraceSourceRef` has the exact shared-family field
+`pub boundary_ref: MethodLibraryTypedBoundaryRef`. Construction is only
+`TryFrom<MethodLibraryTypedBoundaryRef>` after the six-kind check;it exposes
+`as_typed_ref(&self) -> &MethodLibraryTypedBoundaryRef` and
+`as_public_ref(&self) -> &str`. It has no `new(raw_string)` constructor and no second source/kind
+field.
+
+### 2. Exact wrapper and set surface
+
+The following wrappers are exact current-boundary exports and all reject wrong kinds through the
+shared conversion surface:
+
+| wrapper | exact kind |
+|---|---|
+| `TraceSubjectRef` | `TraceSubjectRef` |
+| `ConsumptionImpactSourceRef` | `ConsumptionImpactSourceRef` |
+| `MethodAssetTraceMaterialRef` | `MethodAssetTraceMaterial` |
+| `MethodAssetTraceCursorRef` | `MethodAssetTraceCursor` |
+| `MethodAssetTraceFreshnessMarkerRef` | `MethodAssetTraceFreshnessMarker` |
+| `ConsumptionImpactSummaryRef` | `ConsumptionImpactSummary` |
+| `MethodAssetAuditTrailRef` | `MethodAssetAuditTrail` |
+| `MethodAssetAuditEntryRef` | `MethodAssetAuditEntry` |
+| `MethodAssetAuditCursorRef` | `MethodAssetAuditCursor` |
+| `MethodAssetEvidenceLineageRef` | `MethodAssetEvidenceLineage` |
+
+`MethodAssetSafeReasonRef` is a named newtype with exact field
+`pub safe_marker: MethodLibrarySafeMarker`;its sole constructor is
+`new(safe_marker: MethodLibrarySafeMarker)` and it exposes
+`as_safe_marker(&self) -> &MethodLibrarySafeMarker`. It has no opaque identity kind and no raw
+reason, error text, status, config, provider body, path, or test-only field.
+
+`MethodAssetTraceSourceRefSet`, `MethodAssetTraceMaterialRefSet`, `MethodAssetAuditEntryRefSet`,
+and `MethodAssetEvidenceLineageRefSet` each have exactly `refs: Vec<T>`, `new()`,
+`from_refs(iterable)`, `insert(ref)`, and `is_empty()`. Insertion performs typed-ref equality
+deduplication and preserves first-seen order; it never sorts, parses, hashes, or compares opaque
+text. `TraceSubjectRef` and `ConsumptionImpactSourceRef` are not ref-set members in this slice.
+
+### 3. Exact domain field corrections
+
+The complete PH-06 domain field types are:
+
+| object | exact field correction |
+|---|---|
+| `MethodAssetTraceMaterial` | `trace_material_ref: MethodAssetTraceMaterialRef`; `trace_subject_ref: TraceSubjectRef`; `source_object_refs: MethodAssetTraceSourceRefSet`; `trace_summary: MethodAssetTraceSummary`; `source_cursor_ref: MethodAssetTraceCursorRef`; `freshness_marker_ref: MethodAssetTraceFreshnessMarkerRef`; `external_summary_refs: ExternalSourceSummaryRefSet`; `state: MethodAssetTraceMaterialState`; `safe_reason_ref: Option<MethodAssetSafeReasonRef>` |
+| `ConsumptionImpactSummary` | `impact_summary_ref: ConsumptionImpactSummaryRef`; `impact_source_ref: ConsumptionImpactSourceRef`; `consumption_material_ref: Option<MethodAssetConsumptionMaterialRef>`; `consumption_context_ref: Option<ConsumptionContextRef>`; `impact_kind: ConsumptionImpactKind`; `impact_safe_summary: ConsumptionImpactSafeSummary`; `trace_material_ref: Option<MethodAssetTraceMaterialRef>`; `state: ConsumptionImpactSummaryState` |
+| `MethodAssetAuditTrail` | `audit_trail_ref: MethodAssetAuditTrailRef`; `audit_subject_ref: TraceSubjectRef`; `trace_material_refs: MethodAssetTraceMaterialRefSet`; `actor_context: core_contracts::actor::ActorContext`; `safe_reason_ref: MethodAssetSafeReasonRef`; `audit_entry_refs: MethodAssetAuditEntryRefSet`; `source_cursor_ref: Option<MethodAssetAuditCursorRef>`; `state: MethodAssetAuditTrailState` |
+| `MethodAssetEvidenceLineage` | `evidence_lineage_ref: MethodAssetEvidenceLineageRef`; `lineage_subject_ref: TraceSubjectRef`; `external_summary_refs: ExternalSourceSummaryRefSet`; `basis_summary_refs: FormalizationBasisSummaryRefSet`; `trace_material_refs: MethodAssetTraceMaterialRefSet`; `audit_trail_ref: Option<MethodAssetAuditTrailRef>`; `lineage_summary: MethodAssetEvidenceLineageSummary`; `state: MethodAssetEvidenceLineageState` |
+
+The audit cursor is optional because a newly owned empty trail has no committed entry position.
+`for_subject(audit_trail_ref, audit_subject_ref, actor_context, safe_reason_ref)` initializes
+`source_cursor_ref = None` and `state = TrailOwnerPresent`; `append_entry(entry_ref,
+source_cursor_ref)` copies the supplied cursor and changes state to `SafeEntryRefsAppended`.
+There is no default cursor and no cursor derived from actor, request, timestamp, route, repository
+row, or private fake state.
+
+All PH-06 contract enums use the existing contracts serialization convention
+`#[serde(rename_all = "snake_case")]`;the exact serialized labels are therefore the snake-case
+forms of the closed Rust labels. Contract wrappers, ref sets and summary carriers derive
+`Clone, Debug, Eq, PartialEq, Serialize, Deserialize`;no flattened/raw compatibility shape is
+authorized.
+
+### 4. Exact constructor and transition rules
+
+The pure helper signatures in the preceding supplement are authoritative with these corrections:
+
+* `MethodAssetTraceMaterial::from_source_objects(...)` initializes `Organized` when
+  `source_object_refs` is non-empty and `Partial` when it is empty, with
+  `safe_reason_ref = None`. `mark_state(Organized, ..)` clears `safe_reason_ref` and
+  rejects an empty source set with `InvariantViolation`; `Partial`, `Stale`, and `Unavailable`
+  require `Some(MethodAssetSafeReasonRef)` and store it in `self.safe_reason_ref`. A transition to
+  `Organized` requires the existing cursor and freshness refs and does not synthesize either
+  source.
+* `ConsumptionImpactSummary::register(...)` initializes `state = Current`; it preserves the
+  supplied `impact_kind` through `mark_disposition` and `supersede_with`. Disposition is legal
+  only from `Current` and writes the supplied marker/reason to
+  `impact_safe_summary.disposition_marker_ref` / `impact_safe_summary.safe_reason_ref`;
+  supersession requires `next_impact_summary_ref != self.impact_summary_ref`, is legal only from
+  `Current` or `DispositionMarked`, and sets only `state = Superseded`. `Superseded` is terminal;
+  the next ref is a guard input and is not persisted because the closed object has no superseding
+  ref field.
+* `MethodAssetAuditTrail::append_entry(...)` is legal only from `TrailOwnerPresent` or
+  `SafeEntryRefsAppended`; it preserves all prior entry refs using the exact first-seen set rule,
+  copies the supplied cursor, and rejects `PartialAuditAvailable` or `AuditUnavailable`.
+* `MethodAssetEvidenceLineage::from_external_and_basis(...)` initializes `LineageLinked` and
+  an empty trace/audit linkage; `link_trace_material(...)` appends a typed ref and retains prior
+  links. `mark_partial(...)` is legal from `LineageLinked` or `LineagePartial`, sets
+  `lineage_summary.safe_reason_ref = Some(reason_ref)` and moves to `LineagePartial`;body rejection
+  is legal from `LineageLinked | LineagePartial | LineageUnavailable`, writes only the supplied
+  reason to the same summary field, and moves to `BodyCandidateRejected`. `BodyCandidateRejected`
+  is terminal and the rejected candidate is never accepted as an argument or stored.
+
+All illegal transitions use the existing `MethodLibraryDomainErrorKind::InvalidTransition`;
+missing required wrapper/marker uses `MissingRequiredTypedInput`; identity/invariant mismatch uses
+`InvariantViolation`; unsafe policy input uses `PolicyRejected`; a body candidate is represented
+only by `BodyFreeBoundaryViolation`.
+
+### 5. Design gate consequence
+
+This correction resolves the remaining source/constructor portions of
+`BLK-ML-06A-DESIGN-001` through `BLK-ML-06A-DESIGN-003`. It does not authorize implementation of
+the repositories, resolver/mapper ports, application services, query projections, refresh flows,
+stored replay, jobs, reports, or external/provider body handling reserved for `commit-06-b` and
+later boundaries.

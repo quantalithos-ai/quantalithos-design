@@ -1679,3 +1679,28 @@ next_allowed_action: 等待用户确认后进入 Step 16 `R16.18 cross-step clos
 | 是否未修改正式 `03-详细设计.md` | pass |
 
 next_allowed_action: 等待用户确认后进入 Step 17 `R17.1 开工与必读文档:先思考`;只允许思考 Step 17 的开工边界、必读文档、Step 16 handoff、L1-governance 框架参考、旧 Step 17 污染隔离、实施承接清单分批计划和 `R17.2` 写入边界;不得直接修改正式 `03-详细设计.md`;不得写正式实施计划、commit boundary、代码文件清单、evidence schema、CI command、acceptance gate 或 implementation code。
+
+---
+
+## Design-side boundary override: `commit-06-a` contract-domain-fast cut
+
+The current boundary test surface is limited to `crates/contracts` and `crates/domain` focused
+tests. It must cover:
+
+| cut | minimum assertion |
+|---|---|
+| typed wrappers | every exact kind roundtrips;single-kind and trace-source wrong kinds reject without opaque-text parsing。 |
+| deterministic ref sets | typed equality deduplicates and first-seen order is retained;no sorting, hashing or text comparison。 |
+| safe reason | construction requires an existing `MethodLibrarySafeMarker`;no raw reason field/source exists。 |
+| support carriers | exact enum serialization and body-free summary roundtrip preserve all typed refs/markers。 |
+| trace | only the six exact source kinds are accepted;empty/non-empty source initialization and reason-required guards are covered。 |
+| impact | unknown and pending remain distinct from no-known-effect;disposition/supersession preserve kind and enforce terminal state。 |
+| audit | empty trail has no cursor;append preserves prior refs, copies cursor and rejects partial/unavailable states。 |
+| lineage | refs-only linking, partial state and body-candidate rejection preserve identity and never retain the candidate body。 |
+| redlines | carriers/fixtures contain no raw method/provider/archive/report/log body, path, secret, stack trace, raw reason, config value or fake-only marker。 |
+
+Run-scoped raw artifacts are exactly
+`artifacts/test/<run_id>/suites/contract-domain-fast/{cargo-fmt-check.txt,cargo-check-contracts.txt,cargo-check-domain.txt,cargo-test-contracts.txt,cargo-test-domain.txt,redaction-scan.txt}`.
+An optional summary is derived only from those raw files at
+`reports/runs/<run_id>/suites/contract-domain-fast.md`;no static pass artifact or `latest` alias is
+valid. No service/store/query/API/worker/job/report/replay coverage may be claimed by this slice.

@@ -1,0 +1,216 @@
+# commit-06-b implementation ledger
+
+| field | value |
+|---|---|
+| project | `L2-tools` |
+| boundary_id | `commit-06-b` |
+| phase | `PH-06` |
+| predecessor | `commit-06-a` |
+| next_boundary | `commit-06-c` |
+| design_baseline | `not_fixed_until_handoff` |
+| implementation_repo | `/home/aris/Projects/quantalithos-tools` (`absent`) |
+| status | `planned` |
+| gate_status | `pending` |
+| next_allowed_action | `wait_until_current` |
+| current_recovery_point | `future_boundary_not_active` |
+
+> Planned design-handoff ledger only. It contains no implementation commit, command result, run, artifact, report, evidence, verdict, risk acceptance or signoff.
+
+## Boundary Intent
+
+| item | contract |
+|---|---|
+| objective | Implement the four-gate safe-handoff eligibility decision and immutable body-free handoff material mapping. |
+| formal authority | formal 03 safe-handoff objects/CF-12/OBS/redaction; formal 05 HANDOFF-001~004/OBS; formal 06 AC-021/VF; formal 07 §§6~10 |
+| primary selector | HANDOFF-001~004 and OBS-001~006 |
+| planned title | `feat(handoff): add safe material eligibility` |
+| required body groups | `Four-gate eligibility:`; `Body-free material mapping:` |
+| next boundary | `commit-06-c` |
+
+## Activation Guard
+
+| rule | required observation | current observation | consequence |
+|---|---|---|---|
+| project ledger | `current_boundary = commit-06-b` | Project ledger has not advanced to this future boundary. | Remain planned; do not edit implementation files. |
+| predecessor | real Commit and Handoff Gate for `commit-06-a` | `pending` | Inactive until predecessor is closed. |
+| immutable baseline | authorized formal 00~07 baseline recorded | `not_fixed_until_handoff` | Design Gate cannot pass. |
+| target worktree | authorized repository, branch and initial status recorded | repository `absent` | Worktree/Build/Test Gates cannot run. |
+
+## Required Reads
+
+| document | required section | status | purpose |
+|---|---|---|---|
+| `projects/L2-tools/design-calibration/project_execution_ledger.md` | current design recovery and `L2T-UP-001~009` | `pending` | recover project-level truth and blockers |
+| `projects/L2-tools/design-calibration/implementation_execution_ledger.md` | current boundary and state machine | `pending` | prove activation authority |
+| `projects/L2-tools/07-实施计划.md` | §§3, 6, 7, 8, 10, 11, 12 | `pending` | reads, scope, checks, controls, commit and completion |
+| `design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | exact `commit-06-b` row and batches | `pending` | exact scope and batch authority |
+| `design-calibration/07_implementation_plan_step_07_tests_acceptance_gates.md` | exact `commit-06-b` selector/gate row | `pending` | test and evidence direction |
+| `design-calibration/07_implementation_plan_step_08_config_environment_dependencies.md` | phase readiness and dependency classification | `pending` | environment and unavailable behavior |
+| `design-calibration/07_implementation_plan_step_10_rollback_pause_change_control.md` | PAUSE/RB/change rules | `pending` | failure and recovery discipline |
+| `design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | exact planned title/body groups | `pending` | commit and handoff discipline |
+| formal/calibration authority | formal 03 safe-handoff objects/CF-12/OBS/redaction; formal 05 HANDOFF-001~004/OBS; formal 06 AC-021/VF; formal 07 §§6~10; 03_ddd_step_06_module_outcome_audit_handoff_annex.md; safe-handoff command-flow/state/observability annexes | `pending` | exact schema, flow, state and oracle source |
+| governing standards | code ledger, truth-closure, directory and Rust standards | `pending` | fixed state, layout, Rustdoc and safety rules |
+
+## Allowed Scope
+
+| type | path_or_rule | state |
+|---|---|---|
+| allowed_rule | safe-handoff eligibility rules and immutable material carriers | `planned` |
+| allowed_rule | four-gate mapper and redaction/source allowlist | `planned` |
+| allowed_rule | pure eligibility, missing-ref, forbidden-body and deterministic mapping tests | `planned` |
+| allowed_rule | targeted tests and fixtures owned by this boundary may change with the owning behavior | `planned` |
+| forbidden_rule | target provider execution, event transport, route or readiness ownership | `active` |
+| forbidden_rule | raw body, capture, secret value or full sensitive reference | `active` |
+| forbidden_rule | delivery/Observed inference or external side effects | `active` |
+| forbidden_rule | no unrelated staging, cross-boundary implementation or user-owned worktree changes | `active` |
+| forbidden_rule | no implementation-side schema, Port, state, config, fallback, evidence or owner invention | `active` |
+
+## Batch Plan
+
+| batch | objective | local gate | status |
+|---|---|---|---|
+| `BATCH-06-B1` | Implement the four eligibility checks and typed reasons. | gate ordering and negative matrix | `planned` |
+| `BATCH-06-B2` | Implement immutable body-free handoff material. | source/ref construction and no-body checks | `planned` |
+| `BATCH-06-B3` | Implement pure mapper and redaction fixtures. | HANDOFF-001~004/OBS closure | `planned` |
+
+Each batch targets a 100~300 line locally reviewable increment. Larger or higher-risk work must be split without crossing this boundary.
+
+## Design Closure Gate
+
+| closure item | required conclusion before code | status |
+|---|---|---|
+| field/support carrier | every field/reason/summary/ref-set/kind/status has one formal owner and type | `pending` |
+| DTO construction | request/result/event/job/receipt/report is constructible from formal metadata and sources | `pending` |
+| typed reference | kind, owner, ordering, deduplication and missing semantics are exact | `pending` |
+| callable/Port | domain member, Store/Port method, mapper and entry callable are exact | `pending` |
+| state/transition | current/reserved/illegal/terminal/unknown and phase effects are explicit | `pending` |
+| persistence/idempotency | key/digest/version/UoW/CAS/stored replay/commit unknown are closed | `pending` |
+| Query/Job material | read source or frozen job plan/output is complete with no-write/no-repair | `pending` |
+| config binding | formal key/source/profile/activation/failure is closed where applicable | `pending` |
+| test/evidence | selector/data/raw/report/pairing/redaction/failure retention has an owner | `pending` |
+| responsibility | Runtime/Hub/Auth/Sandbox/Bus/Obs/SDK truth stays outside L2 | `pending` |
+| Rustdoc | all public declarations, fields, variants/payloads, traits, methods and callables have complete English `///` | `pending` |
+| phase closure | no later-boundary object, result, job, report or evidence is consumed | `pending` |
+
+Any unresolved closure item sets `gate_status=blocked` and `next_allowed_action=wait_design`; code-side aliases or defaults are forbidden.
+
+## Required Checks
+
+| check | planned command or oracle | current state |
+|---|---|---|
+| format | `cargo fmt --check` after the target workspace exists | `pending` |
+| compile | `cargo check --workspace` plus affected-package check | `pending` |
+| targeted behavior | four eligibility gates, missing/conflicting refs, forbidden body/secret fields, deterministic material and redaction | `pending` |
+| static boundary | body-free public/material surface; no transport/provider call; only allowlisted safe refs | `pending` |
+| whitespace | target repo `git diff --check`, then staged `git diff --cached --check` | `pending` |
+| evidence | applicable raw/report/check remains `not_created` until a real fixed run | `not_created` |
+
+## Worktree Gate
+
+| check | required observation | status |
+|---|---|---|
+| repository | authorized target git worktree exists | `pending` |
+| initial status | branch, HEAD and exact initial `git status --short` captured | `pending` |
+| user-owned changes | unrelated changes identified and protected | `pending` |
+| touched/staged scope | all paths map to Allowed Scope | `pending` |
+| destructive actions | no reset/checkout/cleanup/cross-boundary staging | `pending` |
+
+## Build Gate
+
+| check | pass contract | status |
+|---|---|---|
+| format/compile | actual commands exit successfully with safe output recorded | `pending` |
+| Rustdoc | nested public Rustdoc coverage passes review/static checks | `pending` |
+| dependency/static | boundary-specific static checks pass | `pending` |
+| whitespace | unstaged and staged whitespace checks pass at their gate | `pending` |
+
+## Test Gate
+
+| check | contract | status |
+|---|---|---|
+| selector | HANDOFF-001~004 and OBS-001~006 expands to exact formal TC identities at execution time | `pending` |
+| positive/negative | four eligibility gates, missing/conflicting refs, forbidden body/secret fields, deterministic material and redaction | `pending` |
+| replay/concurrency | applicable duplicate, stale, race, unknown and no-write/no-repair branches run | `pending` |
+| affected regression | owning suites run without changing the canonical 234 denominator | `pending` |
+| failure retention | failures remain immutable and addressable | `pending` |
+
+## Evidence Gate
+
+| item | canonical contract | current state |
+|---|---|---|
+| raw artifacts | `artifacts/test/<run_id>` with explicit run/profile/baseline context | `not_created` |
+| reports | `reports/runs/<run_id>` derived from matching same-run raw | `not_created` |
+| checks/index | applicable mandatory checks and evidence index with same-run provenance | `not_created` |
+| acceptance | only `draft / review_required`; no verdict, risk acceptance or signoff | `not_created` |
+
+Paths and schemas in this section are not evidence until a real run creates valid same-run material. `latest`, static pass and cross-run stitching are forbidden.
+
+## Gate Matrix
+
+| gate | status | evidence | next_if_failed |
+|---|---|---|---|
+| activation_gate | `pending` | Project ledger has not advanced to this future boundary. | `wait_until_current` |
+| design_gate | `pending` | Immutable baseline and required-read evidence are absent. | `wait_design` |
+| scope_gate | `pending` | No target-repository diff exists. | `fix_gate_failure` |
+| worktree_gate | `pending` | Target repository audit is absent. | `fix_gate_failure` |
+| build_gate | `pending` | No build command has run. | `fix_gate_failure` |
+| test_gate | `pending` | No targeted test has run. | `fix_gate_failure` |
+| evidence_gate | `pending` | No raw/report/evidence instance exists. | `fix_gate_failure` |
+| commit_gate | `pending` | No staged scope or commit exists. | `fix_gate_failure` |
+| handoff_gate | `pending` | No implementation handoff exists. | `handoff` |
+
+## Commit Gate
+
+| item | pass condition | status |
+|---|---|---|
+| staged_scope | only this boundary's allowed files are staged | `pending` |
+| unrelated_changes | user and other-agent changes remain untouched and unstaged | `pending` |
+| commit_message | planned subject is `feat(handoff): add safe material eligibility` with required groups `Four-gate eligibility:` and `Body-free material mapping:` | `pending` |
+| Rustdoc/source language | complete English public Rustdoc and repository source-language rules | `pending` |
+| whitespace | staged whitespace check passes | `pending` |
+| required_checks | every applicable check has actual evidence or reasoned N/A | `pending` |
+
+## Commit Record
+
+| field | value |
+|---|---|
+| planned_commit_message | `feat(handoff): add safe material eligibility`; planned only |
+| staged_files_checked | `pending` |
+| commit_message_checked | `pending` |
+| committed_hash | `none` |
+| committed_message | `none` |
+| post_commit_status | `pending` |
+
+## Handoff Gate
+
+| item | required record | status |
+|---|---|---|
+| committed hash/message | exact real commit values | `pending` |
+| gates run | actual commands and safe same-run paths | `pending` |
+| tests not run | exact selector and reason; no silent omission | `pending` |
+| blockers | remaining structured blocker IDs and owners | `pending` |
+| next boundary | must become `commit-06-c` only after project-ledger transition | `pending` |
+| user changes | actual protected worktree changes | `pending` |
+| conclusion | never prefill pass or completion | `pending` |
+
+## Blockers
+
+| blocker_id | gate/scope | status | reason | next_allowed_action |
+|---|---|---|---|---|
+| `BLK-L2T-COMMIT_06_B-ACTIVATION-001` | Activation | `planned` | Project ledger has not advanced through predecessor handoff. | `wait_until_current` |
+
+Upstream seam blockers do not become local success through fakes. Unaffected local/negative work may proceed only after this boundary is actually activated.
+
+## Experience Review
+
+| item | conclusion | action |
+|---|---|---|
+| boundary-specific review | Eligibility source, immutable material, body-free mapping and redaction are applicable; target execution and route readiness are external. | Recheck exact formal/calibration sources before implementation. |
+| ownership | Runtime/Hub/Auth/Sandbox/Bus/Obs/SDK redlines remain binding. | Return owner-truth requests to the owning project. |
+| evidence provenance | same-run/no-static/no-cross-run rules apply. | Preserve failures; never create aliases or pass files. |
+| planned skeleton | file presence is not activation or progress. | Keep every gate non-pass until actual evidence exists. |
+| design-time truthfulness | no implementation fact exists. | Do not infer a commit, command result, run, evidence, verdict or signoff. |
+
+## Current Conclusion
+
+`planned / wait_until_current / implementation not authorized`.

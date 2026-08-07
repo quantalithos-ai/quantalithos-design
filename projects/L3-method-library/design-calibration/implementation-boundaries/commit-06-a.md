@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-06-a |
 | phase | PH-06 traceability, impact, audit and evidence lineage |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `current-design-with-commit-06-a-ph06-contract-domain-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future trace/audit/impact/lineage contracts-domain boundary; cannot start until `commit-05-b` is implemented and project ledger advances |
+| status | ready_for_design_gate |
+| next_allowed_action | read_docs |
+| current_recovery_point | Design commit `ea99688411602fc73c24d011507042b271fac755` closes the prior PH-06 blockers;restart from this ledger, formal `07` and every Required Read, protect user-owned `?? .gitignore`, then independently rerun Design/Scope/Worktree Gate before implementation edits. |
 
 ---
 
@@ -17,9 +17,9 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-06-a` | planned | If project ledger still points to an earlier boundary, implementation agent must not use this file to modify code. |
-| `commit-05-b` handoff must be closed | planned | Distribution/handoff semantics services must exist before trace/audit/impact contracts-domain work starts. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-06-a` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-06-a` | pass | Project ledger now points to `commit-06-a`;implementation may use this file only within the trace/audit/impact/lineage contracts-domain scope. |
+| `commit-05-b` handoff must be closed | pass | Distribution/handoff services and run-scoped evidence are closed by implementation commit `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73` and design-ledger handoff `95c7eeaaba9f71f0063b48c80b33d9519350a487`. |
+| project ledger must set `next_allowed_action = read_docs` for `commit-06-a` | pass | Project ledger and implementation ledger both require a fresh read cycle against design commit `ea99688411602fc73c24d011507042b271fac755`;no prior gate result may be reused. |
 
 ---
 
@@ -27,29 +27,30 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This future boundary cannot be executed until it becomes current. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented trace material, audit state, evidence lineage schema, redaction rule or report schema | pending | Missing trace/audit/impact/evidence field or safe marker must return to design. |
-| `standards/coding/rust.md` | Rust contract/domain module, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
-| `projects/L3-method-library/00-需求文档.md` | traceability, impact, audit and evidence lineage P0 scope | pending | Trace/audit must be refs-only and must not expose raw body or unsafe provider material. |
-| `projects/L3-method-library/01-架构设计.md` | trace/audit component ownership, evidence lineage and redaction boundary | pending | `VETO-ML-005` / `VETO-ML-006` apply to leaks and untraceable evidence. |
-| `projects/L3-method-library/02-概要设计.md` | trace material, audit trail, impact summary and lineage object outline | pending | Use the current object/component split; do not introduce query projection or report generator behavior. |
-| `projects/L3-method-library/03-详细设计.md` | trace/audit/impact/lineage object, protocol, state, error and test cut contracts | pending | Formal source for typed refs, evidence refs, redaction-safe surfaces and state guards. |
-| `projects/L3-method-library/04-配置设计.md` | redaction, observability and evidence/report boundary | pending | This boundary defines contracts/domain only; no runtime report generator or transport. |
-| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast trace/audit/impact/lineage and artifact/report rules | pending | Targeted report must derive from raw artifact if generated. |
-| `projects/L3-method-library/06-验收标准.md` | ML-FG-004/009/010/011, ML-RL-004/009, `VETO-ML-005` and `VETO-ML-006` | pending | Raw body leaks and untraceable evidence are blocking. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Current source for phase, boundary, allowed scope, checks and commit discipline. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | trace/audit/impact/evidence lineage module boundary | pending | Keep PH-06 contracts/domain separate from services/stores and report generation. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | trace material, audit trail, impact summary, lineage/evidence refs and safe markers | pending | Required typed refs, redaction constraints and state fields must be formal. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | trace/audit/impact contracts and future port seams | pending | This boundary may define contracts/domain surfaces only where formal; no service/store implementation. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | trace/audit/impact DTO shells and safe public result contracts | pending | Public surfaces must be refs-only and body-free. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | trace/audit/impact and evidence lineage state guards | pending | Domain state transitions must match formal state matrix. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | trace/audit/impact safe error surfaces | pending | Errors must be safe, body-free and source-ref based. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | stored replay and evidence consistency constraints | pending | Contracts must support replay/evidence consistency without duplicate truth mutation. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast trace/audit/impact/lineage ownership | pending | Use trace/audit contract-domain slice only. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-06-a` row | pending | Allowed scope is trace material, audit trail, impact summary and lineage/evidence refs. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-06-a` gate row and PH-06 gate | pending | Required checks are contract-domain-fast trace/audit/impact/lineage and redaction-aware report seed checks. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-06-a` commit body grouping | pending | Commit body must include `Trace and audit contracts:` and `Evidence lineage state:`. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-05-b` handoff state | latest implementation state | pending | Must confirm distribution/handoff services landed before this boundary starts. |
+| `standards/document/代码实施台账与门禁规范.md` | current boundary activation, gate matrix, commit and handoff rules | pending | Reread before gate decision;missing design closure must set blocked / wait_design. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented trace carrier, state, port, marker, config or evidence schema | pending | Missing exact source/field/helper remains a design blocker. |
+| `standards/coding/rust.md` | Rust contracts/domain module, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
+| `projects/L3-method-library/00-需求文档.md` | traceability, impact, audit and evidence lineage P0 scope | pending | Trace/audit must remain refs-only and body-free. |
+| `projects/L3-method-library/01-架构设计.md` | trace/audit ownership, evidence lineage and redaction boundary | pending | `VETO-ML-005` / `VETO-ML-006` remain blocking. |
+| `projects/L3-method-library/02-概要设计.md` | trace material, audit trail, impact summary and lineage object outline | pending | Treat historical labels as upstream outline;formal `03` §6.3E is the exact implementation overlay. |
+| `projects/L3-method-library/03-详细设计.md` | §6.3E PH-06 exact contracts/domain closure and carve-outs | pending | Primary formal source for wrappers, carriers, fields, states, helpers and errors. |
+| `projects/L3-method-library/04-配置设计.md` | redaction, observability and evidence/report boundary | pending | No runtime config, transport or report generator may enter this boundary. |
+| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast trace/audit/impact/lineage and artifact/report rules | pending | Targeted evidence must derive from actual raw artifacts. |
+| `projects/L3-method-library/06-验收标准.md` | ML-FG-004/009/010/011, ML-RL-004/009, `VETO-ML-005` and `VETO-ML-006` | pending | Raw body leaks and untraceable evidence remain blocking. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6 commit-06-a, §7 PH-06, §11 and §12 | pending | Exact current scope/check/commit discipline. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | trace/audit/impact/evidence lineage module boundary | pending | Contracts/domain scope remains separate from service/store/report generation. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | PH-06 closure supplement and source/constructor correction | pending | Exact wrapper fields, ref sets, support carriers, object fields and pure helper mutations. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | `commit-06-a` no callable port override | pending | Earlier repository tables are future direction only;no current port/fake implementation. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | trace/audit/impact protocol family boundary | pending | No public handler/body shell is authorized for this contracts/domain slice. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | `commit-06-a` pure state guard override | pending | Separate impact kind from lifecycle state and apply exact mutations. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | `commit-06-a` persistence carve-out | pending | No repository, fake, durable row, UoW, replay or persistence surface. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | `commit-06-a` existing-error mapping override | pending | No new domain/repository/service/transport error family. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | stored replay and consistency future boundary | pending | Confirm replay/concurrency behavior is not implemented in `commit-06-a`. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | `commit-06-a` exact contract-domain-fast cut | pending | Exact focused assertions and six raw artifact names. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-06-a` exact row | pending | Verify contracts/domain-only allowed/forbidden scope. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-06-a` exact gate row | pending | Verify targeted tests/redaction and run-scoped evidence. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-06-a` commit body grouping | pending | Commit body groups remain `Trace and audit contracts:` / `Evidence lineage state:`. |
+| `/home/aris/Projects/quantalithos-method-library` git status, identity and `commit-05-b` handoff | latest implementation state | pending | Must confirm HEAD `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`,identity and user-owned `.gitignore` before edits. |
 
 ---
 
@@ -57,9 +58,9 @@
 
 | type | path_or_rule | status |
 |---|---|---|
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/contracts/src/**` for trace material DTOs, audit trail DTOs, impact summary DTOs, lineage/evidence refs, safe marker wrappers and public error/result shells assigned to `commit-06-a` | planned |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/contracts/src/**` for exact PH-06 typed refs, wrappers/ref sets, body-free summaries and state carriers assigned to `commit-06-a` | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/contracts/tests/**` for trace/audit/impact/lineage contract fixture tests | planned |
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/domain/src/**` for trace material domain objects, audit trail domain objects, impact summary guards, lineage/evidence ref guards and safe errors assigned to `commit-06-a` | planned |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/domain/src/**` for the four exact PH-06 objects, pure constructors/invariants/transitions and reuse of existing safe domain errors | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/domain/tests/**` for trace/audit/impact/lineage domain guard tests | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/artifacts/test/<run_id>/suites/contract-domain-fast/**` only if generated by an actual targeted run after activation | planned |
 | allowed_path | `/home/aris/Projects/quantalithos-method-library/reports/runs/<run_id>/suites/contract-domain-fast.md` only if generated from raw artifact after activation | planned |
@@ -79,10 +80,10 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-06-a` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-05-b` implementation commit and handoff recorded | pending | Distribution/handoff service slice must exist. |
-| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
-| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
+| activation guard | project and implementation ledgers show `current_boundary = commit-06-a`,baseline `current-design-with-commit-06-a-ph06-contract-domain-closure`,and `next_allowed_action = read_docs` | pass | Design commit `ea99688411602fc73c24d011507042b271fac755` is published;fresh read/gate cycle is required. |
+| prior handoff | `commit-05-b` implementation commit and handoff recorded | pass | PH-05 distribution/handoff service slice is recorded at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`, with handoff closed in the design ledger. |
+| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded before any implementation edit as only user-owned `?? .gitignore`;file remains untouched and unstaged. |
+| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
 | workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
 | contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Use actual package name from formal workspace once activated. |
@@ -100,10 +101,10 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-05-b` to `commit-06-a`. | wait_until_current |
-| design_gate | pending | Implementation agent must reread Required Reads and confirm trace/audit/impact/lineage fields, refs, safe markers and redaction closure. | wait_design |
-| scope_gate | pending | Planned changes must be limited to trace/audit/impact/lineage contracts-domain and focused tests. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
+| activation_gate | pass | Project ledger has advanced from `commit-05-b` to `commit-06-a`, and the prior boundary handoff is closed. | read_docs |
+| design_gate | pending | Must be independently rerun after every Required Read is marked pass against `ea99688411602fc73c24d011507042b271fac755`;no old blocked/pass conclusion is reusable. | wait_design |
+| scope_gate | pending | Must verify implementation needs only contracts/domain/tests/run-scoped artifacts and no callable/persistence surface. | wait_design |
+| worktree_gate | pass | Initial status recorded as only user-owned `?? .gitignore`;it remains untouched and unstaged. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/contract/domain checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
 | test_gate | pending | Contract-domain-fast trace/audit/impact/lineage, redaction targeted seed and VETO targeted checks pass after activation. | fix_gate_failure |
 | evidence_gate | pending | Targeted artifact/report is optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
@@ -143,7 +144,10 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-06A-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced through `commit-05-b`; this future boundary must not be used for implementation yet. | After `commit-05-b` handoff, update project ledger to `commit-06-a` and set this boundary to current. | wait_until_current |
+| BLK-ML-06A-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-05-b`;this future boundary could not be used for implementation yet. | Project ledger now advances to `commit-06-a`,records `commit-05-b` handoff closure and sets this boundary to current. | read_docs |
+| BLK-ML-06A-DESIGN-001 | design_gate | resolved | The prior baseline lacked exact wrappers/ref sets/support/object schema. | Formal `03` §6.3E and Step 6 now close exact kinds, wrapper fields/accessors, multi-kind conversion error, first-seen sets, safe reason, summaries, serde and object fields in design commit `ea99688411602fc73c24d011507042b271fac755`. | read_docs |
+| BLK-ML-06A-DESIGN-002 | design_gate | resolved | The prior baseline did not distinguish current pure helpers from future port/persistence candidates. | Formal `03` §6.3E plus Step 7/11 overrides close helper mutations/error ownership and forbid current application/service/repository/fake/resolver/mapper/UoW/persistence work. | read_docs |
+| BLK-ML-06A-DESIGN-003 | design_gate | resolved | The prior baseline lacked exact lifecycle/category split and test/evidence closure. | Step 10/12/16 overrides and formal `07` close legal transitions, marker writes, focused tests, targeted redaction and run-scoped artifacts. | read_docs |
 
 ---
 
@@ -152,4 +156,4 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| trace/audit redaction closure | existing design-closure rule applies | Trace material, audit trail, impact summary, lineage/evidence refs and redaction marker gaps must be fixed in `03/05/06/07` before code; implementation must not invent body-bearing or untraceable evidence semantics. |
+| trace/audit redaction closure | ready_for_design_gate | Design commit `ea99688411602fc73c24d011507042b271fac755` closes current contracts/domain semantics;implementation must still reread and independently validate before code. |

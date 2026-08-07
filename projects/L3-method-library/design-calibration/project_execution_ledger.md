@@ -1,8 +1,8 @@
 # L3-method-library 项目设计讨论执行台账
 
 > 创建日期: 2026-06-15
-> 最近更新: 2026-08-05
-> 当前任务: `commit-05-b` disabled publication outcome design closure 已由设计提交 `e12f092` 完成。项目级 implementation ledger 和当前 boundary ledger 已重置为 `ready_for_design_gate / read_docs`;实现侧必须保护现有 WIP 并重新读取全部 Required Reads。
+> 最近更新: 2026-08-07
+> 当前任务: `commit-06-a` PH-06 contracts/domain design closure 已由设计提交 `ea99688411602fc73c24d011507042b271fac755` 完成。项目级 implementation ledger 和当前 boundary ledger 已重置为 `ready_for_design_gate / read_docs`;实现侧必须保护用户未跟踪 `.gitignore`,重新读取全部 Required Reads 并独立重跑 Design/Scope/Worktree Gate。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-05-b design closure ready for gate` | ready_for_design_gate | Design commit `e12f092` closes port-owned disabled diagnostics, adapter-first safe outcome mapping, persistence/reentry and test redlines;prior gate evidence is superseded. | read_docs:保护现有 WIP,全量重读 Required Reads,再独立重跑 Design/Scope Gate。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-05-b.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-06-a PH-06 design closure ready for gate` | ready_for_design_gate | Design commit `ea99688411602fc73c24d011507042b271fac755` closes exact PH-06 wrappers/ref sets/body-free carriers、pure-domain helpers/state/error mapping、test artifacts and the no-port/no-persistence carve-out;the prior blocked gate conclusion is superseded. | read_docs:保护用户未跟踪 `.gitignore`,全量重读 Required Reads,再独立重跑 Design/Scope/Worktree Gate。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-06-a.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-05-b` ready for fresh gate | read_docs | 正式 `07-实施计划.md` 已同步 disabled publication outcome closure;实现侧须先重读 Required Reads / 重跑 Design/Scope Gate。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-06-a` ready for fresh gate | read_docs | 正式 `07-实施计划.md` 已同步 PH-06 contracts/domain exact scope、carve-out 和 run-scoped checks;实现侧须先重读 Required Reads / 重跑 Design/Scope/Worktree Gate。 |
 
 ---
 
@@ -89,6 +89,9 @@
 | BLK-ML-05A-DESIGN-003 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-05-a.md` | resolved | `commit-05-a` allowed scope 要求 availability marker wrappers/tests,但 Step 10 / Step 12 曾只留下 marker source watch / design blocker,实现会被迫自补 marker schema。 | formal `03` §6.3C、Step 6 `4C.2`、Step 10 `8.2` 和 Step 12 `6.1` 已闭合 `MethodAssetConsumptionAvailabilityMarker`、target/source enums、copy-only rule、missing-source blocker 和禁止 raw error/fake marker synthesis。 |
 | BLK-ML-05B-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-05-b.md` | resolved | `commit-05-b` 曾只有 family-level distribution/handoff seams,缺 exact application facade、service input source map、repository/UoW/stored-result surface 和 fake parity,实现若继续会自补 downstream truth、delivery semantics 或 fake-only mapping。 | formal `03` §6.3D、Step 7 closure patch、Step 9 flow overlay、Step 11 persistence/UoW overlay 和 formal `07` 已闭合 distribution/handoff facade、selector/source carriers、service inputs、support/ref factory、builder/target/publisher/handoff ports、outcome shell、stored result/UoW、fake parity 和 carve-outs。 |
 | BLK-ML-05B-DESIGN-003 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-05-b.md` | resolved | adapter/target `Disabled` 缺少 publication safe outcome 所需 typed diagnostic,实现只能静默停止或私造 diagnostic/outcome mapping。 | 设计提交 `e12f092` 在 Step 6/formal 03/Step 7/9/10/11/12/13/16/formal 07 闭合 port-owned diagnostic、adapter-first mapping、target-set source、factory-issued outcome persistence、no-call/no-rollback/reentry/tests。 |
+| BLK-ML-06A-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `commit-06-a` 曾缺 exact Rust-facing typed-ref kinds/wrappers、multi-kind trace source、ref-set shape/order、body-free support carriers 和 complete object fields。 | 设计提交 `ea99688411602fc73c24d011507042b271fac755` 的 formal `03` §6.3E 与 Step 6 PH-06 closure 已闭合 exact kinds、wrapper fields/accessors、first-seen sets、safe reason、summary/state/object fields 和 serde labels。 |
+| BLK-ML-06A-DESIGN-002 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `commit-06-a` 曾无法区分 pure contracts/domain helper 与 Step 7/11 future repository/service 候选,实现可能私补 callable port、persistence 或 marker source。 | 设计提交 `ea99688411602fc73c24d011507042b271fac755` 已闭合 pure constructors/mutations、现有错误映射和 no application/service/repository/fake/resolver/mapper/UoW/persistence carve-out;future callable surface 后移 `commit-06-b`。 |
+| BLK-ML-06A-DESIGN-003 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `commit-06-a` 曾缺 exact lifecycle/category split、legal/illegal transition 和 concrete fixture/evidence artifact closure。 | 设计提交 `ea99688411602fc73c24d011507042b271fac755` 的 Step 10/12/16 overrides 与 formal `07` 已闭合 four state carriers、impact-kind preservation、safe-reason mutations、focused tests、targeted redaction 和 six run-scoped raw artifact names。 |
 
 ---
 
@@ -101,11 +104,11 @@
 2. 读取 `design-calibration/07_implementation_plan_calibration_flow.md`
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 读取 `design-calibration/implementation_execution_ledger.md`
-5. 读取 `design-calibration/implementation-boundaries/commit-05-b.md`
+5. 读取 `design-calibration/implementation-boundaries/commit-06-a.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前是 `commit-05-b` / `ready_for_design_gate` / `read_docs`,baseline 为 `current-design-with-commit-05-b-disabled-outcome-closure`,设计提交为 `e12f092`
-8. 保护实现仓现有 WIP 与用户未跟踪 `.gitignore`,全量重读 Required Reads,独立重跑 Design/Scope/Worktree Gate;gate pass 后才可继续 Allowed Scope 代码与 tests
-9. 若重跑时再次发现 distribution/handoff facade、selector/source map、port、outcome shell、stored-result/UoW、fake parity、allowed scope 或 tests 仍有未闭口矛盾,实现侧必须重新回写 `blocked / wait_design`,然后从项目级 implementation ledger 和当前 boundary ledger 重新开始
+7. 确认 implementation ledger 当前是 `commit-06-a` / `ready_for_design_gate` / `read_docs`,baseline 为 `current-design-with-commit-06-a-ph06-contract-domain-closure`,设计提交为 `ea99688411602fc73c24d011507042b271fac755`
+8. 保护实现仓用户未跟踪 `.gitignore`,全量重读 Required Reads,独立重跑 Design/Scope/Worktree Gate;gate pass 后才可继续 Allowed Scope 代码与 tests
+9. 若重跑时发现 exact kind/wrapper/set、carrier field、state/helper/error/source、test artifact、no-port/no-persistence carve-out 或 allowed scope 仍有未闭口矛盾,实现侧必须重新回写 `blocked / wait_design`,然后从项目级 implementation ledger 和当前 boundary ledger 重新开始
 ```
 
 ---
@@ -113,8 +116,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`commit-05-b` disabled publication outcome design closure 已由 `e12f092` 完成;
-当前 boundary 是 `commit-05-b`,baseline 是 `current-design-with-commit-05-b-disabled-outcome-closure`,状态为 `ready_for_design_gate / read_docs`;
-下一步由实现侧保护现有 WIP 与用户未跟踪 `.gitignore`,按 boundary 全量重读 Required Reads 并重跑 Design/Scope/Worktree Gate;不得沿用旧 `8e31a2f` gate 结论;
-实现侧仍不得私补 diagnostic、selector/source/seam map、helper ref kind、outcome shell、repository/UoW method、fake-only marker/map、downstream truth、real delivery、transport/config key、durable distribution material store、full relation lifecycle/list/page、PH-06 lineage/event payload or evidence schema;若重跑 gate 发现新缺口,必须回写 blocked / wait_design.
+`commit-06-a` PH-06 contracts/domain closure 已由 `ea99688411602fc73c24d011507042b271fac755` 完成;
+当前 boundary 是 `commit-06-a`,baseline 是 `current-design-with-commit-06-a-ph06-contract-domain-closure`,状态为 `ready_for_design_gate / read_docs`;
+下一步由实现侧保护用户未跟踪 `.gitignore`,按 boundary 全量重读 Required Reads 并重跑 Design/Scope/Worktree Gate;不得沿用旧 blocked 结论;
+实现侧只允许 contracts/domain pure carriers、state guards 和 direct tests,不得私补 application/service/repository/fake/durable/resolver/mapper/UoW/replay/persistence/query/refresh/API/worker/publisher/job/report、raw body、config 或 evidence schema;若重跑 gate 发现新缺口,必须回写 blocked / wait_design.
 ```

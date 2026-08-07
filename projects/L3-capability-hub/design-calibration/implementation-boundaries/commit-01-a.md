@@ -5,22 +5,24 @@
 | project | L3-capability-hub |
 | boundary_id | commit-01-a |
 | phase | PH-01 |
-| design_baseline | not_fixed_until_handoff |
-| implementation_repo | /home/aris/Projects/quantalithos-capability-hub (not established) |
-| status | blocked |
-| gate_status | blocked |
+| design_baseline | historical c10a0994fee6a83d32a520a47e49d9ce0a4ae4e6; superseded for future activation by the pending repair anchor |
+| implementation_repo | /home/aris/Projects/quantalithos-capability-hub (verified Git worktree) |
+| status | completed_historically |
+| historical_gate_status | pass / committed |
+| current_requalification_status | pending under the new design repair anchor |
+| gate_status | not_applicable |
 | next_allowed_action | wait_design |
-| current_recovery_point | handoff-preflight / repository-and-baseline prerequisite |
+| current_recovery_point | preserve the historical handoff; wait for the repair anchor before any requalification |
 
-> Planned design-handoff skeleton only. It contains no implementation fact and does not authorize code changes.
+> The historical PH-01 handoff at `a4df225e3eba8cca611da3ca78f198ae36ec9045` remains authoritative in the implementation-repository ledger. `current_requalification_status=pending` means only that this historical boundary has not been requalified against the new repair anchor; it does not change the historical gate result or authorize new code.
 
 ## Activation Guard
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary equals commit-01-a | blocked | Current for recovery accounting; repository and baseline are missing. |
-| predecessor handoff is closed | blocked | No predecessor implementation fact exists; real preflight is required. |
-| activation permission | blocked | Do not edit implementation code. |
+| project ledger current_boundary equals commit-01-a | not_applicable | This boundary is historical; project ledger has advanced to `commit-02-a`. |
+| predecessor handoff is closed | not_applicable | This was the first boundary and its real handoff is complete. |
+| activation permission | not_applicable | Do not reactivate or rewrite PH-01 history. |
 
 ## Required Reads
 
@@ -79,15 +81,15 @@
 | field | exact contract |
 |---|---|
 | boundary_readiness | target repo, git/worktree, toolchain, core-contracts path, seven-member layout and user-change inventory |
-| primary_selector | FOUNDATION-001,008..011,013..015 |
-| targeted_selector | workspace manifest; all public skeletons; dependency probe |
+| primary_selector | none |
+| targeted_selector | FOUNDATION-001,008..011,013..015 workspace manifest; all public skeletons; dependency probe; canonical assembly owner=`commit-11-a`; semantic source/oracle remains formal `03/04/05/06` and the corresponding boundary owners |
 | planned_commands | cargo fmt --check; cargo check --workspace; git diff --check; check_dependency_boundary.sh --scope workspace; check_rustdoc_coverage.sh --scope public-skeleton |
 | gate_set | GATE-01, GATE-07 |
-| raw_report_contract | artifacts/test/<run_id>/raw; reports/runs/<run_id>/suites/static-contract-docs/; reports/runs/<run_id>/checks/dependency-boundary/ |
-| evidence_contract | FOUNDATION raw rows with source path, member, declaration kind and Rustdoc status; no business EV |
+| raw_report_contract | artifacts/test/<run_id>/raw; targeted `reports/runs/<run_id>/suites/static-contract-docs/`; targeted `reports/runs/<run_id>/checks/dependency-boundary/` |
+| evidence_contract | targeted regression rows with source path, member, declaration kind, Rustdoc status and canonical assembly owner=`commit-11-a`; semantic source/oracle remains formal `03/04/05/06` and the corresponding boundary owners; no canonical TC/DS/EV raw and no business EV |
 | AC_VF_VETO_direction | AC-CH-023/026/032/035; VF-CH-012/013; VETO-CH-012/013 |
-| failure_return | Missing repository, immutable baseline, workspace layout, dependency boundary or Rustdoc source returns `wait_design`; no implementation gate may pass. |
-| execution_status | Planned contract only; no command, test, run, artifact, report or evidence instance has been created. |
+| failure_return | Missing repository, immutable baseline, workspace layout, dependency boundary or Rustdoc source returns `wait_design`; targeted verification cannot create or substitute a canonical primary. |
+| execution_status | Historical PH-01 execution is recorded in the implementation-repository ledger; no command, test, run, artifact, report or evidence has been created for current repair-anchor requalification. |
 | planned reviewer | repository owner + contracts owner |
 | planned title | chore(workspace): establish the capability hub workspace skeleton |
 | required body groups | Workspace and member layout:; Dependency and naming boundaries: |
@@ -97,14 +99,16 @@ Selector shorthand must be expanded to exact TC/DS/EV identities during implemen
 
 ## Required Checks
 
+> Pending rows below refer only to a possible current repair-anchor requalification. They do not replace the historical PH-01 gate, commit, run or handoff facts recorded in the implementation-repository ledger.
+
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation | project ledger current boundary and action | blocked | Repository and immutable baseline are absent. |
-| design closure | required reads and immutable design baseline | blocked | Dirty design HEAD cannot substitute for a baseline. |
+| activation | project ledger current boundary and action | not_applicable | This boundary is historical; its real implementation handoff is recorded in the implementation-repository ledger. |
+| design closure | required reads and immutable design baseline | pending | Requalification against the new repair anchor has not started; the historical PH-01 gate result is preserved unchanged. |
 | worktree ownership | target repository status and unrelated-file inventory | pending | Record before any edit. |
 | format/build | planned command contract | pending | No command has run in this design task. |
 | targeted behavior | workspace manifest; all public skeletons; dependency probe | pending | No test result exists. |
-| evidence/provenance | FOUNDATION raw rows with source path, member, declaration kind and Rustdoc status; no business EV | pending | Planned paths are not evidence. |
+| evidence/provenance | targeted FOUNDATION rows with source path, member, declaration kind, Rustdoc status and canonical assembly owner=`commit-11-a`; no canonical raw or business EV | pending | No current repair-anchor requalification path is evidence. Historical tooling paths remain in the implementation ledger. |
 | Rustdoc | declaration, field, variant/payload, trait, method and callable coverage | pending | Missing English /// blocks Commit Gate. |
 | responsibility/dependency | scope-appropriate checks | pending | Forbidden owner leakage is a veto. |
 | whitespace/staged scope | git diff --check; git diff --cached --check; staged-name review | pending | Must be target-repository output. |
@@ -154,26 +158,26 @@ No planned path is evidence until a real run creates it. latest and evidence-can
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | blocked | Target repository and immutable baseline are absent. | wait_design |
-| design_gate | blocked | Formal sources exist, but immutable baseline is absent. | wait_design |
+| activation_gate | not_applicable | This boundary is not current; historical completion remains recorded in the implementation-repository ledger. | wait_design |
+| design_gate | not_applicable | The current design gate belongs to `commit-02-a`; requalification of this historical boundary is pending the same repair anchor. | wait_design |
 | scope_gate | pending | No implementation diff exists. | fix_gate_failure |
 | worktree_gate | pending | No target-repository audit exists. | fix_gate_failure |
 | build_gate | pending | No build or Rustdoc command has run. | fix_gate_failure |
 | test_gate | pending | No targeted test has run. | fix_gate_failure |
-| evidence_gate | pending | No raw/report/evidence instance exists. | fix_gate_failure |
-| commit_gate | pending | No staged files or commit exists. | fix_gate_failure |
-| handoff_gate | pending | No implementation handoff exists. | handoff |
+| evidence_gate | pending | No raw/report/evidence instance exists for current repair-anchor requalification; historical PH-01 tooling records are preserved separately. | fix_gate_failure |
+| commit_gate | not_applicable | Historical implementation commit and handoff are recorded; no new implementation commit is authorized by this repair. | wait_design |
+| handoff_gate | not_applicable | Historical handoff is complete; no new implementation handoff is authorized by this repair. | wait_design |
 
 ## Evidence Contract
 
 | item | planned canonical contract | current state |
 |---|---|---|
-| raw artifacts | artifacts/test/<run_id>/raw with explicit run/profile/entry/baseline metadata | not_created |
-| suite reports | reports/runs/<run_id>/suites/<suite-id>.md from same-run raw | not_created |
-| gate summary | reports/runs/<run_id>/gate-summary.md and .json | not_created |
-| evidence index | reports/runs/<run_id>/evidence-index.md and .json only | not_created |
-| redaction/dependency audit | reports/runs/<run_id>/redaction-check.md and dependency-boundary.md | not_created |
-| acceptance/review draft | only under reports/acceptance or reports/review where applicable; never final verdict | not_created |
+| raw artifacts | artifacts/test/<run_id>/raw with explicit run/profile/entry/baseline metadata | not_created for repair-anchor requalification; historical PH-01 tooling roots are recorded in the implementation ledger |
+| suite reports | reports/runs/<run_id>/suites/<suite-id>.md from same-run raw | not_created for repair-anchor requalification; historical PH-01 tooling roots are recorded in the implementation ledger |
+| gate summary | reports/runs/<run_id>/gate-summary.md and .json | not_created for repair-anchor requalification; no business verdict is implied by historical tooling summaries |
+| evidence index | reports/runs/<run_id>/evidence-index.md and .json only | not_created for repair-anchor requalification; historical tooling records are not canonical business evidence |
+| redaction/dependency audit | reports/runs/<run_id>/redaction-check.md and dependency-boundary.md | not_created for repair-anchor requalification; historical targeted checks remain historical |
+| acceptance/review draft | only under reports/acceptance or reports/review where applicable; never final verdict | not_created; no acceptance/review action is authorized for this historical boundary |
 
 No path in this section is evidence until a real run creates it with same-run provenance. latest and evidence-candidates.md are forbidden.
 
@@ -209,31 +213,31 @@ No path in this section is evidence until a real run creates it with same-run pr
 
 | field | value |
 |---|---|
-| planned_commit_message | pending planned title only; no commit exists in this design task |
-| staged_files_checked | pending |
-| commit_message_checked | pending |
-| committed_hash | pending; fill only after a real implementation commit |
-| committed_message | pending; fill only after reviewing the real message |
-| post_commit_status | pending |
+| planned_commit_message | historical `chore(workspace): establish the capability hub workspace skeleton` |
+| staged_files_checked | historical fact recorded in the implementation-repository ledger; no current requalification staging |
+| commit_message_checked | historical fact recorded in the implementation-repository ledger; no current requalification commit |
+| committed_hash | historical `a4df225e3eba8cca611da3ca78f198ae36ec9045` |
+| committed_message | historical `chore(workspace): establish the capability hub workspace skeleton` |
+| post_commit_status | historical handoff complete; current repair-anchor requalification pending |
 
 ## Handoff Gate
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill only after a real implementation commit. |
-| committed_message | pending | Fill only after reviewing the real message file. |
-| gates_run | pending | List actual commands and same-run paths. |
-| tests_not_run | pending | State exact non-run reason; do not hide missing tests. |
-| remaining_blockers | pending | Link structured blockers and owners. |
-| next_boundary | pending | Must match project ledger after real handoff. |
-| user_owned_changes_untouched | pending | Record actual target worktree ownership. |
-| final_conclusion | pending | Never prefill pass. |
+| committed_hash | not_applicable | Historical hash is recorded above and in the implementation-repository ledger; no new implementation commit is authorized. |
+| committed_message | not_applicable | Historical message is recorded above and in the implementation-repository ledger. |
+| gates_run | not_applicable | Historical same-run gate paths are recorded in the implementation-repository ledger; no current requalification run exists. |
+| tests_not_run | not_applicable | No current requalification is authorized for this historical boundary. |
+| remaining_blockers | not_applicable | The active blocker belongs to `commit-02-a`; historical synchronization is resolved. |
+| next_boundary | not_applicable | This historical boundary is already handed off to `commit-01-b`. |
+| user_owned_changes_untouched | not_applicable | Historical ownership facts are recorded in the implementation-repository ledger. |
+| final_conclusion | not_applicable | Historical conclusion is preserved above; no new boundary conclusion is asserted. |
 
 ## Blockers
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-CH-01-A-REPO-001 | activation_gate | open | Target repository and immutable design baseline are absent. | Establish target repository and freeze an authorized immutable baseline. | wait_design |
+| BLK-CH-01-A-HISTORICAL-SYNC-001 | design_gate | resolved | `commit-01-a` completed before this selector repair; its historical run must not be rewritten as canonical evidence. | Preserve the real historical implementation handoff; requalify only if this boundary is explicitly reopened under the repair anchor. | wait_design |
 
 ## Experience Review
 
@@ -247,4 +251,4 @@ No path in this section is evidence until a real run creates it with same-run pr
 
 ## Current Conclusion
 
-blocked / wait_design / implementation not authorized.
+completed historically / historical gate preserved / current requalification pending the repair anchor / no implementation action authorized by this design task.

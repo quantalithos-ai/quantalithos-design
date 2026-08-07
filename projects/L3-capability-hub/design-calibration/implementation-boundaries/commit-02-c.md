@@ -79,12 +79,12 @@
 | field | exact contract |
 |---|---|
 | boundary_readiness | 36 Ports, 22/110 repository surface, UoW, idempotency/result/capture/job fake shell |
-| primary_selector | FOUNDATION-003,004,016,018; TX-001..022 |
-| targeted_selector | Port/repository method parity, UoW, idempotency, stored result and fake parity |
-| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- application-transaction; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite repository-transaction; check_rustdoc_coverage.sh --scope application; check_case_manifest.sh --selector FOUNDATION-003,004,016,018,TX-001..022 |
+| primary_selector | TX-001..022 |
+| targeted_selector | FOUNDATION-003,004,016,018; Port/repository method parity, UoW, idempotency, stored result and fake parity |
+| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- application-transaction; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite repository-transaction --selector TX-001..022; check_rustdoc_coverage.sh --scope application; check_case_manifest.sh --selector TX-001..022 |
 | gate_set | GATE-01, GATE-02, GATE-04, GATE-07 |
-| raw_report_contract | artifacts/test/<run_id>/raw; reports/runs/<run_id>/suites/repository-transaction/; reports/runs/<run_id>/checks/case-manifest/ |
-| evidence_contract | 22 TX rows with authority, UoW order, commit tri-state, winner/replay/corruption; fake cannot bypass version or idempotency |
+| raw_report_contract | artifacts/test/<run_id>/raw; primary `reports/runs/<run_id>/suites/repository-transaction/`; `reports/runs/<run_id>/checks/case-manifest/`; targeted FOUNDATION rows in the same suite |
+| evidence_contract | 22 TX primary rows with authority, UoW order, commit tri-state, winner/replay/corruption; FOUNDATION rows are targeted regressions and do not increase the denominator; fake cannot bypass version or idempotency |
 | AC_VF_VETO_direction | AC-CH-023/025/029/030/036; VF-CH-009/010/012; VETO-CH-009/010/012; VETO-CH-P-009 |
 | failure_return | Port/repository/UoW ordering, idempotency winner or commit-unknown mismatch returns `wait_design`; fake parity cannot hide a missing durable authority. |
 | execution_status | Planned contract only; no command, test, run, artifact, report or evidence instance has been created. |
@@ -104,7 +104,7 @@ Selector shorthand must be expanded to exact TC/DS/EV identities during implemen
 | worktree ownership | target repository status and unrelated-file inventory | pending | Record before any edit. |
 | format/build | planned command contract | pending | No command has run in this design task. |
 | targeted behavior | Port/repository method parity, UoW, idempotency, stored result and fake parity | pending | No test result exists. |
-| evidence/provenance | 22 TX rows with authority, UoW order, commit tri-state, winner/replay/corruption; fake cannot bypass version or idempotency | pending | Planned paths are not evidence. |
+| evidence/provenance | TX primary rows plus targeted FOUNDATION-003/004/016/018 rows; authority, UoW order, commit tri-state, winner/replay/corruption; fake cannot bypass version or idempotency | pending | Planned paths are not evidence. |
 | Rustdoc | declaration, field, variant/payload, trait, method and callable coverage | pending | Missing English /// blocks Commit Gate. |
 | responsibility/dependency | scope-appropriate checks | pending | Forbidden owner leakage is a veto. |
 | whitespace/staged scope | git diff --check; git diff --cached --check; staged-name review | pending | Must be target-repository output. |
@@ -133,7 +133,7 @@ Selector shorthand must be expanded to exact TC/DS/EV identities during implemen
 
 | check | contract | status |
 |---|---|---|
-| targeted tests | exact Step 7 selector and boundary cases | pending |
+| targeted tests | FOUNDATION-003/004/016/018 regression plus TX-001..022 primary cases | pending |
 | negative branches | invalid state/config and forbidden responsibility behavior | pending |
 | replay/no-write | applicable duplicate, race, replay, no-write, capture and terminal branches | pending |
 | denominator | targeted regression does not add to canonical 189 primary denominator | pending |

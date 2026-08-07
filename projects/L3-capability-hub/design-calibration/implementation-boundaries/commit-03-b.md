@@ -79,8 +79,8 @@
 | field | exact contract |
 |---|---|
 | boundary_readiness | registry current/history/index fixtures; allowlist/cache/listing semantics are forbidden |
-| primary_selector | none (targeted regression owner; primary remains commit-03-c) |
-| targeted_selector | CMD-005..008; QUERY-004..006; STATE-003 |
+| primary_selector | none |
+| targeted_selector | CMD-005..008; QUERY-004..006; STATE-003; canonical primary owner=`commit-03-c` |
 | planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- registry-contract; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite domain-state --selector CMD-005..008,QUERY-004..006,STATE-003; check_rustdoc_coverage.sh --scope registry |
 | gate_set | GATE-01, GATE-02, GATE-03, GATE-07 |
 | raw_report_contract | artifacts/test/<run_id>/raw; reports/runs/<run_id>/suites/service-command-query/; reports/runs/<run_id>/suites/domain-state/ |

@@ -19,8 +19,8 @@
 | canonical config | 18 modules、27 rows、21 bounded env leaves、3 profiles、3 entries、9 external slots / 14 calls、6 Worker sources、10 outbound routes |
 | P0 environments | 前五个 `ENV-CH-*` planned contracts；Local / Integration profile |
 | selected / release | `ENV-CH-SELECTED-STAGING`、`ENV-CH-RELEASE-CANDIDATE`；当前 blocked prerequisites |
-| current path observation | `core-contracts` path exists；target implementation repo absent |
-| current tool observation | design host reports Cargo/Rust/Rustdoc 1.93.0 and rustfmt 1.8.0-stable；target repo baseline仍未建立 |
+| current path observation | `core-contracts` path and target implementation repo exist; PH-01 handoff is recorded |
+| current tool observation | design host reports Cargo/Rust/Rustdoc 1.93.0 and rustfmt 1.8.0-stable；target toolchain facts remain implementation-ledger evidence |
 | unresolved upstream blocker | `0`；目标仓和 selected products 是 implementation prerequisites |
 | 下一动作 | 进入 Step 9，登记 Spike、风险、待确认事项和 controlled-reopen owner |
 
@@ -45,7 +45,7 @@
 4. **fake/mock 允许到什么范围？** Local/Integration P0 允许 deterministic fake、inMemory、controlled unavailable/failure；必须与 durable/configured typed semantics parity。Deployment 禁止 fake，Disabled不能伪装 success。
 5. **依赖不可用怎么处理？** target repo/core/toolchain/P0 graph 不可用即暂停或 gate failure；合法 negative fixture 按预期 typed branch 判定；selected product 不可用为 `blocked_dependency`，不补 P0。
 6. **由谁提供？** 本项目提供 workspace、P0 fake/controlled adapters和tests；L0-core 提供唯一 compile contract；相邻 owner未来通过 Port/event/ref/adapter/handoff提供运行期协作；operations/security提供 Deployment material。
-7. **本地路径是否存在？** 本轮只做路径观察：`/home/aris/Projects/quantalithos-core/crates/contracts` 存在；`/home/aris/Projects/quantalithos-capability-hub` 不存在。
+7. **本地路径是否存在？** `/home/aris/Projects/quantalithos-core/crates/contracts` 与 `/home/aris/Projects/quantalithos-capability-hub` 均已观察存在；target repo/worktree/toolchain facts仍以实现仓真实 preflight 为准。
 8. **Cargo path 形态？** 唯一允许 `core-contracts = { path = "../quantalithos-core/crates/contracts" }`；目标仓建立后必须由 dependency check 复核。
 9. **哪些不能是 Cargo dependency？** governance、method-library、runtime/tools、SDK、observability/audit、external documents、MCP/A2A/API products、event transport等均只能走 typed runtime/event/ref/adapter/fake seam。
 
@@ -53,7 +53,7 @@
 
 | 问题 | 风险 | 本 Step 处理 |
 |---|---|---|
-| target repo absent | implementation agent没有落点或伪称已初始化 | 固定 PH-01 hard prerequisite，不在设计仓创建实现仓 |
+| target repo historical prerequisite | implementation agent没有落点或伪称已初始化 | PH-01 prerequisite已由真实 handoff解决；后续不得把 design host observation当作 target gate |
 | design host toolchain可见 | 被误写成target baseline或测试事实 | 仅记 host observation；实现仓创建后重新冻结 toolchain manifest |
 | formal `04` 配置很细 | 在 `07` 复制会形成第二 schema authority | 只列配置族、cardinality、phase readiness和 failure action |
 | Configured/Fake/Disabled易被混用 | Configured failure自动fallback成fake/disabled | 分支显式；Missing永远拒绝；无自动转换 |
@@ -79,7 +79,7 @@
 
 | 项目 | 当前观察 | 设计结论 | 实现前动作 |
 |---|---|---|---|
-| target repo | `/home/aris/Projects/quantalithos-capability-hub` absent | implementation prerequisite | 创建或确认仓后记录真实 `.git`、branch/worktree、Cargo baseline |
+| target repo | `/home/aris/Projects/quantalithos-capability-hub` established; PH-01 handoff recorded | implementation prerequisite | 后续 boundary 仍需重新记录真实 `.git`、branch/worktree、Cargo baseline |
 | core contracts | `/home/aris/Projects/quantalithos-core/crates/contracts` exists | 唯一 sibling compile candidate | 在目标仓运行 Cargo metadata 和 dependency scan，不只做目录检查 |
 | Cargo / Rust | host观察 `cargo 1.93.0`、`rustc 1.93.0` | 与formal `03`候选方向一致，但不是target lock | 目标仓记录toolchain/rust-version并运行check/fmt/rustdoc |
 | rustfmt / rustdoc | host观察 `rustfmt 1.8.0-stable`、`rustdoc 1.93.0` | 工具可见，不等于Rustdoc coverage通过 | 实现期执行永久Rustdoc check |
@@ -290,7 +290,7 @@ Expected negative fixture只有在 exact case 实际运行并得到规定 typed 
 | external dependency readiness rows | 15 |
 | phase / boundary readiness | 11/11；26/26 |
 | canonical config/binding | 18/27/21；3 profiles；3 entries；27+9/14+6+10+8 |
-| current observations | core path exists；target repo absent；host toolchain observed only |
+| current observations | core path and target repo exist；PH-01 tooling facts are historical；host toolchain remains observation only |
 | fake/selected separation | P0 parity seam closed；P1/R4 unavailable remains blocked |
-| implementation facts | 0；未声明target repo、build、test、environment、run、artifact、evidence或commit已完成 |
+| implementation facts | PH-01 commits and tooling runs are recorded in the implementation ledger；no PH-02 source, business evidence, verdict or signoff |
 | next step | Step 9 Spike、风险与待确认事项 |

@@ -6,21 +6,21 @@
 > 回填章节: `projects/L3-capability-hub/07-实施计划.md` §11
 > 输入: Step 6 的 26 个 commit boundary、Step 7 gate/evidence contract、Step 10 pause/change control
 > 创建日期: 2026-07-26
-> 当前模式: full-restart / continuous execution
+> 当前模式: controlled-reopen / implementation-handoff-sync
 
 ## 1. Step 状态
 
 | 项目 | 状态 |
 |---|---|
 | 当前 Step | Step 11 定义提交、评审与交付纪律 |
-| 当前状态 | completed_continuous_execution |
+| 当前状态 | controlled_reopen_completed_2026-08-07 |
 | candidate boundary | 26 个，`commit-01-a`~`commit-11-b` |
-| planned implementation commit | 每个 boundary 恰好一笔；当前均未发生 |
+| planned implementation commit | 每个 boundary 恰好一笔；`commit-01-a` 与 `commit-01-b` 已真实发生，其余均未发生 |
 | current design-repo git identity | `quantalithos-labs` / `quantalithos.ai@gmail.com`，仅为当前仓观察事实 |
-| target implementation repo | `/home/aris/Projects/quantalithos-capability-hub` 未发现；无目标仓历史提交可作为事实 |
-| implementation commit / hash | 不存在；本 Step 不提交 |
+| target implementation repo | `/home/aris/Projects/quantalithos-capability-hub` 已验证为 Git worktree；当前实现锚点为 `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec` |
+| implementation commit / hash | PH-01: `a4df225e3eba8cca611da3ca78f198ae36ec9045`, `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`; `commit-02-a` implementation commit 不存在 |
 | unresolved upstream blocker | `0` |
-| 下一动作 | 进入 Step 12，定义实施完成判定 |
+| 下一动作 | 提交并冻结本次 design repair anchor，同步 implementation ledger，然后停止在 `commit-02-a` activation 前 |
 
 ## 2. 本步输入与 SOP 问题回答
 
@@ -54,7 +54,7 @@
 
 | 问题 | 风险 | 本 Step 处理 |
 |---|---|---|
-| 目标实现仓不存在 | 无法核对仓内历史和真实 identity | 以标准和 planned message 为门禁；实现前重新核对 |
+| 目标实现仓历史曾不存在 | 旧设计快照无法核对仓内 identity | 当前以已验证 worktree 与 PH-01 handoff 为事实；后续仍按 current boundary 重新核对 |
 | Step 6 有子功能但无 message 映射 | 实现者可能按 crate 拆提交 | 26/26 固定 body groups |
 | Step 7 有 raw/report contract | 提交说明可能静态宣称 pass | 只引用 run-scoped report，真实结论由 ledger 记录 |
 | evidence/report builder 在 PH-11 才完整 | 早期 boundary 可能误造最终 evidence | 早期只引用可用 targeted raw/report；不得伪造最终 index |
@@ -98,8 +98,8 @@
 
 | 仓类型 | commit message | 源码 / 文档语言 | 当前适用性 |
 |---|---|---|---|
-| `quantalithos-design` | 英文 type；中文 subject/body；固定 footer | 正式设计文档和校准文档以中文为主 | 当前任务只写文档，且明确不提交 |
-| `quantalithos-capability-hub` | title/body 全英文；title 固定 `type(scope): subject` | 标识符、普通注释、Rustdoc、测试名全英文 | 未来实现期适用；目标仓当前未发现 |
+| `quantalithos-design` | 英文 type；中文 subject/body；固定 footer | 正式设计文档和校准文档以中文为主 | 当前受控回开只提交 Capability Hub-only design repair；不提交实现代码 |
+| `quantalithos-capability-hub` | title/body 全英文；title 固定 `type(scope): subject` | 标识符、普通注释、Rustdoc、测试名全英文 | 已用于 PH-01；后续 boundary 继续适用 |
 
 ### 4.3 Type / Scope 约束
 
@@ -171,11 +171,11 @@
 
 | Boundary | Commit timing | 主评审责任 | Report / evidence reference | Handoff Gate 最小交付 |
 |---|---|---|---|---|
-| `commit-01-a` | workspace fmt/check、dependency/name/Rustdoc skeleton 检查通过后 | repository owner + contracts owner | static-contract/dependency targeted report；无业务 EV | 真实 hash/message、member/dependency checks、`commit-01-b` |
-| `commit-01-b` | strict parse、path schema、script dry-run、no-static 检查通过后 | config owner + test tooling owner | runtime-binding/configuration-strict/path reports | config/path checks、未执行真实 run 说明、`commit-02-a` |
-| `commit-02-a` | public contract compile、codec、Rustdoc coverage 通过后 | contracts owner + domain owner | contract foundation targeted report | public schema/Rustdoc checks、`commit-02-b` |
-| `commit-02-b` | 638 pair registry完整且state/policy negative tests通过后 | domain owner + test owner | domain-state report and pair check | pair count/provenance、`commit-02-c` |
-| `commit-02-c` | Port/method parity、22 TX、idempotency/replay/fake parity通过后 | application owner + transaction reviewer | repository-transaction/service targeted reports | UoW/replay checks、`commit-03-a` |
+| `commit-01-a` | workspace fmt/check、dependency/name/Rustdoc targeted 检查通过后 | repository owner + contracts owner | static-contract/dependency targeted report；无 canonical EV | 真实 hash/message、targeted member/dependency checks、canonical assembly owner=`commit-11-a`、`commit-01-b` |
+| `commit-01-b` | strict parse、path schema、script dry-run、no-static targeted 检查通过后 | config owner + test tooling owner | targeted runtime-binding/configuration-strict/path reports；无 canonical EV | config/path checks、canonical assembly owner=`commit-11-a`、`commit-02-a` |
+| `commit-02-a` | public contract compile、codec、Rustdoc targeted coverage 通过后 | contracts owner + domain owner | contract foundation targeted report；无 domain-state report | public schema/Rustdoc checks、不得创建 FOUNDATION-002 chain、`commit-02-b` |
+| `commit-02-b` | 638 pair registry完整且state/policy negative tests通过后 | domain owner + test owner | domain-state report and pair check | 24 STATE primary、FOUNDATION targeted、pair count/provenance、`commit-02-c` |
+| `commit-02-c` | Port/method parity、22 TX、idempotency/replay/fake parity通过后 | application owner + transaction reviewer | repository-transaction/service targeted reports | 22 TX primary、FOUNDATION targeted、UoW/replay checks、`commit-03-a` |
 | `commit-03-a` | identity/access-review contract-domain targeted gates通过后 | identity owner + design closure reviewer | identity contract targeted report；无新增 primary EV | source/state review、`commit-03-b` |
 | `commit-03-b` | registry current/history/visibility targeted gates通过后 | registry owner + design closure reviewer | registry contract targeted report；无新增 primary EV | history/visibility review、`commit-03-c` |
 | `commit-03-c` | C01~C08 accepted/rejected/duplicate/race、same-UoW、no-write通过后 | application owner + identity/registry owners | service-command-query and transaction reports | 8 primary command results、`commit-04-a` |
@@ -190,12 +190,12 @@
 | `commit-08-a` | shared response DTO/read Port/Rustdoc/no-write fixtures通过后 | query owner + contracts reviewer | query-foundation targeted report；无新增 EV | all field/variant `///` review、`commit-08-b` |
 | `commit-08-b` | Q01~Q19 全部 primary raw、visibility/no-write=0 checks通过后 | query owner + capability-family owners | core query suite and pairing report | 19 Query owner/provenance、`commit-08-c` |
 | `commit-08-c` | Q20~Q33 全部 primary raw、freshness/body-free/no-write通过后 | query owner + material/redaction reviewers | extended query/material/redaction reports | 14 Query owner/provenance、`commit-09-a` |
-| `commit-09-a` | header-first、receipt replay、dedup、worker cleanup和redaction通过后 | inbound owner + worker owner | entry-inbound/runtime-binding/redaction reports | 8 primary rows and lifecycle cleanup、`commit-09-b` |
+| `commit-09-a` | header-first、receipt replay、dedup、worker cleanup和redaction通过后 | inbound owner + worker owner | entry-inbound/runtime-binding/redaction reports | 6 INBOUND primary、FOUNDATION targeted and lifecycle cleanup、`commit-09-b` |
 | `commit-09-b` | immutable snapshot、capture、post-commit continuation和failure tests通过后 | outbound owner + collaboration reviewer | outbound-collaboration/transaction/redaction reports | 10 primary rows and no-delivery-truth review、`commit-10-a` |
-| `commit-10-a` | public Job schema、journal/frozen plan/result/report Rustdoc与protocol tests通过后 | jobs owner + contracts reviewer | job protocol targeted report | public schema docs and replay carrier review、`commit-10-b` |
+| `commit-10-a` | public Job schema、journal/frozen plan/result/report Rustdoc与targeted protocol tests通过后 | jobs owner + contracts reviewer | job protocol targeted report；无 canonical EV | zero primary、FOUNDATION/JOB owner links、public schema docs and replay carrier review、`commit-10-b` |
 | `commit-10-b` | J01~J07 target/terminal/report/no-truth-repair gates通过后 | jobs owner + material owner | jobs lifecycle/configuration reports | 7 primary rows and terminal reports、`commit-10-c` |
 | `commit-10-c` | J08 recovery、duplicate/reentry、commit-unknown和terminalization通过后 | jobs owner + transaction reviewer | jobs lifecycle/transaction/idempotency reports | 1 primary row and recovery limits、`commit-11-a` |
-| `commit-11-a` | 189 owner、638 pairs、83 flows、same-run pairing、redaction/dependency/no-static audits通过后 | test tooling owner + evidence reviewer | summary/gate-summary/report-audit/evidence-index candidates | all builder/check paths and non-verdict status、`commit-11-b` |
+| `commit-11-a` | 60 cross-phase primary、full 189 owner、638 pairs、83 flows、same-run pairing、redaction/dependency/no-static audits通过后 | test tooling owner + evidence reviewer | all 10 suite reports、summary/gate-summary/report-audit/evidence-index candidates | FOUNDATION/BIND/CONFIG/OBS 60 primary；189/189 missing=0 duplicate=0；non-verdict status、`commit-11-b` |
 | `commit-11-b` | lower-run refs、release smoke、37 AC/13 VF/23 VETO draft schema和review assignment完整后 | release owner + authorized acceptance/review owners | release report and `reports/acceptance/*` pending-review drafts | no default verdict/signoff、next action=`handoff` or authorized review |
 
 上述 Handoff Gate 中的 hash、message、gate 结果、run path 和下一 boundary 都只能在真实实现期填写。设计期 skeleton 必须保留 `pending` / `planned`，未来 boundary 必须是 `wait_until_current`。
@@ -314,18 +314,20 @@ Co-Authored-By: Codex <noreply@openai.com>
 
 | 输出 | Canonical path | 交付条件 | 当前设计期状态 |
 |---|---|---|---|
-| raw artifacts | `artifacts/test/<run_id>/raw/` | explicit run/attempt/context；failed/invalid记录不可覆盖 | 不存在 |
-| suite reports | `reports/runs/<run_id>/suites/<suite-id>.md` | 由 same-run raw builder 生成 | 不存在 |
-| run summary | `reports/runs/<run_id>/summary.md` | 189 owner、638 pair和checks可追溯 | 不存在 |
-| gate summary | `reports/runs/<run_id>/gate-summary.md` | GATE-01~09由raw/report推导 | 不存在 |
-| evidence index | `reports/runs/<run_id>/evidence-index.md` / `.json` | candidate-only；回指same-run TC/DS/EV raw/report | 不存在 |
-| redaction audit | `reports/runs/<run_id>/redaction-check.md` | finding只含safe location/class/code | 不存在 |
-| dependency audit | `reports/runs/<run_id>/dependency-boundary.md` | 无非core compile edge | 不存在 |
-| report audit | `reports/runs/<run_id>/report-audit.md` | pairing/digest/no-static/builder inputs完整 | 不存在 |
+| raw artifacts | `artifacts/test/<run_id>/raw/` | explicit run/attempt/context；failed/invalid记录不可覆盖 | `commit-02-a`/full-main/business canonical raw 未创建；PH-01 targeted tooling raw 仅以实现仓 ledger 记录为准 |
+| suite reports | `reports/runs/<run_id>/suites/<suite-id>.md` | 由 same-run raw builder 生成 | `commit-02-a`/full-main/business canonical reports 未创建；PH-01 targeted reports 不被本表否认 |
+| run summary | `reports/runs/<run_id>/summary.md` | 189 owner、638 pair和checks可追溯 | `commit-02-a`/full-main summary 未创建；PH-01 historical run records 由实现仓 ledger 管理 |
+| gate summary | `reports/runs/<run_id>/gate-summary.md` | GATE-01~09由raw/report推导 | `commit-02-a`/full-main gate summary 未创建；不得把 PH-01 targeted gate records升级为业务 verdict |
+| evidence index | `reports/runs/<run_id>/evidence-index.md` / `.json` | candidate-only；回指same-run TC/DS/EV raw/report | `commit-02-a`/full-main canonical evidence index 未创建；PH-01 tooling records不构成业务 evidence |
+| redaction audit | `reports/runs/<run_id>/redaction-check.md` | finding只含safe location/class/code | `commit-02-a`/full-main business audit 未创建；PH-01 targeted checks仅按实现仓 ledger引用 |
+| dependency audit | `reports/runs/<run_id>/dependency-boundary.md` | 无非core compile edge | `commit-02-a`/full-main business audit 未创建；PH-01 targeted dependency record保留为历史事实 |
+| report audit | `reports/runs/<run_id>/report-audit.md` | pairing/digest/no-static/builder inputs完整 | `commit-02-a`/full-main business audit 未创建；不否认 PH-01 tooling audit record |
 | acceptance handoff | `reports/acceptance/handoff.md` | 显式run IDs；authorized reviewer审查 | 不存在 |
 | veto checklist | `reports/acceptance/veto-checklist.md` | 23 VETO方向逐项真实审查 | 不存在 |
 | open issues | `reports/acceptance/open-issues.md` | S/A/B/R、owner、retest/acceptance状态明确 | 不存在 |
-| risk acceptance | `reports/acceptance/risk-acceptance.md` | 仅真实conditional路径；有acceptor/expiry/trigger | 不存在；accepted residual=`0` |
+| risk acceptance | `reports/acceptance/risk-acceptance.md` | 仅真实conditional路径；有acceptor/expiry/trigger | `commit-02-a`/full-main acceptance risk 未创建；accepted residual=`0`，PH-01 tooling records不构成 risk acceptance |
+
+本表中“未创建”只针对 `commit-02-a`、full-main 或业务 canonical evidence/acceptance 产物；不否认 PH-01 已由实现仓 ledger 记录的 targeted tooling artifacts/reports。任何 PH-01 路径都不能被提升为 `FOUNDATION-002` canonical chain、业务 verdict、risk acceptance 或 signoff。
 
 Raw artifact 的存在不自动允许 commit；report 的存在不自动形成 evidence；candidate index 不自动形成验收 verdict；handoff draft 不自动形成 signoff。
 
@@ -392,7 +394,7 @@ Raw artifact 的存在不自动允许 commit；report 的存在不自动形成 e
 | footer/空行/字面量换行规则是否明确 | 通过 | 固定 Codex footer；message file控制 |
 | Rust struct/enum field 注释是否进入 Commit Gate | 通过 | public field/variant/payload/callable均要求英文 `///` |
 | Handoff Gate 是否能恢复 | 通过 | hash/message/gates/blockers/next/user changes字段完整 |
-| 是否伪造 commit/run/evidence/verdict/signoff | 通过 | 当前均明确不存在 |
+| 是否伪造 commit/run/evidence/verdict/signoff | 通过 | 仅引用实现仓 ledger 中真实 PH-01 commits/runs；本修复未创建新 run、canonical evidence、verdict 或 signoff |
 
 ## 9. 回填草稿
 
@@ -403,14 +405,14 @@ Raw artifact 的存在不自动允许 commit；report 的存在不自动形成 e
 3. 固定 footer、真实空行、禁止字面量 `\n`、只写文件名和近似改动量。
 4. 26 个 boundary 的 planned title/body group/timing/reviewer/report/handoff 摘要。
 5. Commit Gate、Handoff Gate、artifact/report 交付检查和用户改动保护。
-6. 所有真实 hash/run/report/evidence/verdict/signoff 只在实现期产生。
+6. 所有 hash/run/report/evidence/verdict/signoff 只记录真实事实；当前仅 PH-01 hash/run/tooling report 存在，`commit-02-a`/full-main business evidence、verdict、risk acceptance 和 signoff 不存在。
 
 ## 10. 待确认事项
 
 | 事项 | 当前结论 | 处理位置 |
 |---|---|---|
-| 目标仓是否有更严格 commit 规则 | 当前未知；只能叠加不能放宽本 Step | `commit-01-a` Design Gate |
-| 目标仓 branch/worktree/baseline | 未建立 | project implementation ledger preflight |
+| 目标仓是否有更严格 commit 规则 | PH-01 已按仓内规则提交；后续仍只能叠加不能放宽本 Step | current boundary Design Gate |
+| 目标仓 branch/worktree/baseline | worktree 与 PH-01 实现锚点已建立；new design repair anchor pending | project implementation ledger preflight |
 | 实际文件名和改动量 | 实现期由 staged diff 填写 | message file / Commit Gate |
 | 实际 run/report path | 实现期显式 `run_id` 后填写 | boundary Evidence Gate |
 | acceptance/review主体 | `OQ-CH-009` 未指派 | `commit-11-b` handoff前 |
@@ -425,5 +427,5 @@ Raw artifact 的存在不自动允许 commit；report 的存在不自动形成 e
 | 正反例和格式控制已完成 | 通过 | §6 |
 | Commit/Handoff/artifact交付检查已完成 | 通过 | §7 |
 | 26/26停审和跨提交审计已完成 | 通过 | §8 |
-| 未创建真实 commit/hash/run/evidence | 通过 | truthfulness保持 |
+| 未伪造真实 commit/hash/run/evidence | 通过 | PH-01 facts are recorded; this repair creates none |
 | 可进入 Step 12 | 通过 | 下一步定义实施完成判定 |

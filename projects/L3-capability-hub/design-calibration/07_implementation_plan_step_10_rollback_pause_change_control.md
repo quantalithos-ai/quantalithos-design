@@ -8,21 +8,21 @@
 > 回填章节: `projects/L3-capability-hub/07-实施计划.md` §10
 > 输入: Step 6 boundaries、Step 7 gates、Step 8 dependencies、Step 9 risks/spikes/open questions
 > 创建日期: 2026-07-26
-> 当前模式: full-restart / continuous execution
+> 当前模式: controlled-reopen / implementation-handoff-sync
 
 ## 1. Step 状态
 
 | 项目 | 状态 |
 |---|---|
 | 当前 Step | Step 10 定义回退、暂停与变更控制 |
-| 当前状态 | completed_continuous_execution |
+| 当前状态 | controlled_reopen_completed_2026-08-07 |
 | control unit | 默认以一个 planned commit boundary 为暂停、修复、恢复和提交单位 |
 | pause trigger classes | 10 |
 | rollback semantics | 9；代码、配置、run/evidence、产品和Spike分离 |
 | change authorities | formal `00/01/02/03/04/05/06/07`、standards、implementation-only、operations |
-| current implementation state | target repo/implementation ledger/run均未建立；本 Step只定义future contract |
+| current implementation state | target repo已建立；PH-01 两个 implementation commit 与 run-scoped tooling records 已真实记录；`commit-02-a` 因 selector repair handoff 暂停 |
 | unresolved upstream blocker | `0` |
-| 下一动作 | 进入 Step 11，定义提交、评审与交付纪律 |
+| 下一动作 | 冻结本次 design repair commit/tree anchor，同步 implementation ledger，再进行 `commit-02-a` activation review；不得先落码 |
 
 ## 2. 本步输入与 SOP 问题回答
 
@@ -238,7 +238,7 @@ pause trigger
 | R0~R4 alignment | pass-designed | unknown/shared defaults R2；selected R3；release R4 |
 | P0/selected separation | pass-designed | non-required selected unavailable does not pauseP0 |
 | business commit-unknown safety | pass-designed | no blind mutation retry or truth rollback |
-| execution facts claimed | `0` | no rollback/run/defect/fix/commit actually performed |
+| execution facts claimed | PH-01 implementation commits and tooling runs are historical facts; this repair created no new code, run, artifact, business evidence, verdict or signoff | implementation ledger is the execution authority |
 | unresolved upstream blocker | `0` | design contract complete |
 
 ## 9. 回填草稿
@@ -250,15 +250,29 @@ pause trigger
 
 回退必须区分未提交WIP、已提交forward fix、immutable config candidate、failed run/evidence、selected product和Spike。不得擅自回退用户改动或已验证历史，不得覆盖failed raw，不得以Fake/Disabled fallback Configured，不得把business commit-unknown当作可盲目重试的rollback。设计变化按formal00~07 authority回写，并按R0~R4重新资格化。
 
-## 10. Step 10 完成记录
+## 10. Controlled Reopen Record
+
+| field | value |
+|---|---|
+| change_id | `CH-07-OWNER-REPAIR-001` |
+| trigger | Formal `05` defines `FOUNDATION-002` as the canonical domain/state identity, while the prior Step 7 mapping assigned that selector to contract refs/metadata/errors/codec fixtures. The same owner chain could not truthfully cover both meanings. |
+| authority | Formal `05` TC/DS/EV identity and semantics are retained. Formal `07` Step 7, Step 11 and the affected boundary skeletons are the repaired downstream owners. |
+| affected_boundaries | `commit-01-a`, `commit-01-b`, `commit-02-a`, `commit-02-b`, `commit-02-c`, `commit-09-a`, `commit-10-a`, `commit-11-a` |
+| repair | `FOUNDATION-001..018`, `BIND-001..012`, `CONFIG-001..018` and `OBS-001..012` (60 identities) are primary-owned by `commit-11-a`; early boundaries run targeted-only. `STATE-001..024`, `TX-001..022`, `CMD/QUERY/INBOUND/OUTBOUND/JOB` retain their semantic owners. |
+| baseline_rule | The repair commit created by this controlled reopen is the only new immutable design anchor. Unrelated design-repository commits and the superseded scoped tree are not references for implementation. The real hash/tree are recorded only after the commit. |
+| execution_facts | PH-01 history remains unchanged; this design repair creates no implementation source, run, artifact, canonical EV instance, acceptance verdict, risk acceptance or signoff. |
+| blocker | `BLK-CH-02-A-DESIGN-SELECTOR-001` remains open only until the repair commit/tree anchor is frozen and written to the implementation ledger. |
+| resume_condition | Freeze the real repair commit/tree, update the implementation ledger, resolve the handoff blocker, then review and activate only `commit-02-a`. |
+
+## 11. Step 10 完成记录
 
 | 项目 | 状态 |
 |---|---|
-| Step 10 设计产物 | completed_continuous_execution |
+| Step 10 设计产物 | controlled_reopen_completed_2026-08-07 |
 | pause / rollback classes | 10 / 9 |
 | phase / boundary recovery | 11/11；26/26 |
 | change authorities | formal00~07、implementation、operations、standards |
 | evidence/worktree protection | explicit；no destructive shortcut |
-| execution facts | 0；未执行pause、rollback、fix、run、commit或handoff |
+| execution facts | PH-01 implementation commits/runs are recorded historical facts；本次修复未创建 implementation code/run/artifact/evidence/verdict/signoff |
 | unresolved upstream blocker | 0 |
-| next step | Step 11 提交、评审与交付纪律 |
+| next step | freeze the single repair anchor, synchronize ledgers, then stop before `commit-02-a` |

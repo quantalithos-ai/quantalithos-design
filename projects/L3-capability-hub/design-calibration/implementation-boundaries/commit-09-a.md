@@ -23,7 +23,7 @@
 | allowed scope | six inbound DTOs, header gate, receipt/dedup stores and worker lifecycle |
 | forbidden scope | core truth merge, payload body logging, approval/method writes and delivery ownership |
 | batch sequence | BATCH-09-A1 envelope/header -> BATCH-09-A2 receipt store -> BATCH-09-A3 dedup/replay -> BATCH-09-A4 worker lifecycle tests |
-| primary or targeted selectors | FOUNDATION-005..006; INBOUND-001..006 |
+| primary or targeted selectors | INBOUND-001..006 primary; FOUNDATION-005..006 and related rows targeted |
 | readiness prerequisite | Worker root, six source slots, feed/actor fixture and receipt store |
 | gate set | GATE-01,GATE-02,GATE-03,GATE-04,GATE-05,GATE-06,GATE-07 |
 | planned reviewer | inbound owner + worker owner |
@@ -96,12 +96,12 @@
 
 | field | exact contract |
 |---|---|
-| primary_selector | FOUNDATION-005..006; INBOUND-001..006 |
-| targeted_selector | related CMD/QUERY/TX/BIND/CONFIG/OBS rows; receipt/idempotency regressions |
-| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- inbound-entry-worker; run_main_gate.sh --run-id <run_id> --artifact-root <root> --entry worker --selector FOUNDATION-005..006,INBOUND-001..006; check_case_manifest.sh --selector FOUNDATION-005..006,INBOUND-001..006; check_config_catalog.sh --selector worker; check_redaction.sh --scope inbound; check_artifact_report_pairing.sh --scope commit-09-a |
+| primary_selector | INBOUND-001..006 |
+| targeted_selector | FOUNDATION-005..006; related CMD/QUERY/TX/BIND/CONFIG/OBS rows; receipt/idempotency regressions |
+| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- inbound-entry-worker; run_main_gate.sh --run-id <run_id> --artifact-root <root> --entry worker --selector INBOUND-001..006; check_case_manifest.sh --selector INBOUND-001..006; check_config_catalog.sh --selector worker; check_redaction.sh --scope inbound; check_artifact_report_pairing.sh --scope commit-09-a |
 | gate_set | GATE-01,GATE-02,GATE-03,GATE-04,GATE-05,GATE-06,GATE-07 |
-| raw_report_contract | suites/entry-inbound/; suites/runtime-binding/; suites/configuration-strict/; checks/redaction/; inbound/receipt reports |
-| evidence_contract | header/source/schema/trusted actor must be validated before decode; duplicate returns stored typed receipt; unsupported has no payload write; raw is body-free |
+| raw_report_contract | primary `suites/entry-inbound/`; targeted `suites/runtime-binding/`; targeted `suites/configuration-strict/`; `checks/redaction/`; inbound/receipt reports |
+| evidence_contract | 6 INBOUND primary chains are complete; FOUNDATION rows are targeted regressions owned by `commit-11-a`; header/source/schema/trusted actor must be validated before decode; duplicate returns stored typed receipt; unsupported has no payload write; raw is body-free |
 | AC_VF_VETO_direction | AC-CH-004,006,015..018,021,024..032,034..037; VF-CH-005,006,007,009,010,011; VETO-CH-005..007,009..011; VETO-CH-P-004/005/007/008/009 |
 | failure_return | decode-first, body storage, missing receipt, duplicate mutation or worker cleanup failure blocks; source gap returns to formal 03 |
 | execution_status | planned contract only; no command, test, run, artifact, report or evidence instance has been created |
@@ -130,10 +130,10 @@
 
 | check | contract | status |
 |---|---|---|
-| targeted selector | FOUNDATION-005..006; INBOUND-001..006, expanded to exact TC/DS/EV identities at execution time | pending |
+| targeted selector | FOUNDATION-005..006 and related CMD/QUERY/TX/BIND/CONFIG/OBS rows; INBOUND-001..006 are primary and all shorthand expands to exact identities at execution time | pending |
 | negative branches | invalid state/config, forbidden responsibility and unavailable behavior are typed | pending |
 | replay/no-write | applicable duplicate/race/replay/no-write/capture/terminal branches are checked | pending |
-| denominator | targeted regression does not add to the canonical 189 primary denominator | pending |
+| denominator | only the 6 INBOUND identities add primary rows here; targeted FOUNDATION and related regressions do not add to the canonical 189 denominator | pending |
 | failure retention | failed/blocked/timeout/flaky/invalid attempts remain immutable and same-run addressable | pending |
 
 ## Evidence Gate

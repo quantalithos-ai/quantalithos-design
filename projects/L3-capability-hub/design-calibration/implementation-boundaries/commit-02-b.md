@@ -79,12 +79,12 @@
 | field | exact contract |
 |---|---|
 | boundary_readiness | one fake authority, domain state fixtures and the complete 638-pair registry |
-| primary_selector | FOUNDATION-012; STATE-001..024 |
-| targeted_selector | domain policies, state guards and all 638 pair registry consumers |
-| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- domain-state; check_state_pair_registry.sh --scope state; check_rustdoc_coverage.sh --scope domain |
+| primary_selector | STATE-001..024 |
+| targeted_selector | FOUNDATION-002,012; domain policies, state guards and all 638 pair registry consumers |
+| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- domain-state; check_case_manifest.sh --selector STATE-001..024; check_state_pair_registry.sh --scope state; check_rustdoc_coverage.sh --scope domain |
 | gate_set | GATE-01, GATE-02, GATE-07 |
-| raw_report_contract | artifacts/test/<run_id>/raw; reports/runs/<run_id>/suites/domain-state/; reports/runs/<run_id>/checks/state-pair/ |
-| evidence_contract | one raw row per SP-CH pair; 239 current + 98 reserved + 301 illegal = 638; sampling is invalid |
+| raw_report_contract | artifacts/test/<run_id>/raw; primary `reports/runs/<run_id>/suites/domain-state/`; `reports/runs/<run_id>/checks/state-pair/`; targeted FOUNDATION rows in the same suite |
+| evidence_contract | 24 STATE primary chains and one raw row per SP-CH pair; 239 current + 98 reserved + 301 illegal = 638; FOUNDATION rows are targeted regressions and do not increase the denominator; sampling is invalid |
 | AC_VF_VETO_direction | AC-CH-001..005/023/025/029/030; VF-CH-001/008/010; VETO-CH-001/008/010; VETO-CH-P-001 |
 | failure_return | Missing or duplicate state pair, illegal transition misclassified as current, or incomplete Rustdoc returns `wait_design`; sampling cannot replace the registry. |
 | execution_status | Planned contract only; no command, test, run, artifact, report or evidence instance has been created. |
@@ -104,7 +104,7 @@ Selector shorthand must be expanded to exact TC/DS/EV identities during implemen
 | worktree ownership | target repository status and unrelated-file inventory | pending | Record before any edit. |
 | format/build | planned command contract | pending | No command has run in this design task. |
 | targeted behavior | domain policies, state guards and all 638 pair registry consumers | pending | No test result exists. |
-| evidence/provenance | one raw row per SP-CH pair; 239 current + 98 reserved + 301 illegal = 638; sampling is invalid | pending | Planned paths are not evidence. |
+| evidence/provenance | STATE primary rows plus targeted FOUNDATION-002/012 rows; one raw row per SP-CH pair; 239 current + 98 reserved + 301 illegal = 638; sampling is invalid | pending | Planned paths are not evidence. |
 | Rustdoc | declaration, field, variant/payload, trait, method and callable coverage | pending | Missing English /// blocks Commit Gate. |
 | responsibility/dependency | scope-appropriate checks | pending | Forbidden owner leakage is a veto. |
 | whitespace/staged scope | git diff --check; git diff --cached --check; staged-name review | pending | Must be target-repository output. |
@@ -133,7 +133,7 @@ Selector shorthand must be expanded to exact TC/DS/EV identities during implemen
 
 | check | contract | status |
 |---|---|---|
-| targeted tests | exact Step 7 selector and boundary cases | pending |
+| targeted tests | FOUNDATION-002/012 regression plus STATE-001..024 primary cases | pending |
 | negative branches | invalid state/config and forbidden responsibility behavior | pending |
 | replay/no-write | applicable duplicate, race, replay, no-write, capture and terminal branches | pending |
 | denominator | targeted regression does not add to canonical 189 primary denominator | pending |

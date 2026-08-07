@@ -5,22 +5,22 @@
 | project | L3-capability-hub |
 | boundary_id | commit-02-a |
 | phase | PH-02 |
-| design_baseline | planned-after-commit-01-b |
-| implementation_repo | /home/aris/Projects/quantalithos-capability-hub (not established) |
-| status | planned |
-| gate_status | pending |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future boundary; wait for project ledger activation |
+| design_baseline | pending_design_repair_commit_anchor |
+| implementation_repo | /home/aris/Projects/quantalithos-capability-hub (verified Git worktree) |
+| status | blocked |
+| gate_status | blocked |
+| next_allowed_action | wait_design |
+| current_recovery_point | current boundary; selector contract repaired; freeze the real repair commit/tree before activation |
 
-> Planned design-handoff skeleton only. It contains no implementation fact and does not authorize code changes.
+> Current blocked design-handoff skeleton. It records no `commit-02-a` implementation fact and does not authorize code changes before the repair anchor is frozen.
 
 ## Activation Guard
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary equals commit-02-a | pending | Future boundary stays inactive until project ledger advances. |
-| predecessor handoff is closed | pending | A real predecessor Commit and Handoff Gate are required. |
-| activation permission | pending | Activate only through the project ledger. |
+| project ledger current_boundary equals commit-02-a | pass | This is the only current boundary. |
+| predecessor handoff is closed | pass | PH-01 handoffs are recorded at `a4df225e3eba8cca611da3ca78f198ae36ec9045` and `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`. |
+| activation permission | blocked | Wait for the real design repair commit/tree anchor; do not edit implementation code. |
 
 ## Required Reads
 
@@ -79,14 +79,14 @@
 | field | exact contract |
 |---|---|
 | boundary_readiness | core shared refs/metadata/codec candidate and safe error types must be checked against the target repo |
-| primary_selector | FOUNDATION-002 |
-| targeted_selector | public refs, metadata, errors, codec and nested type fixtures |
-| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- contract-foundation; check_rustdoc_coverage.sh --scope contracts; check_case_manifest.sh --selector FOUNDATION-002 |
+| primary_selector | none |
+| targeted_selector | FOUNDATION-002 public refs, metadata, errors, codec and nested type fixtures; canonical assembly owner=`commit-11-a`; semantic source/oracle remains formal `03/04/05/06` and the corresponding contracts/domain/application/config/entry boundaries |
+| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- contract-foundation; check_rustdoc_coverage.sh --scope contracts; targeted fixture inventory check --selector FOUNDATION-002 |
 | gate_set | GATE-01, GATE-02 |
-| raw_report_contract | artifacts/test/<run_id>/raw; reports/runs/<run_id>/suites/static-contract-docs/; reports/runs/<run_id>/suites/domain-state/ |
-| evidence_contract | TC-CH-FOUNDATION-002 to DS-CH-FOUNDATION-002 to EV-CH-FOUNDATION-002 same-owner chain; safe error only |
+| raw_report_contract | artifacts/test/<run_id>/raw; targeted `reports/runs/<run_id>/suites/static-contract-docs/`; contract-foundation targeted fixture report; no `domain-state` report |
+| evidence_contract | targeted refs/metadata/errors/codec rows record canonical assembly owner=`commit-11-a`; semantic source/oracle remains formal `03/04/05/06` and the corresponding contracts/domain/application/config/entry boundaries; no canonical TC/DS/EV-CH-FOUNDATION-002 chain and no canonical EV |
 | AC_VF_VETO_direction | AC-CH-001/023/029/031; VF-CH-001/002/011; VETO-CH-001/002/011 |
-| failure_return | Missing field source, codec/error contract or nested English Rustdoc returns `wait_design`; implementation must not invent a substitute type. |
+| failure_return | Missing field source, codec/error contract or nested English Rustdoc returns `wait_design`; targeted verification cannot create a canonical primary and implementation must not invent a substitute type. |
 | execution_status | Planned contract only; no command, test, run, artifact, report or evidence instance has been created. |
 | planned reviewer | contracts owner + domain owner |
 | planned title | feat(contracts): add the public capability contract foundation |
@@ -104,7 +104,7 @@ Selector shorthand must be expanded to exact TC/DS/EV identities during implemen
 | worktree ownership | target repository status and unrelated-file inventory | pending | Record before any edit. |
 | format/build | planned command contract | pending | No command has run in this design task. |
 | targeted behavior | public refs, metadata, errors, codec and nested type fixtures | pending | No test result exists. |
-| evidence/provenance | TC-CH-FOUNDATION-002 to DS-CH-FOUNDATION-002 to EV-CH-FOUNDATION-002 same-owner chain; safe error only | pending | Planned paths are not evidence. |
+| evidence/provenance | targeted refs/metadata/errors/codec rows with canonical assembly owner=`commit-11-a`; semantic source/oracle remains formal `03/04/05/06` and the corresponding contracts/domain/application/config/entry boundaries; no canonical TC/DS/EV chain or EV | pending | Planned paths are not evidence. |
 | Rustdoc | declaration, field, variant/payload, trait, method and callable coverage | pending | Missing English /// blocks Commit Gate. |
 | responsibility/dependency | scope-appropriate checks | pending | Forbidden owner leakage is a veto. |
 | whitespace/staged scope | git diff --check; git diff --cached --check; staged-name review | pending | Must be target-repository output. |
@@ -133,7 +133,7 @@ Selector shorthand must be expanded to exact TC/DS/EV identities during implemen
 
 | check | contract | status |
 |---|---|---|
-| targeted tests | exact Step 7 selector and boundary cases | pending |
+| targeted tests | FOUNDATION-002 contract fixtures and Rustdoc cases; exact canonical chain is deferred to `commit-11-a` | pending |
 | negative branches | invalid state/config and forbidden responsibility behavior | pending |
 | replay/no-write | applicable duplicate, race, replay, no-write, capture and terminal branches | pending |
 | denominator | targeted regression does not add to canonical 189 primary denominator | pending |
@@ -233,7 +233,7 @@ No path in this section is evidence until a real run creates it with same-run pr
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-CH-02-A-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced to this future boundary. | Advance the project ledger through the predecessor handoff and set this boundary current. | wait_until_current |
+| BLK-CH-02-A-DESIGN-SELECTOR-001 | design_gate | open | The selector contract is repaired in the design working tree, but its immutable repair commit/tree anchor is not frozen. | Commit only the capability-hub design repair, record the real anchor in the implementation ledger, then rerun activation review. | wait_design |
 
 ## Experience Review
 
@@ -247,4 +247,4 @@ No path in this section is evidence until a real run creates it with same-run pr
 
 ## Current Conclusion
 
-planned / wait_until_current / implementation not authorized.
+blocked / wait_design / current boundary / no implementation action authorized before the repair anchor is frozen.

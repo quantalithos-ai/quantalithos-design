@@ -96,8 +96,8 @@
 
 | field | exact contract |
 |---|---|
-| primary_selector | no new primary; all Query primary ownership remains with commit-08-b and commit-08-c |
-| targeted_selector | QUERY-001..033; page/cursor/marker/read-port shared fixtures |
+| primary_selector | none |
+| targeted_selector | QUERY-001..033; page/cursor/marker/read-port shared fixtures; canonical primary owners=`commit-08-b` and `commit-08-c` |
 | planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- query-foundation; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite static-contract-docs,service-command-query --selector QUERY-001..033 --targeted; check_rustdoc_coverage.sh --scope query-contracts; check_responsibility_boundary.sh --scope query-no-write |
 | gate_set | GATE-01,GATE-02,GATE-03,GATE-07 |
 | raw_report_contract | targeted service-command-query/query-foundation raw/report; no new EV |

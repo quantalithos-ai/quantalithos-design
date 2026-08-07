@@ -1,8 +1,8 @@
 # L3-capability-hub implementation execution ledger
 
 > This ledger is the implementation handoff entry point required by `standards/document/代码实施台账与门禁规范.md`.
-> It is pre-created from formal `07-实施计划.md`; it records no implementation, commit, run, artifact, report, evidence, review, verdict, risk acceptance, or signoff fact.
-> Created: 2026-07-27
+> It is the implementation handoff entry point from formal `07-实施计划.md`; current facts below are limited to the real PH-01 handoff and the blocked `commit-02-a` review.
+> Created: 2026-07-27; current update: 2026-08-07 controlled selector reopen.
 
 ## Current Implementation State
 
@@ -10,35 +10,35 @@
 |---|---|
 | project | `L3-capability-hub` |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
-| implementation_repo | `/home/aris/Projects/quantalithos-capability-hub` (not established) |
-| current_design_baseline | `not_fixed_until_handoff` |
-| current_boundary | `commit-01-a` |
-| current_phase | `PH-01` |
-| status | `pre_implementation_blocked` |
+| implementation_repo | `/home/aris/Projects/quantalithos-capability-hub` (verified Git worktree) |
+| current_design_baseline | `pending_design_repair_commit_anchor` |
+| current_boundary | `commit-02-a` |
+| current_phase | `PH-02` |
+| status | `implementation_incomplete / blocked_on_design_repair_anchor` |
 | gate_status | `blocked` |
-| gate_reason | Target implementation repository is absent and the design working tree has no authorized immutable handoff baseline; current boundary cannot be activated for code changes. |
+| gate_reason | `BLK-CH-02-A-DESIGN-SELECTOR-001`: the selector repair is prepared in the capability-hub design subtree, but its real repair commit/tree anchor is not frozen yet. `commit-02-a` must remain `wait_design`; no implementation-local selector may bypass the design contract. |
 | next_allowed_action | `wait_design` |
-| current_recovery_point | `handoff-preflight / commit-01-a / repository-and-baseline prerequisite` |
-| implementation_commit | `none` |
-| test_run | `none` |
-| artifact_report_evidence | `none` |
+| current_recovery_point | `commit-02-a / controlled selector reopen / freeze repair commit and scoped tree anchor` |
+| implementation_commit | `commit-01-a=a4df225e3eba8cca611da3ca78f198ae36ec9045`; `commit-01-b=8e4a422a4b6477afc214eec1f2db8676f0e1c7ec` |
+| test_run | `20260807T120110+0800-commit-01-a-attempt-05`; `20260807T150946+0800-commit-01-b-attempt-07` |
+| artifact_report_evidence | PH-01 run-scoped tooling records at the corresponding `artifacts/test/<run_id>/` and `reports/runs/<run_id>/` roots; no business evidence instance |
 | acceptance_review_verdict_signoff | `not_evaluated` |
 | accepted_residual_risk | `0` |
 | last_updated_by | `design agent` |
-| last_updated_at | `2026-07-27` |
+| last_updated_at | `2026-08-07` |
 
 ## Truthfulness Boundary
 
 | fact | current value | interpretation |
 |---|---|---|
-| formal design baseline | active formal `00~07` files in the design repository | usable as design authority for skeleton construction; not an immutable implementation baseline |
-| design repository commit | three grouped design-closure commits authorized on 2026-07-27 | actual hashes are Git facts; this ledger does not promote any design commit to the immutable implementation handoff baseline |
-| target repository | path not found during design handoff | no workspace, branch, worktree, package, or code state is claimed |
-| implementation code | absent from this task | this design repository remains documentation-only |
-| gate execution | none | no `pass` may be inferred from a planned command or empty template |
-| evidence | absent | canonical paths are contracts only; no `run_id` or alias exists |
+| formal design baseline | active formal `00~07` plus the controlled selector repair in the capability-hub subtree | formal `05` identities remain unchanged; the repair commit/tree is the only pending immutable anchor |
+| design repository commit | previous design commits are historical context only; the new repair commit is not prefilled | after the real repair commit, record its hash and `git rev-parse HEAD:projects/L3-capability-hub` here and in the implementation-repository ledger |
+| target repository | path exists and is a verified Git worktree | PH-01 handoff is real; later source semantics are not claimed |
+| implementation code | PH-01 workspace/config skeleton only | no `commit-02-a` contracts/domain/application implementation exists |
+| gate execution | PH-01 exact tooling gates passed in two real run-scoped attempts | these are historical boundary facts; no `commit-02-a` gate ran |
+| evidence | PH-01 tooling raw/reports exist under explicit run roots | no canonical business evidence, verdict, risk acceptance or signoff instance exists |
 | acceptance | not entered | no reviewer, acceptor, risk acceptor, verdict, or signature is named |
-| commit requirement | `design_repository_only_authorized` | the authorization covers the three grouped design-closure commits only; no implementation commit is authorized |
+| commit requirement | `design_repair_anchor_pending` | commit only the authorized capability-hub design repair; do not create an implementation commit or jump boundary |
 
 The current formal documents are the active design authority. Their current working-tree state must be reviewed and frozen by the authorized handoff process before an implementation agent can mark Design Gate `pass`. The pre-created ledgers do not authorize code edits.
 
@@ -54,20 +54,20 @@ The current formal documents are the active design authority. Their current work
 | all real pre-commit gates pass | `pass` | `commit` | only the active boundary may be staged and committed |
 | commit and handoff are real and complete | `pass` | `start_next_boundary` | advance the project ledger to the single next boundary |
 
-The present state is the second row. `commit-01-a` is the only current boundary for recovery accounting, but it is not active for implementation. In particular, `blocked -> implement`, `pending -> commit`, and `implement -> start_next_boundary` are forbidden.
+The current state is the design/source-closure row. `commit-02-a` is the only current implementation boundary and remains blocked with `wait_design` until the real repair commit/tree anchor is frozen. In particular, `blocked -> implement`, `pending -> commit`, and `implement -> start_next_boundary` are forbidden.
 
 ## Preflight Contract
 
 | check | required observation | current status | next action |
 |---|---|---|---|
-| implementation repository | target path exists and is a git worktree | `blocked` | establish or identify the authorized target repository |
-| design baseline | authorized immutable ref for formal `00~07` and calibration inputs | `blocked` | freeze a real baseline through the authorized process; do not use a dirty `HEAD` as a substitute |
-| project identity | target repository git identity matches formal `07` | `pending` | read only after target repository exists |
-| workspace shape | seven member names and single `core-contracts` dependency can be checked | `pending` | run PH-01 checks after activation |
-| configuration roots | strict config, profile/entry and explicit artifact/report roots exist | `pending` | run `commit-01-b` checks after `01-a` handoff |
-| user worktree ownership | unrelated changes identified and protected | `pending` | record target-repository status before any edit |
-| Rustdoc policy | public declarations, fields, variants/payloads, traits, methods and callables have English `///` coverage | `pending` | run the exact static check in the target repository |
-| test/evidence harness | scripts and run-scoped roots are executable and raw-derived | `pending` | validate in `commit-01-b` and `commit-11-a` |
+| implementation repository | target path exists and is a git worktree | `pass` | recorded by PH-01 preflight; protect unrelated user files |
+| design baseline | real repair commit/tree anchor for formal `00~07` and calibration inputs | `blocked` | finish the authorized design repair commit; do not use a dirty `HEAD` as a substitute |
+| project identity | target repository identity matches formal `07` | `pass` | recorded by PH-01 preflight |
+| workspace shape | seven member names and single `core-contracts` dependency | `pass` | recorded by `commit-01-a` run |
+| configuration roots | strict config, profile/entry and explicit artifact/report roots | `pass` | recorded by `commit-01-b` run |
+| user worktree ownership | unrelated changes identified and protected | `pass` | `.codex` files, historical runs and generated output remain unstaged |
+| Rustdoc policy | public skeleton declarations have English `///` coverage | `pass` | recorded by PH-01 tooling; `commit-02-a` coverage has not run |
+| test/evidence harness | scripts and run-scoped roots are executable and raw-derived | `pass` for PH-01 tooling only | no business evidence or `commit-02-a` run exists |
 
 No preflight row is `pass` merely because its expected shape is described in formal `07`. A real command and safe, run-scoped output are required after activation.
 
@@ -75,9 +75,9 @@ No preflight row is `pass` merely because its expected shape is described in for
 
 | boundary | phase | design_baseline | status | last_gate | next_allowed_action | notes |
 |---|---|---|---|---|---|---|
-| `commit-01-a` | `PH-01` | `not_fixed_until_handoff` | `blocked` | `activation_gate` | `wait_design` | current; repository and baseline prerequisites are open |
-| `commit-01-b` | `PH-01` | `planned-after-01-a` | `planned` | `activation_gate` | `wait_until_current` | future; strict config and run roots |
-| `commit-02-a` | `PH-02` | `planned-after-01-b` | `planned` | `activation_gate` | `wait_until_current` | future; public contracts |
+| `commit-01-a` | `PH-01` | historical `c10a0994fee6a83d32a520a47e49d9ce0a4ae4e6` | `pass / committed` | `handoff_gate` | `start_next_boundary` | committed at `a4df225e3eba8cca611da3ca78f198ae36ec9045`; old design tree is superseded by the selector repair |
+| `commit-01-b` | `PH-01` | historical `c10a0994fee6a83d32a520a47e49d9ce0a4ae4e6` | `pass / committed` | `handoff_gate` | `wait_design` | committed at `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`; PH-02 activation paused by selector repair |
+| `commit-02-a` | `PH-02` | `pending_design_repair_commit_anchor` | `blocked` | `design_gate` | `wait_design` | current; `BLK-CH-02-A-DESIGN-SELECTOR-001` open until repair anchor is frozen |
 | `commit-02-b` | `PH-02` | `planned-after-02-a` | `planned` | `activation_gate` | `wait_until_current` | future; domain state and policy |
 | `commit-02-c` | `PH-02` | `planned-after-02-b` | `planned` | `activation_gate` | `wait_until_current` | future; Ports, transactions, replay |
 | `commit-03-a` | `PH-03` | `planned-after-02-c` | `planned` | `activation_gate` | `wait_until_current` | future; identity and access review contracts |
@@ -102,14 +102,15 @@ No preflight row is `pass` merely because its expected shape is described in for
 | `commit-11-a` | `PH-11` | `planned-after-10-c` | `planned` | `activation_gate` | `wait_until_current` | future; raw/report/evidence builders |
 | `commit-11-b` | `PH-11` | `planned-after-11-a` | `planned` | `activation_gate` | `wait_until_current` | future; release and acceptance handoff shell |
 
-Only `commit-01-a` is current. Future rows are planned inventory, not progress claims.
+Only `commit-02-a` is current. Later rows are planned inventory, not progress claims; PH-01 rows are immutable historical handoffs.
 
 ## Open Blockers
 
 | blocker_id | boundary | source | status | design_fix_baseline | next_action |
 |---|---|---|---|---|---|
-| `BLK-CH-01-A-REPO-001` | `commit-01-a` | implementation prerequisite | `open` | `not_applicable` | establish the authorized target repository, then rerun preflight |
-| `BLK-CH-HANDOFF-BASELINE-001` | `commit-01-a` | design handoff | `open` | `not_fixed_until_handoff` | freeze an authorized immutable design baseline; do not infer a hash from the dirty design tree |
+| `BLK-CH-01-A-REPO-001` | `commit-01-a` | implementation prerequisite | `resolved` | `not_applicable` | historical; target repository and PH-01 preflight are complete |
+| `BLK-CH-HANDOFF-BASELINE-001` | `commit-01-a` | design handoff | `resolved_by_ph-01_handoff` | `c10a0994fee6a83d32a520a47e49d9ce0a4ae4e6` | historical baseline used for PH-01; superseded by the selector repair anchor |
+| `BLK-CH-02-A-DESIGN-SELECTOR-001` | `commit-02-a` | formal `05` / Step 7 selector contract | `open` | `pending_design_repair_commit_anchor` | freeze the single repair commit/tree anchor, write it to the implementation ledger, then rerun activation review |
 
 These blockers are not schema decisions and cannot be resolved by implementation-side workarounds. No code change is allowed while either blocker remains open.
 
@@ -118,16 +119,16 @@ These blockers are not schema decisions and cannot be resolved by implementation
 1. `standards/document/代码实施台账与门禁规范.md`
 2. `standards/document/设计真相源闭环与可落码性标准.md`
 3. `projects/L3-capability-hub/07-实施计划.md` §§3, 6, 7, 8, 10, 11, 12
-4. `projects/L3-capability-hub/design-calibration/implementation-boundaries/commit-01-a.md`
+4. `projects/L3-capability-hub/design-calibration/implementation-boundaries/commit-02-a.md`
 5. formal `03-详细设计.md`, `04-配置设计.md`, `05-测试方案.md`, and `06-验收标准.md`
 
 ## Handoff Constraints
 
 | rule | current state |
 |---|---|
-| code changes | forbidden until Activation, Design, Scope and Worktree Gates are real and non-blocking |
-| implementation commit | none; never fabricate a hash or message as completed |
-| test/evidence | none; planned paths are not evidence |
+| code changes | forbidden for `commit-02-a` until Activation, Design, Scope and Worktree Gates are real and non-blocking |
+| implementation commit | PH-01 hashes are recorded; no `commit-02-a` commit exists and no hash may be fabricated |
+| test/evidence | PH-01 tooling records exist; planned `commit-02-a` paths are not evidence |
 | acceptance | not entered; no default verdict or signature |
 | future boundary activation | only after current boundary has a real Commit and Handoff Gate |
 | user changes | protect all unrelated working-tree changes; no destructive cleanup |
@@ -138,9 +139,9 @@ Every future update must record the actual boundary, design baseline, gate statu
 
 ## Current Conclusion
 
-`implementation_incomplete / not_started`.
+`implementation_incomplete / PH-01-complete / commit-02-a-blocked / wait_design`.
 
-This conclusion reflects the absence of the target repository and execution facts. It does not assert that implementation failed. The design handoff artifacts are prepared, but implementation is not authorized; the separately authorized design-repository closure commits do not activate implementation or satisfy the immutable handoff baseline prerequisite.
+This conclusion reflects real PH-01 implementation history and the current selector-design blocker. It does not assert that implementation failed. The design repair anchor is not yet frozen; `commit-02-a` has no source, gate, run, artifact, business evidence, verdict, risk acceptance or signoff fact.
 
 ## Final Design Handoff Audit
 
@@ -154,18 +155,18 @@ This conclusion reflects the absence of the target repository and execution fact
 | formal_documents | `00~07 active` |
 | boundary_skeletons | `26/26 present` |
 | unresolved_upstream_design_blockers | `0` |
-| implementation_handoff_status | `blocked_pending_repository_and_immutable_baseline` |
+| implementation_handoff_status | `PH-01_complete_commit-02-a_blocked_pending_design_repair_anchor` |
 
-T071/T072 confirm that the design repository contains the complete formal design and planned handoff inventory. This is a static design and handoff audit only. It does not create an implementation baseline, activate `commit-01-a`, or provide any implementation, test, artifact, report, evidence, acceptance, risk-acceptance, signoff, or implementation commit fact.
+T071/T072 remain historical static design audits. Subsequent PH-01 implementation facts are recorded above, while this controlled reopen creates only a repaired selector contract. It does not activate `commit-02-a` or create a new implementation run, artifact, canonical evidence instance, acceptance decision, risk acceptance or signoff.
 
 The implementation state remains exactly:
 
 ```text
-status = pre_implementation_blocked
+status = implementation_incomplete / PH-01-complete
 gate_status = blocked
-current_boundary = commit-01-a
+current_boundary = commit-02-a
 next_allowed_action = wait_design
-implementation_commit = none
-test_run = none
+implementation_commit = a4df225e3eba8cca611da3ca78f198ae36ec9045, 8e4a422a4b6477afc214eec1f2db8676f0e1c7ec
+test_run = PH-01 run-scoped tooling records only
 evidence_instance = none
 ```

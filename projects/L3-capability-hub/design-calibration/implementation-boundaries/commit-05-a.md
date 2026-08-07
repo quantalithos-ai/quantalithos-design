@@ -96,8 +96,8 @@
 
 | field | exact contract |
 |---|---|
-| primary_selector | no new primary; relation contract targeted owner = commit-05-b |
-| targeted_selector | CMD-013..017; QUERY-012..014; STATE-007..008; INBOUND-001..002 contract rows |
+| primary_selector | none |
+| targeted_selector | CMD-013..017; QUERY-012..014; STATE-007..008; INBOUND-001..002 contract rows; canonical primary owner=`commit-05-b` |
 | planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- governance-method-relation-contract; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite domain-state,service-command-query,entry-inbound --selector CMD-013..017,QUERY-012..014,STATE-007..008,INBOUND-001..002; check_responsibility_boundary.sh --scope relation; check_redaction.sh --scope relation |
 | gate_set | GATE-01,GATE-02,GATE-05,GATE-07 |
 | raw_report_contract | targeted relation/inbound/redaction raw/reports |

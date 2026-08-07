@@ -79,8 +79,8 @@
 | field | exact contract |
 |---|---|
 | boundary_readiness | descriptor/risk/secret-safe fixtures and forbidden corpus; raw body/secret/provider truth is a veto |
-| primary_selector | none (targeted regression owner; primary remains commit-04-b) |
-| targeted_selector | CMD-009..012; QUERY-007..011; STATE-004..006 |
+| primary_selector | none |
+| targeted_selector | CMD-009..012; QUERY-007..011; STATE-004..006; canonical primary owner=`commit-04-b` |
 | planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- descriptor-contract; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite domain-state,service-command-query --selector CMD-009..012,QUERY-007..011,STATE-004..006; check_redaction.sh --scope descriptor; check_rustdoc_coverage.sh --scope descriptor |
 | gate_set | GATE-01, GATE-02, GATE-05, GATE-07 |
 | raw_report_contract | artifacts/test/<run_id>/raw; reports/runs/<run_id>/suites/service-command-query/descriptor/; reports/runs/<run_id>/checks/redaction/ |

@@ -79,8 +79,8 @@
 | field | exact contract |
 |---|---|
 | boundary_readiness | identity/review typed source and state fixtures; any URL/provider/config substitute is a veto |
-| primary_selector | none (targeted regression owner; primary remains commit-03-c) |
-| targeted_selector | CMD-001..004; QUERY-001..003; STATE-001..002 |
+| primary_selector | none |
+| targeted_selector | CMD-001..004; QUERY-001..003; STATE-001..002; canonical primary owner=`commit-03-c` |
 | planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- identity-contract; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite static-contract-docs,domain-state --selector CMD-001..004,QUERY-001..003; check_rustdoc_coverage.sh --scope identity |
 | gate_set | GATE-01, GATE-02, GATE-03, GATE-07 |
 | raw_report_contract | artifacts/test/<run_id>/raw; reports/runs/<run_id>/suites/service-command-query/; reports/runs/<run_id>/suites/domain-state/ |

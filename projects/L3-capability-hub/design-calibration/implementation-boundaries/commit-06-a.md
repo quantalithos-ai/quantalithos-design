@@ -96,8 +96,8 @@
 
 | field | exact contract |
 |---|---|
-| primary_selector | no new primary; exposure contract targeted owner = commit-06-b |
-| targeted_selector | CMD-018..021; QUERY-015..019; STATE-009..014 |
+| primary_selector | none |
+| targeted_selector | CMD-018..021; QUERY-015..019; STATE-009..014; canonical primary owner=`commit-06-b` |
 | planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- exposure-contract; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite domain-state,service-command-query --selector CMD-018..021,QUERY-015..019,STATE-009..014; check_rustdoc_coverage.sh --scope exposure; check_responsibility_boundary.sh --scope exposure |
 | gate_set | GATE-01,GATE-02,GATE-07 |
 | raw_report_contract | targeted exposure/domain raw/reports |

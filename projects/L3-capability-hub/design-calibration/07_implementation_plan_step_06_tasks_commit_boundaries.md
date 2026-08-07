@@ -20,8 +20,8 @@
 | candidate boundary 数量 | 26 个，`commit-01-a`~`commit-11-b`，包含独立的 `commit-03-c` accepted service vertical slice |
 | 直接编码 authority | 正式 `03-详细设计.md` 与指定 `03_ddd_step_*` exact source |
 | test/acceptance authority | 正式 `05-测试方案.md`、`06-验收标准.md`；Step 7 继续细化 |
-| implementation ledger | 当前尚未创建；T068/T069 在正式 `07` 装配后创建 |
-| target implementation repo | `/home/aris/Projects/quantalithos-capability-hub` 未发现 |
+| implementation ledger | project and 26 boundary ledgers are present; current facts are maintained by the implementation-repository ledger |
+| target implementation repo | `/home/aris/Projects/quantalithos-capability-hub` established; PH-01 handoff recorded |
 | unresolved upstream blocker | `0` |
 | 下一动作 | Step 7 绑定 exact TC/DS/EV、suite、gate、artifact/report 和 AC/VETO 门禁 |
 
@@ -403,14 +403,14 @@ Boundary ID、phase归属和顺序在后续正式 `07` 中保持稳定。若实�
 | 每个 boundary 有经验复核及不适用理由 | pass-designed | §5.6 已列；blocker必须回写标准/设计 |
 | 每个 boundary 有停审与跨 boundary 审计 | pass-designed | §5.7~§5.8 已列 |
 | 精确 TC/DS/EV、suite、gate、check、command 尚未绑定 | pending Step 7 | 下一步逐 boundary 映射，不在本 Step 猜执行结果 |
-| 目标实现仓 | implementation prerequisite | `/home/aris/Projects/quantalithos-capability-hub` 设计期未发现 |
-| commit required now | no | 本轮只写设计仓文档 |
+| 目标实现仓 | implementation prerequisite | `/home/aris/Projects/quantalithos-capability-hub` established; historical prerequisite resolved |
+| commit required now | authorized_pending_repair_anchor | commit only the capability-hub design repair; no implementation commit or PH-02 activation |
 
 ## 8. Step 6 完成记录
 
 | 项目 | 状态 |
 |---|---|
-| Step 6 设计产物 | completed_continuous_execution |
+| Step 6 设计产物 | completed_continuous_execution; historical prerequisite facts synchronized |
 | phase task coverage | 11/11 |
 | boundary coverage | 26/26 |
 | boundary closure review | 26/26 `pass-designed`；无 unresolved upstream design blocker |

@@ -6,7 +6,7 @@
 
 本目录是设计仓中的 active project documentation。正式设计基线按 `00-需求文档.md` 至 `07-实施计划.md` 顺序维护；对应的 calibration flow、project ledger、implementation ledger 和 boundary skeleton 是审计与实施移交材料。
 
-当前只声明设计产物已重建，不声明实现仓、代码、测试运行、artifact、report、evidence、验收 verdict、signoff 或 implementation commit 已存在。
+当前只声明设计语义；真实实现事实以实现仓 implementation ledger 为准。PH-01 已有历史实现提交和 run-scoped tooling records，`commit-02-a` 尚未落码且因设计 selector 修复锚点未冻结而保持 `blocked / wait_design`；当前没有业务 evidence、验收 verdict、risk acceptance 或 signoff。
 
 ## 核心职责
 
@@ -50,15 +50,15 @@
 
 - `design-calibration/00_requirements_calibration_flow.md` 至 `07_implementation_plan_calibration_flow.md`：各正式文档的 full-restart 讨论流程和 Step 中间产物索引。
 - `design-calibration/project_execution_ledger.md`：设计恢复点、文档进度、历史材料、blocker 和 commit 要求。
-- `design-calibration/implementation_execution_ledger.md`：实现移交总台账；当前为 pre-implementation blocked。
+- `design-calibration/implementation_execution_ledger.md`：实现移交总台账；当前为 PH-01 complete / `commit-02-a` blocked / `wait_design`。
 - `design-calibration/implementation-boundaries/commit-01-a.md` 至 `commit-11-b.md`：26 个 planned boundary skeleton；只有项目台账当前 boundary 可以被激活，未来 skeleton 不授权实现。
 - `design-calibration/T070_readme_audit_and_disposition.md`：本 README 的历史冲突审计和处置记录。
 - `design-calibration/T071_full_restart_final_audit.md`：formal `00~07`、全部 calibration 产物和实施移交材料的最终静态审计。
 
 ## 真实性与提交纪律
 
-- 当前目标实现仓 `/home/aris/Projects/quantalithos-capability-hub` 尚未建立。
-- 当前没有实现 commit、测试 run、artifact、report、evidence、验收 verdict、risk acceptance 或 signoff。
+- 当前目标实现仓 `/home/aris/Projects/quantalithos-capability-hub` 已建立并完成 PH-01；真实提交和 run-scoped tooling records 以实现仓 ledger 为准。
+- 当前没有 `commit-02-a` 实现、业务 evidence、验收 verdict、risk acceptance 或 signoff。
 - 证据路径必须是显式 run-scoped 的 `reports/runs/<run_id>/evidence-index.md` 和 `.json`；不得使用 `latest` 或 `evidence-candidates.md` alias。
 - 未来 Rust public declaration、struct field、enum variant/payload、trait、method 和 callable 必须有完整英文 `///`；enum struct-variant field 不写 field-level `pub`。
-- 用户已于 2026-07-27 明确授权按 `00/01`、`02/03/04`、`05/06/07` 三组提交本轮设计仓文档；该授权仅适用于设计仓收口，不授权 implementation commit，也不冻结 immutable handoff baseline。
+- 用户已于 2026-07-27 明确授权按 `00/01`、`02/03/04`、`05/06/07` 三组提交本轮设计仓文档；本次受控 selector repair 只提交 capability-hub 设计作用域，不创建 implementation commit。新的 immutable design anchor 只能使用该 repair commit 的真实 hash/tree，不能预填或从 dirty tree 推断。

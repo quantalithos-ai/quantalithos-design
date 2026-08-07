@@ -96,8 +96,8 @@
 
 | field | exact contract |
 |---|---|
-| primary_selector | no new primary; release only aggregates completed denominator |
-| targeted_selector | full compatible main refs, required selected refs, release smoke, 37 AC, 13 VF, 23 VETO and review schema |
+| primary_selector | none |
+| targeted_selector | full compatible main refs, required selected refs, release smoke, 37 AC, 13 VF, 23 VETO and review schema; aggregation owner=`commit-11-a` |
 | planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- release-handoff; run_release_gate.sh --run-id <run_id> --artifact-root <root> --report-root <root> --lower-run-manifest <path>; four builders; 9 checks; acceptance/review draft schema checks |
 | gate_set | GATE-01,GATE-06,GATE-07,GATE-08,GATE-09 |
 | raw_report_contract | release gate raw, all run reports; reports/acceptance/*; reports/review/* draft paths |

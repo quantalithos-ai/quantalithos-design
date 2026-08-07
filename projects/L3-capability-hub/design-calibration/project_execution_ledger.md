@@ -13,7 +13,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | Step 13 completed; T068/T069/T070/T071/T072 closure | implementation handoff and final full-restart audit | `design_task_completed` | Formal 07, implementation ledger, README disposition, 26 boundary skeletons and T071 final audit are complete. No implementation fact exists; target repository and immutable baseline remain implementation prerequisites. | `wait_for_authorized_implementation_handoff` | `代码实施台账与门禁规范.md`、formal 07 §§3/6/7/8/10/11/12、T071 final audit、implementation ledger |
+| `07-实施计划.md` | `CH-07-OWNER-REPAIR-001` controlled reopen completed; repair anchor pending | selector primary-owner repair and implementation handoff sync | `blocked` | Target repository and PH-01 handoffs exist. `commit-02-a` remains blocked because the repaired capability-hub design subtree has not yet been frozen as a real repair commit/tree anchor. | `wait_design` | formal `05/07`、Step 7/10/11、implementation ledger、`implementation-boundaries/commit-02-a.md` |
 
 ---
 
@@ -28,7 +28,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | `04_completed_design_task_wait_implementation_handoff` | Step 15 completed | `design_task_closed_wait_implementation_handoff` | Step 1~15、T070/T071/T072 已完成；18/27/21 inventory、3 profiles、24 failures 和配置静态审计闭合；无执行事实。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | `05_completed_design_task_wait_implementation_handoff` | Step 15 completed | `design_task_closed_wait_implementation_handoff` | Step 1~15、T070/T071/T072 已完成；189 TC/DS/EV、638 pairs、10/5/9/4 automation、37 AC/13 VF 等仍是设计合同；无实现/run/evidence/acceptance事实。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | `06_completed_design_task_wait_implementation_handoff` | Step 15 completed | `design_task_closed_wait_implementation_handoff` | Step 1~15、T070/T071/T072 已完成；formal 06 active，15/15 chapters 和锁定库存已静态审计；无 verdict/signoff 事实。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | `07_completed_design_task_wait_implementation_handoff` | Step 13 completed | `design_task_closed_wait_implementation_handoff` | Formal 07, T068/T069 handoff artifacts, T070 README disposition and T071 final audit are complete. The design task is closed; implementation remains blocked until the target repository and immutable baseline are authorized. |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | `07_controlled_reopen_owner_repair_anchor_pending` | Step 7/10/11 controlled sync after Step 13 | `blocked_wait_design_repair_anchor` | Formal `05` identities are unchanged; primary-owner repair is complete in the working tree. Freeze one real repair commit/tree anchor before `commit-02-a` activation. |
 
 ---
 
@@ -583,7 +583,7 @@ T072 已完成。本轮 full-restart 设计任务从 formal `00-需求文档.md`
 
 T072 关闭时的 `commit_required=no` 是当时执行快照。用户于2026-07-27随后明确授权按 `00/01`、`02/03/04`、`05/06/07` 三组提交本轮设计仓产物；实际提交标识由 Git history 记录，不在设计台账中预填或自引用。该授权只改变设计仓提交纪律，不创建 implementation commit、不激活 `commit-01-a`，也不关闭目标实现仓缺失和 immutable baseline 未冻结两个实施前置 blocker。
 
-### Final recovery point
+### Historical full-restart recovery point
 
 | field | value |
 |---|---|
@@ -600,4 +600,25 @@ T072 关闭时的 `commit_required=no` 是当时执行快照。用户于2026-07-
 | design_repository_commit_authorization | `authorized_three_group_closure_2026_07_27` |
 | implementation_commit | `none` |
 
-此前各节中的“当前恢复点”保留为历史执行记录；以上 Final recovery point 是唯一当前入口。
+此前各节和本表是 T072/T073 历史执行记录；下方 Controlled Reopen Current Recovery Point 是唯一当前入口。
+
+### Controlled Reopen Current Recovery Point
+
+| field | value |
+|---|---|
+| change_id | `CH-07-OWNER-REPAIR-001` |
+| current_document | `07-实施计划.md` |
+| current_step | Step 7/10/11 controlled selector-owner sync completed; design repair anchor pending |
+| current_module | selector primary-owner repair and implementation handoff sync |
+| design_gate_status | `blocked` |
+| next_allowed_action | `wait_design` |
+| unresolved_upstream_design_blocker | `0`; formal `05` identities and semantics are unchanged |
+| implementation_repo | `/home/aris/Projects/quantalithos-capability-hub` verified Git worktree |
+| implementation_current_boundary | `commit-02-a` |
+| implementation_gate_status | `blocked` |
+| implementation_next_allowed_action | `wait_design` |
+| implementation_facts | PH-01 complete: `a4df225e3eba8cca611da3ca78f198ae36ec9045` and `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`; associated run-scoped tooling records exist; no business evidence/verdict/signoff |
+| design_anchor | `pending_real_repair_commit_and_scoped_tree`; do not prefill or infer a future hash |
+| blocker | `BLK-CH-02-A-DESIGN-SELECTOR-001` remains open until the real repair commit/tree is frozen and written to the implementation-repository ledger |
+| anchor_rule | the new repair commit is the sole immutable design reference; unrelated external commits and the superseded scoped tree are ignored unless the user changes this rule |
+| stop_rule | after committing the repair and synchronizing the implementation-repository ledger, stop before any `commit-02-a` source or gate work |

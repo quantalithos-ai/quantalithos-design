@@ -23,7 +23,7 @@
 | allowed scope | J01-J08 public carriers, journal/checkpoint, frozen plan/target and result/report shell |
 | forbidden scope | generic execute, scheduler-owned behavior and Job business mutation |
 | batch sequence | BATCH-10-A1 Job input -> BATCH-10-A2 journal/checkpoint -> BATCH-10-A3 frozen plan/target -> BATCH-10-A4 result/report carriers |
-| primary or targeted selectors | FOUNDATION-007; targeted JOB-001..008 |
+| primary or targeted selectors | no primary; FOUNDATION-007 and JOB-001..008 protocol rows targeted |
 | readiness prerequisite | Jobs root, eight dispatches and public protocol/journal/report fixtures |
 | gate set | GATE-01,GATE-02,GATE-04,GATE-07 |
 | planned reviewer | jobs owner + contracts reviewer |
@@ -96,14 +96,14 @@
 
 | field | exact contract |
 |---|---|
-| primary_selector | FOUNDATION-007 |
-| targeted_selector | JOB-001..008; journal/checkpoint/frozen-plan/result/report protocol rows |
-| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- job-protocol; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite static-contract-docs,jobs-lifecycle --selector FOUNDATION-007,JOB-001..008 --targeted; check_rustdoc_coverage.sh --scope jobs; check_case_manifest.sh --selector FOUNDATION-007 |
+| primary_selector | none |
+| targeted_selector | FOUNDATION-007; JOB-001..008; journal/checkpoint/frozen-plan/result/report protocol rows; canonical owners=`commit-11-a`/`commit-10-b`/`commit-10-c` |
+| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- job-protocol; run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite static-contract-docs,jobs-lifecycle --selector FOUNDATION-007,JOB-001..008 --targeted; check_rustdoc_coverage.sh --scope jobs; targeted job protocol fixture inventory check |
 | gate_set | GATE-01,GATE-02,GATE-04,GATE-07 |
-| raw_report_contract | suites/static-contract-docs/; targeted suites/jobs-lifecycle/; job protocol report |
-| evidence_contract | public Job input/result/journal/report carriers and every struct field/variant/payload require English Rustdoc; frozen plan, ordinal and terminal surface are replayable |
+| raw_report_contract | targeted `suites/static-contract-docs/`; targeted `suites/jobs-lifecycle/`; targeted job protocol report |
+| evidence_contract | protocol rows are `targeted_regression` and point to canonical owners; no canonical TC/DS/EV raw or EV is created; public Job input/result/journal/report carriers and every struct field/variant/payload require English Rustdoc |
 | AC_VF_VETO_direction | AC-CH-011,021,022,024,028,030,033..037; VF-CH-007,010; VETO-CH-007,010; VETO-CH-P-008/009 |
-| failure_return | public schema/Rustdoc/journal/stored report source gap is wait_design; no generic execute or scheduler parameter may supply business identity |
+| failure_return | public schema/Rustdoc/journal/stored report source gap is wait_design; targeted protocol verification cannot create a canonical primary; no generic execute or scheduler parameter may supply business identity |
 | execution_status | planned contract only; no command, test, run, artifact, report or evidence instance has been created |
 
 ## Worktree Gate
@@ -130,10 +130,10 @@
 
 | check | contract | status |
 |---|---|---|
-| targeted selector | FOUNDATION-007; targeted JOB-001..008, expanded to exact TC/DS/EV identities at execution time | pending |
+| targeted selector | FOUNDATION-007 and JOB-001..008 protocol rows, expanded to exact TC/DS/EV identities at execution time and linked to `commit-11-a`/`commit-10-b`/`commit-10-c` owners | pending |
 | negative branches | invalid state/config, forbidden responsibility and unavailable behavior are typed | pending |
 | replay/no-write | applicable duplicate/race/replay/no-write/capture/terminal branches are checked | pending |
-| denominator | targeted regression does not add to the canonical 189 primary denominator | pending |
+| denominator | this boundary adds zero primary rows; targeted protocol regression does not add to the canonical 189 denominator | pending |
 | failure retention | failed/blocked/timeout/flaky/invalid attempts remain immutable and same-run addressable | pending |
 
 ## Evidence Gate

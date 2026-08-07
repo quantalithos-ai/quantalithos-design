@@ -23,9 +23,9 @@
 | allowed scope | run-scoped scripts, report/check builders, machine schemas and pairing/redaction/no-static audits |
 | forbidden scope | static pass, cross-run joins, acceptance signoff and manual evidence fabrication |
 | batch sequence | BATCH-11-A1 raw schemas -> BATCH-11-A2 suite/report builders -> BATCH-11-A3 checks/audits -> BATCH-11-A4 evidence index |
-| primary or targeted selectors | OBS-001..012; aggregate 189/638/83 audit |
+| primary or targeted selectors | FOUNDATION-001..018, BIND-001..012, CONFIG-001..018 and OBS-001..012 primary; remaining 129 identities targeted/full-main aggregate |
 | readiness prerequisite | raw/check/builder fixture schema, explicit roots and safe sink |
-| gate set | GATE-01,GATE-05,GATE-06,GATE-07,GATE-08 |
+| gate set | GATE-01,GATE-02,GATE-03,GATE-04,GATE-05,GATE-06,GATE-07,GATE-08 |
 | planned reviewer | test tooling owner + evidence reviewer |
 | planned title | feat(report): add run reports and evidence index builders |
 | required body groups | Run-scoped raw and reports:; Provenance and safety audits:; Evidence candidate indexing: |
@@ -96,14 +96,14 @@
 
 | field | exact contract |
 |---|---|
-| primary_selector | OBS-001..012 |
-| targeted_selector | all 189 canonical rows, 10 suites, 9 checks, failure fixtures and builder fixtures |
-| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- evidence-pipeline; run_main_gate.sh --run-id <run_id> --artifact-root <root> tool fixtures; four report builders; 9 checks; git diff --check |
-| gate_set | GATE-01,GATE-05,GATE-06,GATE-07,GATE-08 |
-| raw_report_contract | suites/observability-redaction/; checks/<check-id>/; builder raw; summary.md, gate-summary.md, evidence-index.md, report-audit.md |
-| evidence_contract | 12 OBS primary raw covers 60 logs, 48 metrics, 27 spans plus 3 events and 20 durable profiles; builders must generate the canonical candidate index from same-run raw |
-| AC_VF_VETO_direction | AC-CH-023..037; VF-CH-001,004..013; VETO-CH-001,004..013; VETO-CH-P-001..009 |
-| failure_return | raw/report/digest/path/redaction/dependency/no-static/owner failure is non-pass or invalid_artifact; never patch manually |
+| primary_selector | FOUNDATION-001..018; BIND-001..012; CONFIG-001..018; OBS-001..012 |
+| targeted_selector | remaining STATE/TX/CMD/QUERY/INBOUND/OUTBOUND/JOB 129 identities; all 10 suites; 638 pairs; 9 checks; failure fixtures and builder fixtures |
+| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- evidence-pipeline; run_main_gate.sh --run-id <run_id> --artifact-root <root> for the full 189 denominator; check_case_manifest.sh verifies 189/189, missing=0, duplicate=0; four report builders; 9 checks; git diff --check |
+| gate_set | GATE-01,GATE-02,GATE-03,GATE-04,GATE-05,GATE-06,GATE-07,GATE-08 |
+| raw_report_contract | all 10 suite roots; checks/<check-id>/; builder raw; summary.md, gate-summary.md, evidence-index.md, report-audit.md |
+| evidence_contract | `commit-11-a` is the canonical denominator/evidence assembly owner for 60 cross-phase primary chains and retains formal `05` semantics; semantic producer/oracle remains formal `03/04/05/06` and the corresponding domain/application/config/entry owners. It does not implement domain objects, state families, Ports, business flows or business truth. Remaining 129 rows point to existing semantic owners; full-main raw covers 189 identities, 638 pairs and 83 flows; builders generate the canonical candidate index only from same-run raw |
+| AC_VF_VETO_direction | AC-CH-001..037; VF-CH-001..013; VETO-CH-001..013; VETO-CH-P-001..009 |
+| failure_return | raw/report/digest/path/redaction/dependency/no-static/owner/missing/duplicate failure is non-pass or invalid_artifact; never patch manually |
 | execution_status | planned contract only; no command, test, run, artifact, report or evidence instance has been created |
 
 ## Worktree Gate
@@ -130,10 +130,10 @@
 
 | check | contract | status |
 |---|---|---|
-| targeted selector | OBS-001..012; aggregate 189/638/83 audit, expanded to exact TC/DS/EV identities at execution time | pending |
+| targeted selector | remaining 129 identities plus full 189/638/83 aggregate, expanded to exact TC/DS/EV identities at execution time | pending |
 | negative branches | invalid state/config, forbidden responsibility and unavailable behavior are typed | pending |
 | replay/no-write | applicable duplicate/race/replay/no-write/capture/terminal branches are checked | pending |
-| denominator | targeted regression does not add to the canonical 189 primary denominator | pending |
+| denominator | 60 FOUNDATION/BIND/CONFIG/OBS identities are primary here; the full-main manifest must prove 189/189 with missing=0 and duplicate=0 | pending |
 | failure retention | failed/blocked/timeout/flaky/invalid attempts remain immutable and same-run addressable | pending |
 
 ## Evidence Gate

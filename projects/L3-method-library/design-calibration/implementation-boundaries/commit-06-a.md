@@ -7,9 +7,9 @@
 | phase | PH-06 traceability, impact, audit and evidence lineage |
 | design_baseline | `current-design-with-commit-06-a-ph06-contract-domain-closure` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready_for_design_gate |
-| next_allowed_action | read_docs |
-| current_recovery_point | Design commit `ea99688411602fc73c24d011507042b271fac755` closes the prior PH-06 blockers;restart from this ledger, formal `07` and every Required Read, protect user-owned `?? .gitignore`, then independently rerun Design/Scope/Worktree Gate before implementation edits. |
+| status | blocked |
+| next_allowed_action | wait_design |
+| current_recovery_point | Fresh Design Gate found `BLK-ML-06A-DESIGN-004`: close exact `MethodAssetEvidenceLineage::link_trace_material(...)` source states,result preservation,duplicate no-op and terminal rejection in formal design;implementation repo remains unchanged and `?? .gitignore` remains untouched/unstaged. |
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | project ledger current_boundary must equal `commit-06-a` | pass | Project ledger now points to `commit-06-a`;implementation may use this file only within the trace/audit/impact/lineage contracts-domain scope. |
 | `commit-05-b` handoff must be closed | pass | Distribution/handoff services and run-scoped evidence are closed by implementation commit `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73` and design-ledger handoff `95c7eeaaba9f71f0063b48c80b33d9519350a487`. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-06-a` | pass | Project ledger and implementation ledger both require a fresh read cycle against design commit `ea99688411602fc73c24d011507042b271fac755`;no prior gate result may be reused. |
+| project ledger must have activated a fresh `read_docs` cycle for `commit-06-a` | pass | The fresh cycle against design commit `ea99688411602fc73c24d011507042b271fac755` ran and found `BLK-ML-06A-DESIGN-004`;the current action is now `wait_design`,not implementation. |
 
 ---
 
@@ -33,16 +33,16 @@
 | `projects/L3-method-library/00-需求文档.md` | traceability, impact, audit and evidence lineage P0 scope | pending | Trace/audit must remain refs-only and body-free. |
 | `projects/L3-method-library/01-架构设计.md` | trace/audit ownership, evidence lineage and redaction boundary | pending | `VETO-ML-005` / `VETO-ML-006` remain blocking. |
 | `projects/L3-method-library/02-概要设计.md` | trace material, audit trail, impact summary and lineage object outline | pending | Treat historical labels as upstream outline;formal `03` §6.3E is the exact implementation overlay. |
-| `projects/L3-method-library/03-详细设计.md` | §6.3E PH-06 exact contracts/domain closure and carve-outs | pending | Primary formal source for wrappers, carriers, fields, states, helpers and errors. |
+| `projects/L3-method-library/03-详细设计.md` | §6.3E PH-06 exact contracts/domain closure and carve-outs | blocked | Line 1004 defines `link_trace_material(ref)` but omits exact legal source states,result state,duplicate no-op and terminal/unavailable rejection. |
 | `projects/L3-method-library/04-配置设计.md` | redaction, observability and evidence/report boundary | pending | No runtime config, transport or report generator may enter this boundary. |
 | `projects/L3-method-library/05-测试方案.md` | contract-domain-fast trace/audit/impact/lineage and artifact/report rules | pending | Targeted evidence must derive from actual raw artifacts. |
 | `projects/L3-method-library/06-验收标准.md` | ML-FG-004/009/010/011, ML-RL-004/009, `VETO-ML-005` and `VETO-ML-006` | pending | Raw body leaks and untraceable evidence remain blocking. |
 | `projects/L3-method-library/07-实施计划.md` | §3, §6 commit-06-a, §7 PH-06, §11 and §12 | pending | Exact current scope/check/commit discipline. |
 | `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | trace/audit/impact/evidence lineage module boundary | pending | Contracts/domain scope remains separate from service/store/report generation. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | PH-06 closure supplement and source/constructor correction | pending | Exact wrapper fields, ref sets, support carriers, object fields and pure helper mutations. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | PH-06 closure supplement and source/constructor correction | blocked | Lines 6210~6213 and 6406~6412 define the helper and other lineage guards but leave this helper's state matrix incomplete. |
 | `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | `commit-06-a` no callable port override | pending | Earlier repository tables are future direction only;no current port/fake implementation. |
 | `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | trace/audit/impact protocol family boundary | pending | No public handler/body shell is authorized for this contracts/domain slice. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | `commit-06-a` pure state guard override | pending | Separate impact kind from lifecycle state and apply exact mutations. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | `commit-06-a` pure state guard override | blocked | PH-06 override says linking is refs-only but does not name legal source states or terminal rejection. |
 | `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | `commit-06-a` persistence carve-out | pending | No repository, fake, durable row, UoW, replay or persistence surface. |
 | `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | `commit-06-a` existing-error mapping override | pending | No new domain/repository/service/transport error family. |
 | `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | stored replay and consistency future boundary | pending | Confirm replay/concurrency behavior is not implemented in `commit-06-a`. |
@@ -80,7 +80,7 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project and implementation ledgers show `current_boundary = commit-06-a`,baseline `current-design-with-commit-06-a-ph06-contract-domain-closure`,and `next_allowed_action = read_docs` | pass | Design commit `ea99688411602fc73c24d011507042b271fac755` is published;fresh read/gate cycle is required. |
+| activation guard | project and implementation ledgers activated `commit-06-a` at baseline `current-design-with-commit-06-a-ph06-contract-domain-closure` and began from `read_docs` | pass | The activation/read cycle completed far enough to make the fresh Design Gate decision;current `next_allowed_action = wait_design` is governed by `BLK-ML-06A-DESIGN-004`. |
 | prior handoff | `commit-05-b` implementation commit and handoff recorded | pass | PH-05 distribution/handoff service slice is recorded at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`, with handoff closed in the design ledger. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded before any implementation edit as only user-owned `?? .gitignore`;file remains untouched and unstaged. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
@@ -102,8 +102,8 @@
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | Project ledger has advanced from `commit-05-b` to `commit-06-a`, and the prior boundary handoff is closed. | read_docs |
-| design_gate | pending | Must be independently rerun after every Required Read is marked pass against `ea99688411602fc73c24d011507042b271fac755`;no old blocked/pass conclusion is reusable. | wait_design |
-| scope_gate | pending | Must verify implementation needs only contracts/domain/tests/run-scoped artifacts and no callable/persistence surface. | wait_design |
+| design_gate | blocked | `BLK-ML-06A-DESIGN-004`: exact lineage-link state/duplicate/terminal semantics are absent from formal `03`,Step 6 and Step 10;implementation would have to invent behavior. | wait_design |
+| scope_gate | pass | The required closure remains inside the already-authorized contracts/domain/tests scope and adds no callable/persistence surface;implementation still cannot start while Design Gate is blocked. | wait_design |
 | worktree_gate | pass | Initial status recorded as only user-owned `?? .gitignore`;it remains untouched and unstaged. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/contract/domain checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
 | test_gate | pending | Contract-domain-fast trace/audit/impact/lineage, redaction targeted seed and VETO targeted checks pass after activation. | fix_gate_failure |
@@ -148,6 +148,21 @@
 | BLK-ML-06A-DESIGN-001 | design_gate | resolved | The prior baseline lacked exact wrappers/ref sets/support/object schema. | Formal `03` §6.3E and Step 6 now close exact kinds, wrapper fields/accessors, multi-kind conversion error, first-seen sets, safe reason, summaries, serde and object fields in design commit `ea99688411602fc73c24d011507042b271fac755`. | read_docs |
 | BLK-ML-06A-DESIGN-002 | design_gate | resolved | The prior baseline did not distinguish current pure helpers from future port/persistence candidates. | Formal `03` §6.3E plus Step 7/11 overrides close helper mutations/error ownership and forbid current application/service/repository/fake/resolver/mapper/UoW/persistence work. | read_docs |
 | BLK-ML-06A-DESIGN-003 | design_gate | resolved | The prior baseline lacked exact lifecycle/category split and test/evidence closure. | Step 10/12/16 overrides and formal `07` close legal transitions, marker writes, focused tests, targeted redaction and run-scoped artifacts. | read_docs |
+| BLK-ML-06A-DESIGN-004 | design_gate | open | `MethodAssetEvidenceLineage::link_trace_material(...)` lacks exact legal source states,result-state/summary preservation,typed duplicate semantics and rejection from `LineageUnavailable | BodyCandidateRejected`. | Close the helper as legal only from the exact named states;define first-seen duplicate behavior,state/summary preservation,terminal/unavailable `InvalidTransition`,identity/ref preservation on failure,and focused tests in formal `03`,Step 6,Step 10 and Step 16. | wait_design |
+
+## Blocker BLK-ML-06A-DESIGN-004
+
+| field | value |
+|---|---|
+| boundary | `commit-06-a` |
+| discovered_in | implementation fresh Design Gate |
+| gate | design_gate |
+| status | open |
+| blocking_reason | Formal `03` §6.3E line 1004 and Step 6 lines 6210~6213 / 6406~6412 say only that `link_trace_material(...)` appends a typed ref and retains prior links. They do not state whether linking is legal from `LineagePartial` or `LineageUnavailable`,whether it changes state/summary,whether a duplicate is a successful no-op,or whether terminal `BodyCandidateRejected` rejects. |
+| affected_files | No implementation files changed;future `crates/domain/src/**` and `crates/domain/tests/**` would otherwise require invented semantics. |
+| design_sources | `projects/L3-method-library/03-详细设计.md:1004`;`projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md:6210`;`projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md:6406`;`projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md:3875` |
+| forbidden_workarounds | allow every state;silently recover `LineageUnavailable`;change state/summary while linking;permit post-`BodyCandidateRejected` mutation;use private map or test-only rule;parse typed-ref text. |
+| requested_design_closure | Publish one exact matrix for legal source states,result state/summary preservation,typed duplicate no-op,terminal/unavailable `InvalidTransition`,failure no-mutation and focused contract-domain assertions. |
 
 ---
 
@@ -156,4 +171,4 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| trace/audit redaction closure | ready_for_design_gate | Design commit `ea99688411602fc73c24d011507042b271fac755` closes current contracts/domain semantics;implementation must still reread and independently validate before code. |
+| trace/audit redaction closure | blocked_on_lineage_link_state | The broad PH-06 schema remains valid,but `link_trace_material(...)` needs one exact same-layer state/duplicate/terminal closure before code. |

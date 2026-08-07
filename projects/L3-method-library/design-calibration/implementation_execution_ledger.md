@@ -16,11 +16,11 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `current-design-with-commit-06-a-ph06-contract-domain-closure` |
 | current_boundary | `commit-06-a` |
-| gate_status | ready_for_design_gate |
-| gate_reason | Design commit `ea99688411602fc73c24d011507042b271fac755` closes exact PH-06 Rust-facing wrappers/ref sets/body-free carriers, pure-domain helpers/state/error mapping, no-port/no-persistence carve-outs and run-scoped test artifacts;the prior blocked gate conclusion is superseded. |
-| next_allowed_action | read_docs |
-| current_recovery_point | Restart `commit-06-a` from the implementation ledger, current boundary ledger, formal `07` and all Required Reads;protect user-owned `?? .gitignore`, then independently rerun Design/Scope/Worktree Gate before implementation edits. |
-| last_updated_by | design closure agent |
+| gate_status | blocked |
+| gate_reason | `BLK-ML-06A-DESIGN-004`: formal `03` §6.3E and Step 6 define `MethodAssetEvidenceLineage::link_trace_material(...)` but omit exact legal source states, result-state/summary preservation, typed duplicate no-op and rejection from `LineageUnavailable | BodyCandidateRejected`;implementation cannot choose these semantics locally. |
+| next_allowed_action | wait_design |
+| current_recovery_point | Keep implementation repo unchanged and user-owned `?? .gitignore` untouched;close `BLK-ML-06A-DESIGN-004` in formal `03`,Step 6,Step 10 and Step 16,commit a new design baseline,then restart `commit-06-a` from `read_docs`. |
+| last_updated_by | implementation agent |
 | last_updated_at | 2026-08-07 |
 
 ---
@@ -40,7 +40,7 @@
 | `commit-04-b` | `current-design-with-commit-04-b-service-replay-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-04-b` completed across `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; formalization/version services, duplicate replay and replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
 | `commit-05-a` | `current-design-with-commit-05-a-consumption-carrier-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-a` completed across `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; controlled-consumption contracts/domain carriers, pure-domain guards and targeted contract/domain checks are closed. |
 | `commit-05-b` | `current-design-with-commit-05-b-disabled-outcome-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-b` completed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`; distribution/handoff services, disabled diagnostic mapping, fake parity and run-scoped `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
-| `commit-06-a` | `current-design-with-commit-06-a-ph06-contract-domain-closure` | ready_for_design_gate | design_closure | read_docs | Design commit `ea99688411602fc73c24d011507042b271fac755` closes current-boundary contracts/domain schema, helpers, states, safe errors, carve-outs and focused evidence paths;implementation must reread all sources and independently rerun gates. |
+| `commit-06-a` | `current-design-with-commit-06-a-ph06-contract-domain-closure` | blocked | design_gate | wait_design | `BLK-ML-06A-DESIGN-004` requires exact `link_trace_material(...)` state/duplicate/terminal closure before any implementation edit. |
 
 ---
 
@@ -92,6 +92,7 @@
 | BLK-ML-06A-DESIGN-001 | `commit-06-a` | implementation | resolved | `current-design-with-commit-06-a-ph06-contract-domain-closure` | Formal `03` §6.3E and Step 6 now close exact kinds, named wrapper fields/accessors, six-kind trace-source conversion error, first-seen ref sets, safe-marker reason wrapper, body-free summaries, enum serde labels and complete object fields. Resume from `read_docs`. |
 | BLK-ML-06A-DESIGN-002 | `commit-06-a` | implementation | resolved | `current-design-with-commit-06-a-ph06-contract-domain-closure` | Formal `03` §6.3E plus Step 7/11 overrides close pure helper mutations, existing error ownership and the explicit no application/service/repository/fake/resolver/mapper/UoW/persistence surface for this boundary;future callable work is reserved for `commit-06-b`. Resume from `read_docs`. |
 | BLK-ML-06A-DESIGN-003 | `commit-06-a` | implementation | resolved | `current-design-with-commit-06-a-ph06-contract-domain-closure` | Step 10/12/16 overrides and formal `07` close lifecycle/category separation, legal/illegal state guards, safe-reason writes, exact focused test cuts, targeted redaction and six run-scoped raw artifact names. Resume from `read_docs`. |
+| BLK-ML-06A-DESIGN-004 | `commit-06-a` | implementation | open | pending `current-design-with-commit-06-a-lineage-link-state-closure` | Formal `03` §6.3E line 1004,Step 6 lines 6210~6213 and 6406~6412,and Step 10 PH-06 override do not close legal source states/result preservation/duplicate behavior/terminal rejection for `link_trace_material(...)`;design must close these exact semantics and tests,then reset the ledgers to `read_docs`. |
 
 ---
 
@@ -105,7 +106,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing, contradicts the current boundary, or does not close a wrapper field, enum label, ref-set rule, carrier field, lifecycle/state owner, same-layer pure helper, marker source, error mapping, carve-out or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. Current boundary is `commit-06-a` at baseline `current-design-with-commit-06-a-ph06-contract-domain-closure`, published by design commit `ea99688411602fc73c24d011507042b271fac755`;implementation must restart from `read_docs` and independently rerun gates. The prior `commit-05-b` handoff remains closed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`.
+If any required design source is missing, contradicts the current boundary, or does not close a wrapper field, enum label, ref-set rule, carrier field, lifecycle/state owner, same-layer pure helper, marker source, error mapping, carve-out or test-support field needed for implementation, set `gate_status = blocked`, set `next_allowed_action = wait_design`, and stop implementation. That rule is now active for `BLK-ML-06A-DESIGN-004` at baseline `current-design-with-commit-06-a-ph06-contract-domain-closure`;implementation must remain unchanged until a new lineage-link state closure baseline is committed and the ledgers return to `read_docs`. The prior `commit-05-b` handoff remains closed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`.
 
 ---
 
@@ -136,4 +137,4 @@ If any required design source is missing, contradicts the current boundary, or d
 | `commit-04-b` | implemented handoff closed | Implementation handoff records formalization/version service and replay commits `ce425b55fa3726f0149ae338ad9337e684e45f93` and `1672e71f3fbe5e1b4035c1f3bf7c394aad7a162f`; duplicate replay, version conflict, commit-unknown read-back, replay-integrity conflict redline, minimal API entry and targeted `service-flow-fast` evidence are closed. |
 | `commit-05-a` | implemented handoff closed | Implementation handoff records controlled-consumption contracts/domain commits `221664f5304f7f54991390655aea0a794bba482b` and `c4459d10c12bc8c3b32b0dd44240b801dd49d1d3`; typed refs, state carriers, availability marker closure, pure-domain guards and targeted contract/domain tests are closed. |
 | `commit-05-b` | implemented handoff closed | Implementation handoff records distribution/handoff implementation commit `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`; disabled diagnostic ownership, adapter-first `Blocked` / `Unavailable` outcome persistence, no-call/no-rollback behavior, fake parity and run-scoped service-flow-fast / infra-runtime-fake evidence are closed. |
-| `commit-06-a` | design closure published, gate reread required | Project ledger points to `commit-06-a`;design commit `ea99688411602fc73c24d011507042b271fac755` closes the contracts/domain slice, and implementation must restart Required Reads plus Design/Scope/Worktree Gate before editing code. |
+| `commit-06-a` | blocked at fresh Design Gate | `BLK-ML-06A-DESIGN-004` leaves `link_trace_material(...)` state/duplicate/terminal semantics open;implementation remains unchanged pending a new formal closure baseline. |

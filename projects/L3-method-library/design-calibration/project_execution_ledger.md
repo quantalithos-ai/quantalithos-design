@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-08-07
-> 当前任务: `commit-06-a` fresh Design Gate 发现 `BLK-ML-06A-DESIGN-004`: `MethodAssetEvidenceLineage::link_trace_material(...)` 缺 exact source-state / terminal / duplicate no-op 规则。当前状态为 `blocked / wait_design`;实现仓保持零代码改动,用户未跟踪 `.gitignore` 保持 untouched/unstaged。
+> 当前任务: `commit-06-a` lineage-link state closure 已由设计提交 `1b67753504024709a9e5092224aec18f445f8bd2` 完成。三层台账重置为 `ready_for_design_gate / read_docs`;实现侧必须保护用户未跟踪 `.gitignore`,全量重读 Required Reads 并独立重跑 Design/Scope/Worktree Gate。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-06-a lineage-link state guard blocker` | blocked | Formal `03` §6.3E line 1004 and Step 6 correction lines 6406~6412 specify that `link_trace_material(...)` appends refs-only but do not define legal source states, duplicate no-op semantics, resulting state or terminal rejection;implementation would have to invent a state rule. | wait_design:close the exact state matrix/helper/test redline in formal `03`,Step 6,Step 10 and Step 16,then publish a new baseline and restart from `read_docs`. | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-06-a.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-06-a lineage-link state closure ready for gate` | ready_for_design_gate | Design commit `1b67753504024709a9e5092224aec18f445f8bd2` closes exact legal source states,state/summary preservation,first-seen duplicate no-op,unavailable/terminal `InvalidTransition` and failure no-mutation tests for `link_trace_material(...)`;the blocked conclusion is superseded. | read_docs:保护用户未跟踪 `.gitignore`,全量重读 Required Reads,再独立重跑 Design/Scope/Worktree Gate。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-06-a.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_blocked | Step 13 completed + `commit-06-a` Design Gate blocked | wait_design | Allowed scope 和 no-port/no-persistence carve-out 保持闭合;当前只需设计侧补 `link_trace_material(...)` exact state guard / duplicate no-op / terminal rejection,不得在实现仓自行选择。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-06-a` ready for fresh gate | read_docs | PH-06 contracts/domain closure 和 lineage-link exact matrix 已发布;实现侧须从新 baseline 重读 Required Reads / 重跑 Design/Scope/Worktree Gate。 |
 
 ---
 
@@ -92,7 +92,7 @@
 | BLK-ML-06A-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `commit-06-a` 曾缺 exact Rust-facing typed-ref kinds/wrappers、multi-kind trace source、ref-set shape/order、body-free support carriers 和 complete object fields。 | 设计提交 `ea99688411602fc73c24d011507042b271fac755` 的 formal `03` §6.3E 与 Step 6 PH-06 closure 已闭合 exact kinds、wrapper fields/accessors、first-seen sets、safe reason、summary/state/object fields 和 serde labels。 |
 | BLK-ML-06A-DESIGN-002 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `commit-06-a` 曾无法区分 pure contracts/domain helper 与 Step 7/11 future repository/service 候选,实现可能私补 callable port、persistence 或 marker source。 | 设计提交 `ea99688411602fc73c24d011507042b271fac755` 已闭合 pure constructors/mutations、现有错误映射和 no application/service/repository/fake/resolver/mapper/UoW/persistence carve-out;future callable surface 后移 `commit-06-b`。 |
 | BLK-ML-06A-DESIGN-003 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `commit-06-a` 曾缺 exact lifecycle/category split、legal/illegal transition 和 concrete fixture/evidence artifact closure。 | 设计提交 `ea99688411602fc73c24d011507042b271fac755` 的 Step 10/12/16 overrides 与 formal `07` 已闭合 four state carriers、impact-kind preservation、safe-reason mutations、focused tests、targeted redaction 和 six run-scoped raw artifact names。 |
-| BLK-ML-06A-DESIGN-004 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | open | `MethodAssetEvidenceLineage::link_trace_material(...)` 只有“append typed ref / retain prior links”,未闭合 `LineageLinked | LineagePartial | LineageUnavailable | BodyCandidateRejected` 的合法 source states、result state、typed duplicate 语义和 terminal rejection;实现会被迫私选 transition。 | formal `03` §6.3E、Step 6 helper correction、Step 10 state override 和 Step 16 tests 必须统一闭合 exact matrix:允许态、state/summary preservation、first-seen duplicate no-op、terminal/unavailable rejection 及 `InvalidTransition` identity-preservation redline。 |
+| BLK-ML-06A-DESIGN-004 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `MethodAssetEvidenceLineage::link_trace_material(...)` 曾只有“append typed ref / retain prior links”,未闭合合法 source states、result state、typed duplicate 语义和 terminal rejection。 | 设计提交 `1b67753504024709a9e5092224aec18f445f8bd2` 已在 formal `03` §6.3E、Step 6、Step 10 和 Step 16 发布 exact matrix:仅 linked/partial 可链接并保持 state/summary,typed duplicate 成功 no-op,unavailable/body-rejected 返回 `InvalidTransition` 且对象不变。 |
 
 ---
 
@@ -107,9 +107,9 @@
 4. 读取 `design-calibration/implementation_execution_ledger.md`
 5. 读取 `design-calibration/implementation-boundaries/commit-06-a.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前是 `commit-06-a` / `blocked` / `wait_design`,baseline 仍为 `current-design-with-commit-06-a-ph06-contract-domain-closure`,blocker 为 `BLK-ML-06A-DESIGN-004`
-8. 设计侧先在 formal `03`、Step 6、Step 10、Step 16 闭合 `link_trace_material(...)` exact state/duplicate/terminal 规则并提交新 baseline;实现仓不得先行修改
-9. 新 baseline 发布并把三层台账重置为 `ready_for_design_gate / read_docs` 后,实现侧保护用户未跟踪 `.gitignore`,全量重读 Required Reads,独立重跑 Design/Scope/Worktree Gate;gate pass 后才可继续 Allowed Scope 代码与 tests
+7. 确认 implementation ledger 当前是 `commit-06-a` / `ready_for_design_gate` / `read_docs`,baseline 为 `current-design-with-commit-06-a-lineage-link-state-closure`,设计提交为 `1b67753504024709a9e5092224aec18f445f8bd2`
+8. 保护实现仓用户未跟踪 `.gitignore`,全量重读 Required Reads,独立重跑 Design/Scope/Worktree Gate;gate pass 后才可继续 Allowed Scope 代码与 tests
+9. 若重跑时发现 exact kind/wrapper/set、carrier field、state/helper/error/source、test artifact、no-port/no-persistence carve-out 或 allowed scope 仍有未闭口矛盾,实现侧必须重新回写 `blocked / wait_design`,然后从项目级 implementation ledger 和当前 boundary ledger 重新开始
 ```
 
 ---
@@ -117,8 +117,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`commit-06-a` fresh Design Gate 已发现 `BLK-ML-06A-DESIGN-004`;
-当前 boundary 是 `commit-06-a`,baseline 仍是 `current-design-with-commit-06-a-ph06-contract-domain-closure`,状态为 `blocked / wait_design`;
-下一步只允许设计侧闭合 `MethodAssetEvidenceLineage::link_trace_material(...)` 的合法 source states、result preservation、typed duplicate no-op、terminal/unavailable rejection 和 focused tests,然后提交新 baseline 并重置到 `read_docs`;
-实现仓不得自行把链接开放到全部状态、静默恢复 `LineageUnavailable`、修改 lineage state/summary、允许 `BodyCandidateRejected` 后写入,或通过 private map/test-only rule 补口;用户未跟踪 `.gitignore` 保持 untouched/unstaged.
+`commit-06-a` lineage-link state closure 已由 `1b67753504024709a9e5092224aec18f445f8bd2` 完成;
+当前 boundary 是 `commit-06-a`,baseline 是 `current-design-with-commit-06-a-lineage-link-state-closure`,状态为 `ready_for_design_gate / read_docs`;
+下一步由实现侧保护用户未跟踪 `.gitignore`,按 boundary 全量重读 Required Reads 并重跑 Design/Scope/Worktree Gate;不得沿用旧 blocked 结论;
+实现侧只允许 contracts/domain pure carriers、state guards 和 direct tests,并须复制 exact lineage-link matrix;不得私补 application/service/repository/fake/durable/resolver/mapper/UoW/replay/persistence/query/refresh/API/worker/publisher/job/report、raw body、config 或 evidence schema.
 ```

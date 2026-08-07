@@ -3876,7 +3876,16 @@ the pure helpers closed by formal `03` §6.3E and Step 6.
 | `MethodAssetTraceMaterial` | `Organized | Partial | Stale | Unavailable` | construction is `Organized` for a non-empty source set and `Partial` for an empty set with no reason;marking `Organized` requires existing source/cursor/freshness refs and clears reason;marking `Partial | Stale | Unavailable` requires/stores an explicit `MethodAssetSafeReasonRef`。 |
 | `ConsumptionImpactSummary` | `Current | DispositionMarked | Superseded` | register initializes `Current`;disposition writes marker/reason and is only `Current -> DispositionMarked`;supersession requires a different next ref and is only `Current | DispositionMarked -> Superseded`;the next ref is guard-only and `Superseded` is terminal。 |
 | `MethodAssetAuditTrail` | `TrailOwnerPresent | SafeEntryRefsAppended | PartialAuditAvailable | AuditUnavailable` | create initializes `TrailOwnerPresent` with no cursor;append is legal only from owner-present/appended, preserves prior refs and copies the supplied cursor;partial/unavailable reject append。 |
-| `MethodAssetEvidenceLineage` | `LineageLinked | LineagePartial | LineageUnavailable | BodyCandidateRejected` | create initializes `LineageLinked`;trace linking is refs-only;partial from linked/partial stores the summary reason;body rejection from linked/partial/unavailable stores only that reason and enters terminal `BodyCandidateRejected`, never accepting the candidate body。 |
+| `MethodAssetEvidenceLineage` | `LineageLinked | LineagePartial | LineageUnavailable | BodyCandidateRejected` | create initializes `LineageLinked`;trace linking is legal only from linked/partial,uses first-seen typed-ref insertion,preserves current state and complete summary,and treats a typed duplicate as successful no-op;unavailable/body-rejected reject linking with `InvalidTransition` and no mutation. Partial from linked/partial stores the summary reason;body rejection from linked/partial/unavailable stores only that reason and enters terminal `BodyCandidateRejected`,never accepting the candidate body。 |
+
+`link_trace_material(...)` does not perform a lifecycle transition. Its exact matrix is:
+
+| source state | new ref | duplicate ref | result state / error |
+|---|---|---|---|
+| `LineageLinked` | append | no-op | remain `LineageLinked`;summary unchanged。 |
+| `LineagePartial` | append | no-op | remain `LineagePartial`;summary and safe reason unchanged。 |
+| `LineageUnavailable` | reject without mutation | reject without mutation | `InvalidTransition`。 |
+| `BodyCandidateRejected` | reject without mutation | reject without mutation | `InvalidTransition`;terminal。 |
 
 `ConsumptionImpactKind = KnownImpact | UnknownImpact | PendingDownstreamSummary | NoKnownEffect`
 is a separate immutable category field, not a lifecycle state. Disposition and supersession preserve

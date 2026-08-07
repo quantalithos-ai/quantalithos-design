@@ -6227,7 +6227,11 @@ cannot become `Organized` without source refs, cursor and freshness marker, and 
 repair source truth. Impact disposition is legal only from `Current`; supersession is legal only
 from `Current` or `DispositionMarked`, and `Superseded` is terminal. Audit append is legal only
 for `TrailOwnerPresent` or `SafeEntryRefsAppended`, preserves all prior entry refs and uses the
-provided cursor. Lineage linking is refs-only; body rejection never stores the rejected body.
+provided cursor. Lineage linking is refs-only and is legal only from `LineageLinked` or
+`LineagePartial`;it preserves the current state and complete lineage summary. A typed duplicate is
+a successful no-op under the first-seen ref-set rule. `LineageUnavailable` and terminal
+`BodyCandidateRejected` reject linking with `InvalidTransition` and no object mutation. Body
+rejection never stores the rejected body.
 
 ### 6. Port and later-boundary ownership
 
@@ -6258,8 +6262,10 @@ status, config value, timestamp, route, provider response or private fake state.
 `contract-domain-fast` must include focused tests for: every exact kind and wrong-kind conversion;
 first-seen ref-set dedup/order; marker-only safe-reason construction; exact enum serialization;
 body-free summary field roundtrip; trace source-kind rejection; explicit unknown/pending impact;
-append-only audit refs; lineage partial/body-rejection state; legal and illegal transitions; and
-identity/ref preservation after every transition. Tests must assert that no raw body, provider body,
+append-only audit refs; lineage linking from linked/partial with state/summary preservation;
+typed duplicate no-op;unavailable/terminal link rejection;lineage partial/body-rejection state;
+legal and illegal transitions;and identity/ref preservation after every transition. Tests must
+assert that no raw body, provider body,
 path, secret, stack trace or raw reason field exists on the carriers.
 
 The run-scoped raw artifact names for this boundary are fixed as
@@ -6404,12 +6410,28 @@ The pure helper signatures in the preceding supplement are authoritative with th
   `SafeEntryRefsAppended`; it preserves all prior entry refs using the exact first-seen set rule,
   copies the supplied cursor, and rejects `PartialAuditAvailable` or `AuditUnavailable`.
 * `MethodAssetEvidenceLineage::from_external_and_basis(...)` initializes `LineageLinked` and
-  an empty trace/audit linkage; `link_trace_material(...)` appends a typed ref and retains prior
-  links. `mark_partial(...)` is legal from `LineageLinked` or `LineagePartial`, sets
-  `lineage_summary.safe_reason_ref = Some(reason_ref)` and moves to `LineagePartial`;body rejection
-  is legal from `LineageLinked | LineagePartial | LineageUnavailable`, writes only the supplied
-  reason to the same summary field, and moves to `BodyCandidateRejected`. `BodyCandidateRejected`
-  is terminal and the rejected candidate is never accepted as an argument or stored.
+  an empty trace/audit linkage. `link_trace_material(...)` is legal only from `LineageLinked` or
+  `LineagePartial`,appends by the exact first-seen typed-ref rule,and preserves the current state
+  and complete `lineage_summary`;linking an existing typed ref returns success without mutation.
+  `LineageUnavailable` and terminal `BodyCandidateRejected` return `InvalidTransition` without
+  changing identity,refs,summary or state.
+* `MethodAssetEvidenceLineage::mark_partial(...)` is legal from `LineageLinked` or
+  `LineagePartial`,sets `lineage_summary.safe_reason_ref = Some(reason_ref)` and moves to
+  `LineagePartial`;body rejection is legal from
+  `LineageLinked | LineagePartial | LineageUnavailable`,writes only the supplied reason to the same
+  summary field,and moves to `BodyCandidateRejected`. `BodyCandidateRejected` is terminal and the
+  rejected candidate is never accepted as an argument or stored.
+
+The exact `link_trace_material(...)` matrix is:
+
+| source state | input relation | result | mutation |
+|---|---|---|---|
+| `LineageLinked` | new typed ref | `Ok(())` | append;preserve state and complete summary。 |
+| `LineageLinked` | existing typed ref | `Ok(())` | no-op;preserve all fields。 |
+| `LineagePartial` | new typed ref | `Ok(())` | append;preserve partial state and complete summary/safe reason。 |
+| `LineagePartial` | existing typed ref | `Ok(())` | no-op;preserve all fields。 |
+| `LineageUnavailable` | any typed ref | `InvalidTransition` | no mutation。 |
+| `BodyCandidateRejected` | any typed ref | `InvalidTransition` | no mutation;terminal remains terminal。 |
 
 All illegal transitions use the existing `MethodLibraryDomainErrorKind::InvalidTransition`;
 missing required wrapper/marker uses `MissingRequiredTypedInput`; identity/invariant mismatch uses
@@ -6419,7 +6441,7 @@ only by `BodyFreeBoundaryViolation`.
 ### 5. Design gate consequence
 
 This correction resolves the remaining source/constructor portions of
-`BLK-ML-06A-DESIGN-001` through `BLK-ML-06A-DESIGN-003`. It does not authorize implementation of
+`BLK-ML-06A-DESIGN-001` through `BLK-ML-06A-DESIGN-004`. It does not authorize implementation of
 the repositories, resolver/mapper ports, application services, query projections, refresh flows,
 stored replay, jobs, reports, or external/provider body handling reserved for `commit-06-b` and
 later boundaries.

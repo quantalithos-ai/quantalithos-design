@@ -1696,7 +1696,7 @@ tests. It must cover:
 | trace | only the six exact source kinds are accepted;empty/non-empty source initialization and reason-required guards are covered。 |
 | impact | unknown and pending remain distinct from no-known-effect;disposition/supersession preserve kind and enforce terminal state。 |
 | audit | empty trail has no cursor;append preserves prior refs, copies cursor and rejects partial/unavailable states。 |
-| lineage | refs-only linking, partial state and body-candidate rejection preserve identity and never retain the candidate body。 |
+| lineage | linking from linked/partial preserves state and complete summary;first-seen insertion retains prior refs;typed duplicate is a successful no-op;unavailable/body-rejected return `InvalidTransition` with identity/refs/summary/state unchanged;partial and body-candidate rejection never retain a candidate body。 |
 | redlines | carriers/fixtures contain no raw method/provider/archive/report/log body, path, secret, stack trace, raw reason, config value or fake-only marker。 |
 
 Run-scoped raw artifacts are exactly

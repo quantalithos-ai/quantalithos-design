@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-06-b |
 | phase | PH-06 traceability, impact, audit and evidence lineage |
-| design_baseline | `2256ba87a3697660a413a00ed5bab7d1f6f680e4` |
+| design_baseline | `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | blocked |
-| next_allowed_action | wait_design |
-| current_recovery_point | Required Reads and the fresh Design/Scope Gate audit are complete against exact design commit `2256ba87a3697660a413a00ed5bab7d1f6f680e4`;wait for a boundary-specific PH-06 service/store callable closure,then restart from `read_docs`. No implementation code,tests or evidence are authorized while `BLK-ML-06B-DESIGN-001` is open. |
+| status | implemented |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | `commit-06-b` is closed by implementation commit `f4af30991e993ffe92fe0f83046057fddc581995` and run `20260809T061018Z-commit-06-b`;future work must return to the project ledger for explicit next-boundary activation,and user-owned `?? .gitignore` remains untouched and unstaged. |
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | project ledger current_boundary must equal `commit-06-b` | pass | Project ledger now points to `commit-06-b`;activation authorizes Required Reads only until all gates pass. |
 | `commit-06-a` handoff must be closed | pass | Trace/audit/impact/lineage contracts-domain implementation is closed at `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`,with design-ledger handoff `2256ba87a3697660a413a00ed5bab7d1f6f680e4`. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-06-b` | pass | Project and boundary ledgers require a fresh read cycle against exact design commit `2256ba87a3697660a413a00ed5bab7d1f6f680e4`;no prior gate conclusion is reusable. |
+| project and boundary ledgers had to show `ready_for_design_gate / read_docs` before the fresh gate rerun | pass | Both ledgers were read in that state;the fresh Required Reads and Design/Scope/Worktree Gate have now advanced this boundary to `in_progress / implement`. |
 
 ---
 
@@ -27,31 +27,31 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pass | The boundary is current,Required Reads were completed,and a failed Design Gate must return to `blocked / wait_design`. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented service port, store, mapper, marker, redaction rule, replay schema or report schema | pass | §2.2.1A requires exact facade/service/repository/error/version/UoW/stored-result/replay/fake parity closure for this service/store boundary. |
-| `standards/coding/rust.md` | Rust application/infra module, fake store, error and test conventions | pass | Source identifiers, comments, rustdoc, errors and test names must be English. |
-| `projects/L3-method-library/00-需求文档.md` | traceability, impact, audit and evidence lineage service expectations | pass | Services must be refs-only and must not expose raw body or unsafe provider material. |
-| `projects/L3-method-library/01-架构设计.md` | trace/audit service ownership, consistency, observability and redaction boundary | pass | `VETO-ML-005` / `VETO-ML-006` / `VETO-ML-011` apply to leaks, untraceable evidence and unsafe reporting. |
-| `projects/L3-method-library/02-概要设计.md` | trace/audit/impact service and store outline | pass | The service/store split is family-level and does not authorize a Rust-facing callable surface. |
-| `projects/L3-method-library/03-详细设计.md` | trace/audit/impact ports, flows, persistence, state, replay and error contracts | pass | §6 is explicitly an index;the PH-06 section closes `commit-06-a` objects and reserves service/store names for `commit-06-b` without an exact callable closure. |
-| `projects/L3-method-library/04-配置设计.md` | redaction, observability and disabled/degraded runtime seams | pass | Redaction rules are formal,but no production adapter or report generator belongs to this boundary. |
-| `projects/L3-method-library/05-测试方案.md` | service-flow-fast trace/audit/impact, redaction targeted and artifact/report rules | pass | Suite/evidence families are defined,but they do not provide the missing service/store schema. |
-| `projects/L3-method-library/06-验收标准.md` | ML-FG-004/009/010/011, ML-RL-004/009, `VETO-ML-005/006/009/011` | pass | Redaction leak, untraceable evidence or unsafe report/log detail blocks commit. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pass | `commit-06-b` grants only family-level application services/stores/refs-only tests and check families;it does not close exact methods or carriers. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | trace/audit/impact/evidence lineage module boundary | pass | PH-06 services/stores remain separate from report generator,jobs and query projection. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | trace material, audit trail, impact summary and lineage object contracts | pass | Existing objects are exact,but current-boundary service inputs,field sources and support/truth-ref factories are not published. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | trace/audit/impact service ports, repositories/stores and adapter seams | pass | The four repositories are only reserved for `commit-06-b`;no boundary-specific exact trait/facade/service surface follows the reservation. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | trace/audit/impact service request/result shells | pass | The document states its shells are family-level and keeps concrete result/replay fields as watch items. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | trace/audit/impact service flows | pass | Seven PH-06 flow rows give sequence prose only;they do not define exact input/output/source/replay carriers. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | trace/audit/impact state transitions and consistency guards | pass | Domain transition guards are exact,but they do not close service orchestration or persistence ports. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | store, UoW, version and transaction consistency | pass | Logical store semantics exist,but the document explicitly reserves persistence/fake parity until a fresh boundary-specific callable closure. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | safe errors, redaction failures and recovery surfaces | pass | Safe/body-free directions exist,but no current-boundary repository/service error enum and exact mapping are bound. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | duplicate replay, stored result and trace consistency constraints | pass | Generic no-rerun rules exist,but no PH-06 stored-result schema,lookup key,digest canonicalization or replay output is exact. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | service-flow-fast trace/audit/impact and redaction targeted ownership | pass | Test directions are family-level and explicitly defer evidence schema/artifact paths. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-06-b` row | pass | Allowed scope is only the family-level phrase application services,stores and refs-only tests. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-06-b` gate row and PH-06 gate | pass | Required check families are service-flow-fast trace/audit/impact and redaction targeted,but exact raw artifact filenames are not fixed. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-06-b` commit body grouping | pass | Commit body groups are defined;they do not close implementation schema. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-06-a` handoff state | latest implementation state | pass | Confirmed HEAD `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`,only user-owned `?? .gitignore`,and correct local identity;the file remains untouched and unstaged. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pass | Fresh read completed;gated state transitions,scope protection,commit and handoff rules confirmed. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented service port, store, mapper, marker, redaction rule, replay schema or report schema | pass | Fresh read completed;formal §6.3F closes the required callable surface without local schema invention. |
+| `standards/coding/rust.md` | Rust application/infra module, fake store, error and test conventions | pass | Fresh read completed;English identifiers/rustdoc/errors/tests and formatting conventions apply. |
+| `projects/L3-method-library/00-需求文档.md` | traceability, impact, audit and evidence lineage service expectations | pass | Fresh read completed;PH-06 remains refs-only and body-free. |
+| `projects/L3-method-library/01-架构设计.md` | trace/audit service ownership, consistency, observability and redaction boundary | pass | Fresh read completed;domain/application ownership and VETO redlines remain intact. |
+| `projects/L3-method-library/02-概要设计.md` | trace/audit/impact service and store outline | pass | Fresh read completed;current service/store slice follows the current object ownership. |
+| `projects/L3-method-library/03-详细设计.md` | trace/audit/impact ports, flows, persistence, state, replay and error contracts | pass | Fresh read completed against `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0`;§6.3F closes selector/source/input/facade,repository,factory,replay,UoW,fake parity and evidence. |
+| `projects/L3-method-library/04-配置设计.md` | redaction, observability and disabled/degraded runtime seams | pass | Fresh read completed;this boundary adds no config or production adapter. |
+| `projects/L3-method-library/05-测试方案.md` | service-flow-fast trace/audit/impact, redaction targeted and artifact/report rules | pass | Fresh read completed;checks use actual run-scoped raw artifacts only. |
+| `projects/L3-method-library/06-验收标准.md` | ML-FG-004/009/010/011, ML-RL-004/009, `VETO-ML-005/006/009/011` | pass | Fresh read completed;raw-body,untraceable-evidence and unsafe-report redlines remain blocking. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pass | Fresh read completed;exact commit-06-b scope/checks/carve-outs confirmed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | trace/audit/impact/evidence lineage module boundary | pass | Fresh read completed;service/store slice stays separate from query/jobs/report generation. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | trace material, audit trail, impact summary and lineage object contracts | pass | Fresh read completed;exact source fields and only two new domain helpers are closed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | trace/audit/impact service ports, repositories/stores and adapter seams | pass | Fresh read completed;four exact repositories reuse the safe error surface and no fifth truth repository/resolver/mapper is allowed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | trace/audit/impact service request/result shells | pass | Fresh read completed;body-free facade/result/replay shells and source-only field rule confirmed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | trace/audit/impact service flows | pass | Fresh read completed;seven selector flows,duplicate-before-UoW,natural-key rules and CommitUnknown read-back confirmed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | trace/audit/impact state transitions and consistency guards | pass | Fresh read completed;state ownership and the two permitted link helpers confirmed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | store, UoW, version and transaction consistency | pass | Fresh read completed;exact repository methods,UoW order,rollback and read-back rules confirmed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | safe errors, redaction failures and recovery surfaces | pass | Fresh read completed;existing safe repository/stored-result error surfaces are reused,with no PH-06-specific enum. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | duplicate replay, stored result and trace consistency constraints | pass | Fresh read completed;canonical digest/dedup,same/different digest,no-rerun and CommitUnknown rules confirmed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | service-flow-fast trace/audit/impact and redaction targeted ownership | pass | Fresh read completed;fixed raw artifact names and no static/latest evidence rule confirmed. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-06-b` row | pass | Fresh read completed;exact contracts/domain/application/infra scope and carve-outs confirmed. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-06-b` gate row and PH-06 gate | pass | Fresh read completed;fixed service-flow-fast and redaction-check artifacts confirmed. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-06-b` commit body grouping | pass | Fresh read completed;required commit body groups are `Trace service flows:` and `Redaction targeted checks:`. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-06-a` handoff state | latest implementation state | pass | Fresh Worktree Gate recorded pre-edit HEAD `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`,identity `quantalithos-labs <quantalithos.ai@gmail.com>`,and only user-owned `?? .gitignore`;final HEAD is `f4af30991e993ffe92fe0f83046057fddc581995` with the same protected worktree state. |
 
 ---
 
@@ -59,17 +59,17 @@
 
 | type | path_or_rule | status |
 |---|---|---|
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/application/src/**` for trace/audit/impact application services, service errors, replay-safe orchestration and refs-only service facades assigned to `commit-06-b` | planned |
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/application/tests/**` for trace/audit/impact service-flow-fast tests | planned |
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/infra/src/**` for formal in-memory/fake trace/audit/impact stores and adapter seams needed by service tests | planned |
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/infra/tests/**` for fake store, UoW/version and redaction-safe runtime seam tests | planned |
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/contracts/src/**` only for narrow compile integration of already-formal service DTO/port shells needed by service wiring | planned |
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/domain/src/**` only for narrow compile integration of already-formal domain guards needed by service wiring | planned |
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/artifacts/test/<run_id>/suites/service-flow-fast/**` only if generated by an actual targeted run after activation | planned |
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/reports/runs/<run_id>/suites/service-flow-fast.md` only if generated from raw artifact after activation | planned |
-| allowed_path | `/home/aris/Projects/quantalithos-method-library/reports/runs/<run_id>/redaction-check.md` only if generated from an actual targeted redaction check after activation | planned |
-| allowed_rule | Implement trace/audit/impact service flows, store writes/reads, UoW/version handling, stored replay-safe behavior and refs-only consistency checks explicitly defined by formal design. | planned |
-| allowed_rule | Add focused service/fake tests for trace material append/read, audit trail append/read, impact summary derivation, lineage/evidence ref integrity, stored replay regression and redaction-safe outputs. | planned |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/application/src/**` for trace/audit/impact application services, service errors, replay-safe orchestration and refs-only service facades assigned to `commit-06-b` | active |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/application/tests/**` for trace/audit/impact service-flow-fast tests | active |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/infra/src/**` for formal in-memory/fake trace/audit/impact stores and adapter seams needed by service tests | active |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/infra/tests/**` for fake store, UoW/version and redaction-safe runtime seam tests | active |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/contracts/src/**` only for narrow compile integration of already-formal service DTO/port shells needed by service wiring | active |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/crates/domain/src/**` only for narrow compile integration of already-formal domain guards needed by service wiring | active |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/artifacts/test/<run_id>/suites/service-flow-fast/**` only if generated by an actual targeted run after activation | active |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/reports/runs/<run_id>/suites/service-flow-fast.md` only if generated from raw artifact after activation | active |
+| allowed_path | `/home/aris/Projects/quantalithos-method-library/reports/runs/<run_id>/redaction-check.md` only if generated from an actual targeted redaction check after activation | active |
+| allowed_rule | Implement trace/audit/impact service flows, store writes/reads, UoW/version handling, stored replay-safe behavior and refs-only consistency checks explicitly defined by formal design. | active |
+| allowed_rule | Add focused service/fake tests for trace material append/read, audit trail append/read, impact summary derivation, lineage/evidence ref integrity, stored replay regression and redaction-safe outputs. | active |
 | forbidden_rule | Do not implement report generator, evidence index generator, operations job, recovery/replay job, query projection, API handler, worker, publisher or release evidence verdict behavior. | active |
 | forbidden_rule | Do not add external provider body handling, source/archive lifecycle, peripheral package/set, query/read material, inbound/outbound event, final report audit or acceptance handoff behavior. | active |
 | forbidden_rule | Do not invent service ports, store keys, mapper methods, audit entry schema, impact derivation source, evidence refs, redaction marker source, config keys, report schema or VETO evidence schema not closed by formal `03/05/06/07`. | active |
@@ -84,21 +84,21 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-06-b` and `next_allowed_action = read_docs` | pass | Boundary is current at exact design commit `2256ba87a3697660a413a00ed5bab7d1f6f680e4`;only Required Reads are authorized until gate completion. |
+| activation guard | project ledger shows `current_boundary = commit-06-b` and `next_allowed_action = implement` | pass | Boundary is current at exact design commit `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0`;fresh Required Reads and Design/Scope/Worktree Gate passed,so implementation is authorized only inside Allowed Scope. |
 | prior handoff | `commit-06-a` implementation commit and handoff recorded | pass | Trace/audit/impact contracts-domain slice is recorded at `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`,with handoff closed. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded before activation as only user-owned `?? .gitignore`;file remains untouched and unstaged. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
-| format | `cargo fmt --all` | blocked | Blocked by Design Gate;no Rust changes are authorized. |
-| workspace check | `cargo check` | blocked | Blocked by Design Gate;implementation checks must wait for formal closure. |
-| application check | `cargo check -p method-library-application` or the formal application package check | blocked | Blocked by Design Gate;the exact application callable surface is missing. |
-| infra check | `cargo check -p method-library-infra` or the formal infra package check | blocked | Blocked by Design Gate;the exact repository/fake surface is missing. |
-| service-flow-fast trace/audit/impact | targeted trace/audit/impact service tests | blocked | Blocked by Design Gate;exact facade/service inputs,outputs and source maps are not formally closed. |
-| redaction targeted | targeted redaction scan/test over service artifacts, reports and logs | blocked | Blocked by Design Gate;no implementation-side fixture,artifact or report changes are authorized. |
-| stored replay regression | duplicate/replay checks for trace/audit/impact surfaces where formal design requires stored results | blocked | Blocked by Design Gate;the PH-06 stored-result/replay surface and digest rules are not exact. |
-| VETO targeted audit | check `VETO-ML-005` / `VETO-ML-006` / `VETO-ML-009` / `VETO-ML-011` risk is not introduced | blocked | Blocked by Design Gate;there is no authorized current-boundary implementation to audit. |
-| evidence report | run-scoped `service-flow-fast` and redaction artifacts/reports if scripts exist | blocked | Blocked by Design Gate;do not generate evidence before an authorized implementation run. |
-| whitespace | `git diff --check` and `git diff --cached --check` before commit | blocked | No implementation diff is authorized while Design Gate is blocked. |
-| staged scope | `git diff --cached --name-only` | blocked | No implementation files may be staged while Design Gate is blocked. |
+| format | `cargo fmt --all -- --check` | pass | Run `20260809T061018Z-commit-06-b`;raw result is `artifacts/test/20260809T061018Z-commit-06-b/suites/service-flow-fast/cargo-fmt-check.txt`. |
+| workspace check | `cargo check` | pass | Run `20260809T061018Z-commit-06-b`;raw result is `artifacts/test/20260809T061018Z-commit-06-b/suites/service-flow-fast/cargo-check-workspace.txt`. |
+| application check | `cargo check -p method-library-application` | pass | Run `20260809T061018Z-commit-06-b`;raw application build result is committed. |
+| infra check | `cargo check -p method-library-infra` | pass | Run `20260809T061018Z-commit-06-b`;raw infra build result is committed. |
+| service-flow-fast trace/audit/impact/lineage/consistency | `cargo test -p method-library-application` and `cargo test -p method-library-infra` | pass | Application passed 10 integration tests;infra passed 42 integration tests,including 21 PH-06 runtime cases for all seven flows,natural keys,immutable guards,UoW/replay and CommitUnknown. Supplementary contracts/domain package tests also passed after commit. |
+| redaction targeted | targeted scan over PH-06 source,tests,raw artifacts and derived reports | pass | `redaction-check.txt` and `reports/runs/20260809T061018Z-commit-06-b/redaction-check.md` record zero sensitive-value,absolute/external-path,failed-status and forbidden-source matches. |
+| stored replay regression | duplicate/replay checks for trace/audit/impact/lineage surfaces | pass | Focused runtime tests prove same-digest stored replay without rerun,different-digest conflict,damaged replay rejection and exact accepted/stored-only CommitUnknown behavior. |
+| VETO targeted audit | check `VETO-ML-005` / `VETO-ML-006` / `VETO-ML-009` / `VETO-ML-011` risk is not introduced | pass | The 11-file trace-consistency redline scan and final raw/report redaction scans are clean;body-free trace/replay integrity tests pass. |
+| evidence report | run-scoped `service-flow-fast` and redaction artifacts/reports | pass | Seven fixed suite raw artifacts,one root redaction artifact and two raw-derived reports are committed for run `20260809T061018Z-commit-06-b`;no `latest`,static pass or report generator was used. |
+| whitespace | `git diff --check`,`git diff --cached --check` and post-commit `git show --check` | pass | Pre-commit checks passed;`git show --check f4af30991e993ffe92fe0f83046057fddc581995` also passes. |
+| staged scope | pre-commit `git diff --cached --name-only` and committed file list | pass | Commit `f4af30991e993ffe92fe0f83046057fddc581995` contains only 21 current-boundary code,test,raw-artifact and report files;`.gitignore`,`.codex/`,`target/` and unrelated files are absent. |
 
 ---
 
@@ -106,15 +106,15 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pass | Project ledger has advanced from closed `commit-06-a` to `commit-06-b`;fresh Required Reads are now authorized. | read_docs |
-| design_gate | blocked | Required Reads are complete. Formal `03` says §6 is only an index (`03-详细设计.md:659-670`) and reserves PH-06 service/store names without a `commit-06-b` callable surface (`03-详细设计.md:1019`). Step 7 only reserves four repositories (`03_ddd_step_07_trait_port_adapter.md:3322-3332`),Step 9 gives sequence prose (`03_ddd_step_09_function_flows.md:1072-1078`),Step 11 gives logical semantics and explicitly requires a fresh callable closure (`03_ddd_step_11_persistence_tx_consistency.md:1053-1068,2441`),and Step 8/13/16 leave concrete replay/result/evidence surfaces generic or deferred. | wait_design |
-| scope_gate | blocked | Boundary paths are known,but there is no implementable subset:every allowed service/store/test change would require inventing at least one facade/input/source/repository/error/version/UoW/replay/factory/fake/evidence detail. | wait_design |
+| activation_gate | pass | `commit-06-a` handoff is closed and the project ledger advanced to `commit-06-b`;fresh Required Reads were authorized from `read_docs`. | read_docs |
+| design_gate | pass | Fresh Required Reads against design `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` close the exact seven selector/source/input flows,facade,repository/error/factory/replay/UoW/CommitUnknown/fake-parity and fixed evidence surface;no local schema invention is required. | scope_gate |
+| scope_gate | pass | The implementation fits the exact contracts/domain/application/infra and run-scoped evidence paths;no query/material,API,worker,publisher,job,report generator,fifth repository or external body surface is needed. | worktree_gate |
 | worktree_gate | pass | Initial status is only user-owned `?? .gitignore`;it remains untouched and unstaged. | fix_gate_failure |
-| build_gate | blocked | No implementation edits or build checks are authorized before Design Gate closure. | wait_design |
-| test_gate | blocked | No service/fake tests are authorized before Design Gate closure. | wait_design |
-| evidence_gate | blocked | No run-scoped implementation evidence is authorized before Design Gate closure. | wait_design |
-| commit_gate | blocked | No implementation commit is authorized before Design Gate closure. | wait_design |
-| handoff_gate | blocked | `commit-06-b` cannot hand off while `BLK-ML-06B-DESIGN-001` is open. | wait_design |
+| build_gate | pass | `cargo fmt --all -- --check`,`cargo check`,`cargo check -p method-library-application` and `cargo check -p method-library-infra` pass. | fix_gate_failure |
+| test_gate | pass | Application 10/10 and infra 42/42 integration tests pass,including all 21 PH-06 runtime tests;the supplementary contracts/domain package regressions also pass. | fix_gate_failure |
+| evidence_gate | pass | Eight fixed run-scoped raw artifacts and two raw-derived reports are committed under run `20260809T061018Z-commit-06-b`;targeted redaction is clean. | fix_gate_failure |
+| commit_gate | pass | Implementation commit,allowed staged scope,required subject/body groups,identity and whitespace checks pass. | fix_gate_failure |
+| handoff_gate | pass | Commit hash,checks,evidence,out-of-scope suites,blocker status and user-owned-file protection are recorded below. | handoff |
 
 ---
 
@@ -122,12 +122,12 @@
 
 | gate | status | evidence |
 |---|---|---|
-| staged_scope | blocked | No implementation diff is authorized while Design Gate is blocked. |
+| staged_scope | pass | `f4af30991e993ffe92fe0f83046057fddc581995` contains only allowed PH-06 contracts/domain/application/infra sources/tests and run-scoped evidence;`.gitignore` and unrelated files are absent. |
 | unrelated_changes | pass | User-owned untracked `.gitignore` remains untouched and unstaged. |
-| commit_message_format | blocked | No implementation commit is authorized while Design Gate is blocked. |
-| commit_body_group | blocked | No implementation commit is authorized while Design Gate is blocked. |
-| whitespace | blocked | No staged implementation diff exists because Design Gate is blocked. |
-| required_checks | blocked | Build/test/evidence checks must wait for design closure and authorized implementation. |
+| commit_message_format | pass | Subject is `feat(trace): add trace consistency services`,with identity `quantalithos-labs <quantalithos.ai@gmail.com>` and the required Codex co-author footer. |
+| commit_body_group | pass | Commit body contains `Trace service flows:` and `Redaction targeted checks:`. |
+| whitespace | pass | `git diff --check`,`git diff --cached --check` and `git show --check f4af30991e993ffe92fe0f83046057fddc581995` passed. |
+| required_checks | pass | All required build,test,evidence,redaction,VETO and scope checks are recorded as pass. |
 
 ---
 
@@ -135,12 +135,12 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | blocked | No implementation commit is authorized while Design Gate is blocked. |
-| committed_message | blocked | No implementation commit is authorized while Design Gate is blocked. |
-| gates_run | blocked | Required-read and gate-audit commands ran;implementation/build/test/evidence commands must wait for design closure. |
-| tests_not_run | blocked | Tests were not run because no implementation change is authorized. |
-| remaining_blockers | blocked | `BLK-ML-06B-DESIGN-001` prevents implementation handoff. |
-| final_conclusion | blocked | `cannot_decide` until design publishes the exact current-boundary callable surface. |
+| committed_hash | pass | `f4af30991e993ffe92fe0f83046057fddc581995`. |
+| committed_message | pass | `feat(trace): add trace consistency services`,with the required trace-service-flow and redaction-targeted body groups. |
+| gates_run | pass | Ran `cargo fmt --all -- --check`,`cargo check`,application/infra checks and tests,supplementary contracts/domain tests,targeted trace/redaction scans,run-scoped report checks,staged-scope checks and pre/post-commit whitespace checks. |
+| tests_not_run | pass | Full workspace test,API/worker/jobs,durable or production adapters,query/material,publisher/recovery/report-generator and release suites were not run because they remain outside `commit-06-b`;no coverage is claimed for them. |
+| remaining_blockers | pass | No implementation blocker remains inside `commit-06-b`;later boundaries remain unactivated and require their own project-ledger transition and fresh gates. |
+| final_conclusion | pass | `commit-06-b` allowed scope is implemented and delivered with passing required checks and run-scoped evidence `20260809T061018Z-commit-06-b`. |
 | user_owned_changes_untouched | pass | User-owned untracked `.gitignore` remains untouched and unstaged. |
 
 ---
@@ -150,7 +150,7 @@
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
 | BLK-ML-06B-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-06-a`;this future boundary could not be used for implementation. | `commit-06-a` handoff is now closed and project/boundary ledgers advance to `commit-06-b` for fresh Required Reads. | read_docs |
-| BLK-ML-06B-DESIGN-001 | design_gate | open | Required Reads are complete,but current formal sources stop at PH-06 object/domain closure,family-level service flow and logical store semantics. They do not publish an exact `commit-06-b` Rust-facing application/infra surface,so implementation would have to invent callable schema,identity sources,replay behavior or fake rules. | Publish one boundary-specific closure that fixes:facade method and exact I/O;the allowed service method set and every input/source/output field;selector/source mapping if a shared shell is used;support/truth-ref factory methods and canonical digest inputs;exact methods/missing/conflict semantics for `MethodAssetTraceMaterialRepository`,`ConsumptionImpactSummaryRepository`,`MethodAssetAuditTrailRepository`,`MethodAssetEvidenceLineageRepository`;repository error variants/fields;`Versioned<T>`/expected-version/UoW order;stored-result lookup/save/replay schema and CommitUnknown behavior;fake/durable parity including append identity,rollback and duplicate no-rerun;safe redaction/error mappings;and fixed run-scoped raw artifact names for the required service-flow/redaction checks. Preserve the report-generator/jobs carve-out. | wait_design |
+| BLK-ML-06B-DESIGN-001 | design_gate | resolved | The prior baseline lacked a boundary-specific PH-06 callable/replay/factory/fake/evidence closure. | Design commit `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` closes the exact selector/source/input/facade map,four repository traits and safe error surface,support/truth-ref factory,canonical digest/dedup,Versioned/UoW/CommitUnknown,fake parity,safe redaction and fixed run-scoped artifacts;report generator/jobs remain carved out. | read_docs |
 
 ---
 
@@ -159,5 +159,5 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| trace/audit service redaction | existing design-closure rule applies | Trace/audit/impact service,store,replay,redaction and evidence gaps must be fixed in the formal owning sources before code;implementation must not invent body-bearing/untraceable semantics or pull report-generator/jobs into this boundary. |
-| PH-06 identity and fake parity | current design-closure rule applies | Object constructors accepting refs do not authorize services or fakes to mint those refs. Exact factory/source,append identity,version,UoW,rollback,duplicate and CommitUnknown behavior must be formal and shared by fake/durable implementations. |
+| trace/audit service redaction | implemented handoff closed | Commit `f4af30991e993ffe92fe0f83046057fddc581995` and run `20260809T061018Z-commit-06-b` close the body-free service/store/replay/redaction slice without entering report-generator,jobs,query or API scope. |
+| PH-06 identity and fake parity | implemented handoff closed | The delivered factory/source,repository,UoW,replay and CommitUnknown behavior passes focused fake-parity tests without local business ref minting or a fifth truth repository. |

@@ -1,8 +1,8 @@
 # L3-method-library 项目设计讨论执行台账
 
 > 创建日期: 2026-06-15
-> 最近更新: 2026-08-07
-> 当前任务: `commit-06-b` Required Reads 与 Design/Scope Gate 已基于精确设计提交 `2256ba87a3697660a413a00ed5bab7d1f6f680e4` 重跑并由 `BLK-ML-06B-DESIGN-001` 阻塞。当前只允许等待设计侧发布 PH-06 boundary-specific service/store callable、replay/factory/fake 与 targeted raw-evidence 闭口;实现仓不得修改代码、tests 或 evidence。
+> 最近更新: 2026-08-09
+> 当前任务: `commit-06-b` implementation/handoff 已由 `f4af30991e993ffe92fe0f83046057fddc581995` 和 run `20260809T061018Z-commit-06-b` 关闭。当前只允许 `start_next_boundary`;任何未来 boundary 必须先显式激活并从 `read_docs` 重跑 gates。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-06-b design gate blocked` | blocked_wait_design | Required Reads prove that current formal sources close PH-06 objects/domain semantics and family-level flow/store direction only;exact facade/service inputs and sources,repository/error/version/UoW/stored-result/replay/factory/fake parity and fixed targeted raw-evidence names are absent. | 设计侧先关闭 `BLK-ML-06B-DESIGN-001`;新 baseline 记入台账后,实现侧从 `read_docs` 全量重跑 Design/Scope/Worktree Gate。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-06-b.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-06-b handoff closed` | pass | Implementation commit `f4af30991e993ffe92fe0f83046057fddc581995`,required checks and run-scoped service/redaction evidence close the current boundary. | `start_next_boundary` | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-06-b.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-06-b` Design Gate blocked | wait_design | Required Reads 已重读;当前 formal source 仍缺 PH-06 boundary-specific exact callable/replay/factory/fake/evidence 闭口,实现侧等待设计修复。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-06-b` handoff closed | start_next_boundary | 实现提交、required checks、run-scoped service/redaction evidence 与 handoff 已闭口;未来 boundary 尚未激活。 |
 
 ---
 
@@ -93,8 +93,8 @@
 | BLK-ML-06A-DESIGN-002 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `commit-06-a` 曾无法区分 pure contracts/domain helper 与 Step 7/11 future repository/service 候选,实现可能私补 callable port、persistence 或 marker source。 | 设计提交 `ea99688411602fc73c24d011507042b271fac755` 已闭合 pure constructors/mutations、现有错误映射和 no application/service/repository/fake/resolver/mapper/UoW/persistence carve-out;future callable surface 后移 `commit-06-b`。 |
 | BLK-ML-06A-DESIGN-003 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `commit-06-a` 曾缺 exact lifecycle/category split、legal/illegal transition 和 concrete fixture/evidence artifact closure。 | 设计提交 `ea99688411602fc73c24d011507042b271fac755` 的 Step 10/12/16 overrides 与 formal `07` 已闭合 four state carriers、impact-kind preservation、safe-reason mutations、focused tests、targeted redaction 和 six run-scoped raw artifact names。 |
 | BLK-ML-06A-DESIGN-004 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-a.md` | resolved | `MethodAssetEvidenceLineage::link_trace_material(...)` 曾只有“append typed ref / retain prior links”,未闭合合法 source states、result state、typed duplicate 语义和 terminal rejection。 | 设计提交 `1b67753504024709a9e5092224aec18f445f8bd2` 已在 formal `03` §6.3E、Step 6、Step 10 和 Step 16 发布 exact matrix:仅 linked/partial 可链接并保持 state/summary,typed duplicate 成功 no-op,unavailable/body-rejected 返回 `InvalidTransition` 且对象不变。 |
-| BLK-ML-06B-ACTIVATION-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-b.md` | resolved | `commit-06-b` 先前为 future planned boundary,不得用于实现。 | `commit-06-a` handoff 已关闭;三份流程台账现在仅将 `commit-06-b` 激活到 `ready_for_design_gate / read_docs`,exact design closure 仍须由 fresh gate 独立确认。 |
-| BLK-ML-06B-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-b.md` | open | Required Reads 已完成,但 formal `03` §6 明确只是索引且只为 `commit-06-b` 预留 service/store 名称;Step 7 仅预留四 repository family,Step 9 只有 flow prose,Step 11 只有 logical store semantics 并明确要求 fresh boundary-specific callable closure。实现若继续将被迫自补 facade/service carrier/source、truth/support ref factory、repository/error/version/UoW/stored-result/replay/CommitUnknown、fake parity/redaction 或 evidence 文件名。 | 设计侧须一次性发布 PH-06 当前边界 exact Rust-facing callable closure:facade I/O、service method/input/source/output、selector/source map（如使用 shared shell）、support/truth-ref factory 与 canonical digest、四 repository exact methods/missing/conflict、error enum、version/UoW/stored-result/replay/CommitUnknown、fake/durable parity、safe redaction mapping 和 fixed run-scoped raw artifact names;同时保持 report generator/jobs carve-out。闭口后更新 baseline 并将 implementation/boundary ledger 重置为 `read_docs`。 |
+| BLK-ML-06B-ACTIVATION-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-b.md` | resolved | `commit-06-b` 先前为 future planned boundary,不得用于实现。 | `commit-06-a` handoff 已关闭;fresh Required Reads 与 Design/Scope/Worktree Gate 已通过,三份流程台账现授权 exact boundary implementation。 |
+| BLK-ML-06B-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-b.md` | resolved | The prior baseline lacked a boundary-specific PH-06 callable/replay/factory/fake/evidence closure. | Design commit `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` closes the exact selector/source/input/facade map, four repository traits and safe error surface, support/truth-ref factory, canonical digest/dedup, Versioned/UoW/CommitUnknown, fake parity, safe redaction and fixed run-scoped artifacts while preserving report/jobs carve-outs. Implementation must restart from `read_docs` and independently rerun all gates. |
 
 ---
 
@@ -109,9 +109,9 @@
 4. 读取 `design-calibration/implementation_execution_ledger.md`
 5. 读取 `design-calibration/implementation-boundaries/commit-06-b.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前是 `commit-06-b` / `blocked` / `wait_design`,读取基线为精确设计提交 `2256ba87a3697660a413a00ed5bab7d1f6f680e4`,blocker 为 `BLK-ML-06B-DESIGN-001`
-8. 设计侧未发布并登记新的 boundary-specific callable closure 前,保护实现仓用户未跟踪 `.gitignore`,不得编辑代码、tests、fixtures、artifacts 或 reports
-9. 设计修复后必须先把新 baseline 和 blocker resolution 写入 implementation/boundary ledger,再从 `read_docs` 全量重读 Required Reads并独立重跑 Design/Scope/Worktree Gate;不得沿用本次 blocked 或任何历史 pass 结论
+7. 确认 implementation ledger 当前是 `commit-06-b` / `pass` / `start_next_boundary`,设计基线为精确设计提交 `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0`,implementation commit 为 `f4af30991e993ffe92fe0f83046057fddc581995`,run 为 `20260809T061018Z-commit-06-b`
+8. 未经项目级台账显式激活,不得读取未来 boundary 作为开工授权;继续保护实现仓用户未跟踪 `.gitignore`
+9. 下一 boundary 激活后必须从 `read_docs` 重跑 Required Reads 与 Design/Scope/Worktree Gate;若发现 schema/port/state/mapper/config/evidence 缺口,立即回写 `blocked / wait_design`
 ```
 
 ---
@@ -119,8 +119,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`commit-06-a` implementation/handoff 已由 `997b7b02331e11fdc3222f4d0839ab8ce9ea0316` / `2256ba87a3697660a413a00ed5bab7d1f6f680e4` 关闭;
-当前 boundary 是 `commit-06-b`,读取基线是精确设计提交 `2256ba87a3697660a413a00ed5bab7d1f6f680e4`,状态为 `blocked / wait_design`;
-`BLK-ML-06B-DESIGN-001` 要求设计侧发布 exact facade/service carrier/source、support/truth-ref factory、repository/error/version/UoW/stored-result/replay/CommitUnknown、fake parity/redaction 和 fixed targeted raw-evidence 闭口,并保持 report generator/jobs carve-out;
-实现侧不得私补上述 surface,不得修改代码/tests/evidence;设计修复并登记新 baseline 后必须从 `read_docs` 重新开始全部 gates.
+`commit-06-b` implementation/handoff 已由 `f4af30991e993ffe92fe0f83046057fddc581995` 和 run `20260809T061018Z-commit-06-b` 关闭;
+设计基线是精确提交 `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0`,状态为 `pass / start_next_boundary`;
+required build/test/evidence/redaction/commit/handoff gates 均通过,用户 `.gitignore` 保持 untouched/unstaged;
+未来 boundary 尚未激活,不得从 planned 文件直接开工;必须先回项目级台账显式激活并从 `read_docs` 重跑 gates.
 ```

@@ -16,12 +16,12 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `65cc8b029b494f516283882671b63e3c20702b38` |
 | current_boundary | `commit-07-a` |
-| gate_status | ready_for_design_gate |
-| gate_reason | `commit-06-b` implementation/handoff is closed at `f4af30991e993ffe92fe0f83046057fddc581995`;`commit-07-a` is activated only for a fresh Required Reads and Design/Scope/Worktree Gate cycle against exact design commit `65cc8b029b494f516283882671b63e3c20702b38`. |
-| next_allowed_action | read_docs |
-| current_recovery_point | Restart from this ledger,`implementation-boundaries/commit-07-a.md`,formal `07` and every Required Read at exact baseline `65cc8b029b494f516283882671b63e3c20702b38`;protect user-owned `?? .gitignore`,and do not edit implementation code unless external summary/source/artifact schema,body-free adapter fake,redaction and evidence closure independently pass. |
+| gate_status | blocked |
+| gate_reason | `commit-07-a` Required Reads and fresh Design/Scope Gate audit are complete against exact design commit `65cc8b029b494f516283882671b63e3c20702b38`. Formal sources provide family-level external summary/source/artifact direction,an object skeleton,state prose and logical persistence,but no boundary-specific exact Rust-facing carrier/domain/adapter-fake/evidence closure. |
+| next_allowed_action | wait_design |
+| current_recovery_point | Wait for `BLK-ML-07A-DESIGN-001` formal closure;after a new exact design baseline is recorded,restart from this ledger and `implementation-boundaries/commit-07-a.md`,repeat all Required Reads and rerun Design/Scope/Worktree Gates. Do not edit implementation code,tests,fixtures or evidence while blocked. |
 | last_updated_by | implementation agent |
-| last_updated_at | 2026-08-09 15:19:56 +0800 |
+| last_updated_at | 2026-08-09 15:34:36 +0800 |
 
 ---
 
@@ -42,7 +42,7 @@
 | `commit-05-b` | `current-design-with-commit-05-b-disabled-outcome-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-05-b` completed at `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`; distribution/handoff services, disabled diagnostic mapping, fake parity and run-scoped `service-flow-fast` / `infra-runtime-fake` evidence are closed. |
 | `commit-06-a` | `current-design-with-commit-06-a-lineage-link-state-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-a` completed at `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;PH-06 trace/impact/audit/evidence-lineage contracts,domain guards and run-scoped `contract-domain-fast` evidence are closed. |
 | `commit-06-b` | `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-b` completed at `f4af30991e993ffe92fe0f83046057fddc581995`;seven PH-06 service flows,four repository fakes,versioned UoW/stored replay/CommitUnknown behavior and run-scoped service/redaction evidence are closed. |
-| `commit-07-a` | `65cc8b029b494f516283882671b63e3c20702b38` | ready_for_design_gate | activation_gate | read_docs | `commit-06-b` handoff is closed;fresh reads must independently verify exact external summary/source/artifact carriers,body-free adapter fake,state/error/redaction and test-evidence closure before implementation. |
+| `commit-07-a` | `65cc8b029b494f516283882671b63e3c20702b38` | blocked | design_gate | wait_design | Required Reads are complete;`BLK-ML-07A-DESIGN-001` blocks implementation because current sources do not publish an exact boundary-specific external carrier/domain/adapter-fake/error/marker/test-evidence surface. |
 
 ---
 
@@ -98,6 +98,7 @@
 | BLK-ML-06B-ACTIVATION-001 | `commit-06-b` | implementation | resolved | `2256ba87a3697660a413a00ed5bab7d1f6f680e4` | `commit-06-a` handoff is closed and the project ledger advances to `commit-06-b`;implementation must continue from `read_docs` and independently verify exact service/store closure before any code edit. |
 | BLK-ML-06B-DESIGN-001 | `commit-06-b` | implementation | resolved | `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` | Formal `03` §6.3F and the matching Step 5/6/7/8/9/10/11/12/13/16 closure patches publish the exact current-boundary selector/source/input/facade map, four repository traits and safe error surface, support/truth-ref factory, canonical digest/dedup, Versioned/UoW/CommitUnknown/replay behavior, fake parity, redaction rules and fixed raw artifacts;report generator/jobs remain carved out. |
 | BLK-ML-07A-ACTIVATION-001 | `commit-07-a` | implementation | resolved | `65cc8b029b494f516283882671b63e3c20702b38` | `commit-06-b` handoff is closed and the project ledger advances to `commit-07-a`;implementation must continue from `read_docs` and independently verify exact external body-free closure before any code edit. |
+| BLK-ML-07A-DESIGN-001 | `commit-07-a` | implementation | active | `65cc8b029b494f516283882671b63e3c20702b38` | Formal `03` only defers `ExternalSourceSummary`/durable dereference to `commit-07-a`;Step 6 leaves exact field carriers,kinds,identity source and owning-slice kind sets unclosed;Step 10 adds summary state labels without binding a state carrier/field;Step 7/11 keep adapter/repository outcomes candidate-level or later-owned;Step 16 has no current-boundary exact fixtures/raw artifacts. Design must publish the exact wrappers/carriers/object/helpers/transitions,adapter port/fake outcomes/error-marker sources,repository carve-in/out and focused test/evidence filenames while preserving provider-body/archive/peripheral/query/entry/job/report exclusions. |
 
 ---
 
@@ -111,7 +112,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing,contradicts the active boundary,or does not close an exact external summary/source/artifact carrier,typed-ref kind,object/state guard,adapter port/fake behavior,safe error/redaction rule or test-evidence source needed for implementation,set `gate_status = blocked`,set `next_allowed_action = wait_design`,and stop implementation. Current boundary is `commit-07-a` at exact read baseline `65cc8b029b494f516283882671b63e3c20702b38`;activation authorizes Required Reads only,not implementation or use of later boundaries.
+If any required design source is missing,contradicts the active boundary,or does not close an exact external summary/source/artifact carrier,typed-ref kind,object/state guard,adapter port/fake behavior,safe error/redaction rule or test-evidence source needed for implementation,set `gate_status = blocked`,set `next_allowed_action = wait_design`,and stop implementation. Current boundary is `commit-07-a` at exact design commit `65cc8b029b494f516283882671b63e3c20702b38`;the fresh gate is blocked by `BLK-ML-07A-DESIGN-001`,so no implementation edit is authorized until design closes the listed surface and a new Required Reads cycle passes.
 
 ---
 
@@ -144,4 +145,4 @@ If any required design source is missing,contradicts the active boundary,or does
 | `commit-05-b` | implemented handoff closed | Implementation handoff records distribution/handoff implementation commit `ef2ddd60e7c909cf41ac98734ed0a8f24ee94b73`; disabled diagnostic ownership, adapter-first `Blocked` / `Unavailable` outcome persistence, no-call/no-rollback behavior, fake parity and run-scoped service-flow-fast / infra-runtime-fake evidence are closed. |
 | `commit-06-a` | implemented handoff closed | Implementation handoff records PH-06 traceability,impact,audit and evidence-lineage contracts/domain commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;exact typed refs,body-free carriers,first-seen sets,pure state guards,terminal/no-mutation redlines and run-scoped `contract-domain-fast` evidence are closed. |
 | `commit-06-b` | implemented handoff closed | Implementation handoff records PH-06 trace/impact/audit/evidence-lineage service/store commit `f4af30991e993ffe92fe0f83046057fddc581995`;seven service flows,four repository fakes,stored replay/CommitUnknown checks and run-scoped `service-flow-fast` / redaction evidence are closed. |
-| `commit-07-a` | activated for fresh design gate | Exact read baseline is `65cc8b029b494f516283882671b63e3c20702b38`;no external carrier,port,fake or evidence closure is presumed until every Required Read and Design/Scope/Worktree Gate passes. |
+| `commit-07-a` | design gate blocked | Required Reads are complete at exact design commit `65cc8b029b494f516283882671b63e3c20702b38`;`BLK-ML-07A-DESIGN-001` requires a boundary-specific external carrier/domain/adapter-fake/error-marker and focused test-evidence closure before implementation can restart from `read_docs`. |

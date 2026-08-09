@@ -7,9 +7,9 @@
 | phase | PH-07 external summary / reference and peripheral package/set boundary |
 | design_baseline | `65cc8b029b494f516283882671b63e3c20702b38` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready_for_design_gate |
-| next_allowed_action | read_docs |
-| current_recovery_point | `commit-06-b` handoff is closed;restart from this ledger,formal `07` and every Required Read against exact design commit `65cc8b029b494f516283882671b63e3c20702b38`,protect user-owned `?? .gitignore`,and do not edit implementation code unless Design/Scope/Worktree Gates independently pass. |
+| status | blocked |
+| next_allowed_action | wait_design |
+| current_recovery_point | Required Reads and the fresh Design/Scope Gate audit are complete against exact design commit `65cc8b029b494f516283882671b63e3c20702b38`;wait for a boundary-specific external summary/source/artifact and body-free adapter-fake closure,then restart from `read_docs`. No implementation code,tests or evidence are authorized while `BLK-ML-07A-DESIGN-001` is open. |
 
 ---
 
@@ -27,31 +27,31 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This future boundary cannot be executed until it becomes current. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented external summary, source/artifact ref, adapter fake, redaction rule or evidence schema | pending | Missing body-free field, ref, marker or adapter seam must return to design. |
-| `standards/coding/rust.md` | Rust contract/domain/infra fake module, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
-| `projects/L3-method-library/00-需求文档.md` | external summary / reference P0 scope and provider body exclusion | pending | External support is body-free and cannot become core truth or provider body archive. |
-| `projects/L3-method-library/01-架构设计.md` | external boundary, body-free redaction, dependency direction and peripheral separation | pending | `VETO-ML-005` / `VETO-ML-011` apply to provider body leaks and unsafe report/log detail. |
-| `projects/L3-method-library/02-概要设计.md` | external summary refs, source/artifact refs and body boundary adapter fake outline | pending | Use current object/component split; do not add package/set peripheral behavior here. |
-| `projects/L3-method-library/03-详细设计.md` | external summary/source/artifact object, adapter, protocol, state, error and test cut contracts | pending | Formal source for body-free refs, source adapter fake, redaction markers and safe failures. |
-| `projects/L3-method-library/04-配置设计.md` | external adapter binding, redaction, disabled/degraded and body boundary rules | pending | This boundary may add formal fake/disabled seams only; no real provider adapter. |
-| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast external/body boundary, redaction targeted and artifact/report rules | pending | Targeted reports must derive from raw artifacts if generated. |
-| `projects/L3-method-library/06-验收标准.md` | ML-FG-012 seed, ML-RL-004/005, ML-SYNC-007, `VETO-ML-005` and `VETO-ML-011` | pending | Provider body entering repo/artifact/log is blocking. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Current source for phase, boundary, allowed scope, checks and commit discipline. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | external summary/reference module boundary and peripheral split | pending | Keep external summary/source boundary separate from package/set residual behavior. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | external summary refs, source refs, artifact refs and body-free marker objects | pending | Required typed refs, redaction constraints and state fields must be formal. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | external resolver/source adapter ports and body boundary fake seam | pending | Do not add ports, adapter methods or fake behavior beyond formal contracts. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | external summary/source/artifact DTO shells and safe result contracts | pending | Public surfaces must be refs-only and body-free. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | external summary/source adapter flows and safe failure branches | pending | Adapter fake must not persist provider body or archive lifecycle state. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | external summary/source/artifact state guards | pending | Unavailable/degraded/delayed states must match formal state matrix. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | external refs, fake store and body boundary consistency | pending | Fake state must preserve refs-only and body-free semantics. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | external safe errors, provider unavailable and redaction failures | pending | Errors/logs/reports must be safe, refs-only and body-free. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | duplicate/replay and external source consistency constraints | pending | Duplicate/replay must not rerun provider body capture or reconstruct unsafe data. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast external/body-free and redaction targeted ownership | pending | Use external summary/source boundary slice only. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-07-a` row | pending | Allowed scope is external summary refs, source/artifact refs and body boundary adapter fake. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-07-a` gate row and PH-07 gate | pending | Required checks are contract-domain-fast external body boundary and redaction targeted. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-07-a` commit body grouping | pending | Commit body must include `External summary contracts:` and `Body-free source adapters:`. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-06-b` handoff state | latest implementation state | pending | Must confirm trace/audit service and redaction targeted slice landed before this boundary starts. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pass | The boundary is current,Required Reads were completed,and a failed Design Gate must return to `blocked / wait_design`. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented external summary, source/artifact ref, adapter fake, redaction rule or evidence schema | pass | Exact Rust-facing carrier,port/fake,marker/error and evidence gaps must return to design rather than be supplied in implementation. |
+| `standards/coding/rust.md` | Rust contract/domain/infra fake module, error and test conventions | pass | Source identifiers,comments,rustdoc,errors and test names must be English once implementation is authorized. |
+| `projects/L3-method-library/00-需求文档.md` | external summary / reference P0 scope and provider body exclusion | pass | External support is body-free and cannot become core truth or a provider-body archive. |
+| `projects/L3-method-library/01-架构设计.md` | external boundary, body-free redaction, dependency direction and peripheral separation | pass | `VETO-ML-005` / `VETO-ML-011` apply;architecture fixes ownership and exclusions but not current Rust schemas. |
+| `projects/L3-method-library/02-概要设计.md` | external summary refs, source/artifact refs and body boundary adapter fake outline | pass | The component/API outline names external summary/source/artifact families but remains skeleton-level and keeps provider body/archive lifecycle excluded. |
+| `projects/L3-method-library/03-详细设计.md` | external summary/source/artifact object, adapter, protocol, state, error and test cut contracts | pass | Formal §6 defers `ExternalSourceSummary` to `commit-07-a` (`03-详细设计.md:707`) and says durable dereference remains here (`03-详细设计.md:796`),but publishes no boundary-specific exact closure comparable to §6.3A-F. |
+| `projects/L3-method-library/04-配置设计.md` | external adapter binding, redaction, disabled/degraded and body boundary rules | pass | Configuration binds external adapter availability/redaction only;it cannot define missing port outcomes,marker sources or business states. |
+| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast external/body boundary, redaction targeted and artifact/report rules | pass | Test/evidence families and body-leak redlines exist,but they do not define an exact `commit-07-a` fixture or raw-artifact set. |
+| `projects/L3-method-library/06-验收标准.md` | ML-FG-012 seed, ML-RL-004/005, ML-SYNC-007, `VETO-ML-005` and `VETO-ML-011` | pass | Provider body entering repository,artifact,report or log is blocking;acceptance cannot supply implementation schema. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pass | `commit-07-a` grants only the family-level phrase external summary/source/artifact refs and body-boundary adapter fake (`07-实施计划.md:242`),not exact carriers or callable behavior. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | external summary/reference module boundary and peripheral split | pass | External summary/reference ownership and provider-body/peripheral separation are clear. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | external summary refs, source refs, artifact refs and body-free marker objects | pass | `ExternalSourceSummary` has a field skeleton (`Step 6:2447-2468`),but named field types lack exact labels/fields/kinds;its constructors omit the new summary identity source;the owning-slice kind sets were explicitly deferred (`Step 6:3262`). |
+| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | external resolver/source adapter ports and body boundary fake seam | pass | `ExternalSourceSummaryRepository` remains a candidate family and R7.12 forbids concrete trait/adapter methods (`Step 7:1692-1709`);no exact `ExternalBodyFreeSourceAdapterPort` input/output/error/fake surface is published. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | external summary/source/artifact DTO shells and safe result contracts | pass | Protocol families are body-free direction only;no current-boundary exact carrier schema or adapter-fake fixture is bound. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | external summary/source adapter flows and safe failure branches | pass | Flow rows name capture/register/assert/supersede behavior but provide sequence prose rather than exact Rust inputs,outputs,identity/marker sources or fake outcomes. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | external summary/source/artifact state guards | pass | Exact external summary labels are `Captured | Accepted | Superseded | Unavailable` (`Step 10:1308-1335`),but Step 6 has no state field/carrier or helper signatures that bind this state to `ExternalSourceSummary`. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | external refs, fake store and body boundary consistency | pass | Logical persistence is described,but adapter output is non-durable and unavailable/invalid/unresolved remain later concerns (`Step 11:880,884,894,897`);this does not close the requested adapter fake. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | external safe errors, provider unavailable and redaction failures | pass | Safe/body-free directions exist,but exact adapter outcome/error variants and safe marker mapping for current fake behavior are absent. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | duplicate/replay and external source consistency constraints | pass | Generic no-rerun rules exist;they do not close current-boundary creation identity,digest/marker or fake consistency behavior. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | contract-domain-fast external/body-free and redaction targeted ownership | pass | External/body-boundary tests remain cut directions (`Step 16:989,1070,1087`);the only fixed raw outputs are overrides for `commit-06-a` and `commit-06-b` (`Step 16:1685-1732`). |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-07-a` row | pass | The row repeats family-level scope only;no exact external owning-slice schema is linked. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-07-a` gate row and PH-07 gate | pass | Required check families are named,but exact commands/fixtures/raw artifact names for this boundary are not fixed. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-07-a` commit body grouping | pass | Commit body groups are defined;they do not close implementation contracts. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-06-b` handoff state | latest implementation state | pass | Confirmed HEAD `f4af30991e993ffe92fe0f83046057fddc581995`,only user-owned `?? .gitignore`,and correct local identity;the file remains untouched and unstaged. |
 
 ---
 
@@ -74,6 +74,7 @@
 | forbidden_rule | Do not implement real provider adapter, provider body capture, provider body archive lifecycle, external archive retention, marketplace/package peripheral service, query projection, API handler, worker or publisher behavior. | active |
 | forbidden_rule | Do not add package/method set DTO/domain/service, residual markers, advanced UX, query/read material, inbound/outbound event, operations job, report generator or release evidence verdict behavior. | active |
 | forbidden_rule | Do not invent external summary fields, source/artifact ref schema, body boundary marker source, adapter fake behavior, unavailable/degraded marker values, config keys, report schema or VETO evidence schema not closed by formal `03/05/06/07`. | active |
+| forbidden_rule | Do not materialize `ExternalSourceKind`,`ExternalSafeSummary`,`ExternalSummaryDigestRef`,`ExternalSummaryAcceptanceMarkerRef`,`ExternalBodyBoundaryRuleRef`,`ExternalBodyBoundaryReasonRef`,`ForbiddenExternalBodyKindSet`,`ExternalSummaryKindSet` or source/artifact named wrappers until their exact Rust-facing labels,fields,kinds and sources are formally closed. | active |
 | forbidden_rule | Do not persist or expose raw provider body, external provider response, secret, config/env value, full sensitive ref, stack trace, unsafe diff, raw source payload or old MethodContent/publish/snapshot/outbox material in code/tests/artifacts/logs. | active |
 | forbidden_rule | Do not claim peripheral residual, service-flow peripheral, query/material, archive lifecycle, report generator or release evidence coverage from this boundary. | active |
 | forbidden_rule | Do not stage unrelated user changes, generated target directories or implementation outputs from previous boundaries. | active |
@@ -88,17 +89,17 @@
 | prior handoff | `commit-06-b` implementation commit and handoff recorded | pass | PH-06 service-store slice is recorded at `f4af30991e993ffe92fe0f83046057fddc581995`,with handoff closed. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded before activation as only user-owned `?? .gitignore`;file remains untouched and unstaged. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
-| format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
-| workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
-| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Use actual package name from formal workspace once activated. |
-| domain check | `cargo check -p method-library-domain` or the formal domain package check | pending | Use actual package name from formal workspace once activated. |
-| infra check | `cargo check -p method-library-infra` or the formal infra package check if adapter fake files changed | pending | Use actual package name from formal workspace once activated. |
-| contract-domain-fast external body boundary | targeted external summary/source/artifact body-free tests | pending | Must cover refs-only external summary, source/artifact refs and provider-body exclusion. |
-| redaction targeted | targeted redaction scan/test over external artifacts, reports and logs | pending | Provider body, secret, raw source payload and unsafe refs must not leak. |
-| VETO targeted audit | check `VETO-ML-005` / `VETO-ML-011` risk is not introduced | pending | Raw body leak or unsafe redaction/report detail blocks commit. |
-| evidence report | run-scoped `contract-domain-fast` and redaction artifacts/reports if scripts exist | pending | Optional until scripts exist; generated reports must derive from raw artifacts. |
-| whitespace | `git diff --check` and `git diff --cached --check` before commit | pending | Required for Commit Gate. |
-| staged scope | `git diff --cached --name-only` | pending | Must match Allowed Scope. |
+| format | `cargo fmt --all` | blocked | Blocked by Design Gate;no Rust changes are authorized. |
+| workspace check | `cargo check` | blocked | Blocked by Design Gate;implementation checks must wait for formal closure. |
+| contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | blocked | Blocked by Design Gate;the exact external carrier surface is missing. |
+| domain check | `cargo check -p method-library-domain` or the formal domain package check | blocked | Blocked by Design Gate;the exact object/state/helper surface is missing. |
+| infra check | `cargo check -p method-library-infra` or the formal infra package check if adapter fake files changed | blocked | Blocked by Design Gate;the exact adapter port/fake surface is missing. |
+| contract-domain-fast external body boundary | targeted external summary/source/artifact body-free tests | blocked | Blocked by Design Gate;exact carrier,object,state and fixture assertions are not formally closed. |
+| redaction targeted | targeted redaction scan/test over external artifacts,reports and logs | blocked | Blocked by Design Gate;no implementation-side fixture,artifact or report changes are authorized. |
+| VETO targeted audit | check `VETO-ML-005` / `VETO-ML-011` risk is not introduced | blocked | Blocked by Design Gate;there is no authorized current-boundary implementation to audit. |
+| evidence report | run-scoped `contract-domain-fast` and redaction artifacts/reports if scripts exist | blocked | Blocked by Design Gate;do not generate evidence before an authorized implementation run. |
+| whitespace | `git diff --check` and `git diff --cached --check` before commit | blocked | No implementation diff is authorized while Design Gate is blocked. |
+| staged scope | `git diff --cached --name-only` | blocked | No implementation files may be staged while Design Gate is blocked. |
 
 ---
 
@@ -107,14 +108,14 @@
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | Project ledger has advanced from closed `commit-06-b` to `commit-07-a`;fresh Required Reads are now authorized. | read_docs |
-| design_gate | pending | Must independently verify exact external summary/source/artifact carriers and ref kinds,object/state guards,adapter port/fake behavior,safe errors,redaction and test-evidence closure against every Required Read. | wait_design |
-| scope_gate | pending | Planned changes must be limited to external summary/source/artifact contracts-domain, body-free adapter fake and focused tests. | fix_gate_failure |
+| design_gate | blocked | Required Reads are complete. Step 6 names an object skeleton but leaves field carriers/kinds and identity source unclosed (`Step 6:2447-2468`) and explicitly defers external kind sets (`Step 6:3262`). Step 10 adds `Captured | Accepted | Superseded | Unavailable` without a bound state carrier/field (`Step 10:1308-1335`). Step 7 keeps repository/adapter surfaces candidate-level and forbids concrete methods (`Step 7:1692-1709`);Step 11 leaves adapter outcomes to later error/config closure (`Step 11:880,884,894,897`);Step 16 has no `commit-07-a` exact raw outputs. | wait_design |
+| scope_gate | blocked | Boundary paths are known,but there is no implementable subset beyond already-delivered generic summary ref/body-boundary shell:every new external truth,source/artifact wrapper,domain-state or adapter-fake change would require inventing a carrier label/field/kind,identity/marker source,callable outcome or evidence detail. | wait_design |
 | worktree_gate | pass | Initial status is only user-owned `?? .gitignore`;it remains untouched and unstaged. | fix_gate_failure |
-| build_gate | pending | Formatting, workspace/contract/domain/infra checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
-| test_gate | pending | Contract-domain-fast external body boundary, redaction targeted and VETO targeted checks pass after activation. | fix_gate_failure |
-| evidence_gate | pending | Targeted artifacts/reports are optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
-| commit_gate | pending | staged scope, commit message, whitespace and required checks have evidence. | fix_gate_failure |
-| handoff_gate | pending | commit hash, checks run, tests not run, blockers and next boundary state recorded. | handoff |
+| build_gate | blocked | No implementation edits or build checks are authorized before Design Gate closure. | wait_design |
+| test_gate | blocked | No contract/domain/fake tests are authorized before Design Gate closure. | wait_design |
+| evidence_gate | blocked | No run-scoped implementation evidence is authorized before Design Gate closure. | wait_design |
+| commit_gate | blocked | No implementation commit is authorized before Design Gate closure. | wait_design |
+| handoff_gate | blocked | `commit-07-a` cannot hand off while `BLK-ML-07A-DESIGN-001` is open. | wait_design |
 
 ---
 
@@ -122,12 +123,12 @@
 
 | gate | status | evidence |
 |---|---|---|
-| staged_scope | pending | Must include only allowed `commit-07-a` external summary/source/artifact, body-free fake, test and generated targeted evidence files. |
-| unrelated_changes | pending | User-owned unrelated changes must remain unstaged. |
-| commit_message_format | pending | Planned subject: `feat(external): add body-free source boundary` |
-| commit_body_group | pending | Body group must include `External summary contracts:` and `Body-free source adapters:` from Step 11 mapping. |
-| whitespace | pending | `git diff --cached --check` must pass. |
-| required_checks | pending | Required Checks table must have pass/not_applicable evidence. |
+| staged_scope | blocked | No implementation diff is authorized while Design Gate is blocked. |
+| unrelated_changes | pass | User-owned untracked `.gitignore` remains untouched and unstaged. |
+| commit_message_format | blocked | No implementation commit is authorized while Design Gate is blocked. |
+| commit_body_group | blocked | No implementation commit is authorized while Design Gate is blocked. |
+| whitespace | blocked | No staged implementation diff exists because Design Gate is blocked. |
+| required_checks | blocked | Build/test/evidence checks must wait for design closure and authorized implementation. |
 
 ---
 
@@ -135,13 +136,13 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after implementation repo commit. |
-| committed_message | pending | Fill after implementation repo commit. |
-| gates_run | pending | List exact commands and targeted reports. |
-| tests_not_run | pending | Must state none or explain; cannot claim peripheral/query/archive/release suites. |
-| remaining_blockers | pending | Must reference blocker table; any blocking design gap prevents handoff. |
-| final_conclusion | pending | Must be one of pass / fail / cannot_decide with exact evidence source. |
-| user_owned_changes_untouched | pending | List unrelated files left untouched. |
+| committed_hash | blocked | No implementation commit is authorized while Design Gate is blocked. |
+| committed_message | blocked | No implementation commit is authorized while Design Gate is blocked. |
+| gates_run | blocked | Required-read and gate-audit commands ran;implementation/build/test/evidence commands must wait for design closure. |
+| tests_not_run | blocked | Tests were not run because no implementation change is authorized. |
+| remaining_blockers | blocked | `BLK-ML-07A-DESIGN-001` prevents implementation handoff. |
+| final_conclusion | blocked | `cannot_decide` until design publishes the exact current-boundary external carrier/domain/adapter-fake surface. |
+| user_owned_changes_untouched | pass | User-owned untracked `.gitignore` remains untouched and unstaged. |
 
 ---
 
@@ -150,6 +151,7 @@
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
 | BLK-ML-07A-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-06-b`;this future boundary could not be used for implementation. | `commit-06-b` handoff is now closed and project/boundary ledgers advance to `commit-07-a` for fresh Required Reads. | read_docs |
+| BLK-ML-07A-DESIGN-001 | design_gate | open | Required Reads are complete,but current formal sources stop at family-level external summary/source/artifact direction,a field-name object skeleton,state prose and logical persistence. They do not publish one exact `commit-07-a` Rust-facing contracts/domain/application/infra-fake surface,so implementation would have to invent carrier labels/fields/kinds,identity/marker sources,adapter outcomes or evidence details. | Publish one boundary-specific closure that fixes:exact named wrappers and `MethodLibraryTypedBoundaryRefKind` labels for every new source/artifact/rule/reason/digest/acceptance ref;closed enum/struct fields and serde labels for `ExternalSourceKind`,`ExternalSafeSummary`,`ExternalSummaryState`,`ForbiddenExternalBodyKindSet`,`ExternalSummaryKindSet` and any adapter availability/diagnostic carrier;complete `ExternalSourceSummary` fields,identity source,factory/helper signatures and transitions;the exact `ExternalBodyFreeSourceAdapterPort` input/output/error/availability surface and fake parity,including no provider-body storage and no fake-only map/ref/marker;whether any repository callable surface is in or carved out of this boundary;safe domain/adapter error and marker mapping;focused positive/negative/redline fixtures;and fixed run-scoped raw artifact/report names. Preserve provider-body,archive-lifecycle,package/set,query/API/worker/job/report-generator carve-outs. | wait_design |
 
 ---
 

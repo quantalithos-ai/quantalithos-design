@@ -7,6 +7,7 @@
 > 当前模式: full-restart / continuous execution
 > Step 状态: `accepted-designed`
 > 当前任务: `T029`
+> Safe-text scanner controlled repair: 2026-08-09; adds a shared-registry dummy corpus and cleanup contract without adding a canonical DS or execution fact
 
 ---
 
@@ -81,6 +82,10 @@
 | `ReconciliationReportState` 容易被生成 mutable pair | 伪造状态机 | 仅 5 个 immutable formation outcomes，不进入 638 pair 分母 |
 | shared fixture 容易吞并 189 identity | traceability 丢失 | shared primitive 无 canonical DS 身份；每个 DR 仍有自己的 DS manifest |
 | raw body/secret 负向样本可能污染日志或报告 | 安全与证据污染 | dummy-only isolated corpus，scanner 输入不得进入 business store/observer fallback |
+
+#### Closed safe-text marker corpus
+
+The scanner corpus is a shared targeted fixture, not a canonical dataset. Its generator must import the same private eight-marker registry and precedence order as the production contracts scanner; duplicating marker strings in a test-only list is invalid. The corpus must contain, at minimum, the empty/trim vectors, eight exact positive categories, case/punctuation/version/slug near-misses, Unicode confusables, split markers, percent/base64/JSON-escaped/PEM-encoded representations without the exact literal, wrapper controls retaining the literal, repeated markers, all 28 unordered category pairs in both text orders, marker-free UTF-8 preservation values, and raw-owner fail-closed probes. Each input is isolated under the existing foundation/forbidden-material scenario namespace, and no input, matched marker, source body, URL, hash, digest, byte length, or diagnostic excerpt may enter a business carrier, error, log, report, artifact, observer fallback, or evidence record. The corpus is deleted after every attempt, including scanner or parser failure; cleanup failure invalidates run hygiene.
 
 未发现无法由正式 DTO、object、Port、state、UoW 或 config contract 构造的 P0 oracle；unresolved upstream blocker=`0`。
 

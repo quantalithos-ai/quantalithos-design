@@ -6,6 +6,7 @@
 > 当前模式: full-restart
 > 状态: `03_step_14_completed_stop_review`
 > 正式文档状态: 本 Step 不修改正式 `03-详细设计.md`;正式装配留 Step 19
+> Safe-text scanner controlled repair: 2026-08-09; the fixed marker registry/matching/precedence is explicitly non-configurable; no config key, section, profile, Port or binding inventory changes
 
 ---
 
@@ -999,7 +1000,7 @@ The schema is closed. A raw key/section that attempts to express any row below i
 | SDK exposure | 生成SDK client/package/cache、把SDK local visibility当formal exposure或允许SDK反写truth | Hub只拥有formal exposure与controlled view | reject；回SDK consumer boundary |
 | marketplace / console | 创建listing、pricing、transaction、ranking或fulfillment truth | marketplace仅可读消费ecosystem material | reject；回边界外owner |
 | secret boundary | 保存secret value、ciphertext、token、password、private key、decryption material或KMS/Vault lifecycle | Hub只保存external secret ref与safe summary | reject；回security/config owner |
-| forbidden body scanner | 关闭scanner、增加allowed body category或把raw external body降成safe text | Step 6 forbidden-body policy固定 | reject；回Step 6/8/12 |
+| forbidden body scanner | 关闭、删除、重排或扩展八类closed marker；改变exact marker bytes、大小写/边界/precedence；或把raw external body降成safe text | Step 6 §7.2.1 and Step 12 §11.5 fix one trim, exact ASCII byte scan, registry precedence and fail-closed raw-source ownership | reject；回Step 6/8/12 |
 | actor / metadata / trace | 关闭trusted actor、operation metadata、trace id、reason或command context要求 | `core-contracts`与Step 8 protocol固定 | reject；回Step 8/13 |
 | idempotency / stored replay | 关闭key、digest、reservation/result、same-UoW save或允许duplicate重跑 | Step 11/13 authority固定 | reject；回Step 6/7/8/11/13 |
 | idempotency canonical bytes | trim、case-fold、Unicode normalize或改用`Display / Debug / serde`形成key bytes | 用户授权的exact `as_str().as_bytes()`原始UTF-8假设 | reject；签名/字节变化回Step 13并处理上游债务 |

@@ -13,7 +13,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | `CH-07-OWNER-REPAIR-001` controlled reopen completed; repair anchor pending | selector primary-owner repair and implementation handoff sync | `blocked` | Target repository and PH-01 handoffs exist. `commit-02-a` remains blocked because the repaired capability-hub design subtree has not yet been frozen as a real repair commit/tree anchor. | `wait_design` | formal `05/07`、Step 7/10/11、implementation ledger、`implementation-boundaries/commit-02-a.md` |
+| `03/05/07` | `CH-DDD-SAFE-TEXT-SCANNER-REPAIR-001` controlled repair completed; repair anchor pending | safe-text marker contract, targeted oracle and implementation handoff sync | `blocked` | Target repository and PH-01 handoffs exist. The scanner contract is closed in the working tree, but `commit-02-a` remains blocked until the repaired capability-hub subtree is frozen as a real repair commit/tree anchor. | `wait_design` | formal `03/05/07`、DDD Steps 6/12/14、test Steps 6/7、implementation ledger、`implementation-boundaries/commit-02-a.md` |
 
 ---
 
@@ -24,11 +24,11 @@
 | `00-需求文档.md` | `design-calibration/00_requirements_calibration_flow.md` | `00_completed_design_task_wait_implementation_handoff` | Step 17 completed | `design_task_closed_wait_implementation_handoff` | Step 1~17、T070/T071/T072 已完成；正式 `00` 是 active formal baseline。旧 README、旧 `00~06` 和 restart 前 Step 8~9 仅作 historical material；无 upstream blocker。 |
 | `01-架构设计.md` | `design-calibration/01_architecture_calibration_flow.md` | `01_completed_design_task_wait_implementation_handoff` | Step 16 completed | `design_task_closed_wait_implementation_handoff` | Step 1~16、T070/T071/T072 已完成；正式 `01` 是 active architecture baseline，已被后续 formal 文档承接；无 upstream blocker。 |
 | `02-概要设计.md` | `design-calibration/02_hld_calibration_flow.md` | `02_completed_design_task_wait_implementation_handoff` | Step 14 completed | `design_task_closed_wait_implementation_handoff` | Step 1~14、T070/T071/T072 已完成；正式 `02` 是 active HLD baseline，已被后续 formal 文档承接；无 upstream blocker。 |
-| `03-详细设计.md` | `design-calibration/03_ddd_calibration_flow.md` | `03_completed_design_task_wait_implementation_handoff` | Step 19 completed | `design_task_closed_wait_implementation_handoff` | Step 1~19、T070/T071/T072 已完成；正式 `03` 通过静态装配审计；L0-core debt 保持 non-blocking，目标仓缺失仅为 implementation prerequisite。 |
+| `03-详细设计.md` | `design-calibration/03_ddd_calibration_flow.md` | `03_safe_text_scanner_controlled_repair_anchor_pending` | Step 6/12/14 controlled repair after Step 19 | `blocked_wait_design_repair_anchor` | `CapabilitySafeText` marker registry、matching、precedence、encoding/normalization exclusion、no-echo 与 raw-owner fail-closed 已闭合；等待 real repair anchor。 |
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | `04_completed_design_task_wait_implementation_handoff` | Step 15 completed | `design_task_closed_wait_implementation_handoff` | Step 1~15、T070/T071/T072 已完成；18/27/21 inventory、3 profiles、24 failures 和配置静态审计闭合；无执行事实。 |
-| `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | `05_completed_design_task_wait_implementation_handoff` | Step 15 completed | `design_task_closed_wait_implementation_handoff` | Step 1~15、T070/T071/T072 已完成；189 TC/DS/EV、638 pairs、10/5/9/4 automation、37 AC/13 VF 等仍是设计合同；无实现/run/evidence/acceptance事实。 |
+| `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | `05_safe_text_scanner_targeted_oracle_repair_anchor_pending` | Step 6/7 controlled repair after Step 15 | `blocked_wait_design_repair_anchor` | Scanner oracle/corpus 已闭合且保持 189 TC/DS/EV、638 pairs、10/5/9/4 分母不变；无实现/run/evidence/acceptance事实。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | `06_completed_design_task_wait_implementation_handoff` | Step 15 completed | `design_task_closed_wait_implementation_handoff` | Step 1~15、T070/T071/T072 已完成；formal 06 active，15/15 chapters 和锁定库存已静态审计；无 verdict/signoff 事实。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | `07_controlled_reopen_owner_repair_anchor_pending` | Step 7/10/11 controlled sync after Step 13 | `blocked_wait_design_repair_anchor` | Formal `05` identities are unchanged; primary-owner repair is complete in the working tree. Freeze one real repair commit/tree anchor before `commit-02-a` activation. |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | `07_safe_text_scanner_repair_anchor_pending` | scanner boundary/handoff sync after Step 13 | `blocked_wait_design_repair_anchor` | Selector owner repair is historical and closed. Freeze one real scanner repair commit/tree anchor before `commit-02-a` activation review. |
 
 ---
 
@@ -606,19 +606,19 @@ T072 关闭时的 `commit_required=no` 是当时执行快照。用户于2026-07-
 
 | field | value |
 |---|---|
-| change_id | `CH-07-OWNER-REPAIR-001` |
+| change_id | `CH-DDD-SAFE-TEXT-SCANNER-REPAIR-001` |
 | current_document | `07-实施计划.md` |
-| current_step | Step 7/10/11 controlled selector-owner sync completed; design repair anchor pending |
-| current_module | selector primary-owner repair and implementation handoff sync |
+| current_step | Step 6/12/14 + formal 03/05/07 safe-text scanner repair completed; design repair anchor pending |
+| current_module | safe-text marker contract, targeted oracle and implementation handoff sync |
 | design_gate_status | `blocked` |
 | next_allowed_action | `wait_design` |
-| unresolved_upstream_design_blocker | `0`; formal `05` identities and semantics are unchanged |
+| unresolved_upstream_design_blocker | `0`; scanner ambiguity is repaired in the working tree and formal `05` identities remain unchanged |
 | implementation_repo | `/home/aris/Projects/quantalithos-capability-hub` verified Git worktree |
 | implementation_current_boundary | `commit-02-a` |
 | implementation_gate_status | `blocked` |
 | implementation_next_allowed_action | `wait_design` |
 | implementation_facts | PH-01 complete: `a4df225e3eba8cca611da3ca78f198ae36ec9045` and `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`; associated run-scoped tooling records exist; no business evidence/verdict/signoff |
 | design_anchor | `pending_real_repair_commit_and_scoped_tree`; do not prefill or infer a future hash |
-| blocker | `BLK-CH-02-A-DESIGN-SELECTOR-001` remains open until the real repair commit/tree is frozen and written to the implementation-repository ledger |
+| blocker | `BLK-CH-02-A-DESIGN-SAFE-TEXT-SCANNER-001` is contract-repaired but remains blocked on immutable handoff until the real repair commit/tree is frozen and written to the implementation-repository ledger; `BLK-CH-02-A-DESIGN-SELECTOR-001` is historical/resolved |
 | anchor_rule | the new repair commit is the sole immutable design reference; unrelated external commits and the superseded scoped tree are ignored unless the user changes this rule |
 | stop_rule | after committing the repair and synchronizing the implementation-repository ledger, stop before any `commit-02-a` source or gate work |

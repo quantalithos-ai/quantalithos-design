@@ -6,6 +6,7 @@
 > 回填目标：`05-测试方案.md` §6；正式文档只允许在 Step 15 装配
 > 当前状态：`05_step_06_completed_continuous_execution`
 > 执行事实：本文只定义 future test cases；未执行测试，未创建 run、artifact、report、真实 evidence 或验收结论
+> Safe-text scanner controlled repair: 2026-08-09; adds targeted parameter oracles without adding a canonical TC/DS/EV identity or execution fact
 
 ---
 
@@ -200,6 +201,19 @@ typed public/application terminal
 | `TC-CH-FOUNDATION-016` / `CUT-PORT-LOCAL` | 27 local/base Port exact callable/authority / P0 | positive all callables；negative hidden/private finder、wrong UoW、non-Send、second authority | 编译trait/callable inventory；对typed fake执行formal outcomes与concurrency contract | 27/27 Port/callable set exact；future满足Send；formal typed return/error retained | private lookup、string/generic result、adapter-opened nested UoW、fallback authority=0 | Port/callable/signature/UoW identity与调用owner可定位 | `DR-CH-FOUNDATION-016` | L0+L3 / required compile+contract automation | `EVC-CH-FOUNDATION-016` |
 | `TC-CH-FOUNDATION-017` / `CUT-PORT-EXTERNAL` | 9 external Ports/14 callables binding parity / P0 | positive Configured/Fake/Disabled legal rows；negative Missing/wrong family/typed response asymmetry/failure | 对9/14 exact callable逐binding state调用，注入temporary/permanent/invalid response | Configured/Fake产生formal typed result；Disabled产生exact existing `NotConfigured`；Missing blocks activation；asymmetry=`ConsistencyDefect` | configured failure不fallback Fake/Disabled；raw response/body/secret不公开；unmodeled retry=0 | Port/callable/binding/failure class/call count可定位 | `DR-CH-FOUNDATION-017` | L3 / required external contract automation | `EVC-CH-FOUNDATION-017` |
 | `TC-CH-FOUNDATION-018` / `CUT-REPO-ALL` | 22 repository traits/110 methods parity / P0 | positive success/missing/page/order；negative CAS/unique/wrong key/index/cursor/owner/version/asymmetry | 每exact method在deterministic fake执行；future selected durable复用同一contract；注入每类failure | exact typed return；CAS=`OptimisticConflict`、unique=`UniquenessConflict`、impossible row=`ConsistencyDefect` | 不全表fallback、不首项猜测、不私有finder、不覆盖winner、不在adapter开新UoW | 22/110 method key、expected version、order/cursor、staged set与fake parity可定位 | `DR-CH-FOUNDATION-018` | L3 / required parameterized contract automation | `EVC-CH-FOUNDATION-018` |
+
+#### Safe-text scanner targeted parameter set
+
+The following parameters are attached to the existing `CUT-MOD-01` / forbidden-material assertions as `targeted_regression`. They are not additional canonical cases, datasets, evidence identities, public declarations, or denominator entries.
+
+| parameter set | exact inputs | expected / prohibited effect |
+|---|---|---|
+| `safe-text-marker-v1-empty-trim` | empty, ASCII whitespace-only, Unicode whitespace-only, and each exact marker surrounded by whitespace | empty returns `EmptySafeText` before scanning; non-empty input is scanned after one Rust Unicode `trim()`; retained bytes equal the trimmed input |
+| `safe-text-marker-v1-positive` | each of the eight exact registry markers at beginning, middle, end, and adjacent to ordinary text | returns only the corresponding `ForbiddenExternalBody` variant; no marker or source text is retained or echoed |
+| `safe-text-marker-v1-near-miss` | case, punctuation, version, slug, Unicode-confusable, split-marker, percent/base64/JSON-escaped/PEM-encoded variants without the exact literal, plus wrappers retaining the literal as controls | encoded/escaped or near-miss values do not match; wrappers retaining exact bytes do match; no semantic keyword, decoder or wrapper parser |
+| `safe-text-marker-v1-collision` | repeated same marker and all 28 unordered marker pairs in both text orders | repeated marker keeps its category; pair result follows fixed registry declaration order, never textual position |
+| `safe-text-marker-v1-preservation` | marker-free UTF-8 with interior Unicode, leading/trailing whitespace, and finite long values | exact once-trimmed byte preservation; no normalization, case-fold, truncation, hash, length or lossy replacement |
+| `safe-text-marker-v1-raw-owner` | dummy raw external body supplied to a typed source/Port/decoder with and without a marker | owner rejects/classifies fail-closed before `CapabilitySafeText`; no-marker primitive success cannot downgrade raw body; all persistence/emission/observer/error echo effects are zero |
 
 ### 6.1 Batch stop-review
 

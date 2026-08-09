@@ -9,6 +9,7 @@
 > 本轮口径: batch `12.7`只完成全局异常 / rollback / recovery / consistency closure、historical与cross-step audit、正式§11 assembly source和Step 13 handoff；不得进入Step 13或修改正式`03`。
 > Step 13受控同步: 2026-07-18;保留`IdempotencyConflict / IdempotencyInProgress` application/public error语义,删除persisted `Conflict`暗示；committed Command / Inbound `Reserved`归consistency defect,Job仅`Reserved + matching Planned journal`可恢复；active state baseline为111 variants / 638 pairs
 > Step 14受控同步: 2026-07-19;`CapabilityUnitOfWorkManager::resolve_commit`的`Durable / NotDurable / Unknown`只作为恢复判定输入；无法形成typed resolution时继续使用`CommitOutcomeUnknown`,不把timeout、replica absence或一次`None`读解释为`NotDurable`；17个`ApplicationError`、51个issue code和83 / 83 mapping不变
+> Safe-text scanner controlled repair: 2026-08-09; `EmptySafeText` precedence, exact marker-to-variant mapping, collision order, representation exclusions and no-echo are closed without changing the 10-variant `ContractValueError`
 
 ---
 
@@ -381,7 +382,7 @@ pub enum ContractValueError {
 |---|---|---|---|
 | `EmptyOpaqueId` | `CapabilityOpaqueId::new`及全部typed id newtype | trim后empty | 原始字符串、字段名、route |
 | `EmptySafeText` | `CapabilitySafeText::new`及safe-text newtype | trim后empty | 原始正文 |
-| `ForbiddenBody { body_kind }` | safe-text scanner -> typed category | 命中`ForbiddenExternalBody` closed variant | 命中片段、secret、method / governance / runtime / audit body |
+| `ForbiddenBody { body_kind }` | contracts-owned closed marker scanner -> typed category | trimmed UTF-8 bytes命中`ForbiddenExternalBody` marker registry；多类别按registry声明顺序取最早variant | 命中片段、marker literal、secret、method / governance / runtime / audit body |
 | `EmptyTypedSet` | generic non-empty set factory | values empty | type name字符串 |
 | `DuplicateTypedSetValue` | generic factory、possibly-empty helper、specialized set factory | typed equality发现duplicate | duplicate value的Debug / Display |
 | `UnsupportedConsumerViewSource` | `ConsumerViewSourceVersionSet::try_from_markers` | marker不是registry / descriptor / seam / optional method / exposure / reference | adapter-private marker |
@@ -403,6 +404,16 @@ pub enum ContractValueError {
 | Job ordinal | zero check | `NonPositiveJobTargetOrdinal` |
 
 `ContractValueError`不包含`Other`、raw `String`、字段名、value片段、URL、digest、adapter code或transport status。`Display` / `thiserror` message若实现,只能为每个variant输出compile-time static category text；不得格式化payload的`Debug / Display`到public / persisted error message。
+
+### 11.5 `CapabilitySafeText` scanner oracle
+
+The scanner contract is closed in Step 6 §7.2.1 and is repeated here because error precedence is an error-model obligation. `CapabilitySafeText::new` performs exactly one Rust Unicode `trim()`, checks emptiness, then linearly scans the trimmed UTF-8 bytes for the eight exact, case-sensitive ASCII marker literals in the shared private registry. It does not apply Unicode normalization or case-folding, decode percent/base64/JSON-escaped/PEM-encoded representations, infer semantics from keywords, or impose a scanner-specific length cap. Marker position and token boundaries are irrelevant; the marker may occur anywhere in the bytes. A repeated marker yields the same category. A malformed or near-miss marker, Unicode confusable, changed version/slug, split marker, or encoded representation that lacks the exact marker literal is safe-text at this primitive layer unless an owning raw-input mapper rejects it under its own typed source contract. A wrapper that retains the exact marker bytes still matches; the scanner never parses wrapper semantics.
+
+The registry order is the stable conflict precedence: `ExternalCapabilitySourceBody`, `GovernanceBody`, `MethodBody`, `SecretBody`, `ExternalDocumentBody`, `RuntimeExecutionPayload`, `SdkClientBody`, then `ObservabilityBody`. The scanner evaluates all categories and returns the first category in that order, never the first textual occurrence. The registry is private, compile-time fixed, shared by production scanning and dummy corpus generation, and cannot be changed by configuration or a caller.
+
+The empty-before-forbidden rule is strict: whitespace-only input returns `EmptySafeText` without scanning; input containing both whitespace and a marker is trimmed once and then returns the marker category if the marker remains. On every rejection, only the closed typed `body_kind` is retained. Raw input, marker text, matched span, URL, digest, hash, byte length, encoded form, and diagnostic excerpt are forbidden in errors, logs, reports, artifacts, cleanup records, and evidence. A no-marker result is not a semantic DLP clearance. Any source/Port/decoder/mapper that owns raw external body material must fail closed before invoking `CapabilitySafeText::new`; it may not convert a raw body to safe text merely because the structural scanner found no marker.
+
+The scanner has no public callable, no new error variant, no new object, and no canonical `TC`/`DS`/`EV` identity. Its tests are targeted parameters of the existing contracts foundation and forbidden-body cases; they do not change the `43 + 7` object/helper, `250` public type, `83` flow, `189` canonical case, or `638` state-pair denominators.
 
 ---
 

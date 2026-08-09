@@ -5,6 +5,7 @@
 > 创建日期: 2026-07-10
 > 当前模式: full-restart
 > 状态: completed_with_step_13_controlled_reopen_and_authorized_dependency_assumption
+> Safe-text scanner controlled repair: 2026-08-09; existing `CapabilitySafeText` receives one private closed eight-marker registry, exact byte-matching/precedence and raw-owner fail-closed contract; no public type, field, callable, Port, object, state, protocol, flow or denominator change
 > Step 13 并发 / 幂等回开修正: 2026-07-18;closed operation identity改为channel-aware struct，normalized idempotency key改为Command / InboundEvent / OperationsJob closed enum，四类digest收紧为private `[u8; 32]` carrier；不可达`CapabilityIdempotencyState::Conflict`、`CapabilityIdempotencyConflictReason`、`conflict_reason`与`mark_conflict(...)`删除。43个HLD objects + 7个application helpers不变；Step 8 protocol文件250个public struct / enum不变，Step 6 application-support inventory单独删除1个type；所有新增struct field、enum variant / payload与callable均有英文`///`
 > Step 8 回开修正: 2026-07-10;已为所有直接返回 append-only change record 的 mutation 补齐 application 生成的 record id、actor / trace / reason 和确定 change kind;对象 owner、字段、Port 和正式文档边界未改变
 > Step 8 batch 8.5 回开修正: 2026-07-12;异步传播的 post-commit / pre-intent 崩溃窗口触发 durable-capture 门禁,新增 application-owned immutable event payload snapshot 与 versioned capture record。二者是技术一致性对象,不新增 capability truth、broker topic、delivery attempt 或外部投递状态 owner
@@ -262,7 +263,7 @@ capability-hub 自有 primitive 采用以下固定形态。代码块表达落码
 /// Opaque non-empty identifier owned by capability-hub contracts.
 pub struct CapabilityOpaqueId(String);
 
-/// Opaque non-empty safe text that cannot contain forbidden body material.
+/// Opaque non-empty safe text guarded by the closed forbidden-body marker contract.
 pub struct CapabilitySafeText(String);
 
 /// Ordered and duplicate-free collection of typed values.
@@ -280,11 +281,36 @@ pub struct VersionedRef<I> {
 | pattern | factory / member contract | invariant |
 |---|---|---|
 | `CapabilityOpaqueId` | `pub fn new(value: impl Into<String>) -> Result<Self, ContractValueError>`;`pub fn as_str(&self) -> &str`;`pub(crate) fn from_audited_static(value: &'static str) -> Self` | runtime value仍经trim后非空校验；crate-visible static入口只接受本仓代码中逐项审计的非空literal,当前唯一调用者是protocol issue-ref mapper；不得解析内部格式推导业务含义 |
-| `CapabilitySafeText` | `pub fn new(value: impl Into<String>) -> Result<Self, ContractValueError>`;`pub fn as_str(&self) -> &str`;`pub(crate) fn copy_validated(&self) -> Self` | trim 后非空;通过 forbidden-body scanner;crate-visible copy只供同crate closed carrier mapper无损复制；不得含 secret、method body、governance body、runtime payload |
+| `CapabilitySafeText` | `pub fn new(value: impl Into<String>) -> Result<Self, ContractValueError>`;`pub fn as_str(&self) -> &str`;`pub(crate) fn copy_validated(&self) -> Self` | 先按 Rust Unicode `trim()` 做一次边界 trim；非空后通过 contracts-owned closed marker scanner；保留 trimmed UTF-8 bytes 原样；crate-visible copy 只供同crate closed carrier mapper 无损复制；不得把该 primitive 宣称为任意自然语言的语义 DLP |
 | `CapabilityTypedSet<T>` | `pub fn try_from_values(values: Vec<T>) -> Result<Self, ContractValueError>`;`pub(crate) fn try_from_possibly_empty_values(values: Vec<T>) -> Result<Self, ContractValueError>`;`pub fn iter(&self) -> impl Iterator<Item = &T>` | public factory保持输入稳定顺序、拒绝重复且不得为空；crate-visible helper只供明确允许empty的specialized wrapper并仍拒绝重复；不得降级为无序裸列表 |
 | `VersionedRef<I>` | `pub fn current(id: I) -> Self`;`pub fn exact(id: I, version: Version) -> Self` | `version == None` 表示读取当前版本,不表示 expected version 已满足 |
 
 `ContractValueError` 只是 stable error type name;exact variant 由 Step 12 定义。
+
+#### 7.2.1 Closed forbidden-body marker scanner
+
+`CapabilitySafeText` 的 forbidden-body scanner 是 `contracts` 私有、固定且无配置的 structural guard。它不是自然语言语义 DLP，也不承诺识别没有显式 marker 的任意外部正文。实现必须遵守以下唯一算法：
+
+1. `CapabilitySafeText::new` 将输入转换为合法 Rust UTF-8 `String`，只调用一次 Rust `str::trim()`；该操作使用 Rust Unicode whitespace 语义，不做第二次 trim。
+2. 若 trimmed value 为空，立即返回 `ContractValueError::EmptySafeText`；空值优先于 scanner，且不得读取或保存正文。
+3. scanner 对 trimmed value 的 UTF-8 bytes 做一次线性扫描，按下表对完整 ASCII byte literal 做 `contains` 匹配。marker 可以出现在任意 byte 位置，包括紧邻其他字符；不要求 token boundary，也不识别转义形式。
+4. 匹配大小写敏感；只接受下表列出的 ASCII literal。扫描全部八类后，若命中多个类别，按表中既有 `ForbiddenExternalBody` variant 声明顺序返回最早类别，而不是按正文中的位置、长度或重复次数裁决。
+5. 没有命中时保留 trimmed value 的原始 UTF-8 bytes，不做 Unicode normalization、case-fold、percent-decoding、base64-decoding、JSON/PEM parsing、lossy replacement、长度型校验、截断或hash。任意有限长度的合法 `String` 均由该 primitive 接受；协议/transport 的长度限制属于其 owner 的独立合同。
+
+| marker slug | exact ASCII marker literal | `ForbiddenExternalBody` result / precedence rank |
+|---|---|---:|
+| `external-capability-source` | `[[capability-hub:forbidden-body:v1:external-capability-source]]` | `ExternalCapabilitySourceBody` / 1 |
+| `governance` | `[[capability-hub:forbidden-body:v1:governance]]` | `GovernanceBody` / 2 |
+| `method` | `[[capability-hub:forbidden-body:v1:method]]` | `MethodBody` / 3 |
+| `secret` | `[[capability-hub:forbidden-body:v1:secret]]` | `SecretBody` / 4 |
+| `external-document` | `[[capability-hub:forbidden-body:v1:external-document]]` | `ExternalDocumentBody` / 5 |
+| `runtime-execution-payload` | `[[capability-hub:forbidden-body:v1:runtime-execution-payload]]` | `RuntimeExecutionPayload` / 6 |
+| `sdk-client` | `[[capability-hub:forbidden-body:v1:sdk-client]]` | `SdkClientBody` / 7 |
+| `observability` | `[[capability-hub:forbidden-body:v1:observability]]` | `ObservabilityBody` / 8 |
+
+Repeated occurrences of one marker return the same typed category. Near-miss punctuation, a changed version/slug, case changes, Unicode confusables, percent/base64/JSON-escaped/PEM-encoded forms that no longer contain the exact literal, and markers split across non-contiguous bytes do not match. A JSON string, PEM-like envelope, or any other wrapper that still contains the exact marker bytes does match because wrapper semantics are not parsed. The registry and its precedence are private contracts constants; configuration cannot disable, remove, reorder, or extend them, and the production scanner and dummy corpus must consume the same registry.
+
+Any typed source, Port, decoder, or mapper that owns raw external body input must reject or classify that input fail-closed before constructing `CapabilitySafeText`; it must never use a successful no-marker result as permission to downgrade raw body to safe text. `ContractValueError::ForbiddenBody` carries only the typed category. No scanner branch, error, report, log, or cleanup record may echo the input, matched marker, URL, digest, hash, length, or diagnostic excerpt.
 
 `CapabilityOpaqueId`的audited-static例外只关闭closed issue code到opaque ref之间本可证明infallible的构造路径。它不是通用绕过校验入口:
 

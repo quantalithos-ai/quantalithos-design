@@ -2,6 +2,7 @@
 
 > 创建日期: 2026-07-06
 > 当前模式: full-restart
+> Fixed access-review reason controlled repair: 2026-08-09; scanner repair anchor `5896471...` is historical/frozen; current `commit-02-a` handoff remains blocked on the separate reason-literal repair anchor
 > 当前策略: 从 `00-需求文档.md` Step 1 重新开始；用户于2026-07-25授权按`/tmp/L3-capability-hub_full_restart_remaining_tasks.md`连续完成剩余任务并逐项勾选，不再逐Step停审
 > 设计仓提交授权: 用户于2026-07-27明确授权按`00/01`、`02/03/04`、`05/06/07`三组提交设计收口产物；该授权不适用于实现仓
 > Step 粒度参考: `projects/L1-governance/design-calibration/00_req_step_01_upstream_relation.md`;`projects/L1-governance/design-calibration/01_arch_step_01_requirement_baseline.md`
@@ -13,7 +14,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `03/05/07` | `CH-DDD-SAFE-TEXT-SCANNER-REPAIR-001` controlled repair completed; repair anchor pending | safe-text marker contract, targeted oracle and implementation handoff sync | `blocked` | Target repository and PH-01 handoffs exist. The scanner contract is closed in the working tree, but `commit-02-a` remains blocked until the repaired capability-hub subtree is frozen as a real repair commit/tree anchor. | `wait_design` | formal `03/05/07`、DDD Steps 6/12/14、test Steps 6/7、implementation ledger、`implementation-boundaries/commit-02-a.md` |
+| `03/05/07` | `CH-DDD-SAFE-TEXT-SCANNER-REPAIR-001` resolved by real commit `589647151908f049a49b69f55cf4160a16fb3548`; `CH-DDD-FIXED-ACCESS-REVIEW-REASON-001` controlled repair active; reason repair anchor pending | fixed access-review reason literal/bytes, exact propagation/replay oracle and implementation handoff sync | `blocked` | Scanner contract is frozen at the historical anchor. The fixed reason contract is closed in the working tree, but `commit-02-a` remains blocked until this separate capability-hub subtree repair is frozen as a real commit/tree anchor. | `wait_design` | formal `03/05/07`、DDD Steps 6/8/9/12/13/16、test Steps 6/7、implementation ledger、`implementation-boundaries/commit-02-a.md` |
 
 ---
 
@@ -24,11 +25,11 @@
 | `00-需求文档.md` | `design-calibration/00_requirements_calibration_flow.md` | `00_completed_design_task_wait_implementation_handoff` | Step 17 completed | `design_task_closed_wait_implementation_handoff` | Step 1~17、T070/T071/T072 已完成；正式 `00` 是 active formal baseline。旧 README、旧 `00~06` 和 restart 前 Step 8~9 仅作 historical material；无 upstream blocker。 |
 | `01-架构设计.md` | `design-calibration/01_architecture_calibration_flow.md` | `01_completed_design_task_wait_implementation_handoff` | Step 16 completed | `design_task_closed_wait_implementation_handoff` | Step 1~16、T070/T071/T072 已完成；正式 `01` 是 active architecture baseline，已被后续 formal 文档承接；无 upstream blocker。 |
 | `02-概要设计.md` | `design-calibration/02_hld_calibration_flow.md` | `02_completed_design_task_wait_implementation_handoff` | Step 14 completed | `design_task_closed_wait_implementation_handoff` | Step 1~14、T070/T071/T072 已完成；正式 `02` 是 active HLD baseline，已被后续 formal 文档承接；无 upstream blocker。 |
-| `03-详细设计.md` | `design-calibration/03_ddd_calibration_flow.md` | `03_safe_text_scanner_controlled_repair_anchor_pending` | Step 6/12/14 controlled repair after Step 19 | `blocked_wait_design_repair_anchor` | `CapabilitySafeText` marker registry、matching、precedence、encoding/normalization exclusion、no-echo 与 raw-owner fail-closed 已闭合；等待 real repair anchor。 |
+| `03-详细设计.md` | `design-calibration/03_ddd_calibration_flow.md` | `03_fixed_access_review_reason_controlled_repair_anchor_pending` | Step 6/8/9/12/13/16 controlled repair after scanner anchor | `blocked_wait_design_repair_anchor` | scanner contract is frozen by `5896471...`; fixed reason literal/bytes、audited-static ownership、propagation、digest exclusion、replay and compatibility are closed in working tree; waiting real reason-repair anchor. |
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | `04_completed_design_task_wait_implementation_handoff` | Step 15 completed | `design_task_closed_wait_implementation_handoff` | Step 1~15、T070/T071/T072 已完成；18/27/21 inventory、3 profiles、24 failures 和配置静态审计闭合；无执行事实。 |
-| `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | `05_safe_text_scanner_targeted_oracle_repair_anchor_pending` | Step 6/7 controlled repair after Step 15 | `blocked_wait_design_repair_anchor` | Scanner oracle/corpus 已闭合且保持 189 TC/DS/EV、638 pairs、10/5/9/4 分母不变；无实现/run/evidence/acceptance事实。 |
+| `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | `05_fixed_access_review_reason_targeted_oracle_repair_anchor_pending` | Step 6/7 controlled repair after scanner anchor | `blocked_wait_design_repair_anchor` | scanner oracle remains historical; fixed reason exact-byte/fresh-replay/corruption/compatibility parameters are closed and preserve 189 TC/DS/EV, 638 pairs, 10/5/9/4 denominators; no implementation/run/evidence/acceptance fact. |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | `06_completed_design_task_wait_implementation_handoff` | Step 15 completed | `design_task_closed_wait_implementation_handoff` | Step 1~15、T070/T071/T072 已完成；formal 06 active，15/15 chapters 和锁定库存已静态审计；无 verdict/signoff 事实。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | `07_safe_text_scanner_repair_anchor_pending` | scanner boundary/handoff sync after Step 13 | `blocked_wait_design_repair_anchor` | Selector owner repair is historical and closed. Freeze one real scanner repair commit/tree anchor before `commit-02-a` activation review. |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | `07_fixed_access_review_reason_repair_anchor_pending` | fixed-reason boundary/handoff sync after scanner anchor | `blocked_wait_design_repair_anchor` | Selector and scanner repairs are historical/frozen. Freeze one real fixed-reason repair commit/tree anchor before `commit-02-a` activation review. |
 
 ---
 
@@ -606,19 +607,23 @@ T072 关闭时的 `commit_required=no` 是当时执行快照。用户于2026-07-
 
 | field | value |
 |---|---|
-| change_id | `CH-DDD-SAFE-TEXT-SCANNER-REPAIR-001` |
+| change_id | `CH-DDD-FIXED-ACCESS-REVIEW-REASON-001` |
 | current_document | `07-实施计划.md` |
-| current_step | Step 6/12/14 + formal 03/05/07 safe-text scanner repair completed; design repair anchor pending |
-| current_module | safe-text marker contract, targeted oracle and implementation handoff sync |
+| current_step | Step 6/8/9/12/13/16 + formal 03/05/07 fixed access-review reason repair; scanner anchor already frozen |
+| current_module | fixed persisted reason literal/bytes, exact propagation/replay oracle and implementation handoff sync |
 | design_gate_status | `blocked` |
 | next_allowed_action | `wait_design` |
-| unresolved_upstream_design_blocker | `0`; scanner ambiguity is repaired in the working tree and formal `05` identities remain unchanged |
+| unresolved_upstream_design_blocker | `0`; fixed reason ambiguity is repaired in the working tree and formal `05` identities remain unchanged |
 | implementation_repo | `/home/aris/Projects/quantalithos-capability-hub` verified Git worktree |
 | implementation_current_boundary | `commit-02-a` |
 | implementation_gate_status | `blocked` |
 | implementation_next_allowed_action | `wait_design` |
 | implementation_facts | PH-01 complete: `a4df225e3eba8cca611da3ca78f198ae36ec9045` and `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`; associated run-scoped tooling records exist; no business evidence/verdict/signoff |
-| design_anchor | `pending_real_repair_commit_and_scoped_tree`; do not prefill or infer a future hash |
-| blocker | `BLK-CH-02-A-DESIGN-SAFE-TEXT-SCANNER-001` is contract-repaired but remains blocked on immutable handoff until the real repair commit/tree is frozen and written to the implementation-repository ledger; `BLK-CH-02-A-DESIGN-SELECTOR-001` is historical/resolved |
-| anchor_rule | the new repair commit is the sole immutable design reference; unrelated external commits and the superseded scoped tree are ignored unless the user changes this rule |
-| stop_rule | after committing the repair and synchronizing the implementation-repository ledger, stop before any `commit-02-a` source or gate work |
+| design_anchor | historical scanner `589647151908f049a49b69f55cf4160a16fb3548` / `b6aeabf2a4217eb24fcfe14da7252aa7fab7ca7b`; current fixed-reason repair commit/tree pending; do not prefill or infer a future hash |
+| blocker | `BLK-CH-02-A-DESIGN-SAFE-TEXT-SCANNER-001` is resolved by the real scanner anchor; `BLK-CH-02-A-DESIGN-REASON-LITERAL-001` is contract-repaired but remains blocked on immutable handoff until the real fixed-reason commit/tree is frozen and written to the implementation-repository ledger; selector blocker is historical/resolved |
+| anchor_rule | the fixed-reason repair commit created by this controlled reopen will be the sole new immutable design reference; scanner commit `5896471...` remains the historical frozen prerequisite; unrelated external commits and superseded scoped trees are ignored unless the user changes this rule |
+| stop_rule | after committing the fixed-reason repair and synchronizing the implementation-repository ledger, stop before any `commit-02-a` source or gate work |
+
+### Fixed access-review reason contract decision
+
+The sole canonical persisted value is `capability-hub.change-reason/access-review-fact-recorded.v1` (ASCII=UTF-8, `59` bytes). It is contracts-owned, created only by the audited-static factory, excluded from the request digest, copied unchanged through change/trace/material bridges, and never regenerated for stored replay. This decision adds no object, field, Port, state, protocol, flow, canonical TC/DS/EV identity, run or evidence fact.

@@ -5,14 +5,14 @@
 | project | L3-capability-hub |
 | boundary_id | commit-02-a |
 | phase | PH-02 |
-| design_baseline | pending_design_repair_commit_anchor (scanner contract repaired in working tree; immutable anchor not yet frozen) |
+| design_baseline | pending_fixed_access_review_reason_repair_commit_anchor (scanner anchor frozen at `589647151908f049a49b69f55cf4160a16fb3548` / `b6aeabf2a4217eb24fcfe14da7252aa7fab7ca7b`; fixed-reason anchor not yet frozen) |
 | implementation_repo | /home/aris/Projects/quantalithos-capability-hub (verified Git worktree) |
 | status | blocked |
 | gate_status | blocked |
 | next_allowed_action | wait_design |
-| current_recovery_point | current boundary; historical selector repair retained and safe-text scanner contract repaired; freeze the real repair commit/tree before activation |
+| current_recovery_point | current boundary; selector and scanner repairs are historical/frozen; fixed access-review reason contract repaired in working tree; freeze its real repair commit/tree before activation |
 
-> Current blocked design-handoff skeleton. It records no `commit-02-a` implementation fact and does not authorize code changes before the repair anchor is frozen.
+> Current blocked design-handoff skeleton. It records no `commit-02-a` implementation fact and does not authorize code changes before the fixed-reason repair anchor is frozen.
 
 ## Activation Guard
 
@@ -20,7 +20,7 @@
 |---|---|---|
 | project ledger current_boundary equals commit-02-a | pass | This is the only current boundary. |
 | predecessor handoff is closed | pass | PH-01 handoffs are recorded at `a4df225e3eba8cca611da3ca78f198ae36ec9045` and `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`. |
-| activation permission | blocked | Safe-text scanner contract is now closed in active design sources, but wait for the real repair commit/tree anchor; do not edit implementation code. |
+| activation permission | blocked | Selector/scanner contracts are frozen historical anchors, but wait for the real fixed-reason repair commit/tree anchor; do not edit implementation code. |
 
 ## Required Reads
 
@@ -78,15 +78,15 @@
 
 | field | exact contract |
 |---|---|
-| boundary_readiness | core shared refs/metadata/codec candidate and safe error types must be checked against the target repo; `CapabilitySafeText` uses the closed marker contract in Step 6 §7.2.1 and Step 12 §11.5 |
+| boundary_readiness | core shared refs/metadata/codec candidate and safe error types must be checked against the target repo; `CapabilitySafeText` uses the frozen scanner contract, and the access-review reason fixture uses the exact Step 6 §7.6.1 literal/bytes and audited-static factory |
 | primary_selector | none |
-| targeted_selector | contracts foundation refs/metadata/errors/codec/nested type fixtures plus `safe-text-marker-v1-*` targeted parameters; `FOUNDATION-002` remains domain/state-only and is not used as contract codec identity; canonical assembly owner=`commit-11-a`; semantic source/oracle remains formal `03/04/05/06` and the corresponding contracts/domain/application/config/entry boundaries |
-| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- contract-foundation; check_rustdoc_coverage.sh --scope contracts; targeted fixture inventory check --selector contract-foundation |
+| targeted_selector | contracts foundation refs/metadata/errors/codec/nested type fixtures plus `safe-text-marker-v1-*` and `access-review-reason-v1-*` targeted parameters; `FOUNDATION-002` remains domain/state-only and is not used as contract codec identity; canonical assembly owner=`commit-11-a`; semantic source/oracle remains formal `03/04/05/06` and the corresponding contracts/domain/application/config/entry boundaries |
+| planned_commands | cargo fmt --check; cargo check --workspace; cargo test --workspace -- contract-foundation; check_rustdoc_coverage.sh --scope contracts; targeted fixture inventory check --selector contract-foundation,access-review-reason-v1 |
 | gate_set | GATE-01, GATE-02 |
 | raw_report_contract | artifacts/test/<run_id>/raw; targeted `reports/runs/<run_id>/suites/static-contract-docs/`; contract-foundation targeted fixture report; no `domain-state` report |
-| evidence_contract | targeted refs/metadata/errors/codec and safe-text marker rows record canonical assembly owner=`commit-11-a`; semantic source/oracle remains formal `03/04/05/06` and the corresponding contracts/domain/application/config/entry boundaries; no canonical TC/DS/EV-CH-FOUNDATION-002 chain and no canonical EV |
+| evidence_contract | targeted refs/metadata/errors/codec, safe-text marker and fixed-reason rows record canonical assembly owner=`commit-11-a`; fixed-reason rows assert exact literal/bytes, audited-static ownership and compatibility without a new canonical identity; semantic source/oracle remains formal `03/04/05/06` and corresponding boundaries; no canonical TC/DS/EV-CH-FOUNDATION-002 chain and no canonical EV |
 | AC_VF_VETO_direction | AC-CH-001/023/029/031; VF-CH-001/002/011; VETO-CH-001/002/011 |
-| failure_return | Missing field source, codec/error contract or nested English Rustdoc returns `wait_design`; targeted verification cannot create a canonical primary and implementation must not invent a substitute type. |
+| failure_return | Missing field source, codec/error contract, exact reason bytes/ownership or nested English Rustdoc returns `wait_design`; targeted verification cannot create a canonical primary and implementation must not invent a substitute type or reason. |
 | execution_status | Planned contract only; no command, test, run, artifact, report or evidence instance has been created. |
 | planned reviewer | contracts owner + domain owner |
 | planned title | feat(contracts): add the public capability contract foundation |
@@ -234,7 +234,8 @@ No path in this section is evidence until a real run creates it with same-run pr
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
 | BLK-CH-02-A-DESIGN-SELECTOR-001 | design_gate | resolved_by_a5e0ab10 | Formal `05` identity is retained and early contract checks are targeted-only. | Historical; no action. | not_applicable |
-| BLK-CH-02-A-DESIGN-SAFE-TEXT-SCANNER-001 | design_gate | contract_repaired_anchor_pending | The safe-text scanner contract and targeted oracle are repaired in the design working tree, but their immutable repair commit/tree anchor is not frozen. | Commit only the capability-hub design repair, record the real anchor in the implementation ledger, then rerun activation/design/worktree review. | wait_design |
+| BLK-CH-02-A-DESIGN-SAFE-TEXT-SCANNER-001 | design_gate | resolved_by_5896471 | The scanner contract and targeted oracle are frozen by the historical real design commit/tree. | Historical; consume the frozen scanner contract. | not_applicable |
+| BLK-CH-02-A-DESIGN-REASON-LITERAL-001 | design_gate | contract_repaired_anchor_pending | The fixed access-review reason literal/bytes, audited-static construction and targeted oracle are repaired in the design working tree, but their immutable repair commit/tree anchor is not frozen. | Commit only the capability-hub fixed-reason design repair, record the real anchor in the implementation ledger, then rerun activation/design/worktree review. | wait_design |
 
 ## Experience Review
 
@@ -248,4 +249,4 @@ No path in this section is evidence until a real run creates it with same-run pr
 
 ## Current Conclusion
 
-blocked / wait_design / current boundary / no implementation action authorized before the repair anchor is frozen.
+blocked / wait_design / current boundary / no implementation action authorized before the fixed-reason repair anchor is frozen.

@@ -9,6 +9,7 @@
 > 输入: Step 5 `PH-01`~`PH-11`、Step 4 交付物池、正式 `03/04/05/06`
 > 创建日期: 2026-07-26
 > 当前模式: full-restart / continuous execution
+> Fixed access-review reason controlled repair: 2026-08-09; `commit-02-a` remains limited to contracts foundation and consumes the exact Step 6 §7.6.1 reason factory/bytes as a targeted contract fixture; no domain/application implementation is pulled forward
 
 ## 1. Step 状态
 
@@ -239,7 +240,7 @@ Boundary ID、phase归属和顺序在后续正式 `07` 中保持稳定。若实�
 |---|---|---|---|---|
 | `commit-01-a` | workspace manifest、7 member skeleton、dependency/name checks | 共同形成可预检的工程骨架 | layout、checks 和 diff 均通过后 | profiles、业务 contracts、domain/service |
 | `commit-01-b` | config loader shell、script/root contract、path checks | 共同形成 strict tooling/evidence baseline | dry-run 和 path schema 检查通过后 | real run、业务代码、真实 evidence |
-| `commit-02-a` | refs、metadata、closed errors、shared codec、Rustdoc fixtures | public carrier 必须与其 kind/error/codec 同步 | contracts/static checks 通过后 | domain truth、Port、adapter |
+| `commit-02-a` | refs、metadata、closed errors、shared codec、Rustdoc fixtures；fixed access-review reason audited-static fixture | public carrier 必须与其 kind/error/codec 同步；system reason literal/bytes must match Step 6 §7.6.1 without adding a domain owner | contracts/static checks and targeted exact-reason fixture pass后 | domain truth、Port、adapter、review flow body |
 | `commit-02-b` | state guards、policy/invariant、domain errors、pure tests | 共同形成不依赖 infra 的 domain foundation | state/invariant negative checks 通过后 | UoW、repository、config |
 | `commit-02-c` | Ports、repositories、UoW、idempotency、stored result、fakes | application shell 只有整体具备 replay/transaction 语义才可验证 | application/TX checks 通过后 | concrete capability service、entry runtime |
 | `commit-03-a` | identity/access-review contract、domain state、pure tests | identity 与 review 的 source/transition 规则同一增量 | contract-domain checks 通过后 | registry and later capability families |
@@ -404,7 +405,7 @@ Boundary ID、phase归属和顺序在后续正式 `07` 中保持稳定。若实�
 | 每个 boundary 有停审与跨 boundary 审计 | pass-designed | §5.7~§5.8 已列 |
 | 精确 TC/DS/EV、suite、gate、check、command 尚未绑定 | pending Step 7 | 下一步逐 boundary 映射，不在本 Step 猜执行结果 |
 | 目标实现仓 | implementation prerequisite | `/home/aris/Projects/quantalithos-capability-hub` established; historical prerequisite resolved |
-| commit required now | authorized_pending_repair_anchor | commit only the capability-hub design repair; no implementation commit or PH-02 activation |
+| commit required now | authorized_pending_fixed_reason_repair_anchor | commit only the capability-hub design repair; no implementation commit or PH-02 activation |
 
 ## 8. Step 6 完成记录
 

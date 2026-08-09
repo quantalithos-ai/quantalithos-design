@@ -6,6 +6,7 @@
 > 当前模式: full-restart
 > 状态: completed_with_step_13_controlled_reopen_and_authorized_dependency_assumption
 > Safe-text scanner controlled repair: 2026-08-09; existing `CapabilitySafeText` receives one private closed eight-marker registry, exact byte-matching/precedence and raw-owner fail-closed contract; no public type, field, callable, Port, object, state, protocol, flow or denominator change
+> Fixed access-review reason controlled repair: 2026-08-09; `ChangeReason::access_review_fact_recorded()` now owns one exact ASCII/UTF-8 persisted literal through a contracts-audited static construction; no business object, public field, Port, state, protocol or canonical denominator change
 > Step 13 并发 / 幂等回开修正: 2026-07-18;closed operation identity改为channel-aware struct，normalized idempotency key改为Command / InboundEvent / OperationsJob closed enum，四类digest收紧为private `[u8; 32]` carrier；不可达`CapabilityIdempotencyState::Conflict`、`CapabilityIdempotencyConflictReason`、`conflict_reason`与`mark_conflict(...)`删除。43个HLD objects + 7个application helpers不变；Step 8 protocol文件250个public struct / enum不变，Step 6 application-support inventory单独删除1个type；所有新增struct field、enum variant / payload与callable均有英文`///`
 > Step 8 回开修正: 2026-07-10;已为所有直接返回 append-only change record 的 mutation 补齐 application 生成的 record id、actor / trace / reason 和确定 change kind;对象 owner、字段、Port 和正式文档边界未改变
 > Step 8 batch 8.5 回开修正: 2026-07-12;异步传播的 post-commit / pre-intent 崩溃窗口触发 durable-capture 门禁,新增 application-owned immutable event payload snapshot 与 versioned capture record。二者是技术一致性对象,不新增 capability truth、broker topic、delivery attempt 或外部投递状态 owner
@@ -281,7 +282,7 @@ pub struct VersionedRef<I> {
 | pattern | factory / member contract | invariant |
 |---|---|---|
 | `CapabilityOpaqueId` | `pub fn new(value: impl Into<String>) -> Result<Self, ContractValueError>`;`pub fn as_str(&self) -> &str`;`pub(crate) fn from_audited_static(value: &'static str) -> Self` | runtime value仍经trim后非空校验；crate-visible static入口只接受本仓代码中逐项审计的非空literal,当前唯一调用者是protocol issue-ref mapper；不得解析内部格式推导业务含义 |
-| `CapabilitySafeText` | `pub fn new(value: impl Into<String>) -> Result<Self, ContractValueError>`;`pub fn as_str(&self) -> &str`;`pub(crate) fn copy_validated(&self) -> Self` | 先按 Rust Unicode `trim()` 做一次边界 trim；非空后通过 contracts-owned closed marker scanner；保留 trimmed UTF-8 bytes 原样；crate-visible copy 只供同crate closed carrier mapper 无损复制；不得把该 primitive 宣称为任意自然语言的语义 DLP |
+| `CapabilitySafeText` | `pub fn new(value: impl Into<String>) -> Result<Self, ContractValueError>`;`pub fn as_str(&self) -> &str`;`pub(crate) fn copy_validated(&self) -> Self`;`pub(crate) fn from_audited_static(value: &'static str) -> Self` | 先按 Rust Unicode `trim()` 做一次边界 trim；非空后通过 contracts-owned closed marker scanner；保留 trimmed UTF-8 bytes 原样；crate-visible copy 只供同crate closed carrier mapper 无损复制；audited-static入口只接受本仓逐项审计的非空ASCII literal；不得把该 primitive 宣称为任意自然语言的语义 DLP |
 | `CapabilityTypedSet<T>` | `pub fn try_from_values(values: Vec<T>) -> Result<Self, ContractValueError>`;`pub(crate) fn try_from_possibly_empty_values(values: Vec<T>) -> Result<Self, ContractValueError>`;`pub fn iter(&self) -> impl Iterator<Item = &T>` | public factory保持输入稳定顺序、拒绝重复且不得为空；crate-visible helper只供明确允许empty的specialized wrapper并仍拒绝重复；不得降级为无序裸列表 |
 | `VersionedRef<I>` | `pub fn current(id: I) -> Self`;`pub fn exact(id: I, version: Version) -> Self` | `version == None` 表示读取当前版本,不表示 expected version 已满足 |
 
@@ -325,6 +326,9 @@ impl CapabilityOpaqueId {
 impl CapabilitySafeText {
     /// Copies this validated body-free value without changing its bytes or meaning.
     pub(crate) fn copy_validated(&self) -> Self;
+
+    /// Creates safe text from one compile-time audited non-empty ASCII literal.
+    pub(crate) fn from_audited_static(value: &'static str) -> Self;
 }
 ```
 
@@ -332,6 +336,8 @@ impl CapabilitySafeText {
 - 51个当前literal必须逐项非空、ASCII、互异且带固定`v1`namespace；任一literal修改均是protocol compatibility change,不能由实现者现场生成。
 - implementation不得把该callable改成`pub`,不得增加`from_unchecked(String)`、hash-based fallback或`unwrap / expect`构造路径。
 - 普通opaque id、typed id、cursor、surface ref与collaboration ref继续只调用fallible `CapabilityOpaqueId::new(...)`;本例外不能扩散。
+
+`CapabilitySafeText::from_audited_static(...)` 是另一条独立且更窄的contracts-only例外。它当前只允许由 §7.6.1 `ChangeReason::access_review_fact_recorded()`传入该节唯一literal；不得由普通safe-text newtype、request、configuration、environment、database、adapter、error chain、format、`Debug`或`Display`调用。该literal必须在代码审查中证明non-empty、ASCII、marker-free且exactly namespaced/versioned；普通safe text继续只调用fallible `CapabilitySafeText::new(...)`。
 
 `CapabilityTypedSet<T>`的empty例外必须通过下列crate-visible helper显式进入；其他wrapper不得绕过public non-empty factory:
 
@@ -521,7 +527,24 @@ bridge对borrowed newtype执行validated value copy,不接受fallback string、�
 | `pub fn to_derived_material_stale_reason(&self) -> DerivedMaterialStaleReason` | `Copies this validated change explanation into a directory-material stale reason.` | `DirectorySearchBrowseProjection::mark_stale` |
 | `pub fn to_audit_export_gap_reason(&self) -> AuditExportGapReason` | `Copies this validated change explanation into an audit-export stale reason.` | `AuditFriendlyExportSummary::mark_stale`;不形成evidence / sign-off |
 | `pub fn to_discovery_unavailable_reason(&self) -> DiscoveryUnavailableReason` | `Copies this validated change explanation into an ecosystem-discovery stale reason.` | `ReadOnlyEcosystemDiscoverySummary::mark_stale`;不形成listing truth |
-| `pub fn access_review_fact_recorded() -> Self` | `Returns the fixed body-free reason used when a recorded access-review fact is attached.` | 只供`RecordCapabilityAccessReviewFact`;compile-time固定safe value,不得携带review / governance body |
+| `pub fn access_review_fact_recorded() -> Self` | `Returns the fixed body-free reason used when a recorded access-review fact is attached.` | 只供`RecordCapabilityAccessReviewFact`;直接由下方唯一audited static literal构造；不得携带review / governance body |
+
+#### 7.6.1 Fixed access-review attachment reason
+
+`ChangeReason::access_review_fact_recorded()` 的返回值是持久化 change record、traceability reason 和 affected-material propagation 的协议数据，不是可由实现者自由选择的说明文案。唯一 canonical value 如下：
+
+| item | exact contract |
+|---|---|
+| ASCII literal | `capability-hub.change-reason/access-review-fact-recorded.v1` |
+| UTF-8 bytes | 因 literal 仅含 ASCII，UTF-8 与 ASCII 一一对应，共 `59` bytes；hex 为 `63 61 70 61 62 69 6c 69 74 79 2d 68 75 62 2e 63 68 61 6e 67 65 2d 72 65 61 73 6f 6e 2f 61 63 63 65 73 73 2d 72 65 76 69 65 77 2d 66 61 63 74 2d 72 65 63 6f 72 64 65 64 2e 76 31` |
+| namespace / version | `capability-hub.change-reason/` is the capability-hub persisted-reason namespace; `v1` is the compatibility version owned by the contracts protocol surface |
+| construction | `ChangeReason::access_review_fact_recorded()` directly calls `CapabilitySafeText::from_audited_static("capability-hub.change-reason/access-review-fact-recorded.v1")`, then wraps that validated value; no runtime input, configuration, environment, repository, clock, id generator, format, `Debug`, `Display`, hash, or fallible guessing is allowed |
+| allowed caller | only `RecordCapabilityAccessReviewFact` / `command_record_capability_access_review_fact_flow`; other commands must use their caller-provided validated reason and explicit bridge |
+| persistence / propagation | the exact validated bytes are copied unchanged into `ReviewFactAttached.change_reason`, its traceability bridge, and the affected-material reason bridges; no prefix, suffix, concatenation, normalization, or re-encoding is permitted |
+| compatibility ownership | changing the literal, namespace, version, or bytes is a persisted protocol compatibility change. It requires a controlled reopen of Step 6/8/9/12/13/16 and the affected formal 03/05/07 gates before any implementation or migration decision |
+| redaction | errors, logs, reports, artifacts, cleanup records, evidence candidates and external envelopes may retain only the typed reason where their owning contract explicitly permits it; they must never echo review context, risk summary, matched body, or diagnostic text |
+
+The contracts crate owns the audited static constructor and this literal. `from_audited_static` is crate-visible rather than a public unchecked constructor; its only permitted caller is the fixed factory above. The factory is infallible because the literal is compile-time audited as non-empty, ASCII, marker-free and namespace/version complete. A caller cannot supply an alternative literal, and an implementation cannot replace this value with a natural-language phrase or an enum-derived `Debug`/`Display` string.
 
 这些bridge不增加新的reason truth owner。Command有caller reason时,trace与material stale reason必须从terminal accepted change record的`change_reason`转换;没有caller reason的review attachment只允许使用`access_review_fact_recorded()`。application不得自行拼接“stale because ...”或把多个change reason连接成字符串。
 

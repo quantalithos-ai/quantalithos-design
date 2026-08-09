@@ -2,7 +2,7 @@
 
 > This ledger is the implementation handoff entry point required by `standards/document/代码实施台账与门禁规范.md`.
 > It is the implementation handoff entry point from formal `07-实施计划.md`; current facts below are limited to the real PH-01 handoff and the blocked `commit-02-a` review.
-> Created: 2026-07-27; current update: 2026-08-09 controlled safe-text scanner repair.
+> Created: 2026-07-27; current update: 2026-08-09 fixed access-review reason repair.
 
 ## Current Implementation State
 
@@ -11,34 +11,34 @@
 | project | `L3-capability-hub` |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-capability-hub` (verified Git worktree) |
-| current_design_baseline | `pending_design_repair_commit_anchor` |
+| current_design_baseline | `pending_fixed_access_review_reason_repair_commit_anchor`; historical scanner anchor `589647151908f049a49b69f55cf4160a16fb3548` / `b6aeabf2a4217eb24fcfe14da7252aa7fab7ca7b` |
 | current_boundary | `commit-02-a` |
 | current_phase | `PH-02` |
-| status | `implementation_incomplete / blocked_on_design_repair_anchor` |
+| status | `implementation_incomplete / blocked_on_fixed_reason_design_anchor` |
 | gate_status | `blocked` |
-| gate_reason | `BLK-CH-02-A-DESIGN-SAFE-TEXT-SCANNER-001`: the scanner contract is repaired in the capability-hub design subtree, but its real repair commit/tree anchor is not frozen yet. `commit-02-a` must remain `wait_design`; no implementation-local marker/keyword/encoding/precedence rule may bypass the design contract. |
+| gate_reason | `BLK-CH-02-A-DESIGN-REASON-LITERAL-001`: the fixed access-review reason contract is repaired in the capability-hub design subtree, but its real repair commit/tree anchor is not frozen yet. Scanner anchor `5896471...` is historical and frozen. `commit-02-a` must remain `wait_design`; no implementation-local reason literal/bytes/digest/replay rule may bypass the design contract. |
 | next_allowed_action | `wait_design` |
-| current_recovery_point | `commit-02-a / controlled safe-text scanner repair / freeze repair commit and scoped tree anchor` |
+| current_recovery_point | `commit-02-a / controlled fixed access-review reason repair / freeze repair commit and scoped tree anchor` |
 | implementation_commit | `commit-01-a=a4df225e3eba8cca611da3ca78f198ae36ec9045`; `commit-01-b=8e4a422a4b6477afc214eec1f2db8676f0e1c7ec` |
 | test_run | `20260807T120110+0800-commit-01-a-attempt-05`; `20260807T150946+0800-commit-01-b-attempt-07` |
 | artifact_report_evidence | PH-01 run-scoped tooling records at the corresponding `artifacts/test/<run_id>/` and `reports/runs/<run_id>/` roots; no business evidence instance |
 | acceptance_review_verdict_signoff | `not_evaluated` |
 | accepted_residual_risk | `0` |
 | last_updated_by | `design agent` |
-| last_updated_at | `2026-08-07` |
+| last_updated_at | `2026-08-09` |
 
 ## Truthfulness Boundary
 
 | fact | current value | interpretation |
 |---|---|---|
-| formal design baseline | active formal `00~07` plus the controlled safe-text scanner repair in the capability-hub subtree | formal `05` identities remain unchanged; the scanner repair commit/tree is the only pending immutable anchor |
-| design repository commit | previous design commits are historical context only; the new repair commit is not prefilled | after the real repair commit, record its hash and `git rev-parse HEAD:projects/L3-capability-hub` here and in the implementation-repository ledger |
+| formal design baseline | active formal `00~07` plus frozen scanner anchor and current fixed-reason controlled repair in the capability-hub subtree | formal `05` identities remain unchanged; scanner anchor is historical; fixed-reason repair commit/tree is the only pending immutable anchor |
+| design repository commit | scanner repair `5896471...` is historical; the new fixed-reason repair commit is not prefilled | after the real fixed-reason repair commit, record its hash and `git rev-parse HEAD:projects/L3-capability-hub` here and in the implementation-repository ledger |
 | target repository | path exists and is a verified Git worktree | PH-01 handoff is real; later source semantics are not claimed |
 | implementation code | PH-01 workspace/config skeleton only | no `commit-02-a` contracts/domain/application implementation exists |
 | gate execution | PH-01 exact tooling gates passed in two real run-scoped attempts | these are historical boundary facts; no `commit-02-a` gate ran |
 | evidence | PH-01 tooling raw/reports exist under explicit run roots | no canonical business evidence, verdict, risk acceptance or signoff instance exists |
 | acceptance | not entered | no reviewer, acceptor, risk acceptor, verdict, or signature is named |
-| commit requirement | `design_repair_anchor_pending` | commit only the authorized capability-hub design repair; do not create an implementation commit or jump boundary |
+| commit requirement | `fixed_reason_design_repair_anchor_pending` | commit only the authorized capability-hub fixed-reason design repair; do not create an implementation commit or jump boundary |
 
 The current formal documents are the active design authority. Their current working-tree state must be reviewed and frozen by the authorized handoff process before an implementation agent can mark Design Gate `pass`. The pre-created ledgers do not authorize code edits.
 
@@ -76,8 +76,8 @@ No preflight row is `pass` merely because its expected shape is described in for
 | boundary | phase | design_baseline | status | last_gate | next_allowed_action | notes |
 |---|---|---|---|---|---|---|
 | `commit-01-a` | `PH-01` | historical `c10a0994fee6a83d32a520a47e49d9ce0a4ae4e6` | `pass / committed` | `handoff_gate` | `start_next_boundary` | committed at `a4df225e3eba8cca611da3ca78f198ae36ec9045`; historical design tree is superseded |
-| `commit-01-b` | `PH-01` | historical `c10a0994fee6a83d32a520a47e49d9ce0a4ae4e6` | `pass / committed` | `handoff_gate` | `wait_design` | committed at `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`; PH-02 activation paused by the scanner repair handoff |
-| `commit-02-a` | `PH-02` | `pending_design_repair_commit_anchor` | `blocked` | `design_gate` | `wait_design` | current; `BLK-CH-02-A-DESIGN-SAFE-TEXT-SCANNER-001` is contract-repaired but awaits a frozen repair anchor |
+| `commit-01-b` | `PH-01` | historical `c10a0994fee6a83d32a520a47e49d9ce0a4ae4e6` | `pass / committed` | `handoff_gate` | `wait_design` | committed at `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`; PH-02 activation paused by the fixed-reason repair handoff |
+| `commit-02-a` | `PH-02` | `pending_fixed_access_review_reason_repair_commit_anchor` | `blocked` | `design_gate` | `wait_design` | current; `BLK-CH-02-A-DESIGN-REASON-LITERAL-001` is contract-repaired but awaits a frozen repair anchor |
 | `commit-02-b` | `PH-02` | `planned-after-02-a` | `planned` | `activation_gate` | `wait_until_current` | future; domain state and policy |
 | `commit-02-c` | `PH-02` | `planned-after-02-b` | `planned` | `activation_gate` | `wait_until_current` | future; Ports, transactions, replay |
 | `commit-03-a` | `PH-03` | `planned-after-02-c` | `planned` | `activation_gate` | `wait_until_current` | future; identity and access review contracts |
@@ -111,7 +111,8 @@ Only `commit-02-a` is current. Later rows are planned inventory, not progress cl
 | `BLK-CH-01-A-REPO-001` | `commit-01-a` | implementation prerequisite | `resolved` | `not_applicable` | historical; target repository and PH-01 preflight are complete |
 | `BLK-CH-HANDOFF-BASELINE-001` | `commit-01-a` | design handoff | `resolved_by_ph-01_handoff` | `c10a0994fee6a83d32a520a47e49d9ce0a4ae4e6` | historical baseline used for PH-01; superseded by later design anchors |
 | `BLK-CH-02-A-DESIGN-SELECTOR-001` | `commit-02-a` | formal `05` / Step 7 selector contract | `resolved_by_a5e0ab10` | `a5e0ab10a2e48e4878725c81a5ead17c23eef5bb` | historical; formal `05` identity retained and early boundary checks are targeted-only |
-| `BLK-CH-02-A-DESIGN-SAFE-TEXT-SCANNER-001` | `commit-02-a` | Step 6/12/14 scanner contract and formal `03/05` oracle | `contract_repaired_anchor_pending` | `pending_design_repair_commit_anchor` | freeze the single scanner repair commit/tree anchor, write it to the implementation ledger, then rerun activation/design/worktree review |
+| `BLK-CH-02-A-DESIGN-SAFE-TEXT-SCANNER-001` | `commit-02-a` | Step 6/12/14 scanner contract and formal `03/05` oracle | `resolved_by_5896471` | `589647151908f049a49b69f55cf4160a16fb3548` / `b6aeabf2a4217eb24fcfe14da7252aa7fab7ca7b` | historical; consume frozen scanner contract |
+| `BLK-CH-02-A-DESIGN-REASON-LITERAL-001` | `commit-02-a` | Step 6/8/9/12/13/16 fixed reason contract and formal `03/05/07` oracle | `contract_repaired_anchor_pending` | `pending_fixed_reason_design_repair_commit_anchor` | freeze the single fixed-reason repair commit/tree anchor, write it to this ledger and the target implementation ledger, then rerun activation/design/worktree review |
 
 These blockers are not schema decisions and cannot be resolved by implementation-side workarounds. No code change is allowed while either blocker remains open.
 
@@ -142,7 +143,7 @@ Every future update must record the actual boundary, design baseline, gate statu
 
 `implementation_incomplete / PH-01-complete / commit-02-a-blocked / wait_design`.
 
-This conclusion reflects real PH-01 implementation history and the current scanner repair handoff blocker. It does not assert that implementation failed. The design repair anchor is not yet frozen; `commit-02-a` has no gate, run, artifact, business evidence, verdict, risk acceptance or signoff fact.
+This conclusion reflects real PH-01 implementation history and the current fixed-reason repair handoff blocker. It does not assert that implementation failed. The scanner design anchor is frozen, but the fixed-reason repair anchor is not; `commit-02-a` has no gate, run, artifact, business evidence, verdict, risk acceptance or signoff fact.
 
 ## Final Design Handoff Audit
 
@@ -156,9 +157,9 @@ This conclusion reflects real PH-01 implementation history and the current scann
 | formal_documents | `00~07 active` |
 | boundary_skeletons | `26/26 present` |
 | unresolved_upstream_design_blockers | `0` |
-| implementation_handoff_status | `PH-01_complete_commit-02-a_blocked_pending_design_repair_anchor` |
+| implementation_handoff_status | `PH-01_complete_commit-02-a_blocked_pending_fixed_reason_repair_anchor` |
 
-T071/T072 remain historical static design audits. Subsequent PH-01 implementation facts are recorded above, while this controlled repair creates only a repaired safe-text scanner contract and targeted oracle. It does not activate `commit-02-a` or create a new implementation run, artifact, canonical evidence instance, acceptance decision, risk acceptance or signoff.
+T071/T072 remain historical static design audits. Subsequent PH-01 implementation facts are recorded above, while the scanner anchor is retained as a historical design fact and this controlled repair creates only the fixed access-review reason contract and targeted oracle. It does not activate `commit-02-a` or create a new implementation run, artifact, canonical evidence instance, acceptance decision, risk acceptance or signoff.
 
 The implementation state remains exactly:
 

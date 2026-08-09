@@ -9,6 +9,7 @@
 > 输入: Step 3 前置矩阵、Step 5 `PH-01`~`PH-11`、Step 6 的 26 个 boundary、Step 7 门禁矩阵
 > 创建日期: 2026-07-26
 > 当前模式: full-restart / continuous execution
+> Fixed access-review reason controlled repair: 2026-08-09; the persisted reason is contracts-owned static protocol data, not a configuration, environment, dependency or external binding input
 
 ## 1. Step 状态
 
@@ -181,7 +182,7 @@ Expected negative fixture只有在 exact case 实际运行并得到规定 typed 
 |---|---|---|---|
 | `commit-01-a` | target repo、workspace、core path、toolchain、git/worktree | preflight + dependency/Rustdoc checks | pause；不得创建copied core |
 | `commit-01-b` | strict parser、3 profiles/3 entries、18/27/21 catalog、script/root CLI | config/catalog/no-static dry-run | config/root/script冲突阻断 |
-| `commit-02-a` | core shared refs/metadata/codec candidate、safe error types | contract compile/roundtrip/doc | core shape冲突回写 owning design/debt |
+| `commit-02-a` | core shared refs/metadata/codec candidate、safe error types、fixed access-review reason v1 literal fixture | contract compile/roundtrip/doc and exact-byte compatibility check | reason/config/dependency source confusion or core shape冲突回写 owning design；不得配置化 reason |
 | `commit-02-b` | one fake authority、domain state fixtures、638 registry | domain-state/state-pair check | parity或pair source缺失阻断 |
 | `commit-02-c` | 36 Ports、UoW、idempotency/result/capture/job store fake shell | transaction/fake parity checks | hidden Port/partial authority/commit mapping阻断 |
 | `commit-03-a` | identity/review typed source and state fixtures | contract/domain targeted | URL/provider/config substitute => VETO |

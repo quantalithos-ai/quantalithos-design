@@ -7,6 +7,7 @@
 > 输入: Step 6 的 26 个 commit boundary、Step 7 gate/evidence contract、Step 10 pause/change control
 > 创建日期: 2026-07-26
 > 当前模式: controlled-reopen / implementation-handoff-sync
+> Fixed access-review reason controlled repair: 2026-08-09; the next design-only commit freezes the exact persisted reason contract; no implementation commit or PH-02 run exists
 
 ## 1. Step 状态
 
@@ -20,7 +21,7 @@
 | target implementation repo | `/home/aris/Projects/quantalithos-capability-hub` 已验证为 Git worktree；当前实现锚点为 `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec` |
 | implementation commit / hash | PH-01: `a4df225e3eba8cca611da3ca78f198ae36ec9045`, `8e4a422a4b6477afc214eec1f2db8676f0e1c7ec`; `commit-02-a` implementation commit 不存在 |
 | unresolved upstream blocker | `0` |
-| 下一动作 | 提交并冻结本次 design repair anchor，同步 implementation ledger，然后停止在 `commit-02-a` activation 前 |
+| 下一动作 | 提交并冻结本次 fixed-reason design repair anchor，同步 implementation ledger，然后停止在 `commit-02-a` activation 前 |
 
 ## 2. 本步输入与 SOP 问题回答
 
@@ -412,7 +413,7 @@ Raw artifact 的存在不自动允许 commit；report 的存在不自动形成 e
 | 事项 | 当前结论 | 处理位置 |
 |---|---|---|
 | 目标仓是否有更严格 commit 规则 | PH-01 已按仓内规则提交；后续仍只能叠加不能放宽本 Step | current boundary Design Gate |
-| 目标仓 branch/worktree/baseline | worktree 与 PH-01 实现锚点已建立；new design repair anchor pending | project implementation ledger preflight |
+| 目标仓 branch/worktree/baseline | worktree 与 PH-01 实现锚点已建立；scanner anchor `5896471...` 已冻结；new fixed-reason design repair anchor pending | project implementation ledger preflight |
 | 实际文件名和改动量 | 实现期由 staged diff 填写 | message file / Commit Gate |
 | 实际 run/report path | 实现期显式 `run_id` 后填写 | boundary Evidence Gate |
 | acceptance/review主体 | `OQ-CH-009` 未指派 | `commit-11-b` handoff前 |

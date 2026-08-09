@@ -9,6 +9,7 @@
 > 输入: Step 6 boundaries、Step 7 gates、Step 8 dependencies、Step 9 risks/spikes/open questions
 > 创建日期: 2026-07-26
 > 当前模式: controlled-reopen / implementation-handoff-sync
+> Fixed access-review reason controlled repair: 2026-08-09; scanner repair is historical/frozen at `5896471...`; a separate reason-literal anchor remains pending and blocks `commit-02-a`
 
 ## 1. Step 状态
 
@@ -20,9 +21,9 @@
 | pause trigger classes | 10 |
 | rollback semantics | 9；代码、配置、run/evidence、产品和Spike分离 |
 | change authorities | formal `00/01/02/03/04/05/06/07`、standards、implementation-only、operations |
-| current implementation state | target repo已建立；PH-01 两个 implementation commit 与 run-scoped tooling records 已真实记录；`commit-02-a` 因 selector repair handoff 暂停 |
+| current implementation state | target repo已建立；PH-01 两个 implementation commit 与 run-scoped tooling records 已真实记录；selector/scanner repairs 已有历史锚点；`commit-02-a` 因 fixed reason literal handoff 暂停 |
 | unresolved upstream blocker | `0` |
-| 下一动作 | 冻结本次 design repair commit/tree anchor，同步 implementation ledger，再进行 `commit-02-a` activation review；不得先落码 |
+| 下一动作 | 冻结本次 fixed-reason design repair commit/tree anchor，同步 implementation ledger，再进行 `commit-02-a` activation review；不得先落码 |
 
 ## 2. 本步输入与 SOP 问题回答
 
@@ -261,8 +262,20 @@ pause trigger
 | repair | `FOUNDATION-001..018`, `BIND-001..012`, `CONFIG-001..018` and `OBS-001..012` (60 identities) are primary-owned by `commit-11-a`; early boundaries run targeted-only. `STATE-001..024`, `TX-001..022`, `CMD/QUERY/INBOUND/OUTBOUND/JOB` retain their semantic owners. |
 | baseline_rule | The repair commit created by this controlled reopen is the only new immutable design anchor. Unrelated design-repository commits and the superseded scoped tree are not references for implementation. The real hash/tree are recorded only after the commit. |
 | execution_facts | PH-01 history remains unchanged; this design repair creates no implementation source, run, artifact, canonical EV instance, acceptance verdict, risk acceptance or signoff. |
-| blocker | `BLK-CH-02-A-DESIGN-SELECTOR-001` remains open only until the repair commit/tree anchor is frozen and written to the implementation ledger. |
-| resume_condition | Freeze the real repair commit/tree, update the implementation ledger, resolve the handoff blocker, then review and activate only `commit-02-a`. |
+| blocker | Historical selector blocker and scanner blocker are resolved (`a5e0ab10...` and `5896471...` respectively). Current blocker is `BLK-CH-02-A-DESIGN-REASON-LITERAL-001`, which remains open only until this repair commit/tree anchor is frozen and written to the implementation ledger. |
+| resume_condition | Freeze the real fixed-reason repair commit/tree, update the implementation ledger, resolve the handoff blocker, then review and activate only `commit-02-a`. |
+
+### 10.1 Fixed Access-Review Reason Reopen
+
+| field | value |
+|---|---|
+| change_id | `CH-DDD-FIXED-ACCESS-REVIEW-REASON-001` |
+| trigger | `ChangeReason::access_review_fact_recorded()` had a callable contract but no exact persisted literal/bytes, leaving implementation and replay compatibility under-specified |
+| scope | Step 6/8/9/12/13/16, formal 03/05/07, project/implementation ledgers and `commit-02-a` targeted gate only |
+| exact decision | `capability-hub.change-reason/access-review-fact-recorded.v1`, ASCII=UTF-8, 59 bytes; contracts-owned audited-static construction; no config/environment/runtime input |
+| compatibility | any literal/namespace/version/byte mutation requires controlled reopen; no silent migration or current-truth reconstruction |
+| execution facts | no implementation source, PH-02 run, artifact, report, evidence, verdict, risk acceptance or signoff created |
+| current blocker | `BLK-CH-02-A-DESIGN-REASON-LITERAL-001`; `blocked / wait_design` until real repair commit/tree anchor |
 
 ## 11. Step 10 完成记录
 

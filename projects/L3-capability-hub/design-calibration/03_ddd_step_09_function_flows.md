@@ -17,6 +17,7 @@
 > Step 12 batch 12.5受控同步: 2026-07-18;五条reference Inbound flow把caller contradiction的`Rejected / Quarantined`与matching resolver成功返回不对称的exact `ConsistencyDefect`分开；new-subject `Forbidden` quarantine、existing non-terminal terminal transition和terminal exact replay规则对齐Step 10。十条Outbound flow的Phase A/B/C与post-commit语义不变。83个flow、DTO、Port、transaction与effect cardinality不变
 > Step 12 batch 12.6受控同步: 2026-07-18;八条Operations Job flow统一safe-terminalization gate:normal missing/inapplicable可在exact identity + closed issue + typed impact + zero-effect证明后terminalize；loaded owner/version/union/sidecar、capture/snapshot、journal/result不对称及codec/rollback/commit-unknown/control-plane failure保持exact `ApplicationError`和`Planned`。83个flow、DTO、Port、transaction与effect cardinality不变；无新增Rust声明,既有struct / field注释未遗漏
 > Step 13受控同步: 2026-07-18;shared Command / Inbound / Job guard显式调用contracts-owned canonical field-byte encoder；八条Job reserve-race分支统一rollback、丢弃本地plan并对winner做一次exact read，禁止递归调用Job自身入口。83 / 83 flow、transaction与effect cardinality不变；原accessor blocker已由Step 13显式用户授权依赖假设解除，L0-core正式设计同步为非阻塞债务
+> Fixed access-review reason controlled repair: 2026-08-09; the record-review flow binds its only system-generated reason to the exact Step 6 §7.6.1 literal/bytes and stored replay rule; no flow, request field, digest field, transaction member or effect cardinality change
 > 本轮边界: 逐一展开 Step 8 已闭合的 83 个 Command / Query / Inbound Event Consumer / Outbound Event / Operations Job flow，固定入口、DTO 构造、Step 6 对象函数、Step 7 Port、UoW、错误分支、状态与事件副作用和测试切口。本 Step 不定义完整状态转换矩阵、DDL / index、错误码全集、digest算法、配置 key、physical topic / scheduler、实现 commit、真实 run_id、测试结果、evidence alias或验收签署。
 
 ---
@@ -2709,7 +2710,7 @@ Flow status: `completed_in_batch_9_1`。
 | `review_context` | body safe value | `CapabilityAccessReviewFact::draft`;approval/policy shape rejected |
 | `risk_summary` | body safe value | identity-level review fact only；not descriptor risk / governance result |
 | separation marker | domain constant | `AccessGovernanceSeparationMarker::Separated`;caller cannot supply |
-| attachment reason | Step 6 fixed factory | `ChangeReason::access_review_fact_recorded()`;no body text concatenation |
+| attachment reason | Step 6 fixed factory | `ChangeReason::access_review_fact_recorded()` returns exact UTF-8 `capability-hub.change-reason/access-review-fact-recorded.v1` (`59` ASCII bytes);no caller/config input,fallible construction,body text concatenation,normalization,`Debug` or `Display` |
 | review/change/trace/result ids + now | IdGenerator / Clock | replacement id passed to old review supersede；same operation time |
 | digest | Step 13 | identity ref + review context + risk summary |
 
@@ -2726,6 +2727,7 @@ Flow status: `completed_in_batch_9_1`。
   | review.find_current_by_identity(identity id)
   | new review.draft(Separated) -> record
   | old current present -> old.supersede(new review id)
+  | ChangeReason::access_review_fact_recorded() -> exact audited-static v1 bytes
   | identity.attach_review_fact(fixed reason) -> ReviewFactAttached
   v
 [Same UoW]
@@ -2810,7 +2812,7 @@ if let Some(old) = loaded_old_review.as_mut() {
     // [CapabilityAccessReviewFact::supersede(CapabilityAccessReviewFactId, Timestamp)]
     old.value.supersede(review_id, now)?;
 }
-// [ChangeReason::access_review_fact_recorded()]
+// [ChangeReason::access_review_fact_recorded(); exact Step 6 §7.6.1 bytes]
 let attachment_reason = ChangeReason::access_review_fact_recorded();
 // [CapabilityIdentity::attach_review_fact(...)]
 let attached_record = loaded_identity.value.attach_review_fact(
@@ -3138,6 +3140,8 @@ Flow status: `completed_in_batch_9_1`。
 | record review | 1 | 1 | ReviewFactAttached record | fixed attachment reason,once | pass |
 
 No flow mutates governance approval、method-library asset body、secret body、runtime/tools execution、SDK client or marketplace listing。The four-flow checkpoint is not the batch stop-review;registry flows remain required。
+
+For fresh `RecordCapabilityAccessReviewFact`, the factory is invoked once after the new review has reached `Recorded` and before `attach_review_fact(...)`; the returned value is then moved or copied only through typed `ChangeReason` bridges. The exact reason bytes are persisted with `ReviewFactAttached` and copied unchanged into trace/material propagation. Completed duplicate replay reads the immutable stored result and persisted record surface; it invokes the factory, Clock, IdGenerator, domain mutation, material scan and capture zero times. A persisted value different from the exact v1 bytes is not silently normalized to the current constant; it is handled only by an explicitly versioned compatibility/migration contract.
 
 ## 15. Registry Command Flows: Batch `9.1`
 

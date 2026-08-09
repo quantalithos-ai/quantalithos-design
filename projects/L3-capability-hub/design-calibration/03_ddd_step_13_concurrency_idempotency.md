@@ -6,6 +6,7 @@
 > 当前模式: full-restart
 > 状态: `03_step_13_completed_with_step_14_commit_resolution_sync`
 > 正式文档状态: 本 Step 不修改正式 `03-详细设计.md`;正式装配留 Step 19
+> Fixed access-review reason controlled repair: 2026-08-09; the system-generated reason is excluded from the request digest, copied exactly on fresh execution and never regenerated during stored replay; no key, digest field or state change
 
 ---
 
@@ -593,7 +594,7 @@ Every Command request digest domain embeds the exact operation and writes every 
 | 1 | `EstablishCapabilityAccessContext` | `source` variant + all variant fields；`intake.identity_key`,`review_context`,`risk_summary`,`change_reason` | exact stored accepted result or stored stable rejection；no resolver、identity/review creation、capture ormaterial scan |
 | 2 | `CorrectCapabilityIdentity` | `identity_ref`,`correction_kind`,`new_identity_key`,`related_identity_refs` in validated order,`correction_reason` | exact stored result/rejection；no correction reopen、new id ormaterial scan |
 | 3 | `RetireCapabilityIdentity` | `identity_ref`,`retirement_reason` | exact stored result/rejection；no second retirement/cascade |
-| 4 | `RecordCapabilityAccessReviewFact` | `identity_ref`,`review_context`,`risk_summary` | exact stored result/rejection；no second fact orattachment |
+| 4 | `RecordCapabilityAccessReviewFact` | `identity_ref`,`review_context`,`risk_summary`;the fixed Step 6 §7.6.1 system reason is not a request field and is excluded | exact stored result/rejection；no second fact orattachment；no `ChangeReason::access_review_fact_recorded()` call orreason reconstruction |
 | 5 | `RegisterCapabilityInRegistry` | `identity_ref`,`visibility_basis`,`visibility_context`,`registration_reason` | exact stored entry result/rejection；no second registry id |
 | 6 | `UpdateRegistryLifecycleState` | `registry_entry_ref`,`target_state`,`lifecycle_reason` | exact stored result/rejection；no current-prerequisite reevaluation |
 | 7 | `UpdateRegistryVisibilityBasis` | `registry_entry_ref`,`visibility_basis`,`visibility_context`,`change_reason` | exact stored result/rejection；no second visibility revision |
@@ -618,6 +619,8 @@ Every Command request digest domain embeds the exact operation and writes every 
 | 26 | `RegisterCapabilityConsumerReference` | `registration` variant + every RuntimeTools / Sdk variant field | exact stored result/rejection；no resolver,consumer ref orexposure mutation |
 
 The raw idempotency key is repository identity material andisnotalsoincludedin`CapabilityRequestDigest`。Operation isalreadydomain-separated andstored inbothkey andreservation；it isnotrepeatedasa top-level request field。Thecanonical domain stillincludesoperation toprevent cross-operation digest equivalence。
+
+For operation 4, fresh accepted execution calls `ChangeReason::access_review_fact_recorded()` exactly once after the review becomes `Recorded` and before attachment. The resulting exact ASCII/UTF-8 bytes `capability-hub.change-reason/access-review-fact-recorded.v1` (`59` bytes) are copied unchanged into the terminal change record, traceability and affected-material bridges. The value is a deterministic system effect and therefore is not appended to the request digest. Same-key/same-digest replay reads the immutable stored result and persisted record surface and invokes the factory zero times. A stored missing, corrupt or different reason cannot be repaired from the current constant; it follows Step 12 `ConsistencyDefect` recovery. Any literal, namespace, version or byte change is a persisted compatibility change rather than an idempotency implementation refactor.
 
 ### 11.2 Command idempotency window
 

@@ -6,6 +6,7 @@
 > 当前模式：full-restart / continuous execution
 > 状态：`03_step_16_completed_continuous_execution`
 > 真实性边界：本文只定义未来测试义务和 oracle；没有执行测试、生成 run_id、artifact、report、evidence 或验收结论。
+> Fixed access-review reason controlled repair: 2026-08-09; adds targeted exact-byte, propagation, digest-exclusion and replay oracles without adding a canonical TC/DS/EV identity or execution fact
 
 ---
 
@@ -135,7 +136,7 @@ Fixture values must be synthetic and body-free. Formal `05` will define files an
 | `CUT-FLOW-C-01` establish access context | new identity + source ref/state accepted | invalid source symmetry or duplicate conflict | identity/change/trace/capture/result atomic; no provider body |
 | `CUT-FLOW-C-02` correct identity | loaded expected version corrected | stale version or terminal identity | winner unchanged; no hidden source reconstruction |
 | `CUT-FLOW-C-03` retire identity | active identity retires | already terminal / illegal pair | exact history/change/trace; no relation cascade |
-| `CUT-FLOW-C-04` record access review fact | valid body-free review recorded | approval/policy body or inconsistent subject | review + identity revision only; no governance approval truth |
+| `CUT-FLOW-C-04` record access review fact | valid body-free review recorded with exact 59-byte Step 6 §7.6.1 reason | approval/policy body, inconsistent subject or persisted reason mismatch | review + identity revision only; one fresh factory call; exact change/trace/material byte propagation; duplicate factory calls=0; no governance approval truth |
 | `CUT-FLOW-C-05` register registry entry | identified capability registered | missing identity / duplicate registry | registry/change/trace/capture atomic |
 | `CUT-FLOW-C-06` update registry lifecycle | legal current transition | illegal/reserved/expected-version conflict | exact transition or zero mutation |
 | `CUT-FLOW-C-07` update visibility basis | actual basis delta | exact no-op / invalid applicability | no fake history on no-op |
@@ -288,6 +289,19 @@ Global matrix gate:
 | `CUT-TX-14` | Job Reserved without/asymmetric journal | consistency defect; no plan regeneration |
 | `CUT-TX-15` | two writers same expected version | one durable winner; loser reload/retry only where policy explicitly allows |
 | `CUT-TX-16` | affected-material collect-before-mutate race | deterministic typed union, one revision per eligible material, no full scan |
+
+### 9.1 Fixed access-review reason targeted oracle
+
+These parameters refine existing `CUT-FLOW-C-04`, `CUT-OBJ-CORE`, `CUT-OBJ-DIGEST` and replay cuts. They do not create a new canonical cut or change the 83-flow, 22-transaction or formal `TC/DS/EV` denominators.
+
+| Targeted parameter | Input / observation | Required oracle |
+|---|---|---|
+| `access-review-reason-v1-factory` | call the existing factory on a fresh valid path | exact literal `capability-hub.change-reason/access-review-fact-recorded.v1`; ASCII and UTF-8 bytes are identical; byte length is `59`; factory call count is one |
+| `access-review-reason-v1-digest-exclusion` | hold request body constant and observe canonical field writes | digest fields are exactly `identity_ref`, `review_context`, `risk_summary`; the system reason is never written into or sourced from request digest bytes |
+| `access-review-reason-v1-propagation` | observe accepted change record, traceability and every eligible affected-material bridge | every typed reason carries the same 59 bytes without prefix, suffix, normalization, formatting, hashing or re-encoding |
+| `access-review-reason-v1-replay` | complete once, then replay same key/digest with Clock/ID/factory/material spies | exact stored terminal is replayed; Clock, ID, factory, mutation, material scan and capture call counts are zero; reason is not rebuilt from the current constant |
+| `access-review-reason-v1-corruption` | seed missing, truncated or byte-different persisted reason symmetry | exact `ConsistencyDefect`; no normalization, fallback literal, silent migration, current-truth reconstruction or partial result |
+| `access-review-reason-v1-compatibility` | static review mutates literal, namespace, version or expected bytes | compatibility gate fails and requires controlled Step 6/8/9/12/13/16 plus formal 03/05/07 reopen |
 | `CUT-TX-17` | Outbound Phase A crash/rollback | snapshot/capture/source atomic; no collaboration before Durable |
 | `CUT-TX-18` | Phase B timeout/failure | local source/capture unchanged; no delivery state or rollback |
 | `CUT-TX-19` | Phase C CAS race/Unknown | one stable intent bind or exact recovery; no duplicate collaboration caused by observer |

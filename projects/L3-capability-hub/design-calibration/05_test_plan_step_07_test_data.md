@@ -8,6 +8,7 @@
 > Step 状态: `accepted-designed`
 > 当前任务: `T029`
 > Safe-text scanner controlled repair: 2026-08-09; adds a shared-registry dummy corpus and cleanup contract without adding a canonical DS or execution fact
+> Fixed access-review reason controlled repair: 2026-08-09; adds an exact immutable byte vector and fresh/replay spy script to existing DS-CH-FLOW-C-004 without adding a canonical DS or execution fact
 
 ---
 
@@ -229,6 +230,12 @@ TC-CH-CMD-001
 
 Foundation stop-review：18/18 DS均唯一；250/43/83/27/9/14/22/110和Rustdoc targets都有机械参数 identity；negative corpus不与valid baseline共用 mutable seed；不存在实现路径、测试运行或真实 dependency fact。
 
+### 7.1 Fixed access-review reason targeted fixture
+
+This targeted fixture is consumed by existing `DS-CH-FLOW-C-004` and contracts-foundation checks; it is not a nineteenth foundation dataset or a new canonical DS. The immutable byte vector is ASCII/UTF-8 `capability-hub.change-reason/access-review-fact-recorded.v1`, exactly `59` bytes. Its expected hex is `63 61 70 61 62 69 6c 69 74 79 2d 68 75 62 2e 63 68 61 6e 67 65 2d 72 65 61 73 6f 6e 2f 61 63 63 65 73 73 2d 72 65 76 69 65 77 2d 66 61 63 74 2d 72 65 63 6f 72 64 65 64 2e 76 31`.
+
+The fixture provides separate fresh and replay call journals for factory, Clock, ID generator, mutation, material scan and capture; typed snapshots for change, trace and each affected-material bridge; canonical-field writer observations; and isolated missing/truncated/byte-different persisted records. Fresh expects one factory call and exact propagation. Replay expects every fresh-effect count to remain zero and returns stored bytes. Corruption expects `ConsistencyDefect`. Static compatibility mutation is isolated from runtime seeds and must fail without generating a migrated row. Cleanup drops only the fixture namespace and call journals, even after corruption assertions.
+
 ## 8. Flow canonical data bundles: 83/83
 
 ### 8.1 Flow shared construction contract
@@ -248,7 +255,7 @@ Foundation stop-review：18/18 DS均唯一；250/43/83/27/9/14/22/110和Rustdoc 
 | `DS-CH-FLOW-C-001` / `TC-CH-CMD-001` | valid intake、typed external-source candidate/resolution、absent identity key/review，Created + ReviewFactAttached atomic set | invalid candidate/source；Resolved/Unresolved variants；same/different digest duplicate；each UoW phase fault | `identity_key/operation_key`；drop run + reset resolver/UoW |
 | `DS-CH-FLOW-C-002` / `TC-CH-CMD-002` | current exact identity + loaded expected version + body-free correction producing final Active | wrong target、stale/terminal、exact no-op、two-writer loser、intermediate CorrectionPending exposure probe | `identity_ref/version`；drop run + reset race/UoW |
 | `DS-CH-FLOW-C-003` / `TC-CH-CMD-003` | nonterminal current identity/version with no blocking contradiction | stale/already Retired/wrong owner/current-registry guard；cascade-delete trap rows | `identity_ref/version`；drop run |
-| `DS-CH-FLOW-C-004` / `TC-CH-CMD-004` | exact identity + body-free Recorded review; variants with/without prior current review | raw approval/vote/policy body、wrong identity、terminal review、duplicate/current-index race | `identity_ref/review_ref`；drop run + delete dummy body corpus |
+| `DS-CH-FLOW-C-004` / `TC-CH-CMD-004` | exact identity + body-free Recorded review; variants with/without prior current review; immutable exact 59-byte v1 reason vector plus fresh/replay call journals | raw approval/vote/policy body、wrong identity、terminal review、duplicate/current-index race；missing/truncated/byte-different persisted reason；literal/namespace/version compatibility mutation | `identity_ref/review_ref/operation_key`；drop run + reason fixture journals + dummy body corpus; never rewrite stored corruption seed |
 | `DS-CH-FLOW-C-005` / `TC-CH-CMD-005` | Active identity + absent registry current key；canonical registry input | missing/terminal identity、unique winner race、body-bearing registry candidate | `identity_ref/registry_key`；drop run + reset race |
 | `DS-CH-FLOW-C-006` / `TC-CH-CMD-006` | current registry/version and every public lifecycle target | complete current/reserved/illegal `SP-CH-REGISTRY_*` subset、stale/terminal/wrong owner | `registry_ref/pair_id`；drop run |
 | `DS-CH-FLOW-C-007` / `TC-CH-CMD-007` | current registry + exact old/new visibility basis and affected-material set | exact no-op、wrong source/applicability、terminal、stale；dedup/permutation set vectors | `registry_ref/basis_revision`；drop run |

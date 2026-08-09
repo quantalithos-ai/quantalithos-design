@@ -8,22 +8,23 @@
 > 回填章节: `projects/L3-capability-hub/07-实施计划.md` §7
 > 输入: Step 5 `PH-01`~`PH-11`、Step 6 `commit-01-a`~`commit-11-b`
 > 创建日期: 2026-07-26
-> 当前模式: controlled-reopen / selector-owner repair
+> 当前模式: controlled-reopen / selector-owner + fixed access-review reason repair
+> Fixed access-review reason controlled repair: 2026-08-09; `commit-02-a` targeted contracts fixtures now include the exact factory literal/bytes while canonical ownership and all denominators remain unchanged
 
 ## 1. Step 状态
 
 | 项目 | 状态 |
 |---|---|
 | 当前 Step | Step 7 嵌入测试与验收门禁 |
-| 当前状态 | controlled_reopen_completed_2026-08-07 |
+| 当前状态 | fixed_reason_controlled_reopen_completed_anchor_pending_2026-08-09 |
 | 输入基线 | Step 6 的 11 个 phase、26 个 boundary、批次和 scope；正式 `05/06` |
 | canonical denominator | `189 TC / 189 DS / 189 EV`、`638` state pairs、`83` exact flows |
 | primary suite | 10 个互斥 suite |
 | gate/check/builder | 5 个 gate、9 个 mandatory check、4 个 report builder |
 | artifact roots | `artifacts/test/<run_id>/`、`reports/runs/<run_id>/`、`reports/acceptance/`、`reports/review/` |
-| implementation status | 目标实现仓已建立；`commit-01-a` 与 `commit-01-b` 已真实提交并完成 handoff；`commit-02-a` 未落码、未运行 gate，因本 Step selector 冲突暂停后进入本次受控回开 |
-| unresolved upstream blocker | `0`；本次修复保持正式 `05` 的 189 个 canonical identity 不变，并闭合 boundary owner 冲突 |
-| 下一动作 | 将本次修复提交为新的 immutable design baseline；随后只能重新激活 `commit-02-a`，不得跳过 boundary |
+| implementation status | 目标实现仓已建立；`commit-01-a` 与 `commit-01-b` 已真实提交并完成 handoff；selector/scanner repairs 已有历史设计锚点；`commit-02-a` 的 preserved A1 草稿未提交、未运行 PH-02 gate，当前等待 fixed-reason repair 的真实 commit/tree anchor |
+| unresolved upstream blocker | `0`；exact reason ambiguity 已在 active working tree 闭合，正式 `05` 的 189 个 canonical identity 不变 |
+| 下一动作 | 只提交 Capability Hub fixed-reason 修复并冻结新的 immutable design baseline；随后重新执行 `commit-02-a` activation/design/worktree review，不得跳过 boundary |
 
 ## 2. 本步输入与 SOP 问题回答
 
@@ -237,7 +238,7 @@ STATE/TX/BIND/OBS/CONFIG-n -> matching TC/DS/EV family and ordinal
 |---|---|---|---|---|---|---|---|---|
 | `commit-01-a` | 无新增 primary；相关 canonical assembly owner 为 `commit-11-a` | `FOUNDATION-001,008..011,013..015` 的 workspace manifest、所有 public skeleton、dependency probe | `cargo fmt --check`; `cargo check --workspace`; `git diff --check`; `check_dependency_boundary.sh --scope workspace`; `check_rustdoc_coverage.sh --scope public-skeleton` | `GATE-01`,`GATE-07` | targeted `suites/static-contract-docs/`、`checks/dependency-boundary/`; targeted suite/dependency reports | raw 只记录 source path、member、declaration kind 和 Rustdoc status；不得生成 canonical TC/DS/EV raw 或业务 EV | `AC-CH-023/026/032/035`; `VF-CH-012/013`; `VETO-CH-012/013` | 命名、workspace、compile edge 或注释缺口：`fix_gate_failure`；设计 source 不闭合：`wait_design` |
 | `commit-01-b` | 无新增 primary；相关 canonical assembly owner 为 `commit-11-a` | `FOUNDATION-017`; `BIND-001..012`; `CONFIG-001..018` 的 config profile/parser skeleton、script CLI/path fixtures | `cargo fmt --check`; `cargo check --workspace`; `git diff --check`; `run_pr_gate.sh --run-id <run_id> --artifact-root <root> --config-profile <profile> --suite runtime-binding,configuration-strict --targeted`; `check_config_catalog.sh`; `check_no_static_evidence.sh --scope scripts` | `GATE-01`,`GATE-05`,`GATE-06`,`GATE-07` | targeted `suites/runtime-binding/`、`suites/configuration-strict/`、`checks/config/`; targeted reports | raw 只记录 schema/profile/key class、path class 和 script exit；不得生成 canonical TC/DS/EV raw、真实 evidence 或 passed map | `AC-CH-026,032,035,037`; `VF-CH-012/013`; `VETO-CH-012/013`; `VETO-CH-P-003/006/007` | strict parse、path、profile、static evidence 或 dependency 失败：不提交；配置设计冲突回写 `04` |
-| `commit-02-a` | 无新增 primary；相关 FOUNDATION canonical assembly owner 为 `commit-11-a` | public refs、metadata、errors、codec、nested type fixtures | `cargo fmt --check`; `cargo check --workspace`; `cargo test --workspace -- contract-foundation`; `check_rustdoc_coverage.sh --scope contracts`; targeted fixture inventory check（不得以 `FOUNDATION-002` 作为 contract codec identity） | `GATE-01`,`GATE-02` | targeted `suites/static-contract-docs/`; contract-foundation fixture report；不得声明 `domain-state` report | refs/metadata/errors/codec fixtures 仅形成 boundary-targeted raw；不创建 `TC/DS/EV-CH-FOUNDATION-002` chain 或任何 canonical EV | `AC-CH-001,023,029,031`; `VF-CH-001,002,011`; `VETO-CH-001,002,011` | 字段/ref/codec/Rustdoc 不闭合：`wait_design` 并回写 `03`；测试失败：修复后用新 attempt 重跑 |
+| `commit-02-a` | 无新增 primary；相关 FOUNDATION canonical assembly owner 为 `commit-11-a` | public refs、metadata、errors、codec、nested type fixtures；`access-review-reason-v1-*` exact factory/literal/59-byte targeted fixtures | `cargo fmt --check`; `cargo check --workspace`; `cargo test --workspace -- contract-foundation`; `check_rustdoc_coverage.sh --scope contracts`; targeted fixture inventory check（不得以 `FOUNDATION-002` 作为 contract codec identity） | `GATE-01`,`GATE-02` | targeted `suites/static-contract-docs/`; contract-foundation fixture report；不得声明 `domain-state` report | refs/metadata/errors/codec/fixed-reason fixtures 仅形成 boundary-targeted raw；固定 reason 断言 exact bytes、audited-static ownership 和 compatibility；不创建 `TC/DS/EV-CH-FOUNDATION-002` chain 或任何 canonical EV | `AC-CH-001,023,029,031`; `VF-CH-001,002,011`; `VETO-CH-001,002,011` | 字段/ref/codec/reason bytes/Rustdoc 不闭合：`wait_design` 并回写 `03`；测试失败：修复后用新 attempt 重跑 |
 | `commit-02-b` | `STATE-001..024` | `FOUNDATION-002,012`；domain policy、state guard、all 638 pair registry consumers | `cargo fmt --check`; `cargo check --workspace`; `cargo test --workspace -- domain-state`; `check_case_manifest.sh --selector STATE-001..024`; `check_state_pair_registry.sh --scope state`; `check_rustdoc_coverage.sh --scope domain` | `GATE-01`,`GATE-02`,`GATE-07` | `suites/domain-state/`、`checks/state-pair/`; STATE primary report and FOUNDATION targeted rows | 24 STATE chains与638个 `SP-CH-*` raw必须完整满足 `239 current + 98 reserved + 301 illegal = 638`；FOUNDATION rows只作 targeted，不增加分母 | `AC-CH-001..005,023,025,029,030`; `VF-CH-001,008,010`; `VETO-CH-001,008,010`; `VETO-CH-P-001` | 任一 pair 缺失/重复/误分类、非法 transition 或 field doc 缺失：阻断并回写 `03` |
 | `commit-02-c` | `TX-001..022` | `FOUNDATION-003,004,016,018`；Port/repository method parity、UoW、idempotency、stored result、fake parity | `cargo fmt --check`; `cargo check --workspace`; `cargo test --workspace -- application-transaction`; `run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite repository-transaction --selector TX-001..022`; `check_rustdoc_coverage.sh --scope application`; `check_case_manifest.sh --selector TX-001..022` | `GATE-01`,`GATE-02`,`GATE-04`,`GATE-07` | `suites/repository-transaction/`、`checks/case-manifest/`; TX primary report and FOUNDATION targeted rows | 22 TX 必须有 authority、UoW order、commit tri-state、winner/replay/corruption raw；FOUNDATION rows只作 targeted；fake 不得绕过版本或幂等 | `AC-CH-023,025,029,030,036`; `VF-CH-009,010,012`; `VETO-CH-009,010,012`; `VETO-CH-P-009` | Port/method/transaction/source 缺口：`wait_design` 回写 `03`；fake parity 或测试失败：`fix_gate_failure` |
 | `commit-03-a` | 无新增 primary；identity contract targeted owner由 `commit-03-c` 承担 | `CMD-001..004`; `QUERY-001..003`; `STATE-001..002` | `cargo fmt --check`; `cargo check --workspace`; `cargo test --workspace -- identity-contract`; `run_pr_gate.sh --run-id <run_id> --artifact-root <root> --suite static-contract-docs,domain-state --selector CMD-001..004,QUERY-001..003`; `check_rustdoc_coverage.sh --scope identity` | `GATE-01`,`GATE-02`,`GATE-03`,`GATE-07` | targeted `service-command-query/`、`domain-state/` raw/report；不创建新 EV | targeted rows必须引用其 primary owner 的 canonical IDs，并记录 no-duplicate-primary；identity source/ref/state negative branches必须有 safe findings | `AC-CH-001,006..008,023,029`; `VF-CH-001,002,003`; `VETO-CH-001,002,003` | identity 字段、review state 或 validation truth 缺失：`wait_design`；越界 allowlist/provider 语义：`VETO` 停审 |
@@ -454,3 +455,15 @@ STATE/TX/BIND/OBS/CONFIG-n -> matching TC/DS/EV family and ordinal
 | repair | 60 cross-phase canonical identities moved to `commit-11-a` primary/evidence assembly; semantic producer/oracle remains formal `03/04/05/06` and the corresponding domain/application/config/entry owners; early boundaries are targeted-only; `STATE/TX/CMD/QUERY/INBOUND/OUTBOUND/JOB` retain their semantic owners |
 | execution_facts | no code, run, artifact, evidence, verdict or signoff was created by this design repair |
 | resume_condition | real design repair commit, scoped tree freeze, implementation ledger update, then `commit-02-a` activation review |
+
+### 8.2 Fixed Access-Review Reason Controlled Reopen
+
+| field | value |
+|---|---|
+| change_id | `CH-DDD-FIXED-ACCESS-REVIEW-REASON-001` |
+| trigger | existing `ChangeReason::access_review_fact_recorded()` was required by Step 6/8/9 but its persisted literal and UTF-8 bytes were not defined, so `commit-02-a` could not implement or test the factory without guessing |
+| authority | Step 6 §7.6.1 owns exact literal/bytes and audited-static construction; Step 8/9/12/13/16 and formal 03/05/07 own propagation, replay, targeted oracle and boundary handoff |
+| exact value | `capability-hub.change-reason/access-review-fact-recorded.v1`; ASCII=UTF-8; `59` bytes |
+| denominator effect | no new canonical TC/DS/EV, flow, state pair, public type, Port or evidence identity |
+| execution_facts | no PH-02 gate, run, artifact, report, evidence, verdict, signoff or implementation commit is created by this design repair |
+| resume_condition | real fixed-reason design repair commit, scoped tree freeze, implementation-repository ledger update, then `commit-02-a` activation/design/worktree review |

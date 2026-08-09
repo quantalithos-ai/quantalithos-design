@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-07-a |
 | phase | PH-07 external summary / reference and peripheral package/set boundary |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `65cc8b029b494f516283882671b63e3c20702b38` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future external summary/source/artifact boundary; cannot start until `commit-06-b` is implemented and project ledger advances |
+| status | ready_for_design_gate |
+| next_allowed_action | read_docs |
+| current_recovery_point | `commit-06-b` handoff is closed;restart from this ledger,formal `07` and every Required Read against exact design commit `65cc8b029b494f516283882671b63e3c20702b38`,protect user-owned `?? .gitignore`,and do not edit implementation code unless Design/Scope/Worktree Gates independently pass. |
 
 ---
 
@@ -17,9 +17,9 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-07-a` | planned | If project ledger still points to an earlier boundary, implementation agent must not use this file to modify code. |
-| `commit-06-b` handoff must be closed | planned | Trace/audit/impact services and redaction targeted checks must exist before external body-free boundary work starts. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-07-a` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-07-a` | pass | Project ledger now points to `commit-07-a`;activation authorizes Required Reads only until all gates pass. |
+| `commit-06-b` handoff must be closed | pass | Trace/audit/impact service-store implementation is closed at `f4af30991e993ffe92fe0f83046057fddc581995`,with run-scoped handoff `20260809T061018Z-commit-06-b`. |
+| project ledger must set `next_allowed_action = read_docs` for `commit-07-a` | pass | Project and boundary ledgers require a fresh read cycle against exact design commit `65cc8b029b494f516283882671b63e3c20702b38`;no prior gate conclusion is reusable. |
 
 ---
 
@@ -84,10 +84,10 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-07-a` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-06-b` implementation commit and handoff recorded | pending | Trace/audit services and redaction targeted checks must exist. |
-| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
-| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
+| activation guard | project ledger shows `current_boundary = commit-07-a` and `next_allowed_action = read_docs` | pass | Boundary is current at exact read baseline `65cc8b029b494f516283882671b63e3c20702b38`;only Required Reads are authorized until gate completion. |
+| prior handoff | `commit-06-b` implementation commit and handoff recorded | pass | PH-06 service-store slice is recorded at `f4af30991e993ffe92fe0f83046057fddc581995`,with handoff closed. |
+| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded before activation as only user-owned `?? .gitignore`;file remains untouched and unstaged. |
+| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
 | workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
 | contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Use actual package name from formal workspace once activated. |
@@ -106,10 +106,10 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-06-b` to `commit-07-a`. | wait_until_current |
-| design_gate | pending | Implementation agent must reread Required Reads and confirm external summary/source/artifact refs, body boundary fake and redaction closure. | wait_design |
+| activation_gate | pass | Project ledger has advanced from closed `commit-06-b` to `commit-07-a`;fresh Required Reads are now authorized. | read_docs |
+| design_gate | pending | Must independently verify exact external summary/source/artifact carriers and ref kinds,object/state guards,adapter port/fake behavior,safe errors,redaction and test-evidence closure against every Required Read. | wait_design |
 | scope_gate | pending | Planned changes must be limited to external summary/source/artifact contracts-domain, body-free adapter fake and focused tests. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
+| worktree_gate | pass | Initial status is only user-owned `?? .gitignore`;it remains untouched and unstaged. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/contract/domain/infra checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
 | test_gate | pending | Contract-domain-fast external body boundary, redaction targeted and VETO targeted checks pass after activation. | fix_gate_failure |
 | evidence_gate | pending | Targeted artifacts/reports are optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
@@ -149,7 +149,7 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-07A-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced through `commit-06-b`; this future boundary must not be used for implementation yet. | After `commit-06-b` handoff, update project ledger to `commit-07-a` and set this boundary to current. | wait_until_current |
+| BLK-ML-07A-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-06-b`;this future boundary could not be used for implementation. | `commit-06-b` handoff is now closed and project/boundary ledgers advance to `commit-07-a` for fresh Required Reads. | read_docs |
 
 ---
 

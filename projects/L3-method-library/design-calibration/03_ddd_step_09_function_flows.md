@@ -1698,3 +1698,28 @@ and rollback. Accepted `CommitUnknown` verifies stored result and the exact chan
 rejected/ignored/consistency results verify stored result only. No path blindly retries,
 scans sibling truth, derives refs from text, runs recovery, emits events, refreshes query
 material, or calls API/worker/job/report code.
+
+## `commit-07-a` pure external flow override
+
+The earlier `CaptureExternalSourceSummaryFlow`, external registration/supersession Command flows,
+and Inbound execution overlays require repositories,services,replay or receipts and therefore do
+not enter `commit-07-a`. The current boundary has only these direct pure-call sequences:
+
+| call sequence | exact steps | forbidden side effect |
+|---|---|---|
+| adapter fake resolution | construct explicit fake fixture -> call `resolve_body_free_summary(input)` -> exact input comparison -> configured echo/body-free validation -> return cloned safe outcome/error | no source lookup,body/archive load,ref mint,repository write,UoW,replay,log or event |
+| summary capture | caller supplies deterministic summary identity and a `Resolved` carrier's source/artifact/kind/summary/digest -> call `capture` -> initialize `Captured` | no application orchestration,adapter-owned identity or persistence |
+| summary acceptance | use the in-memory test subject -> require `Captured` -> copy explicit acceptance marker -> `Accepted` | no repository/version/stored result/event |
+| summary unavailable | use the in-memory test subject -> require `Captured | Accepted` -> copy explicit reason -> `Unavailable` | no retry/recovery/provider call |
+| summary supersession | use the in-memory test subject -> require `Accepted` and different next ref -> copy next ref and explicit acceptance marker -> `Superseded` | no next-summary load or durable lineage update |
+| body-rule assertion/rejection | construct explicit owning rule -> assert typed summary/basis or reject a closed body kind -> optionally link typed lineage ref | no candidate body argument,body persistence,diagnostic builder,repository/audit/event write |
+
+`Resolved` may feed a pure test capture only by explicitly copying its fields and a separately
+supplied deterministic `ExternalSourceSummaryRef`;the fake never performs capture and never owns
+summary identity. `Unrecognized`, `Unavailable`, and `BodyRejected` are returned as safe outcomes
+and do not implicitly create or mutate a domain object. Technical `Unavailable` and
+`ContractViolation` errors likewise have no mutation.
+
+All rejected domain transitions and fake fixture/call mismatches are side-effect free and preserve
+the configured fixture or object exactly. No idempotency,digest calculation,dedup,transaction,
+CommitUnknown or concurrent writer behavior exists in this slice.

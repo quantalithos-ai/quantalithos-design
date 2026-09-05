@@ -1731,3 +1731,28 @@ implementation run rather than a new generator, are
 `reports/runs/<run_id>/suites/service-flow-fast.md` and
 `reports/runs/<run_id>/redaction-check.md`. `latest`, static pass artifacts, release EV
 verdicts and report-generator code are forbidden.
+
+## Design-side boundary override: `commit-07-a` external body-free cut
+
+Formal `03-详细设计.md` §6.3G owns the exact schema,helpers,port,fake and artifact names. This
+override replaces earlier family-level external test directions for the current boundary.
+
+| cut | minimum assertions |
+|---|---|
+| typed wrappers | `ExternalSourceRef`, `ArtifactArchiveRef`, `ExternalSummaryDigestRef` and `ExternalBodyBoundaryRuleRef` roundtrip only their exact kinds;wrong kinds reject without opaque-text parsing;`ExternalSourceSummaryRef` retains its existing exact kind. |
+| safe marker wrappers | acceptance/reason wrappers preserve an existing `MethodLibrarySafeMarker` and add no typed kind;`ExternalSafeSummary.summary_marker_ref` remains the generic safe marker. The existing generic `NoBodyMarker` remains untouched;this boundary adds no subtype,marker-kind parsing or test-only marker family. |
+| enums and sets | all exact snake-case enum labels roundtrip;typed enum equality deduplicates and preserves first-seen order;owning summary/rule rejects required empty sets without sorting,text comparison or hidden defaults. |
+| safe summary | construction preserves the supplied generic marker and exact summary-kind set;no title,text,bytes,URL,path,payload,provider or metadata-map field exists. |
+| summary lifecycle | capture initializes `Captured` and all transition options `None`;accepted,unavailable and superseded legal transitions preserve immutable source/artifact/kind/summary/digest identity;illegal,repeated,equal-ref and terminal transitions return the formal domain error and leave every field unchanged. |
+| body rule | exact constructor validates non-empty sets and anchor-derived initial state;summary source/artifact and kind allow-list guards,basis typed-ref assertion,forbidden-kind rejection,lineage first/equal no-op/different rejection and invalid/terminal no-mutation branches are covered;old `try_new` and raw-body boolean helper are absent. |
+| adapter outcomes | `Resolved`, `Unrecognized`, `Unavailable` and `BodyRejected` preserve exact source/kind/artifact echoes;technical `Unavailable` and `ContractViolation` remain the only errors;business outcomes do not become technical errors or mutate a summary. |
+| fake parity | `from_outcome` rejects invalid echo or empty resolved summary;`from_error` stores the explicit error;equal calls return the validated clone and unequal calls return the explicit contract-violation reason;repeat calls are side-effect free. The three fixture fields remain private and no accessor/counter/mutation hook/private semantic map is added. |
+| redlines | carriers,errors,fake state,tests,logs and artifacts contain no provider/document/standard/ADR/governance/artifact/archive/evidence body,URL,path,endpoint,secret,header,status,stack trace,raw reason,config value,opaque-ref parsing or locally minted ref/marker. |
+| scope claim | no test or report claims service,repository,durable dereference,UoW,replay,provider adapter,archive lifecycle,query/API/worker/job,package/set or report-generator coverage. |
+
+The fixed run-scoped raw outputs are exactly
+`artifacts/test/<run_id>/suites/contract-domain-fast/{cargo-fmt-check.txt,cargo-check-workspace.txt,cargo-check-contracts.txt,cargo-check-domain.txt,cargo-check-application.txt,cargo-check-infra.txt,cargo-test-contracts.txt,cargo-test-domain.txt,cargo-test-application.txt,cargo-test-infra.txt,external-body-free-redline.txt}`
+and `artifacts/test/<run_id>/redaction-check.txt`. Optional summaries are derived only from those
+actual files at `reports/runs/<run_id>/suites/contract-domain-fast.md` and
+`reports/runs/<run_id>/redaction-check.md`. A `latest` alias,static pass artifact,release EV
+verdict or report/evidence generator implemented by this boundary is invalid.

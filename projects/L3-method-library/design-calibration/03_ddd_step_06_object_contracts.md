@@ -6500,3 +6500,126 @@ is legal only in `LineageLinked | LineagePartial`; absent becomes supplied, iden
 a no-op, and a different existing ref rejects without mutation. Existing
 `append_entry` and `link_trace_material` remain the only other mutations used by this
 boundary. No trace reorganization or impact replacement helper is added.
+
+## `commit-07-a` exact external contracts/domain object closure
+
+This section is normative over the earlier `ExternalSourceSummary` card, the `commit-02-b`
+generic `ExternalBodyBoundaryRule` shell, and any deferred owning-slice note. Formal
+`03-详细设计.md` §6.3G is the matching formal source.
+
+### 1. Exact wrappers and carrier fields
+
+| named wrapper | exact representation / kind | current-boundary source rule |
+|---|---|---|
+| `ExternalSourceRef` | named wrapper over `MethodLibraryTypedBoundaryRef`;kind `ExternalSourceRef` | verified body-free boundary or deterministic fixture only;never URL/path/provider id/opaque-text parsing |
+| `ArtifactArchiveRef` | named wrapper over `MethodLibraryTypedBoundaryRef`;kind `ArtifactArchiveRef` | anchor only;no artifact/archive body,path or lifecycle |
+| `ExternalSummaryDigestRef` | named wrapper over `MethodLibraryTypedBoundaryRef`;kind `ExternalSummaryDigest` | copied from the body-free source boundary;no local digest algorithm |
+| `ExternalBodyBoundaryRuleRef` | named wrapper over `MethodLibraryTypedBoundaryRef`;kind `ExternalBodyBoundaryRule` | deterministic pure-domain fixture in this no-service slice;production factory deferred |
+| `ExternalSourceSummaryRef` | existing named wrapper;kind `ExternalSourceSummary` | deterministic contracts/domain fixture only for new summary identity in this slice |
+| `ExternalSummaryAcceptanceMarkerRef` | named newtype over `MethodLibrarySafeMarker` | adapter `Resolved` output or explicit pure-domain transition input |
+| `ExternalBodyBoundaryReasonRef` | named newtype over `MethodLibrarySafeMarker` | formal boundary judgement or adapter safe outcome only |
+
+Typed wrappers use the existing `new`, `expected_kind`, `as_typed_ref`, `as_public_ref`, and
+wrong-kind `TryFrom<MethodLibraryTypedBoundaryRef>` convention. Marker wrappers expose only
+`new(MethodLibrarySafeMarker)` and `as_safe_marker()`. Marker wrappers add no typed-ref kind.
+
+| carrier | exact labels / fields |
+|---|---|
+| `ExternalSourceKind` | `Standard`;`ArchitectureDecision`;`GovernanceConclusion`;`ExternalDocument`;`Artifact`;`EcosystemReference` |
+| `ExternalSummaryKind` | `SafeSummary`;`TypedReference`;`SafeMarker`;`EvidenceLineage` |
+| `ExternalSummaryKindSet` | `kinds: Vec<ExternalSummaryKind>` |
+| `ForbiddenExternalBodyKind` | `StandardBody`;`ArchitectureDecisionBody`;`GovernanceExecutionBody`;`ExternalDocumentBody`;`ArtifactBody`;`ArchiveBody`;`EvidenceBody`;`ProviderPayload` |
+| `ForbiddenExternalBodyKindSet` | `kinds: Vec<ForbiddenExternalBodyKind>` |
+| `ExternalSafeSummary` | `summary_marker_ref: MethodLibrarySafeMarker`;`summary_kind_set: ExternalSummaryKindSet`;the marker is a copied generic safe marker. The existing generic `NoBodyMarker` remains outside this closure;it is not a current-boundary subtype or an inspectable marker-kind label. |
+| `ExternalSummaryState` | `Captured`;`Accepted`;`Superseded`;`Unavailable` |
+
+Enums derive the standard contracts enum traits and snake-case serde labels. Contracts
+structs/wrappers derive the standard contracts struct traits;both set carriers also derive
+`Default`. Sets expose only `new`, `from_kinds`, `insert`, `is_empty`, and `contains`;typed enum
+equality deduplicates while preserving first-seen order. They never sort or parse text.
+`ExternalSafeSummary::new` preserves its supplied marker and set. Its shape contains no title,
+description,text,bytes,URL,path,payload,provider field or metadata map.
+No current-boundary marker subtype,marker-kind enum or marker-text parser exists. The existing
+generic `NoBodyMarker` remains untouched;body-free validity comes from the closed carrier shape,
+non-empty summary-kind set and owning rule guards. Implementation must not infer validity from a
+special marker value or mint a test-only marker family.
+
+### 2. Exact `ExternalSourceSummary`
+
+```rust
+pub struct ExternalSourceSummary {
+    pub external_summary_ref: ExternalSourceSummaryRef,
+    pub external_source_ref: ExternalSourceRef,
+    pub artifact_archive_ref: Option<ArtifactArchiveRef>,
+    pub source_kind: ExternalSourceKind,
+    pub safe_summary: ExternalSafeSummary,
+    pub summary_digest_ref: ExternalSummaryDigestRef,
+    pub acceptance_marker_ref: Option<ExternalSummaryAcceptanceMarkerRef>,
+    pub state_reason_ref: Option<ExternalBodyBoundaryReasonRef>,
+    pub superseded_by_ref: Option<ExternalSourceSummaryRef>,
+    pub state: ExternalSummaryState,
+}
+```
+
+`capture(external_summary_ref, external_source_ref, artifact_archive_ref, source_kind,
+safe_summary, summary_digest_ref) -> Result<Self, MethodLibraryDomainError>` requires a non-empty
+summary-kind set and initializes `Captured` with all three optional transition fields `None`.
+The identity is an explicit deterministic test fixture in this boundary;domain/fake code may not
+mint it from source,digest,URL,path,provider id,time/counter,row id,config or opaque ref text.
+
+| helper | exact guard / mutation |
+|---|---|
+| `assert_body_free(&self)` | validates non-empty summary-kind set and the exact state/optional-field invariant;accepts no raw-body parameter |
+| `assert_source(&self, &ExternalSourceRef)` | typed equality only;source mismatch is `InvariantViolation` |
+| `mark_accepted(&mut self, ExternalSummaryAcceptanceMarkerRef)` | only `Captured -> Accepted`;store acceptance marker;reason/superseded refs remain `None` |
+| `mark_unavailable(&mut self, ExternalBodyBoundaryReasonRef)` | only `Captured | Accepted -> Unavailable`;preserve prior acceptance marker;store reason;superseded ref remains `None` |
+| `supersede_with(&mut self, ExternalSourceSummaryRef, ExternalSummaryAcceptanceMarkerRef)` | only `Accepted -> Superseded`;next identity must differ;store explicit marker and next ref;reason remains `None` |
+
+`Superseded` and `Unavailable` are terminal. Every rejected operation preserves every field.
+The optional-field invariant is: `Captured = None/None/None`, `Accepted = Some/None/None`,
+`Superseded = Some/None/Some(different identity)`, and `Unavailable = preserved acceptance /
+Some reason / None`, in acceptance/reason/superseded order.
+
+### 3. Owning-slice `ExternalBodyBoundaryRule` migration
+
+The exact fields replace, rather than coexist with, the generic-ref shell:
+
+```rust
+pub struct ExternalBodyBoundaryRule {
+    pub rule_ref: ExternalBodyBoundaryRuleRef,
+    pub external_source_ref: Option<ExternalSourceRef>,
+    pub artifact_archive_ref: Option<ArtifactArchiveRef>,
+    pub forbidden_body_kind_set: ForbiddenExternalBodyKindSet,
+    pub allowed_summary_kind_set: ExternalSummaryKindSet,
+    pub boundary_reason_ref: ExternalBodyBoundaryReasonRef,
+    pub lineage_marker_ref: Option<MethodAssetEvidenceLineageRef>,
+    pub state: ExternalBodyBoundaryState,
+}
+```
+
+`default_no_body_rule(...) -> Result<Self, MethodLibraryDomainError>` takes those fields in table
+order except `state`,requires both sets non-empty,and selects `AssertedBodyFree` when at least one
+source/artifact anchor exists,otherwise `InvalidCandidate`. The old `try_new` and boolean
+`assert_summary_body_free(raw_body_candidate)` are removed with no compatibility overload.
+
+| helper | exact rule |
+|---|---|
+| `assert_summary_body_free(&self, &ExternalSourceSummary)` | only from `AssertedBodyFree`;calls the summary invariant,requires each rule `Some` source/artifact anchor to equal the summary,and requires every summary kind in the allow-list |
+| `assert_basis_body_free(&self, &FormalizationBasisSummaryRef)` | only from `AssertedBodyFree`;validates the typed ref without dereference or body load |
+| `reject_external_body(&mut self, ForbiddenExternalBodyKind, ExternalBodyBoundaryReasonRef)` | only `AssertedBodyFree -> BodyCandidateRejected`;kind must be in the forbidden set;replace safe reason;never accept body content |
+| `allow_lineage_ref(&mut self, MethodAssetEvidenceLineageRef)` | from `AssertedBodyFree | BodyCandidateRejected`;set or retain equal ref,preserve all other fields;different replacement is rejected |
+
+`InvalidCandidate` cannot assert/reject/link. Repeated rejection and all other state changes return
+`InvalidTransition`. Absent forbidden kind and out-of-allow-list summary kind return
+`PolicyRejected`;anchor mismatch/different lineage replacement return `InvariantViolation`.
+No second body-boundary state enum is introduced.
+
+### 4. Exact error and carve-out
+
+Missing required typed input maps to `MissingRequiredTypedInput`;empty sets,source mismatch or
+equal superseding identity map to `InvariantViolation`;illegal/terminal transitions map to
+`InvalidTransition`;allow-list rejection maps to `PolicyRejected`;a raw body carrier/fixture maps
+to `BodyFreeBoundaryViolation`. There is no external-specific domain error enum.
+
+No application service, repository, UoW, replay, persistence, query material, provider adapter,
+archive lifecycle, API/worker/job/report or package/set object is opened by this closure.

@@ -1813,3 +1813,29 @@ storage errors expose no SQL/status/stack/path/config detail. Recovery, consiste
 query refresh, report generation and jobs remain deferred. Raw reason, provider/method/
 archive/report body, secret, full sensitive ref and canonical digest material must not be
 logged, persisted in an error or written to evidence.
+
+## `commit-07-a` external body-free error and recovery override
+
+The current boundary has two disjoint error surfaces and no recovery workflow.
+
+| condition | exact surface | mutation/recovery rule |
+|---|---|---|
+| single-kind wrapper receives wrong kind | existing `MethodLibraryTypedBoundaryRefKindMismatch` | reject without opaque-text inspection;no fallback alias or parsed ref |
+| required typed/wrapper input absent | `MethodLibraryDomainErrorKind::MissingRequiredTypedInput` | no mutation |
+| empty owning set,source/artifact mismatch,equal superseding identity or different lineage replacement | `InvariantViolation` | preserve every object/rule field |
+| illegal or terminal summary/rule transition | `InvalidTransition` | preserve every object/rule field |
+| summary kind not allowed or rejected body kind not in configured forbidden set | `PolicyRejected` | preserve every object/rule field |
+| raw body carrier/fixture candidate | `BodyFreeBoundaryViolation` | reject without storing/logging the candidate |
+| adapter dependency cannot execute | `ExternalBodyFreeSourceAdapterError::Unavailable { reason_ref }` | return explicit safe reason;no retry or fallback |
+| fake fixture echo/body-free invariant fails,or call input differs from expected input | `ExternalBodyFreeSourceAdapterError::ContractViolation { reason_ref }` | return constructor-supplied safe reason;no fixture mutation |
+| source is validly unknown,unavailable or body-rejected | `ExternalBodyFreeSourceAdapterOutcome::{Unrecognized,Unavailable,BodyRejected}` | successful safe outcome;not a technical exception and no summary mutation |
+
+`ExternalSummaryAcceptanceMarkerRef` and `ExternalBodyBoundaryReasonRef` copy an existing
+`MethodLibrarySafeMarker`. No error/outcome may synthesize a marker from raw reason,error/status,
+HTTP/SQL/provider response,URL/path,config,timestamp,counter,stack trace or fake-private state.
+The exact adapter error enum has no third variant and there is no external-specific domain error,
+repository error,service rejection,transport status,quarantine state or retry classification.
+
+No branch performs provider retry,refresh,recovery,repository read-back,stored replay,body fetch,
+archive load,query fallback,worker handoff or job scheduling. Missing a formal marker/schema/port
+is a Design Gate blocker,not an instruction to add an error payload or private fallback.

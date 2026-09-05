@@ -175,7 +175,7 @@
 | commit-05-b | `Distribution and handoff services:`;`Availability seam fakes:` | distribution service/fake |
 | commit-06-a | `Trace and audit contracts:`;`Evidence lineage state:` | trace/audit contract |
 | commit-06-b | `Trace service flows:`;`Redaction targeted checks:` | trace service / redaction report |
-| commit-07-a | `External summary contracts:`;`Body-free source adapters:` | external body-free / redaction |
+| commit-07-a | `External summary body-free contracts:`;`External boundary-rule state:`;`Body-free source adapter fake:`;`External body-free redline checks:` | only run-scoped `contract-domain-fast` and `redaction-check` raw outputs plus actual-run-derived reports;no service/repository/provider/archive/report-generator claim |
 | commit-07-b | `Peripheral package and set shell:`;`Residual risk markers:` | peripheral residual report |
 | commit-08-a | `Query and view contracts:`;`Read material ports:` | query DTO/contract report |
 | commit-08-b | `Core query services:`;`Query no-write guards:` | core query service report |

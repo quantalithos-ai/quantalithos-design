@@ -2467,3 +2467,28 @@ same-digest execution never begins a UoW. Audit/lineage all-duplicate fresh comm
 an `Ignored` stored result without owner save/version advance. Stored-result lookup/save
 reuses the existing repository schema and no replay response may be reconstructed from
 current truth alone.
+
+## `commit-07-a` persistence and transaction carve-out
+
+This override is normative for the current external body-free boundary. The earlier logical
+`ExternalSourceSummaryRepository`, source lookup, durable dereference, archive store and inbound
+receipt rows remain future design direction and are not callable implementation surfaces here.
+
+| current subject | current persistence rule | forbidden substitute |
+|---|---|---|
+| `ExternalSourceSummary` | transient contracts/domain test subject only;identity is an explicit deterministic fixture;no row,index,version,save/load or UoW | repository id, map key, URL/path, digest text, provider response or default reload state |
+| `ExternalBodyBoundaryRule` | transient pure-domain subject;constructor and state changes are in-memory only;no durable rule store | config profile, private side map, body candidate, raw reason or status field |
+| `ExternalBodyFreeSourceAdapterInput` / outcome / error | transient application port carriers;fake returns cloned configured result | serialized DTO, receipt, stored result, retry token or provider payload |
+| `InMemoryExternalBodyFreeSourceAdapter` | explicit fixture state only;calls are side-effect free and do not stage writes | source map, repository row, generated ref/marker, counter/time or hidden call history |
+
+`commit-07-a` has no transaction boundary, expected-version rule, idempotency key, digest
+calculation, duplicate replay, CommitUnknown read-back, rollback, concurrent writer or post-commit
+side effect. Contract/domain roundtrip tests are not persistence evidence. If implementation requires
+any of those surfaces, it must stop and return to the owning design boundary rather than adding a
+repository, UoW or fake-only persistence behavior.
+
+The only permitted external data shape is the exact body-free field set in formal `03` §6.3G:
+typed source/artifact/summary/digest refs, closed enum labels, safe summary marker/kind set,
+transition marker/reason wrappers, state and optional typed lineage/supersession refs. Raw
+provider/document/artifact/archive/evidence/report body, URL/path, headers, secret, response,
+stack trace and config value are never a persistence input or test artifact.

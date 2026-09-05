@@ -2650,3 +2650,20 @@ field, actor context, ordered shell typed refs/markers, API-entry/application-di
 refs and formal idempotency key. Request/trace id, timestamp, free text, external-ref
 text, route/body/config/current truth are excluded. Every option tag and first-seen set
 order is material; the canonical text is never logged or persisted.
+
+## `commit-07-a` no-public-protocol override
+
+`commit-07-a` adds no Command, Query, Inbound Consumer, Outbound Event, Operations Job, route,
+RPC, HTTP body, receipt, result DTO, or public payload field. The exact external typed wrappers,
+safe marker wrappers, enums, sets, and `ExternalSafeSummary` in formal `03` §6.3G are contracts
+carriers,not authorization for an intake protocol.
+
+`ExternalBodyFreeSourceAdapterInput`, `ExternalBodyFreeSourceAdapterOutcome`, and
+`ExternalBodyFreeSourceAdapterError` are application-owned non-wire port carriers. They must not
+be serialized into a public command body or inferred from route,type name,typed-ref order/number,
+marker text,config,provider payload or raw body. The adapter outcome echoes its structured input;
+it does not create an `ExternalSourceSummaryRef` or public accepted receipt.
+
+All earlier external command/inbound/outbound protocol rows remain future-flow direction only for
+this boundary. If implementation needs a public shell,selector,handler,receipt,dedup envelope or
+transport mapping,Design Gate must stop rather than adding one locally.

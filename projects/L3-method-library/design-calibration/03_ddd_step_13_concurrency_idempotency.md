@@ -2060,3 +2060,29 @@ uses the exact selected natural owner stated in formal §6.3F.
 Fakes and durable adapters must agree on these branches. Array position, map iteration,
 counter/time, repository row id, ref text parsing, raw body, route, config and failure
 injection state are never business identity, digest input or append proof.
+
+## `commit-07-a` no-replay/no-concurrency override
+
+`commit-07-a` is a pure contracts/domain plus single-input adapter-fake boundary. It defines no
+Command/Inbound/Job operation, idempotency reservation, semantic digest, dedup scope, stored
+result, optimistic version, UoW, lock, lease, retry, CommitUnknown or concurrent writer behavior.
+
+The name `ExternalSummaryDigestRef` is a typed anchor supplied by the body-free source boundary;
+it is not an idempotency digest and the method library does not calculate,canonicalize,compare or
+parse its opaque text. `ExternalSourceSummaryRef` and `ExternalBodyBoundaryRuleRef` are explicit
+deterministic test fixtures in this no-service slice;they are not generated from the digest,
+source/artifact refs,call count,time,counter,row id,route,config or fake map.
+
+Fake determinism means only:
+
+- construction fixes one `expected_input`,one configured cloned outcome/error,and one explicit
+  contract-violation reason;
+- equal calls return the same validated clone without state change;
+- unequal calls return the same explicit `ContractViolation` without state change;
+- outcome echo/body-free validation is repeated and has no side effect;
+- call order,number,thread scheduling,array position,map iteration and failure injection state do
+  not alter any result or create any identity/marker.
+
+Tests may call the pure domain helpers repeatedly to prove illegal/terminal transitions preserve
+state,but they must not claim durable idempotency,concurrent update,rollback,replay or fake/durable
+parity. Any future service/store concurrency contract requires a later formal owning boundary.

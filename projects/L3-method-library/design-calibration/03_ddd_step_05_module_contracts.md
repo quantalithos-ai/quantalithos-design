@@ -1875,3 +1875,21 @@ application source carrier is not a public protocol DTO. `ConsistencyProtectionP
 remains a pure domain shell and does not create a fifth repository or durable decision
 truth. Fixed run-scoped raw evidence belongs to actual implementation checks only; this
 design patch does not generate evidence or a report.
+
+## `commit-07-a` external body-free module ownership override
+
+This override is normative for `commit-07-a` over earlier family-level external-summary maps.
+Formal `03-详细设计.md` §6.3G owns the exact schema and behavior.
+
+| module | current-boundary ownership | forbidden expansion |
+|---|---|---|
+| `contracts` | exact source/artifact/digest/rule named wrappers, marker wrappers, closed source/summary/body-kind carriers, deterministic sets and `ExternalSafeSummary` | no command/query/inbound DTO, provider payload, URL/path, archive body/lifecycle or extra kind/marker family |
+| `domain` | `ExternalSourceSummary`, `ExternalSummaryState`, pure transition guards, and owning-slice migration of `ExternalBodyBoundaryRule` | no repository, service, UoW, replay, durable dereference, query material or external truth copy |
+| `application` | one body-free `ExternalBodyFreeSourceAdapterPort` plus its non-wire input/outcome/error carriers | no facade, command/inbound orchestration, idempotency, mapper, repository or local ref factory |
+| `infra` | deterministic `InMemoryExternalBodyFreeSourceAdapter` implementing the exact port | no real provider adapter, body fetch, config binding, private semantic map, persistence or generated identity/marker |
+| `api` / `worker` / `jobs` | no current-boundary implementation | no route/RPC, consumer, publisher, archive, job, report or evidence generator |
+
+Dependency direction remains `contracts <- domain`, with `application` consuming contracts and
+`infra` implementing the application-owned port. The fake may validate typed body-free carriers;
+it may not depend on domain persistence or create an application service. Package/method-set and
+all peripheral behavior remain `commit-07-b` or later.

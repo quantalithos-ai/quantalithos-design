@@ -3362,3 +3362,72 @@ version and natural-key uniqueness, and apply committed writes before returning 
 configured `CommitUnknown`. Its fake behavior must equal a future durable adapter; typed
 objects and safe markers may configure failures, but strings/config/status/private maps
 may not define business semantics.
+
+## `commit-07-a` exact body-free adapter port and fake override
+
+This override is normative over earlier external repository/adapter candidate families. It opens
+one application-owned port and one infra fake only;formal `03-详细设计.md` §6.3G owns the matching
+schema.
+
+```rust
+pub struct ExternalBodyFreeSourceAdapterInput {
+    pub external_source_ref: ExternalSourceRef,
+    pub source_kind: ExternalSourceKind,
+    pub artifact_archive_ref: Option<ArtifactArchiveRef>,
+}
+
+pub trait ExternalBodyFreeSourceAdapterPort: Send + Sync {
+    fn resolve_body_free_summary(
+        &self,
+        input: ExternalBodyFreeSourceAdapterInput,
+    ) -> Result<ExternalBodyFreeSourceAdapterOutcome, ExternalBodyFreeSourceAdapterError>;
+}
+```
+
+The port has exactly one method. Input/outcome/error are application-owned `Clone + Debug + Eq +
+PartialEq` carriers and are not wire DTOs. Outcome variants are exact:
+
+| variant | exact fields |
+|---|---|
+| `Resolved` | input echo fields plus `safe_summary: ExternalSafeSummary`, `summary_digest_ref: ExternalSummaryDigestRef`, `acceptance_marker_ref: ExternalSummaryAcceptanceMarkerRef` |
+| `Unrecognized` | input echo fields plus `reason_ref: ExternalBodyBoundaryReasonRef` |
+| `Unavailable` | input echo fields plus `reason_ref: ExternalBodyBoundaryReasonRef` |
+| `BodyRejected` | input echo fields plus `reason_ref: ExternalBodyBoundaryReasonRef` |
+
+The input echo fields are exactly `external_source_ref`, `source_kind`, and
+`artifact_archive_ref`. Technical error variants are exactly `Unavailable { reason_ref }` and
+`ContractViolation { reason_ref }`. `Unrecognized` and `BodyRejected` are successful safe
+outcomes,not technical errors. No branch contains raw error/status/provider/body/path/config data.
+
+The infra implementation is exactly:
+
+```rust
+pub struct InMemoryExternalBodyFreeSourceAdapter {
+    expected_input: ExternalBodyFreeSourceAdapterInput,
+    configured_result:
+        Result<ExternalBodyFreeSourceAdapterOutcome, ExternalBodyFreeSourceAdapterError>,
+    contract_violation_reason_ref: ExternalBodyBoundaryReasonRef,
+}
+```
+
+All three fields are private. The fake adds no field accessor,fixture-state getter,mutation hook,
+call counter or inspection API;its only public callable surface is `from_outcome`, `from_error`,
+and the `ExternalBodyFreeSourceAdapterPort` method.
+
+`from_outcome(expected_input, outcome, contract_violation_reason_ref) -> Result<Self,
+ExternalBodyFreeSourceAdapterError>` validates exact echo fields and validates a `Resolved`
+summary has a non-empty kind set/body-free shape. Invalid fixture returns `ContractViolation`
+with the supplied reason and constructs no fake. `from_error(expected_input, error,
+contract_violation_reason_ref) -> Self` stores the explicit technical result. On every call,
+actual input must equal `expected_input`;otherwise return `ContractViolation` with the explicit
+reason. Before returning a configured outcome,the fake repeats echo and resolved-summary
+validation. All validation is side-effect free.
+
+The fake stores no body,URL,path,provider response,headers,raw error,config,private source map,
+repository row or generated ref. It never parses opaque text or mints/replaces any source,
+summary,artifact,digest,marker or reason ref. Its explicit one-input fixture is not a semantic map.
+
+No `ExternalSourceSummaryRepository` method is callable in `commit-07-a`;the earlier repository
+family remains future design only. Existing `ExternalSourceSummaryValidationPort` remains the
+`commit-03-b` named-ref validation carve-out and is neither expanded nor reused. There is no
+facade,service,UoW,stored replay,durable adapter,provider adapter,API,worker or job in this slice.

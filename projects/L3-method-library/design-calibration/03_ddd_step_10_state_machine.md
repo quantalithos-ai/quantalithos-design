@@ -3917,3 +3917,41 @@ This patch does not add state labels. It binds the current service methods to th
 An audit/lineage existing owner with no newly inserted relation is an application-level
 `Ignored` result and does not advance repository version. State is never inferred from
 stored-result kind, map membership, route/config/error text or fake-private flags.
+
+## `commit-07-a` external summary and body-rule state override
+
+This override binds the previously listed external summary labels to the exact
+`ExternalSourceSummary.state` field. It is normative over earlier flow-oriented transitions that
+imply repository/service/event behavior.
+
+| source state | helper | precondition | target | exact optional-field result |
+|---|---|---|---|---|
+| virtual absent | `capture` | non-empty summary-kind set;all typed inputs supplied | `Captured` | acceptance/reason/superseded all `None` |
+| `Captured` | `mark_accepted` | explicit acceptance marker | `Accepted` | `Some` / `None` / `None` |
+| `Captured` | `mark_unavailable` | explicit safe reason | `Unavailable` | `None` / `Some` / `None` |
+| `Accepted` | `mark_unavailable` | explicit safe reason | `Unavailable` | preserve `Some` / `Some` / `None` |
+| `Accepted` | `supersede_with` | explicit different next ref and acceptance marker | `Superseded` | `Some` / `None` / `Some(different)` |
+
+`Superseded` and `Unavailable` are terminal. `Captured -> Superseded`, repeated acceptance,
+`Accepted -> Accepted`, equal-ref supersession, and every operation from a terminal state reject
+without mutation. Acceptance/reason/superseded are the three columns in the table;identity,
+source/artifact refs,source kind,safe summary and digest never change after capture.
+
+`ExternalBodyBoundaryState` retains exactly `AssertedBodyFree | BodyCandidateRejected |
+InvalidCandidate`. `default_no_body_rule` chooses `AssertedBodyFree` iff a source or artifact
+anchor exists,otherwise `InvalidCandidate`;both kind sets must still be non-empty.
+
+| rule source state | operation | target / result |
+|---|---|---|
+| `AssertedBodyFree` | assert matching allowed summary or typed basis | remain `AssertedBodyFree`;no mutation |
+| `AssertedBodyFree` | reject a body kind in the forbidden set with explicit reason | `BodyCandidateRejected`;reason replaced safely |
+| `AssertedBodyFree` | link first/equal lineage ref | remain `AssertedBodyFree`;set/no-op only |
+| `BodyCandidateRejected` | link first/equal lineage ref | remain `BodyCandidateRejected`;reason preserved |
+| `BodyCandidateRejected` | repeated rejection or assertion | `InvalidTransition`;no mutation |
+| `InvalidCandidate` | assertion,rejection or lineage link | `InvalidTransition`;no mutation |
+
+A body kind absent from the forbidden set or summary kind outside the allow-list is
+`PolicyRejected`;source/artifact mismatch or different lineage replacement is
+`InvariantViolation`. The old boolean raw-body helper is removed;raw-body fixture/carrier attempts
+map to `BodyFreeBoundaryViolation`,not a new state. No repository/version/event/stored-result
+transition is implied by this state closure.

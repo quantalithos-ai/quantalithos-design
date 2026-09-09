@@ -1,8 +1,8 @@
 # L3-method-library 项目设计讨论执行台账
 
 > 创建日期: 2026-06-15
-> 最近更新: 2026-09-06
-> 当前任务: 设计提交 `bf004e6642cff243360524d83e1efcbdeac03654` 已闭合 `commit-07-a` external body-free surface。当前状态为 `ready_for_design_gate / read_docs`;实现侧必须从新 baseline 全量重读 Required Reads 并独立重跑 Design/Scope/Worktree Gate,不得沿用旧 blocked 结论。
+> 最近更新: 2026-09-09
+> 当前任务: `commit-07-a` 已在精确设计基线 `a6132575c3d91744f28d8521975110639f5f2df6` 完成 fresh Required Reads 与 Design/Scope/Worktree Gate。当前状态为 `in_progress / implement`;只允许 external body-free contracts/domain、单方法 adapter port、三字段 fake、直接测试与实际 run-scoped evidence。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-07-a external body-free design closure` | ready_for_design_gate | Design commit `bf004e6642cff243360524d83e1efcbdeac03654` publishes exact external wrappers/kinds,body-free carriers,domain guards,one-method adapter port,three-field fake,safe errors/redaction and fixed evidence. Fresh Required Reads and Design/Scope/Worktree Gate are still required. | read_docs:保护用户 `.gitignore`,全量重读 Required Reads,独立核对 exact closure;发现缺口必须 blocked / wait_design。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-07-a.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-07-a external body-free implementation` | in_progress | Fresh Required Reads and Design/Scope/Worktree Gates passed at `a6132575c3d91744f28d8521975110639f5f2df6`;the exact wrappers/carriers/domain guards/one-method port/three-field fake/test-evidence surface requires no local schema invention. | implement:只落当前 boundary exact slice;保护用户 `.gitignore`;随后执行 fixed build/test/redaction/evidence gates。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-07-a.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-07-a` ready for fresh Design Gate | read_docs | 设计提交 `bf004e6642cff243360524d83e1efcbdeac03654` 已闭合 exact external body-free carrier/domain/adapter-fake/error-marker/test-evidence surface;实现侧必须从 `read_docs` 全量重读并独立重跑 Design/Scope/Worktree Gate。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-07-a` implementation in progress | implement | Fresh gates 已通过;只允许 exact contracts/domain/application-port/infra-fake、direct tests 与 actual run-scoped evidence,其余 surface 继续后移。 |
 
 ---
 
@@ -111,9 +111,9 @@
 4. 读取 `design-calibration/implementation_execution_ledger.md`
 5. 读取 `design-calibration/implementation-boundaries/commit-07-a.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前是 `commit-07-a` / `ready_for_design_gate` / `read_docs`,读取基线为精确设计提交 `bf004e6642cff243360524d83e1efcbdeac03654`,且 `BLK-ML-07A-DESIGN-001` 已 resolved
-8. 保护实现仓用户未跟踪 `.gitignore`,全量重读 boundary Required Reads,并在任何代码编辑前独立重跑 Design/Scope/Worktree Gate
-9. 不得沿用旧 blocked 或任何历史 pass 结论;若 fresh gate 发现 schema/port/state/mapper/config/evidence/boundary 缺口,立即将 implementation/boundary ledger 置为 `blocked / wait_design` 并停止实现
+7. 确认 implementation ledger 当前是 `commit-07-a` / `in_progress` / `implement`,精确设计基线为 `a6132575c3d91744f28d8521975110639f5f2df6`,且 fresh Design/Scope/Worktree Gate 已 pass
+8. 保护实现仓用户未跟踪 `.gitignore`,只在 boundary Allowed Scope 内继续实现、fixed checks 与 actual run-scoped evidence
+9. 若实现中发现新的 schema/port/state/mapper/config/evidence/boundary 缺口,立即将 implementation/boundary ledger 置为 `blocked / wait_design` 并停止实现
 ```
 
 ---
@@ -122,7 +122,7 @@
 
 ```text
 `commit-06-b` implementation/handoff 已由 `f4af30991e993ffe92fe0f83046057fddc581995` 和 run `20260809T061018Z-commit-06-b` 关闭;
-当前 boundary 是 `commit-07-a`,读取基线是精确设计提交 `bf004e6642cff243360524d83e1efcbdeac03654`,状态为 `ready_for_design_gate / read_docs`;
-`BLK-ML-07A-DESIGN-001` 已由 formal `03` §6.3G、Step 5~16 与 formal `07` 的 exact external body-free closure 解决;
-实现侧必须从 `read_docs` 全量重读并独立重跑 Design/Scope/Worktree Gate,在 gates 通过前不得修改代码/tests/evidence;若 fresh gate 发现新缺口,不得私补而应立即回写 `blocked / wait_design`.
+当前 boundary 是 `commit-07-a`,精确设计基线是 `a6132575c3d91744f28d8521975110639f5f2df6`,状态为 `in_progress / implement`;
+`BLK-ML-07A-DESIGN-001` 已由 formal `03` §6.3G、Step 5~16 与 formal `07` 的 exact external body-free closure 解决,formal commit groups 也已同步;
+fresh Required Reads 与 Design/Scope/Worktree Gate 已通过;实现侧只可继续 exact boundary code/tests/evidence,发现新设计缺口必须回写 `blocked / wait_design`.
 ```

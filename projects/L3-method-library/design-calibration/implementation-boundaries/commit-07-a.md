@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-07-a |
 | phase | PH-07 external summary / reference and peripheral package/set boundary |
-| design_baseline | `bf004e6642cff243360524d83e1efcbdeac03654` |
+| design_baseline | `a6132575c3d91744f28d8521975110639f5f2df6` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | ready_for_design_gate |
-| next_allowed_action | read_docs |
-| current_recovery_point | Design closure is recorded at exact commit `bf004e6642cff243360524d83e1efcbdeac03654`;restart Required Reads and independent Design/Scope/Worktree Gates from `read_docs`,protect user-owned `?? .gitignore`,and do not edit implementation code until the fresh gates pass. |
+| status | in_progress |
+| next_allowed_action | implement |
+| current_recovery_point | Fresh Required Reads and Design/Scope/Worktree Gates passed at exact design commit `a6132575c3d91744f28d8521975110639f5f2df6`;implement only the exact external body-free contracts/domain/application-port/infra-fake slice,protect user-owned `?? .gitignore`,then run fixed checks and actual run-scoped evidence. |
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | project ledger current_boundary must equal `commit-07-a` | pass | Project ledger now points to `commit-07-a`;activation authorizes Required Reads only until all gates pass. |
 | `commit-06-b` handoff must be closed | pass | Trace/audit/impact service-store implementation is closed at `f4af30991e993ffe92fe0f83046057fddc581995`,with run-scoped handoff `20260809T061018Z-commit-06-b`. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-07-a` | pass | Project and boundary ledgers require a fresh read cycle against exact design commit `bf004e6642cff243360524d83e1efcbdeac03654`;no prior gate conclusion is reusable. |
+| project and boundary ledgers had to show `ready_for_design_gate / read_docs` before the fresh gate rerun | pass | Both ledgers were read in that state;the fresh gates now advance this boundary to `in_progress / implement` at exact design commit `a6132575c3d91744f28d8521975110639f5f2df6`. |
 
 ---
 
@@ -27,31 +27,31 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | Reread against the new baseline before any code edit;failed gate returns to `blocked / wait_design`. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented external summary, source/artifact ref, adapter fake, redaction rule or evidence schema | pending | Reread exact closure and confirm no local schema invention is required. |
-| `standards/coding/rust.md` | Rust contract/domain/infra fake module, error and test conventions | pending | Reread before implementation;source identifiers,comments,rustdoc,errors and test names must be English. |
-| `projects/L3-method-library/00-需求文档.md` | external summary / reference P0 scope and provider body exclusion | pending | Confirm external support remains body-free and cannot become core truth or a provider-body archive. |
-| `projects/L3-method-library/01-架构设计.md` | external boundary, body-free redaction, dependency direction and peripheral separation | pending | Confirm `VETO-ML-005` / `VETO-ML-011` and architectural exclusions. |
-| `projects/L3-method-library/02-概要设计.md` | external summary refs, source/artifact refs and body boundary adapter fake outline | pending | Confirm the outline does not expand the §6.3G closure or provider-body/archive exclusions. |
-| `projects/L3-method-library/03-详细设计.md` | formal §6.3G external summary/source/artifact contracts,domain,port,fake and carve-outs | pending | Reread exact wrappers/carriers,object helpers,one-method port,three-field fake,persistence carve-out and fixed evidence rules. |
-| `projects/L3-method-library/04-配置设计.md` | external adapter binding, redaction, disabled/degraded and body boundary rules | pending | Confirm no config key or runtime binding is added by this boundary. |
-| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast external/body boundary, redaction targeted and artifact/report rules | pending | Confirm test/evidence family compatibility with §6.3G fixed raw outputs. |
-| `projects/L3-method-library/06-验收标准.md` | ML-FG-012 seed, ML-RL-004/005, ML-SYNC-007, `VETO-ML-005` and `VETO-ML-011` | pending | Confirm body leakage remains blocking and acceptance adds no implementation schema. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Reread the current `commit-07-a` row and its exact scope/check/evidence carve-outs. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | `commit-07-a` external body-free module ownership override | pending | Confirm contracts/domain/application/infra ownership and all forbidden surfaces. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | `commit-07-a` external body-free object-contract override | pending | Confirm exact typed wrappers,carriers,sets,summary/rule fields and pure helper signatures. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | `commit-07-a` external body-free port/fake override | pending | Confirm the sole adapter method,exact I/O/error surface,three private fake fields and no repository/service seam. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | `commit-07-a` body-free protocol carve-out | pending | Confirm no public command/query/inbound DTO or wire body is added. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | `commit-07-a` external body-free flow override | pending | Confirm only pure transition/adapter-fake flow and no service/repository/UoW/replay behavior. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | `commit-07-a` external summary and body-rule state override | pending | Confirm exact states,legal transitions and no-mutation branches. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | `commit-07-a` transient/persistence carve-out override | pending | Confirm no storage,dereference,UoW,version or replay behavior is introduced. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | `commit-07-a` external body-free error and recovery override | pending | Confirm exact reused domain errors and two-variant adapter error surface. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | `commit-07-a` no-replay/no-concurrency override | pending | Confirm no identity minting,digest calculation,replay or mutable fake behavior. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | `commit-07-a` external body-free cut | pending | Confirm focused assertions,redlines and fixed run-scoped raw artifact names. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-07-a` row | pending | Confirm §6.3G scope and prohibited service/repository/provider/archive/report surfaces. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-07-a` gate row and PH-07 gate | pending | Confirm exact checks and raw artifact/report rule. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-07-a` commit body grouping | pending | Confirm required commit body groups and no report-generator claim. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-06-b` handoff state | latest implementation state | pending | Rerecord HEAD,identity and user-owned `?? .gitignore` before code edits;the file remains untouched and unstaged. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pass | Current boundary activation, failed-gate return, Commit Gate and Handoff Gate rules were reread before implementation edits. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented external summary, source/artifact ref, adapter fake, redaction rule or evidence schema | pass | Exact current-boundary fields,kinds,states,port,fake and evidence are closed;no local schema invention is required. |
+| `standards/coding/rust.md` | Rust contract/domain/infra fake module, error and test conventions | pass | Rust naming,rustdoc,error,module and test conventions were reread;implementation text remains English. |
+| `projects/L3-method-library/00-需求文档.md` | external summary / reference P0 scope and provider body exclusion | pass | External support remains body-free and cannot become core truth or a provider-body archive. |
+| `projects/L3-method-library/01-架构设计.md` | external boundary, body-free redaction, dependency direction and peripheral separation | pass | External body and adjacent runtime truth remain excluded;dependency direction and `VETO-ML-005/011` are preserved. |
+| `projects/L3-method-library/02-概要设计.md` | external summary refs, source/artifact refs and body boundary adapter fake outline | pass | The outline is narrowed by formal §6.3G;provider body,durable archive and peripheral flows remain out of scope. |
+| `projects/L3-method-library/03-详细设计.md` | formal §6.3G external summary/source/artifact contracts,domain,port,fake and carve-outs | pass | Exact wrappers,carriers,sets,summary/rule helpers,one-method port,three-field fake,persistence carve-out and fixed evidence are implementation-ready. |
+| `projects/L3-method-library/04-配置设计.md` | external adapter binding, redaction, disabled/degraded and body boundary rules | pass | This boundary adds no config key,runtime binding,provider constructor or fallback synthesis. |
+| `projects/L3-method-library/05-测试方案.md` | contract-domain-fast external/body boundary, redaction targeted and artifact/report rules | pass | §13.3 matches §6.3G/Step 16 and fixes the actual-run raw outputs plus derived-report boundary. |
+| `projects/L3-method-library/06-验收标准.md` | ML-FG-012 seed, ML-RL-004/005, ML-SYNC-007, `VETO-ML-005` and `VETO-ML-011` | pass | Body leakage remains blocking;acceptance adds no implementation-owned schema or release verdict. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pass | Current scope/check/evidence carve-outs are exact;process-only commit `a6132575c3d91744f28d8521975110639f5f2df6` aligns §11.2 with the four Step 11 body groups. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | `commit-07-a` external body-free module ownership override | pass | Contracts/domain/application-port/infra-fake ownership and all forbidden service/entry/runtime surfaces are explicit. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | `commit-07-a` external body-free object-contract override | pass | Exact typed wrappers,marker wrappers,enums,sets,summary/rule fields and pure helper signatures are closed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | `commit-07-a` external body-free port/fake override | pass | The sole adapter method,exact non-wire I/O/error surface,three private fake fields and no-repository carve-out are closed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | `commit-07-a` body-free protocol carve-out | pass | No public command/query/inbound/event/job DTO,route,RPC or payload is authorized. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | `commit-07-a` external body-free flow override | pass | Only direct pure domain transitions and adapter-fake calls enter this boundary;no service/UoW/replay flow is required. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | `commit-07-a` external summary and body-rule state override | pass | Exact legal,illegal,terminal,no-mutation and field-preservation rules are closed. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | `commit-07-a` transient/persistence carve-out override | pass | No repository,durable store,UoW,version,dedup or stored replay behavior is introduced. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | `commit-07-a` external body-free error and recovery override | pass | Existing five domain errors and exact two-variant technical adapter error surface close all current branches. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | `commit-07-a` no-replay/no-concurrency override | pass | No identity minting,digest calculation,replay,concurrency state or mutable fake behavior is required. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | `commit-07-a` external body-free cut | pass | Focused assertions,redlines and exactly eleven suite raw outputs plus root redaction output are fixed. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-07-a` row | pass | Scope is exactly §6.3G contracts/domain/port/fake/direct-tests/evidence;future surfaces remain excluded. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-07-a` gate row and PH-07 gate | pass | Exact cargo checks/tests,external redline output,root redaction output and no-static/latest rule are closed. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-07-a` commit body grouping | pass | Four exact body groups and no service/repository/provider/archive/report-generator claim are authoritative and now aligned in formal §11.2. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-06-b` handoff state | latest implementation state | pass | HEAD is `f4af30991e993ffe92fe0f83046057fddc581995`;identity is correct;status is only user-owned `?? .gitignore`,which remains untouched and unstaged. |
 
 ---
 
@@ -111,8 +111,8 @@
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
 | activation_gate | pass | Project ledger has advanced from closed `commit-06-b` to `commit-07-a`;fresh Required Reads are now authorized. | read_docs |
-| design_gate | pending | Reread every Required Read against `bf004e6642cff243360524d83e1efcbdeac03654` and verify §6.3G / Step 5~16 / formal `07` close every required schema,helper,port,fake,error,redaction and evidence surface without local invention. | wait_design |
-| scope_gate | pending | Confirm implementation is limited to the exact contracts/domain/application-port/infra-fake slice,focused direct tests and actual run-scoped fixed artifacts. | fix_gate_failure |
+| design_gate | pass | Every Required Read was reread against the `bf004e6642cff243360524d83e1efcbdeac03654` semantic closure plus process-only baseline `a6132575c3d91744f28d8521975110639f5f2df6`;§6.3G / Step 5~16 / formal `07` close every required schema,helper,port,fake,error,redaction and evidence surface without local invention. | wait_design |
+| scope_gate | pass | Planned implementation is limited to exact contracts/domain/application-port/infra-fake code,direct tests and actual run-scoped fixed artifacts;no service,repository,protocol,durable/provider/archive/entry/query/job/package/report-generator work is required. | fix_gate_failure |
 | worktree_gate | pass | Initial status is only user-owned `?? .gitignore`;it remains untouched and unstaged. | fix_gate_failure |
 | build_gate | pending | Formatting and all changed-package/workspace checks must pass after implementation. | fix_gate_failure |
 | test_gate | pending | Direct contracts/domain/application/infra body-free tests must pass after implementation. | fix_gate_failure |

@@ -7,9 +7,9 @@
 | phase | PH-07 external summary / reference and peripheral package/set boundary |
 | design_baseline | `a6132575c3d91744f28d8521975110639f5f2df6` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | in_progress |
-| next_allowed_action | implement |
-| current_recovery_point | Fresh Required Reads and Design/Scope/Worktree Gates passed at exact design commit `a6132575c3d91744f28d8521975110639f5f2df6`;implement only the exact external body-free contracts/domain/application-port/infra-fake slice,protect user-owned `?? .gitignore`,then run fixed checks and actual run-scoped evidence. |
+| status | implemented |
+| next_allowed_action | start_next_boundary |
+| current_recovery_point | `commit-07-a` is closed by implementation commit `be7550b2231aeb915c398ea92973008f1fbce5f1` and run `20260909T051615Z-commit-07-a`;future work must return to the project ledger for explicit `commit-07-b` activation,and user-owned `?? .gitignore` remains untouched and unstaged. |
 
 ---
 
@@ -51,7 +51,7 @@
 | `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-07-a` row | pass | Scope is exactly §6.3G contracts/domain/port/fake/direct-tests/evidence;future surfaces remain excluded. |
 | `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-07-a` gate row and PH-07 gate | pass | Exact cargo checks/tests,external redline output,root redaction output and no-static/latest rule are closed. |
 | `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-07-a` commit body grouping | pass | Four exact body groups and no service/repository/provider/archive/report-generator claim are authoritative and now aligned in formal §11.2. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-06-b` handoff state | latest implementation state | pass | HEAD is `f4af30991e993ffe92fe0f83046057fddc581995`;identity is correct;status is only user-owned `?? .gitignore`,which remains untouched and unstaged. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-06-b` handoff state | latest implementation state | pass | Pre-edit HEAD was `f4af30991e993ffe92fe0f83046057fddc581995`;final HEAD is `be7550b2231aeb915c398ea92973008f1fbce5f1`,identity is correct,and status remains only user-owned `?? .gitignore`,which is untouched and unstaged. |
 
 ---
 
@@ -91,18 +91,18 @@
 | prior handoff | `commit-06-b` implementation commit and handoff recorded | pass | PH-06 service-store slice is recorded at `f4af30991e993ffe92fe0f83046057fddc581995`,with handoff closed. |
 | worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded before activation as only user-owned `?? .gitignore`;file remains untouched and unstaged. |
 | local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
-| format | `cargo fmt --all` | pending | Run after authorized Rust changes. |
-| workspace check | `cargo check` | pending | Run after authorized Rust changes. |
-| contracts check | `cargo check -p method-library-contracts` | pending | Run after contracts changes. |
-| domain check | `cargo check -p method-library-domain` | pending | Run after domain changes. |
-| application check | `cargo check -p method-library-application` | pending | Run after port-carrier changes. |
-| infra check | `cargo check -p method-library-infra` | pending | Run after fake changes. |
-| contract-domain-fast external body boundary | targeted external body-free contracts/domain/application/infra tests | pending | Run direct focused assertions fixed by §6.3G and Step 16. |
-| redaction targeted | targeted redaction scan/test over current-boundary artifacts,reports and logs | pending | Must reject prohibited body/URL/path/secret/status/raw-reason/config content. |
-| VETO targeted audit | check `VETO-ML-005` / `VETO-ML-011` risk is not introduced | pending | Verify no provider body/archive or unsafe external content enters code/tests/evidence. |
-| evidence report | fixed run-scoped `contract-domain-fast` raw artifacts and `redaction-check.txt`,plus derived reports | pending | Generate only after an actual authorized run;no static/latest/generator claim. |
-| whitespace | `git diff --check` and `git diff --cached --check` before commit | pending | Required for Commit Gate. |
-| staged scope | `git diff --cached --name-only` | pending | Must remain inside Allowed Scope. |
+| format | `cargo fmt --all -- --check` | pass | Run `20260909T051615Z-commit-07-a`;raw result is `artifacts/test/20260909T051615Z-commit-07-a/suites/contract-domain-fast/cargo-fmt-check.txt`. |
+| workspace check | `cargo check` | pass | Run `20260909T051615Z-commit-07-a`;raw result is `artifacts/test/20260909T051615Z-commit-07-a/suites/contract-domain-fast/cargo-check-workspace.txt`. |
+| contracts check | `cargo check -p method-library-contracts` | pass | The run-scoped contracts compile artifact records exit code 0. |
+| domain check | `cargo check -p method-library-domain` | pass | The run-scoped domain compile artifact records exit code 0. |
+| application check | `cargo check -p method-library-application` | pass | The run-scoped application compile artifact records exit code 0. |
+| infra check | `cargo check -p method-library-infra` | pass | The run-scoped infra compile artifact records exit code 0. |
+| contract-domain-fast external body boundary | `cargo test` for contracts/domain/application/infra focused packages | pass | Contracts passed 34 integration tests;domain passed 50 integration tests and 3 compile-fail doctests;application passed 12 integration tests;infra passed 46 integration tests. |
+| redaction targeted | targeted redaction scan/test over current-boundary artifacts,reports and logs | pass | `redaction-check.txt` records all required artifacts present and zero sensitive-value,absolute/external-path,failed-status and moving-alias matches. |
+| VETO targeted audit | check `VETO-ML-005` / `VETO-ML-011` risk is not introduced | pass | The 15-file external redline audit records zero forbidden carrier,runtime/private-map,opaque-ref parsing,local-mint,removed-API and out-of-scope path matches. |
+| evidence report | fixed run-scoped `contract-domain-fast` raw artifacts and `redaction-check.txt`,plus derived reports | pass | Eleven fixed suite raw artifacts,one root redaction artifact and two raw-derived reports are committed for run `20260909T051615Z-commit-07-a`;no `latest`,static pass or report generator was used. |
+| whitespace | `git diff --check`,`git diff --cached --check` and post-commit `git show --check` | pass | Pre-commit checks passed;`git show --check be7550b2231aeb915c398ea92973008f1fbce5f1` also passes. |
+| staged scope | pre-commit `git diff --cached --name-only` and committed file list | pass | Commit `be7550b2231aeb915c398ea92973008f1fbce5f1` contains only 29 allowed code,test,raw-artifact and report files;`.gitignore`,`.codex/`,`target/` and unrelated files are absent. |
 
 ---
 
@@ -114,11 +114,11 @@
 | design_gate | pass | Every Required Read was reread against the `bf004e6642cff243360524d83e1efcbdeac03654` semantic closure plus process-only baseline `a6132575c3d91744f28d8521975110639f5f2df6`;§6.3G / Step 5~16 / formal `07` close every required schema,helper,port,fake,error,redaction and evidence surface without local invention. | wait_design |
 | scope_gate | pass | Planned implementation is limited to exact contracts/domain/application-port/infra-fake code,direct tests and actual run-scoped fixed artifacts;no service,repository,protocol,durable/provider/archive/entry/query/job/package/report-generator work is required. | fix_gate_failure |
 | worktree_gate | pass | Initial status is only user-owned `?? .gitignore`;it remains untouched and unstaged. | fix_gate_failure |
-| build_gate | pending | Formatting and all changed-package/workspace checks must pass after implementation. | fix_gate_failure |
-| test_gate | pending | Direct contracts/domain/application/infra body-free tests must pass after implementation. | fix_gate_failure |
-| evidence_gate | pending | Fixed raw artifacts and derived reports must be produced from an actual run after implementation. | fix_gate_failure |
-| commit_gate | pending | Staged scope,commit message,whitespace and required checks must have evidence. | fix_gate_failure |
-| handoff_gate | pending | Commit hash,checks,evidence,remaining blockers and protected user files must be recorded after implementation. | handoff |
+| build_gate | pass | `cargo fmt --all -- --check`,`cargo check` and all four changed-package checks pass in the fixed run. | fix_gate_failure |
+| test_gate | pass | Contracts 34,domain 50 plus 3 compile-fail doctests,application 12 and infra 46 integration tests pass. | fix_gate_failure |
+| evidence_gate | pass | Twelve fixed run-scoped raw artifacts and two raw-derived reports are committed under `20260909T051615Z-commit-07-a`;targeted redaction and external redlines are clean. | fix_gate_failure |
+| commit_gate | pass | Implementation commit,allowed staged scope,required subject/body groups,identity and whitespace checks pass. | fix_gate_failure |
+| handoff_gate | pass | Commit hash,checks,evidence,out-of-scope suites,blocker status and user-owned-file protection are recorded below. | handoff |
 
 ---
 
@@ -126,12 +126,12 @@
 
 | gate | status | evidence |
 |---|---|---|
-| staged_scope | pending | Must include only `commit-07-a` allowed code,test and actual generated evidence files. |
+| staged_scope | pass | `be7550b2231aeb915c398ea92973008f1fbce5f1` contains only allowed external body-free code/tests and run-scoped evidence;`.gitignore` and unrelated files are absent. |
 | unrelated_changes | pass | User-owned untracked `.gitignore` remains untouched and unstaged. |
-| commit_message_format | pending | Planned subject: `feat(external): add body-free summary boundary` |
-| commit_body_group | pending | Body groups must match Step 11: `External summary body-free contracts:`, `External boundary-rule state:`, `Body-free source adapter fake:`, and `External body-free redline checks:` as applicable. |
-| whitespace | pending | `git diff --cached --check` must pass. |
-| required_checks | pending | Required Checks table must have pass/not_applicable evidence. |
+| commit_message_format | pass | Subject is `feat(external): add body-free summary boundary`,with identity `quantalithos-labs <quantalithos.ai@gmail.com>` and the required Codex co-author footer. |
+| commit_body_group | pass | Commit body contains `External summary body-free contracts:`,`External boundary-rule state:`,`Body-free source adapter fake:` and `External body-free redline checks:`. |
+| whitespace | pass | `git diff --check`,`git diff --cached --check` and `git show --check be7550b2231aeb915c398ea92973008f1fbce5f1` passed. |
+| required_checks | pass | All required build,test,evidence,redaction,VETO and scope checks are recorded as pass. |
 
 ---
 
@@ -139,12 +139,12 @@
 
 | gate | status | evidence |
 |---|---|---|
-| committed_hash | pending | Fill after implementation repo commit. |
-| committed_message | pending | Fill after implementation repo commit. |
-| gates_run | pending | List exact Required Read,build,test,redaction and evidence commands after implementation. |
-| tests_not_run | pending | State none or explain;do not claim service/repository/provider/archive/query/API/worker/job/report-generator coverage. |
-| remaining_blockers | pending | Reference blocker table;any new design gap blocks handoff. |
-| final_conclusion | pending | Must be one of pass / fail / cannot_decide with exact evidence source. |
+| committed_hash | pass | `be7550b2231aeb915c398ea92973008f1fbce5f1`. |
+| committed_message | pass | `feat(external): add body-free summary boundary`,with all four required body groups. |
+| gates_run | pass | Ran fresh Required Reads and Design/Scope/Worktree Gates,`cargo fmt --all -- --check`,`cargo check`,four package checks,four package tests,targeted external/redaction audits,run-scoped report checks,staged-scope checks and pre/post-commit whitespace checks. |
+| tests_not_run | pass | Full workspace test and service,repository,durable/provider/archive,API/worker/job,query/material,package/set,report-generator and release suites were not run because they remain outside `commit-07-a`;no coverage is claimed for them. |
+| remaining_blockers | pass | No implementation blocker remains inside `commit-07-a`;`commit-07-b` remains planned and requires explicit activation plus its own fresh gates. |
+| final_conclusion | pass | `commit-07-a` allowed scope is implemented and delivered with passing required checks and run-scoped evidence `20260909T051615Z-commit-07-a`. |
 | user_owned_changes_untouched | pass | User-owned untracked `.gitignore` remains untouched and unstaged. |
 
 ---
@@ -163,4 +163,4 @@
 | item | conclusion | action |
 |---|---|---|
 | future boundary pre-creation | applies current planned-ledger rule | Pre-created future ledgers must use `planned / wait_until_current` and must not authorize code changes until project ledger advances. |
-| external body-free closure | existing design-closure rule applies | External summary, source/artifact refs, body boundary adapter fake and redaction gaps must be fixed in `03/05/06/07` before code; implementation must not invent provider body, archive lifecycle or unsafe source semantics. |
+| external body-free closure | implemented handoff closed | Commit `be7550b2231aeb915c398ea92973008f1fbce5f1` and run `20260909T051615Z-commit-07-a` close the exact body-free contracts/domain/adapter-fake/redaction slice without entering service,repository,provider/archive,peripheral or report-generator scope. |

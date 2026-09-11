@@ -5,11 +5,11 @@
 | project | L3-method-library |
 | boundary_id | commit-07-b |
 | phase | PH-07 external summary / reference and peripheral package/set boundary |
-| design_baseline | `planned-after-d3faf90-handoff-ledger` |
+| design_baseline | `c38992e17b7ba2f5bbd8122ea12105e4a424d118` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| status | planned |
-| next_allowed_action | wait_until_current |
-| current_recovery_point | future package/method set peripheral shell boundary; cannot start until `commit-07-a` is implemented and project ledger advances |
+| status | blocked |
+| next_allowed_action | wait_design |
+| current_recovery_point | Fresh Required Reads at `c38992e17b7ba2f5bbd8122ea12105e4a424d118` failed Design Gate under `BLK-ML-07B-DESIGN-001`;close exact package/set carrier,domain/service/store/replay/error,state,residual/dependency and evidence contracts in design,commit them,and restart from `read_docs`. Implementation code and user-owned `?? .gitignore` remain untouched. |
 
 ---
 
@@ -17,9 +17,9 @@
 
 | rule | status | consequence |
 |---|---|---|
-| project ledger current_boundary must equal `commit-07-b` | planned | If project ledger still points to an earlier boundary, implementation agent must not use this file to modify code. |
-| `commit-07-a` handoff must be closed | planned | External summary/source/artifact body-free boundary must exist before peripheral package/set shell starts. |
-| project ledger must set `next_allowed_action = read_docs` for `commit-07-b` | planned | Until then this boundary remains `wait_until_current`. |
+| project ledger current_boundary must equal `commit-07-b` | pass | Project ledger now points to `commit-07-b`;activation authorizes Required Reads only until all gates pass. |
+| `commit-07-a` handoff must be closed | pass | External body-free implementation is closed at `be7550b2231aeb915c398ea92973008f1fbce5f1`,with design-ledger handoff `c38992e17b7ba2f5bbd8122ea12105e4a424d118`. |
+| project ledger must set `next_allowed_action = read_docs` for `commit-07-b` | pass | Project and boundary ledgers require a fresh read/gate cycle;prior boundary evidence may not be reused. |
 
 ---
 
@@ -27,31 +27,31 @@
 
 | document | required_section | status | notes |
 |---|---|---|---|
-| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pending | This future boundary cannot be executed until it becomes current. |
-| `standards/document/设计真相源闭环与可落码性标准.md` | no invented peripheral schema, marketplace transaction, residual marker, dependency rule or report schema | pending | Missing peripheral/residual field, owner or marker must return to design. |
-| `standards/coding/rust.md` | Rust contract/domain/application module, fake store, error and test conventions | pending | Source identifiers, comments, rustdoc, errors and test names must be English. |
-| `projects/L3-method-library/00-需求文档.md` | FR-ML-E peripheral/future scope and P0 non-blocking rule | pending | Peripheral capability is bounded/residual and must not become a P0 blocker. |
-| `projects/L3-method-library/01-架构设计.md` | peripheral package/set boundary, dependency direction and core non-blocking rule | pending | `VETO-ML-008` applies if peripheral blocks core or marketplace scope becomes P0. |
-| `projects/L3-method-library/02-概要设计.md` | package/method set shell and residual marker outline | pending | Use current peripheral model; do not add marketplace transaction or advanced UX behavior. |
-| `projects/L3-method-library/03-详细设计.md` | package/set object, service, residual marker, risk and dependency contracts | pending | Formal source for package/set shell, residual marker semantics and safe failures. |
-| `projects/L3-method-library/04-配置设计.md` | peripheral adapter/dependency boundary and disabled/degraded behavior | pending | Peripheral disabled/unavailable state must not degrade P0 core success. |
-| `projects/L3-method-library/05-测试方案.md` | service-flow-fast peripheral package/set residual and artifact/report rules | pending | Peripheral residual report must derive from raw artifact if generated. |
-| `projects/L3-method-library/06-验收标准.md` | ML-FG-012, ML-RL-004/005, ML-SYNC-007 and `VETO-ML-008` | pending | Peripheral blocking core or unowned residual blocks commit. |
-| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pending | Current source for phase, boundary, allowed scope, checks and commit discipline. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | peripheral package/set module boundary | pending | Keep peripheral shell separate from core truth, query/material and marketplace transaction. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | package/set objects, peripheral refs, residual marker and risk state objects | pending | Required typed refs, residual fields and non-blocking state fields must be formal. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | package/set service ports, dependency seams and residual marker ports | pending | Do not add ports, stores or fakes beyond formal contracts. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | package/set service DTO shells and safe result contracts | pending | Public surfaces must be safe and must not imply marketplace completion. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | package/set service flows and residual/risk marker flows | pending | Service behavior must preserve core non-blocking and formal residual ownership. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | peripheral/residual state guards | pending | Peripheral unavailable/residual states must match formal state matrix. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | package/set store, UoW and residual marker consistency | pending | Fake stores must preserve version/UoW and not bypass residual ownership. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | peripheral safe errors and residual escalation rules | pending | Errors must be safe and must not mark P0 core as failed unless formal VETO is hit. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | duplicate/replay and peripheral consistency constraints | pending | Duplicate/replay must not convert residual into success or rerun marketplace-like side effects. |
-| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | service-flow-fast peripheral package/set residual ownership | pending | Use peripheral residual slice only. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-07-b` row | pending | Allowed scope is package/set DTO/domain/service and residual markers. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-07-b` gate row and PH-07 gate | pending | Required checks are service-flow-fast peripheral package/set residual plus risk/dependency seed checks. |
-| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-07-b` commit body grouping | pending | Commit body must include `Peripheral package and set shell:` and `Residual risk markers:`. |
-| `/home/aris/Projects/quantalithos-method-library` git status and `commit-07-a` handoff state | latest implementation state | pending | Must confirm external body-free boundary landed before this boundary starts. |
+| `standards/document/代码实施台账与门禁规范.md` | planned boundary activation, gate matrix, commit and handoff rules | pass | Read and applied before any implementation edit. |
+| `standards/document/设计真相源闭环与可落码性标准.md` | no invented peripheral schema, marketplace transaction, residual marker, dependency rule or report schema | pass | Read and applied;missing peripheral/residual closure must return to design. |
+| `standards/coding/rust.md` | Rust contract/domain/application module, fake store, error and test conventions | pass | Read and applied;implementation has not started. |
+| `projects/L3-method-library/00-需求文档.md` | FR-ML-E peripheral/future scope and P0 non-blocking rule | pass | Read;peripheral capability remains bounded/residual and cannot become a P0 blocker. |
+| `projects/L3-method-library/01-架构设计.md` | peripheral package/set boundary, dependency direction and core non-blocking rule | pass | Read;`VETO-ML-008` applies if peripheral blocks core or marketplace scope becomes P0. |
+| `projects/L3-method-library/02-概要设计.md` | package/method set shell and residual marker outline | pass | Read;marketplace transaction and advanced UX behavior remain excluded. |
+| `projects/L3-method-library/03-详细设计.md` | package/set object, service, residual marker, risk and dependency contracts | pass | Read;no exact implementation-facing `commit-07-b` closure exists after §6.3G. |
+| `projects/L3-method-library/04-配置设计.md` | peripheral adapter/dependency boundary and disabled/degraded behavior | pass | Read;peripheral disabled/unavailable state must not degrade P0 core success. |
+| `projects/L3-method-library/05-测试方案.md` | service-flow-fast peripheral package/set residual and artifact/report rules | pass | Read;exact targeted cases and fixed residual evidence surface remain unclosed. |
+| `projects/L3-method-library/06-验收标准.md` | ML-FG-012, ML-RL-004/005, ML-SYNC-007 and `VETO-ML-008` | pass | Read;acceptance intent exists but executable residual ownership evidence remains unclosed. |
+| `projects/L3-method-library/07-实施计划.md` | §3, §6, §7, §8, §11 and §12 | pass | Read;current boundary scope cannot close safely until design gaps are resolved. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_05_module_contracts.md` | peripheral package/set module boundary | pass | Read;peripheral shell remains separate from core truth,query/material and marketplace transaction. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_06_object_contracts.md` | package/set objects, peripheral refs, residual marker and risk state objects | pass | Read;field skeletons reference undefined Rust-facing support carriers. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_07_trait_port_adapter.md` | package/set service ports, dependency seams and residual marker ports | pass | Read;exact callable service/repository/fake parity surfaces are absent. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_08_protocol_contracts.md` | package/set service DTO shells and safe result contracts | pass | Read;exact selector/source/input/output mapping is absent. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_09_function_flows.md` | package/set service flows and residual/risk marker flows | pass | Read;family-level prose explicitly does not add concrete schema/port signatures. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_10_state_machine.md` | peripheral/residual state guards | pass | Read;package/assembly state vocabulary conflicts with formal `03`. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_11_persistence_tx_consistency.md` | package/set store, UoW and residual marker consistency | pass | Read;exact methods use fields absent from object schemas and do not close UoW/replay/fake parity. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_12_errors_recovery.md` | peripheral safe errors and residual escalation rules | pass | Read;exact current-boundary safe error mapping is absent. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_13_concurrency_idempotency.md` | duplicate/replay and peripheral consistency constraints | pass | Read;package/set canonical digest and duplicate replay rules are absent. |
+| `projects/L3-method-library/design-calibration/03_ddd_step_16_test_cut.md` | service-flow-fast peripheral package/set residual ownership | pass | Read;exact targeted test and raw-artifact contracts are absent. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_06_tasks_commit_boundaries.md` | `commit-07-b` row | pass | Read;allowed scope still depends on missing exact design closure. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_07_test_acceptance_gates.md` | `commit-07-b` gate row and PH-07 gate | pass | Read;generic seeds do not close fixed executable evidence. |
+| `projects/L3-method-library/design-calibration/07_implementation_plan_step_11_commit_review_delivery.md` | `commit-07-b` commit body grouping | pass | Read;commit grouping exists but implementation is blocked before Commit Gate. |
+| `/home/aris/Projects/quantalithos-method-library` git status and `commit-07-a` handoff state | latest implementation state | pass | Confirmed `commit-07-a` at `be7550b2231aeb915c398ea92973008f1fbce5f1`;only user-owned `?? .gitignore` exists and remains untouched. |
 
 ---
 
@@ -86,10 +86,10 @@
 
 | check | command_or_evidence | status | notes |
 |---|---|---|---|
-| activation guard | project ledger shows `current_boundary = commit-07-b` and `next_allowed_action = read_docs` | pending | Must pass before any implementation edit. |
-| prior handoff | `commit-07-a` implementation commit and handoff recorded | pending | External body-free boundary must exist. |
-| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pending | Record before edits and protect unrelated files. |
-| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pending | Must remain `quantalithos-labs <quantalithos.ai@gmail.com>`. |
+| activation guard | project ledger shows `current_boundary = commit-07-b` and `next_allowed_action = read_docs` | pass | Project ledger and this boundary ledger now activate only fresh Required Reads at exact committed baseline `c38992e17b7ba2f5bbd8122ea12105e4a424d118`. |
+| prior handoff | `commit-07-a` implementation commit and handoff recorded | pass | External body-free boundary is closed at implementation commit `be7550b2231aeb915c398ea92973008f1fbce5f1` and design handoff `c38992e17b7ba2f5bbd8122ea12105e4a424d118`. |
+| worktree baseline | `git -C /home/aris/Projects/quantalithos-method-library status --short` | pass | Recorded before activation as only user-owned `?? .gitignore`;file remains untouched and unstaged. |
+| local git identity | `git -C /home/aris/Projects/quantalithos-method-library config user.name` and `user.email` | pass | Confirmed `quantalithos-labs <quantalithos.ai@gmail.com>`. |
 | format | `cargo fmt --all` | pending | Run in implementation repo after Rust changes. |
 | workspace check | `cargo check` | pending | Ensures the full workspace still compiles. |
 | contracts check | `cargo check -p method-library-contracts` or the formal contracts package check | pending | Use actual package name from formal workspace once activated. |
@@ -110,10 +110,10 @@
 
 | gate | status | evidence | next_if_failed |
 |---|---|---|---|
-| activation_gate | pending | Boundary is planned until project ledger advances from `commit-07-a` to `commit-07-b`. | wait_until_current |
-| design_gate | pending | Implementation agent must reread Required Reads and confirm package/set shell, residual marker, dependency and `VETO-ML-008` closure. | wait_design |
-| scope_gate | pending | Planned changes must be limited to package/set peripheral shell, residual markers, formal fake seams and focused tests. | fix_gate_failure |
-| worktree_gate | pending | Initial implementation worktree status recorded; unrelated user changes protected. | fix_gate_failure |
+| activation_gate | pass | Project ledger has advanced from closed `commit-07-a` to `commit-07-b`;fresh Required Reads are now authorized. | read_docs |
+| design_gate | blocked | Fresh reads found only object field skeletons and family-level flow/store prose:exact support carriers,callable service/repository/UoW/replay/fake surfaces,state vocabulary and residual/evidence schema are not closed;formal `03` package/assembly state labels also conflict with Step 10. | wait_design |
+| scope_gate | blocked | A safe implementation scope cannot be derived until `BLK-ML-07B-DESIGN-001` fixes which DTO/domain/service/store/fake/evidence surfaces actually belong to this boundary. | wait_design |
+| worktree_gate | pass | Initial status is only user-owned `?? .gitignore`;it remains untouched and unstaged. | fix_gate_failure |
 | build_gate | pending | Formatting, workspace/contract/domain/application/infra checks and dependency boundary checks pass or failure is recorded. | fix_gate_failure |
 | test_gate | pending | Service-flow-fast peripheral, dependency seed, risk/residual seed and VETO targeted checks pass after activation. | fix_gate_failure |
 | evidence_gate | pending | Targeted artifacts/reports are optional; any generated report must be run-scoped and raw-artifact-derived. | fix_gate_failure |
@@ -127,7 +127,7 @@
 | gate | status | evidence |
 |---|---|---|
 | staged_scope | pending | Must include only allowed `commit-07-b` peripheral package/set, residual marker, test and generated targeted evidence files. |
-| unrelated_changes | pending | User-owned unrelated changes must remain unstaged. |
+| unrelated_changes | pass | User-owned untracked `.gitignore` remains untouched and unstaged. |
 | commit_message_format | pending | Planned subject: `feat(peripheral): add package set shell` |
 | commit_body_group | pending | Body group must include `Peripheral package and set shell:` and `Residual risk markers:` from Step 11 mapping. |
 | whitespace | pending | `git diff --cached --check` must pass. |
@@ -153,7 +153,8 @@
 
 | blocker_id | gate | status | blocking_reason | requested_design_closure | next_allowed_action |
 |---|---|---|---|---|---|
-| BLK-ML-07B-ACTIVATION-001 | activation_gate | planned | Project ledger has not advanced through `commit-07-a`; this future boundary must not be used for implementation yet. | After `commit-07-a` handoff, update project ledger to `commit-07-b` and set this boundary to current. | wait_until_current |
+| BLK-ML-07B-ACTIVATION-001 | activation_gate | resolved | Project ledger had not advanced through `commit-07-a`;this future boundary could not be used for implementation. | `commit-07-a` handoff is now closed and project/boundary ledgers advance to `commit-07-b` for fresh Required Reads. | read_docs |
+| BLK-ML-07B-DESIGN-001 | design_gate | open | Baseline `c38992e17b7ba2f5bbd8122ea12105e4a424d118` has no formal `03` implementation-facing `commit-07-b` section. Step 6 names package/set/rule field types without Rust-facing definitions;Step 7/9/11 lack exact callable facade,input/output,repository,UoW,stored-result and fake parity surfaces;Step 13 lacks package/set canonical digest/replay;formal `03` and Step 10 use conflicting lifecycle labels;`05/06/07` do not define executable residual owner/acceptor/deadline artifact schema or targeted cases. | Publish one exact boundary closure across formal `03/05/06/07` and matching Step 5/6/7/8/9/10/11/12/13/16:typed kinds/wrappers/ref sets and support carriers;complete domain fields/factories/transitions;selector/source/service/facade map;repository/UoW/replay/fake parity;safe errors;single state vocabulary;residual/dependency/VETO test and fixed run-scoped evidence contracts. | wait_design |
 
 ---
 

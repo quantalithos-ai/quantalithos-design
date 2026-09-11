@@ -1,8 +1,8 @@
 # L3-method-library 项目设计讨论执行台账
 
 > 创建日期: 2026-06-15
-> 最近更新: 2026-09-09
-> 当前任务: `commit-07-a` 已在精确设计基线 `a6132575c3d91744f28d8521975110639f5f2df6` 完成 fresh Required Reads 与 Design/Scope/Worktree Gate。当前状态为 `in_progress / implement`;只允许 external body-free contracts/domain、单方法 adapter port、三字段 fake、直接测试与实际 run-scoped evidence。
+> 最近更新: 2026-09-10
+> 当前任务: `commit-07-b` fresh Design Gate 已在精确已提交 baseline `c38992e17b7ba2f5bbd8122ea12105e4a424d118` 失败。当前状态为 `blocked / wait_design`;必须先关闭 `BLK-ML-07B-DESIGN-001`,实现仓代码与用户 `?? .gitignore` 保持不变。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-07-a external body-free implementation` | in_progress | Fresh Required Reads and Design/Scope/Worktree Gates passed at `a6132575c3d91744f28d8521975110639f5f2df6`;the exact wrappers/carriers/domain guards/one-method port/three-field fake/test-evidence surface requires no local schema invention. | implement:只落当前 boundary exact slice;保护用户 `.gitignore`;随后执行 fixed build/test/redaction/evidence gates。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-07-a.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-07-b design closure` | blocked | Committed Required Reads lack exact package/set support schemas and callable surfaces,contain state conflicts,and do not close executable residual/evidence ownership;see `BLK-ML-07B-DESIGN-001`. | wait_design:只允许修复并提交 formal `03/05/06/07` 与 matching Step 5~16 design closure;不得修改实现仓代码。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-07-b.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_active | Step 13 completed + `commit-07-a` implementation in progress | implement | Fresh gates 已通过;只允许 exact contracts/domain/application-port/infra-fake、direct tests 与 actual run-scoped evidence,其余 surface 继续后移。 |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_blocked | Step 13 completed + `commit-07-b` Design Gate blocked | wait_design | `BLK-ML-07B-DESIGN-001` requires an exact package/set implementation-facing closure before implementation can restart. |
 
 ---
 
@@ -97,6 +97,8 @@
 | BLK-ML-06B-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-06-b.md` | resolved | The prior baseline lacked a boundary-specific PH-06 callable/replay/factory/fake/evidence closure. | Design commit `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` closes the exact selector/source/input/facade map, four repository traits and safe error surface, support/truth-ref factory, canonical digest/dedup, Versioned/UoW/CommitUnknown, fake parity, safe redaction and fixed run-scoped artifacts while preserving report/jobs carve-outs. Implementation must restart from `read_docs` and independently rerun all gates. |
 | BLK-ML-07A-ACTIVATION-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-07-a.md` | resolved | `commit-07-a` 先前为 future planned boundary,不得用于实现。 | `commit-06-b` handoff 已关闭;三份流程台账将 `commit-07-a` 激活到 `ready_for_design_gate / read_docs`,并以设计提交 `bf004e6642cff243360524d83e1efcbdeac03654` 作为 fresh gate 基线。 |
 | BLK-ML-07A-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-07-a.md` | resolved | 旧基线曾缺 exact external carrier/domain/adapter-fake/error-marker/test-evidence surface,实现会被迫私补 schema/port/state/marker/fake/evidence。 | 设计提交 `bf004e6642cff243360524d83e1efcbdeac03654` 的 formal `03` §6.3G、Step 5~16 与 formal `07` 已闭合 exact wrappers/kinds、carriers、summary/rule state helpers、one-method adapter port、three-private-field fake、safe errors/redaction、persistence carve-out 和 fixed raw artifacts;实现必须从 `read_docs` 全量重读并独立重跑 gates。 |
+| BLK-ML-07B-ACTIVATION-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-07-b.md` | resolved | `commit-07-b` 先前为 future planned boundary,不得用于实现。 | `commit-07-a` handoff 已关闭;三份流程台账现在仅将 `commit-07-b` 激活到 `ready_for_design_gate / read_docs`,exact peripheral closure 仍须基于 committed design truth 由 fresh gate 独立确认。 |
+| BLK-ML-07B-DESIGN-001 | `implementation_execution_ledger.md`;`implementation-boundaries/commit-07-b.md` | open | Baseline `c38992e17b7ba2f5bbd8122ea12105e4a424d118` has no boundary-specific Rust-facing closure:package/set/rule support carriers are undefined,service/repository/UoW/replay/fake callables are absent,state labels conflict,and residual/dependency/VETO evidence is not executable. | Close exact typed refs/carriers,domain helpers and one state vocabulary,selector/source/service/facade mapping,repository/UoW/stored replay/fake parity,safe errors,and fixed residual/dependency/VETO test-evidence contracts in formal `03/05/06/07` and matching Step 5~16;then commit and restart from `read_docs`. |
 
 ---
 
@@ -109,11 +111,11 @@
 2. 读取 `design-calibration/07_implementation_plan_calibration_flow.md`
 3. 读取 `design-calibration/07_implementation_plan_step_13_formal_document_assembly.md`
 4. 读取 `design-calibration/implementation_execution_ledger.md`
-5. 读取 `design-calibration/implementation-boundaries/commit-07-a.md`
+5. 读取 `design-calibration/implementation-boundaries/commit-07-b.md`
 6. 确认正式 `projects/L3-method-library/07-实施计划.md` 已完成 full-restart 装配
-7. 确认 implementation ledger 当前是 `commit-07-a` / `in_progress` / `implement`,精确设计基线为 `a6132575c3d91744f28d8521975110639f5f2df6`,且 fresh Design/Scope/Worktree Gate 已 pass
-8. 保护实现仓用户未跟踪 `.gitignore`,只在 boundary Allowed Scope 内继续实现、fixed checks 与 actual run-scoped evidence
-9. 若实现中发现新的 schema/port/state/mapper/config/evidence/boundary 缺口,立即将 implementation/boundary ledger 置为 `blocked / wait_design` 并停止实现
+7. 确认 implementation ledger 当前是 `commit-07-b` / `blocked` / `wait_design`,阻塞项为 `BLK-ML-07B-DESIGN-001`
+8. 只在 design repo 修复 formal `03/05/06/07` 与 matching Step 5~16 exact closure,保护其他项目和用户未提交改动
+9. 设计闭口提交后,将 implementation/boundary ledger 重新置为 `ready_for_design_gate / read_docs`,再由实现侧基于新 commit 全量重读并独立跑 gates
 ```
 
 ---
@@ -121,8 +123,8 @@
 ## 7. 当前 next_allowed_action
 
 ```text
-`commit-06-b` implementation/handoff 已由 `f4af30991e993ffe92fe0f83046057fddc581995` 和 run `20260809T061018Z-commit-06-b` 关闭;
-当前 boundary 是 `commit-07-a`,精确设计基线是 `a6132575c3d91744f28d8521975110639f5f2df6`,状态为 `in_progress / implement`;
-`BLK-ML-07A-DESIGN-001` 已由 formal `03` §6.3G、Step 5~16 与 formal `07` 的 exact external body-free closure 解决,formal commit groups 也已同步;
-fresh Required Reads 与 Design/Scope/Worktree Gate 已通过;实现侧只可继续 exact boundary code/tests/evidence,发现新设计缺口必须回写 `blocked / wait_design`.
+`commit-07-a` implementation/handoff 已由 `be7550b2231aeb915c398ea92973008f1fbce5f1` 和 run `20260909T051615Z-commit-07-a` 关闭;
+当前 boundary 是 `commit-07-b`,fresh Design Gate 在 committed baseline `c38992e17b7ba2f5bbd8122ea12105e4a424d118` 失败,状态为 `blocked / wait_design`;
+`BLK-ML-07B-DESIGN-001` 要求补齐 exact carrier/domain/service/store/replay/error/state/residual/dependency/test-evidence closure;
+下一步只允许在设计仓完成并提交该闭口;实现仓不得修改,用户 `?? .gitignore` 必须继续保持 untouched/unstaged.
 ```

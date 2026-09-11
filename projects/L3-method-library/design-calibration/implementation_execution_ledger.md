@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `a6132575c3d91744f28d8521975110639f5f2df6` |
-| current_boundary | `commit-07-a` |
-| gate_status | pass |
-| gate_reason | `commit-07-a` implementation is complete in `be7550b2231aeb915c398ea92973008f1fbce5f1`;Design,Scope,Worktree,Build,Test,Evidence,Commit and Handoff Gates pass with run-scoped `contract-domain-fast` and redaction evidence `20260909T051615Z-commit-07-a`. |
-| next_allowed_action | start_next_boundary |
-| current_recovery_point | `commit-07-a` handoff is closed by implementation commit `be7550b2231aeb915c398ea92973008f1fbce5f1` and run `20260909T051615Z-commit-07-a`;`commit-07-b` remains planned and must be explicitly activated before fresh Required Reads and independent gates. User-owned `?? .gitignore` remains untouched and unstaged. |
+| current_design_baseline | `c38992e17b7ba2f5bbd8122ea12105e4a424d118` |
+| current_boundary | `commit-07-b` |
+| gate_status | blocked |
+| gate_reason | `commit-07-b` fresh Design Gate failed at committed baseline `c38992e17b7ba2f5bbd8122ea12105e4a424d118`:formal `03` has no implementation-facing `commit-07-b` closure;Step 6 contains only field skeletons with undefined support carriers;Step 7/9/11 provide family-level repository/flow semantics without exact callable service/store/replay surfaces;formal `03` and Step 10 also disagree on package/assembly state labels;residual/evidence ownership remains non-executable. |
+| next_allowed_action | wait_design |
+| current_recovery_point | Resolve `BLK-ML-07B-DESIGN-001` in formal `03/05/06/07` and matching Step 5/6/7/8/9/10/11/12/13/16 sources,commit the exact closure,then restart `commit-07-b` from `read_docs`;implementation code remains untouched and user-owned `?? .gitignore` remains unstaged. |
 | last_updated_by | implementation agent |
-| last_updated_at | 2026-09-10 20:31:27 +0800 |
+| last_updated_at | 2026-09-10 23:36:50 +0800 |
 
 ---
 
@@ -43,7 +43,7 @@
 | `commit-06-a` | `current-design-with-commit-06-a-lineage-link-state-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-a` completed at `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;PH-06 trace/impact/audit/evidence-lineage contracts,domain guards and run-scoped `contract-domain-fast` evidence are closed. |
 | `commit-06-b` | `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-b` completed at `f4af30991e993ffe92fe0f83046057fddc581995`;seven PH-06 service flows,four repository fakes,versioned UoW/stored replay/CommitUnknown behavior and run-scoped service/redaction evidence are closed. |
 | `commit-07-a` | `a6132575c3d91744f28d8521975110639f5f2df6` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-07-a` completed at `be7550b2231aeb915c398ea92973008f1fbce5f1`;external body-free contracts/domain,one-method adapter port,three-field fake and run-scoped contract/redaction evidence are closed. |
-| `commit-07-b` | `planned-after-d3faf90-handoff-ledger` | planned | activation_gate | wait_until_current | Pre-created future package/set peripheral boundary;it is not authorized until an explicit project-ledger activation advances it to `read_docs`. |
+| `commit-07-b` | `c38992e17b7ba2f5bbd8122ea12105e4a424d118` | blocked | design_gate | wait_design | Fresh Required Reads found no exact implementation-facing package/set closure and found cross-document state conflicts;see `BLK-ML-07B-DESIGN-001`. |
 
 ---
 
@@ -100,6 +100,8 @@
 | BLK-ML-06B-DESIGN-001 | `commit-06-b` | implementation | resolved | `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` | Formal `03` §6.3F and the matching Step 5/6/7/8/9/10/11/12/13/16 closure patches publish the exact current-boundary selector/source/input/facade map, four repository traits and safe error surface, support/truth-ref factory, canonical digest/dedup, Versioned/UoW/CommitUnknown/replay behavior, fake parity, redaction rules and fixed raw artifacts;report generator/jobs remain carved out. |
 | BLK-ML-07A-ACTIVATION-001 | `commit-07-a` | implementation | resolved | `bf004e6642cff243360524d83e1efcbdeac03654` | `commit-06-b` handoff is closed and the project ledger advances to `commit-07-a`;implementation must restart from `read_docs` and independently verify the new exact external body-free closure before any code edit. |
 | BLK-ML-07A-DESIGN-001 | `commit-07-a` | implementation | resolved | `bf004e6642cff243360524d83e1efcbdeac03654` | Design commit `bf004e6642cff243360524d83e1efcbdeac03654` adds formal `03` §6.3G and matching Step 5~16 / formal `07` closure: exact wrappers/kinds, closed carriers and sets, `ExternalSourceSummary` and `ExternalBodyBoundaryRule` guards, one-method adapter port, three-field fake, safe error/marker rules, persistence carve-out and fixed raw artifacts. Implementation must restart Required Reads and independent Design/Scope/Worktree Gates from `read_docs`;no historical gate result is reusable. |
+| BLK-ML-07B-ACTIVATION-001 | `commit-07-b` | implementation | resolved | `c38992e17b7ba2f5bbd8122ea12105e4a424d118` | `commit-07-a` handoff is closed and the project ledger advances to `commit-07-b`;implementation must continue from `read_docs` and independently verify exact peripheral package/set closure before any code edit. |
+| BLK-ML-07B-DESIGN-001 | `commit-07-b` | implementation | open | pending design closure | Baseline `c38992e17b7ba2f5bbd8122ea12105e4a424d118` lacks exact typed-ref/support carrier schemas,complete package/set/rule object and helper contracts,selector/source/service input/output and facade map,repository/UoW/stored-result/fake parity callables,canonical digest/replay rules,one state vocabulary,safe error mapping,and executable residual/dependency/VETO evidence schema. Design must close these in formal `03/05/06/07` plus matching Step 5~16 sources before a fresh `read_docs` restart. |
 
 ---
 
@@ -108,12 +110,12 @@
 Any implementation agent resuming `L3-method-library` must read files in this order:
 
 1. `projects/L3-method-library/design-calibration/implementation_execution_ledger.md`
-2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-07-a.md`
+2. `projects/L3-method-library/design-calibration/implementation-boundaries/commit-07-b.md`
 3. `projects/L3-method-library/07-实施计划.md`
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-If any required design source is missing,contradicts the active boundary,or does not close an exact carrier,port,state,mapper,config or evidence source needed for implementation,set `gate_status = blocked`,set `next_allowed_action = wait_design`,and stop implementation. Current boundary `commit-07-a` is closed at exact design commit `a6132575c3d91744f28d8521975110639f5f2df6` and implementation commit `be7550b2231aeb915c398ea92973008f1fbce5f1`;the next action is `start_next_boundary`,not implementation from the planned `commit-07-b` ledger.
+Fresh Required Reads found the exact gaps governed by `BLK-ML-07B-DESIGN-001`;current state is `blocked / wait_design`. Implementation must not resume until a committed design baseline closes every listed package/set carrier,callable,state,replay,residual/dependency and evidence surface and the boundary is explicitly returned to `read_docs`.
 
 ---
 
@@ -147,4 +149,4 @@ If any required design source is missing,contradicts the active boundary,or does
 | `commit-06-a` | implemented handoff closed | Implementation handoff records PH-06 traceability,impact,audit and evidence-lineage contracts/domain commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;exact typed refs,body-free carriers,first-seen sets,pure state guards,terminal/no-mutation redlines and run-scoped `contract-domain-fast` evidence are closed. |
 | `commit-06-b` | implemented handoff closed | Implementation handoff records PH-06 trace/impact/audit/evidence-lineage service/store commit `f4af30991e993ffe92fe0f83046057fddc581995`;seven service flows,four repository fakes,stored replay/CommitUnknown checks and run-scoped `service-flow-fast` / redaction evidence are closed. |
 | `commit-07-a` | implemented handoff closed | Implementation handoff records external body-free contracts/domain/application-port/infra-fake commit `be7550b2231aeb915c398ea92973008f1fbce5f1`;typed refs,body-free carriers,state guards,deterministic fake and run-scoped `contract-domain-fast` / redaction evidence are closed. |
-| `commit-07-b` | planned,not activated | The pre-created peripheral package/set boundary remains `planned / wait_until_current`;it requires an explicit project-ledger transition followed by fresh Required Reads and Design/Scope/Worktree Gates. |
+| `commit-07-b` | blocked at design gate | Required Reads at `c38992e17b7ba2f5bbd8122ea12105e4a424d118` expose `BLK-ML-07B-DESIGN-001`;implementation remains unchanged until committed exact design closure and a fresh gate cycle. |

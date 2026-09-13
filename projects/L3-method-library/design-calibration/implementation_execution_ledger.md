@@ -14,14 +14,14 @@
 | project | L3-method-library |
 | design_repo | `/home/aris/Projects/quantalithos-design` |
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
-| current_design_baseline | `c38992e17b7ba2f5bbd8122ea12105e4a424d118` |
+| current_design_baseline | `132db640cb19ea3ca0939c2e315af871ab6b7e5e` |
 | current_boundary | `commit-07-b` |
-| gate_status | blocked |
-| gate_reason | `commit-07-b` fresh Design Gate failed at committed baseline `c38992e17b7ba2f5bbd8122ea12105e4a424d118`:formal `03` has no implementation-facing `commit-07-b` closure;Step 6 contains only field skeletons with undefined support carriers;Step 7/9/11 provide family-level repository/flow semantics without exact callable service/store/replay surfaces;formal `03` and Step 10 also disagree on package/assembly state labels;residual/evidence ownership remains non-executable. |
-| next_allowed_action | wait_design |
-| current_recovery_point | Resolve `BLK-ML-07B-DESIGN-001` in formal `03/05/06/07` and matching Step 5/6/7/8/9/10/11/12/13/16 sources,commit the exact closure,then restart `commit-07-b` from `read_docs`;implementation code remains untouched and user-owned `?? .gitignore` remains unstaged. |
+| gate_status | ready_for_design_gate |
+| gate_reason | Design commit `132db640cb19ea3ca0939c2e315af871ab6b7e5e` closes `BLK-ML-07B-DESIGN-001`;the prior blocked result is historical and no Required Read or gate result may be reused. |
+| next_allowed_action | read_docs |
+| current_recovery_point | Restart `commit-07-b` from the ordered Required Reads at exact baseline `132db640cb19ea3ca0939c2e315af871ab6b7e5e`,then independently run Design/Scope/Worktree Gates before any implementation edit;preserve user-owned `?? .gitignore`. |
 | last_updated_by | implementation agent |
-| last_updated_at | 2026-09-10 23:36:50 +0800 |
+| last_updated_at | 2026-09-13 18:11:20 +0800 |
 
 ---
 
@@ -43,7 +43,7 @@
 | `commit-06-a` | `current-design-with-commit-06-a-lineage-link-state-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-a` completed at `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;PH-06 trace/impact/audit/evidence-lineage contracts,domain guards and run-scoped `contract-domain-fast` evidence are closed. |
 | `commit-06-b` | `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-b` completed at `f4af30991e993ffe92fe0f83046057fddc581995`;seven PH-06 service flows,four repository fakes,versioned UoW/stored replay/CommitUnknown behavior and run-scoped service/redaction evidence are closed. |
 | `commit-07-a` | `a6132575c3d91744f28d8521975110639f5f2df6` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-07-a` completed at `be7550b2231aeb915c398ea92973008f1fbce5f1`;external body-free contracts/domain,one-method adapter port,three-field fake and run-scoped contract/redaction evidence are closed. |
-| `commit-07-b` | `c38992e17b7ba2f5bbd8122ea12105e4a424d118` | blocked | design_gate | wait_design | Fresh Required Reads found no exact implementation-facing package/set closure and found cross-document state conflicts;see `BLK-ML-07B-DESIGN-001`. |
+| `commit-07-b` | `132db640cb19ea3ca0939c2e315af871ab6b7e5e` | ready_for_design_gate | design_closure_recorded | read_docs | Exact peripheral package/set carrier/domain/service/store/replay/state/residual/dependency/VETO/redaction closure is committed;fresh gates remain mandatory. |
 
 ---
 
@@ -101,7 +101,7 @@
 | BLK-ML-07A-ACTIVATION-001 | `commit-07-a` | implementation | resolved | `bf004e6642cff243360524d83e1efcbdeac03654` | `commit-06-b` handoff is closed and the project ledger advances to `commit-07-a`;implementation must restart from `read_docs` and independently verify the new exact external body-free closure before any code edit. |
 | BLK-ML-07A-DESIGN-001 | `commit-07-a` | implementation | resolved | `bf004e6642cff243360524d83e1efcbdeac03654` | Design commit `bf004e6642cff243360524d83e1efcbdeac03654` adds formal `03` §6.3G and matching Step 5~16 / formal `07` closure: exact wrappers/kinds, closed carriers and sets, `ExternalSourceSummary` and `ExternalBodyBoundaryRule` guards, one-method adapter port, three-field fake, safe error/marker rules, persistence carve-out and fixed raw artifacts. Implementation must restart Required Reads and independent Design/Scope/Worktree Gates from `read_docs`;no historical gate result is reusable. |
 | BLK-ML-07B-ACTIVATION-001 | `commit-07-b` | implementation | resolved | `c38992e17b7ba2f5bbd8122ea12105e4a424d118` | `commit-07-a` handoff is closed and the project ledger advances to `commit-07-b`;implementation must continue from `read_docs` and independently verify exact peripheral package/set closure before any code edit. |
-| BLK-ML-07B-DESIGN-001 | `commit-07-b` | implementation | open | pending design closure | Baseline `c38992e17b7ba2f5bbd8122ea12105e4a424d118` lacks exact typed-ref/support carrier schemas,complete package/set/rule object and helper contracts,selector/source/service input/output and facade map,repository/UoW/stored-result/fake parity callables,canonical digest/replay rules,one state vocabulary,safe error mapping,and executable residual/dependency/VETO evidence schema. Design must close these in formal `03/05/06/07` plus matching Step 5~16 sources before a fresh `read_docs` restart. |
+| BLK-ML-07B-DESIGN-001 | `commit-07-b` | implementation | resolved | `132db640cb19ea3ca0939c2e315af871ab6b7e5e` | Formal `03` §6.3H,formal `05/06/07` and matching Step 5/6/7/8/9/10/11/12/13/16 now close exact typed refs/carriers,domain helpers,state vocabulary,nine selector/source/input/service flows,repositories,UoW/stored replay/CommitUnknown,fake parity,safe errors,canonical digest,and fixed residual/dependency/VETO/redaction evidence. Restart from `read_docs`;no old gate result is reusable. |
 
 ---
 
@@ -115,7 +115,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-Fresh Required Reads found the exact gaps governed by `BLK-ML-07B-DESIGN-001`;current state is `blocked / wait_design`. Implementation must not resume until a committed design baseline closes every listed package/set carrier,callable,state,replay,residual/dependency and evidence surface and the boundary is explicitly returned to `read_docs`.
+Design commit `132db640cb19ea3ca0939c2e315af871ab6b7e5e` resolves `BLK-ML-07B-DESIGN-001`;current state is `ready_for_design_gate / read_docs`. Implementation must reread every required source and independently pass Design/Scope/Worktree Gates before editing code.
 
 ---
 
@@ -149,4 +149,4 @@ Fresh Required Reads found the exact gaps governed by `BLK-ML-07B-DESIGN-001`;cu
 | `commit-06-a` | implemented handoff closed | Implementation handoff records PH-06 traceability,impact,audit and evidence-lineage contracts/domain commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;exact typed refs,body-free carriers,first-seen sets,pure state guards,terminal/no-mutation redlines and run-scoped `contract-domain-fast` evidence are closed. |
 | `commit-06-b` | implemented handoff closed | Implementation handoff records PH-06 trace/impact/audit/evidence-lineage service/store commit `f4af30991e993ffe92fe0f83046057fddc581995`;seven service flows,four repository fakes,stored replay/CommitUnknown checks and run-scoped `service-flow-fast` / redaction evidence are closed. |
 | `commit-07-a` | implemented handoff closed | Implementation handoff records external body-free contracts/domain/application-port/infra-fake commit `be7550b2231aeb915c398ea92973008f1fbce5f1`;typed refs,body-free carriers,state guards,deterministic fake and run-scoped `contract-domain-fast` / redaction evidence are closed. |
-| `commit-07-b` | blocked at design gate | Required Reads at `c38992e17b7ba2f5bbd8122ea12105e4a424d118` expose `BLK-ML-07B-DESIGN-001`;implementation remains unchanged until committed exact design closure and a fresh gate cycle. |
+| `commit-07-b` | design closure committed;fresh gate pending | Design commit `132db640cb19ea3ca0939c2e315af871ab6b7e5e` resolves `BLK-ML-07B-DESIGN-001`;implementation remains unchanged until ordered Required Reads and fresh Design/Scope/Worktree Gates pass. |

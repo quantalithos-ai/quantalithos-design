@@ -2492,3 +2492,56 @@ typed source/artifact/summary/digest refs, closed enum labels, safe summary mark
 transition marker/reason wrappers, state and optional typed lineage/supersession refs. Raw
 provider/document/artifact/archive/evidence/report body, URL/path, headers, secret, response,
 stack trace and config value are never a persistence input or test artifact.
+
+## `commit-07-b` package/set persistence and UoW override
+
+The only new persisted truth is complete `MethodPackage` and `MethodSetAssembly` aggregate values
+through the exact two repositories in formal `03-详细设计.md` §6.3H.4. Package ref and identity,
+assembly ref and identity,and stored-result lookup are indexes over those formal values,not extra
+truth. Definition/formal-version maps in the fake contain full existing domain objects and are
+read-only fixtures for this boundary.
+
+"Read-only" describes the current package/set flow,not an incomplete Rust trait implementation.
+The runtime satisfies all existing `MethodAssetDefinitionRepository` and
+`FormalMethodAssetVersionRepository` methods. Current services call only the two exact
+get-with-version methods;find methods scan/derive from the complete seeded values,and save methods
+stage nothing and return the existing `StorageUnavailable` variant. There is no panic,
+`unimplemented!`,silent upstream write or private identity/current/status side map.
+
+Stored replay uses only the canonical complete
+`crate::definition_catalog::{MethodAssetStoredOperationResult,
+MethodAssetStoredOperationResultKind}` through
+`crate::ports::MethodAssetStoredOperationResultRepository`,plus the existing
+`crate::unit_of_work::{CommandUnitOfWork, UnitOfWork, MethodAssetCommitObservation}` and exact
+version/error carriers. The legacy zero-sized same-named shell in `crate::idempotency` is not a
+persistence value and is never used or extended.
+
+Fresh ordering is duplicate lookup -> begin UoW -> facade preload when required -> service
+authoritative loads/version equality -> member/rule/domain guards -> staged package/assembly save
+when any -> staged stored-result save -> commit. Establish/assemble save with `None`;all mutations
+save the version copied from the matching load. Evaluation stages only stored result. Rejected
+business branches stage only a rejected result. Staged data is invisible before commit and rollback
+discards truth,identity index,version and stored result together.
+
+Before publishing any staged write,the UoW evaluates the post-write snapshot under its exclusive
+commit lock:no non-retired assembly references a `Retired` package,and every package referenced by
+an assembly created or composition-adjusted in this UoW still exists as `Active`. Existing
+assemblies may retain a package that later becomes `Unavailable`;this does not silently change
+assembly state. A concurrent retire/assemble race admits the first valid commit;the losing commit
+applies nothing,including its accepted result,and facade maps the unit commit failure to ephemeral
+`Conflict`. The same lock revalidates natural identities and expected versions;any race first
+exposed there likewise aborts every staged write and returns ephemeral conflict. An already
+committed assembly found by `find_non_retired_assembly_by_package` produces the ordinary stored
+business rejection. No private membership/status map or stale precheck can replace commit
+validation.
+
+`Committed` returns the stored result. `CommitUnknown` applies the atomic writes first and is never
+blindly retried. A mutation reads back stored result and the exact final aggregate/version;
+evaluation reads back stored result only. Digest/result/truth mismatch or absence is ephemeral
+conflict. Retirement/evaluation markers have no persisted field and cannot be hidden in index,
+history,event or stored result;only residual risk is persisted in the aggregate's exact field.
+Every repository error and configured `CommitUnknown` marker copies one `NoBodyMarker` derived at
+runtime assembly from the support factory's exact `peripheral_package_set_dispatch_ref()` typed
+ref. No repository/UoW/fake may mint it from text,time,counter,config,row id or private state.
+There is no durable schema,query material,event candidate,marketplace row,history store or report
+store in this boundary.

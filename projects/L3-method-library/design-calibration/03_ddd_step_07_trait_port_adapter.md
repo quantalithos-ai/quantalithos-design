@@ -3431,3 +3431,50 @@ No `ExternalSourceSummaryRepository` method is callable in `commit-07-a`;the ear
 family remains future design only. Existing `ExternalSourceSummaryValidationPort` remains the
 `commit-03-b` named-ref validation carve-out and is neither expanded nor reused. There is no
 facade,service,UoW,stored replay,durable adapter,provider adapter,API,worker or job in this slice.
+
+## `commit-07-b` exact service,repository and fake override
+
+Formal `03-详细设计.md` §6.3H.3-§6.3H.4 owns every callable signature. This boundary adds exactly:
+
+| surface | exact callable set |
+|---|---|
+| facade | `MethodAssetPeripheralPackageSetCommandFacade::dispatch_peripheral_package_set_command(input) -> MethodAssetDefinitionCatalogCommandDispatchOutput` |
+| service | `MethodAssetPeripheralPackageSetService` with the nine `fn(input, &mut dyn CommandUnitOfWork) -> Result<MethodAssetPeripheralPackageSetServiceExecution, MethodAssetRepositoryError>` methods listed in formal §6.3H.3 |
+| package repository | `get_package_with_version`, `find_package_by_identity`, `save_package` |
+| assembly repository | `get_assembly_with_version`, `find_assembly_by_identity`, `find_non_retired_assembly_by_package`, `save_assembly` |
+| upstream traits | existing complete `MethodAssetDefinitionRepository` and `FormalMethodAssetVersionRepository`;current flow calls only their exact get-with-version methods |
+| replay/UoW/result/error | canonical `crate::ports::MethodAssetStoredOperationResultRepository`;`crate::unit_of_work::{UnitOfWork, CommandUnitOfWork, MethodAssetCommitObservation}`;`crate::definition_catalog::{MethodAssetStoredOperationResult, MethodAssetStoredOperationResultKind, Versioned, VersionedRef, MethodAssetExpectedVersion, MethodAssetRepositoryError}` without extension |
+| support factory | exact dispatch/API/replay/result/effect methods plus `new_package_ref`, `new_assembly_ref` and `new_composition_summary_ref` in formal §6.3H.4 |
+
+The facade owns selector/source matching,replay-envelope build,duplicate precheck,UoW lifecycle,
+preload-to-version input assembly,service dispatch and commit/read-back. The default service owns
+authoritative reload/version equality,member truth validation,domain call,repository save and
+staged stored result. No second facade-local business implementation or hidden context carrier is
+allowed. Repository missing is `Ok(None)`;no list/page/context/discovery/replacement/consumption,
+marketplace,resolver/mapper,event/history or extra error callable enters this boundary.
+
+Although the current service calls only `get_definition_with_version` and
+`get_formal_method_asset_version_with_version`,the runtime implements all methods on the two
+existing Rust traits. Their find methods derive from complete seeded truth;their non-current save
+methods stage nothing and return the existing `StorageUnavailable` variant. They do not panic,
+silently mutate seeded truth or use a private index/side map. The complete stored-result types in
+`crate::definition_catalog` are canonical;the legacy zero-sized same-named shell and duplicate enum
+in `crate::idempotency` are not a callable surface and must not be imported or extended.
+
+`InMemoryMethodAssetPeripheralPackageSetRuntime` is the only fake assembly and exposes only the
+public assembly/seed/failure controls listed in formal §6.3H.4. It seeds complete
+`MethodAssetDefinition` and `FormalMethodAssetVersion` values at version 1 and creates package/set
+fixtures through the service. It stages full aggregate,index and stored-result writes in one UoW,
+enforces expected version/natural identity/cross-aggregate membership at commit and scans real
+aggregate values. Boolean/string validity,status/membership maps and fake-only refs are forbidden.
+Any future durable adapter must match these observable semantics.
+
+Repository errors and configured `CommitUnknown` copy one `NoBodyMarker` derived from
+`MethodAssetPeripheralPackageSetSupportRefFactory::peripheral_package_set_dispatch_ref()` during
+runtime assembly. No repository,fake or UoW may construct error markers from string labels,raw
+errors,time/counters,config,row ids or private maps,and no new marker or error variant is added.
+
+Earlier `PeripheralDiscoveryContextBuilderPort`, `MarketplaceContextRefResolverPort`, policy
+diagnostic builder use,degraded mapper,consumption availability resolver,event candidate,publisher,
+replacement helper and run-history candidates remain later-boundary directions and are not callable
+from `commit-07-b`.

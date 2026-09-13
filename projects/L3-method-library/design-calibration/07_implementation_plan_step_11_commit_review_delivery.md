@@ -176,7 +176,7 @@
 | commit-06-a | `Trace and audit contracts:`;`Evidence lineage state:` | trace/audit contract |
 | commit-06-b | `Trace service flows:`;`Redaction targeted checks:` | `service-flow-fast` and `redaction-check` reports derived from the fixed run-scoped raw artifacts in formal `03` §6.3F.5 |
 | commit-07-a | `External summary body-free contracts:`;`External boundary-rule state:`;`Body-free source adapter fake:`;`External body-free redline checks:` | only run-scoped `contract-domain-fast` and `redaction-check` raw outputs plus actual-run-derived reports;no service/repository/provider/archive/report-generator claim |
-| commit-07-b | `Peripheral package and set shell:`;`Residual risk markers:` | peripheral residual report |
+| commit-07-b | `Peripheral package and set shell:`;`Residual risk markers:` | exact contracts/domain/service/repository/staged-fake diff plus formal §6.3H.5 run-scoped `service-flow-fast`,dependency,residual,VETO and redaction raw outputs;reports only when derived from that run |
 | commit-08-a | `Query and view contracts:`;`Read material ports:` | query DTO/contract report |
 | commit-08-b | `Core query services:`;`Query no-write guards:` | core query service report |
 | commit-08-c | `Extended read surfaces:`;`Material freshness and degraded markers:` | extended query/material report |

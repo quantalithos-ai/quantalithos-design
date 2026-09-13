@@ -1756,3 +1756,43 @@ and `artifacts/test/<run_id>/redaction-check.txt`. Optional summaries are derive
 actual files at `reports/runs/<run_id>/suites/contract-domain-fast.md` and
 `reports/runs/<run_id>/redaction-check.md`. A `latest` alias,static pass artifact,release EV
 verdict or report/evidence generator implemented by this boundary is invalid.
+
+## Design-side boundary override: `commit-07-b` peripheral package/set cut
+
+Formal `03-详细设计.md` §6.3H owns the exact schemas,callables,state,UoW and artifact names. This
+override replaces every earlier generic peripheral/marketplace test direction for the current
+boundary and adds no new TC/EV family.
+
+| cut | minimum assertion |
+|---|---|
+| contracts | six exact wrappers and nine selector kinds roundtrip;wrong kind rejects without parsing;definition/package ref sets deduplicate full typed equality and preserve first-seen order;summary/risk/deadline-or-trigger carriers preserve exact fields |
+| marker/residual | summary,risk,retirement and evaluation markers require existing `MethodLibrarySafeMarkerKind::NoBodyMarker`;owner/acceptor ids are non-empty and principal pairs differ;deadline timestamp or trigger typed ref is non-empty;raw reason and parameterless toggle reject |
+| package domain | establish/adjust/unavailable/retire legal matrix,complete-group replacement,identity/member/rule preservation and every illegal/no-mutation branch use only `Active | Unavailable | Retired` |
+| assembly domain | assemble/adjust/stale-or-unavailable/retire legal matrix,residual replacement,identity/member/rule preservation and illegal/no-mutation branches use only `Active | Stale | Unavailable | Retired` |
+| composition | exact rule ref equality,member shape and pure package/assembly evaluation;no repository,marketplace,config,consumption or external-body access |
+| facade/service | all nine selector/source/input/service methods;capability/unknown/missing/wrong-kind/mismatch rejection;preload missing/failed behavior;service authoritative reload and version equality |
+| full-truth validation | definition/formal-version/package members are validated from complete domain objects and their formal lifecycle/state/direct membership;no bool/status/member side map |
+| replay/UoW | factory-only truth/summary/result refs;digest sensitivity to selector/source/option/order/every source field;same-digest no-rerun;different-digest conflict;expected-version/natural-key conflicts;rollback invisibility |
+| cross aggregate | committed assembly blocks package retirement;concurrent retire versus assembly create/adjust admits one valid commit and losing commit exposes no truth/index/accepted result;scan uses actual aggregates |
+| CommitUnknown | mutation verifies exact stored result and final aggregate/version;evaluation verifies stored result only;missing/mismatch conflicts without retry |
+| non-blocking/VETO | package/set operations never mutate or gate seeded definition/formal-version truth or expand consumption authorization;marketplace scope is absent |
+| redlines | no body/listing/order/install/fulfillment,URL/path/secret/header/status/error text/raw reason/config,opaque-ref parsing,local mint,query/event/worker/job/durable/report-generator behavior or fake semantic map |
+
+The fixed actual-run raw outputs are exactly
+`artifacts/test/<run_id>/suites/service-flow-fast/{cargo-fmt-check.txt,cargo-check-workspace.txt,cargo-check-contracts.txt,cargo-check-domain.txt,cargo-check-application.txt,cargo-check-infra.txt,cargo-test-contracts.txt,cargo-test-domain.txt,cargo-test-application.txt,cargo-test-infra.txt,peripheral-package-set-redline.txt}`,
+`artifacts/test/<run_id>/dependency-boundary.txt`,
+`artifacts/test/<run_id>/peripheral-residual.txt` and
+`artifacts/test/<run_id>/veto-ml-008.txt`,and
+`artifacts/test/<run_id>/redaction-check.txt`. The residual file has the exact header/column order
+`subject_kind|subject_ref|state|risk_marker_ref|owner_actor_kind|owner_actor_id|acceptor_actor_kind|acceptor_actor_id|deadline_or_trigger_kind|deadline_or_trigger_value`.
+The VETO file records `core_truth_unchanged`,`consumption_authorization_unchanged`,
+`marketplace_scope_absent`,`result`;`pass` requires all first three values true. Dependency output
+is an actual manifest scan and must show no non-core sibling compile dependency.
+
+Optional reports may only be derived from those raw files at
+`reports/runs/<run_id>/suites/service-flow-fast.md`,
+`reports/runs/<run_id>/dependency-boundary.md`,
+`reports/runs/<run_id>/peripheral-residual.md` and
+`reports/runs/<run_id>/veto-ml-008.md`,and
+`reports/runs/<run_id>/redaction-check.md`. No `latest`,static pass/default VETO,release verdict,
+hand-written evidence or report generator is valid.

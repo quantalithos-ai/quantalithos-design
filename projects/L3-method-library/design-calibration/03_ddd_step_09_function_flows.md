@@ -1723,3 +1723,30 @@ and do not implicitly create or mutate a domain object. Technical `Unavailable` 
 All rejected domain transitions and fake fixture/call mismatches are side-effect free and preserve
 the configured fixture or object exactly. No idempotency,digest calculation,dedup,transaction,
 CommitUnknown or concurrent writer behavior exists in this slice.
+
+## `commit-07-b` nine-flow execution override
+
+Formal `03-详细设计.md` §6.3H owns the exact carriers,methods and order. Every flow first validates
+capability/selector/source/kinds/markers,builds the replay envelope and performs duplicate lookup.
+Same digest replays before UoW;different digest returns ephemeral `Conflict`;only a fresh command
+begins a UoW.
+
+| flow | exact fresh-command sequence | safe branch |
+|---|---|---|
+| `EstablishMethodPackageFlow` | factory creates package/composition-summary refs -> service validates natural identity -> loads each full active definition/formal version and direct membership relation -> constructs package/rule -> saves package with `None` and accepted result -> commit | missing/inactive/mismatched member,empty shape,rule failure or identity race stores rejection;no marketplace/discovery call |
+| `AdjustMethodPackageCompositionFlow` | facade preload copies package version and factory summary ref -> service reloads exact package and compares version -> validates complete replacement members -> adjusts/evaluates -> saves package with expected version and accepted result -> commit | only `Active`;all invalid/version branches reject without partial replacement |
+| `RetireMethodPackageFlow` | facade preload -> service reload/version compare -> scan non-retired assemblies for reference -> validate no-body marker -> mark retired -> save package/result -> commit-time cross-aggregate check -> commit | already committed assembly reference stores rejection;concurrent assembly winner causes whole commit failure and ephemeral conflict |
+| `MarkMethodPackageUnavailableFlow` | facade preload -> service reload/version compare -> validate exact residual carrier -> `Active -> Unavailable` -> save package/result -> commit | raw/missing marker or invalid owner/acceptor/deadline-or-trigger rejects;an existing assembly may retain the ref and core/member truth remains unchanged |
+| `AssembleMethodSetFlow` | factory creates assembly/composition-summary refs -> service validates natural identity -> loads each full active package/definition/formal version -> constructs assembly/rule -> saves assembly/result -> commit-time cross-aggregate check -> commit | absent/non-active member or invalid direct membership stores rejection;no consumption resolver |
+| `AdjustMethodSetAssemblyFlow` | facade preload and factory summary ref -> service reload/version compare -> validate all replacement members -> adjust/evaluate -> save assembly/result -> commit-time cross-aggregate check -> commit | only `Active`;stale/unavailable/retired and member/rule/version mismatch reject unchanged |
+| `RetireMethodSetAssemblyFlow` | facade preload -> service reload/version compare -> validate no-body marker -> retire -> save assembly/result -> commit | no replacement hint,run history,event or package mutation |
+| `MarkMethodSetAssemblyStaleOrUnavailableFlow` | facade preload -> service reload/version compare -> require target `Stale | Unavailable` and exact residual carrier -> replace residual/status -> save assembly/result -> commit | parameterless toggle,raw reason or unsupported target rejects unchanged;no availability/degraded resolver |
+| `EvaluatePackageCompositionFlow` | facade preload exact package/assembly version -> service reload/version compare -> require stored rule ref equality -> run exact pure rule -> save accepted/rejected result with exactly one factory effect ref -> commit | no aggregate save,new composition summary,diagnostic mapper,event/history or query material |
+
+The facade performs source-to-input assembly exactly once. For existing targets its preload only
+copies the repository version;the service's second load is authoritative. Retirement/evaluation
+markers are validated and digested but not silently stored. Residual markers are copied only into
+the aggregate field. None of these flows invokes `PeripheralDiscoveryContextBuilderPort`,
+`MarketplaceContextRefResolverPort`,consumption availability/degraded mapper,event candidate,
+publisher,replacement helper or optional run history. Earlier rows implying those calls are
+future-family direction and are overridden for `commit-07-b`.

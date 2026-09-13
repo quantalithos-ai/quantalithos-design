@@ -6623,3 +6623,38 @@ to `BodyFreeBoundaryViolation`. There is no external-specific domain error enum.
 
 No application service, repository, UoW, replay, persistence, query material, provider adapter,
 archive lifecycle, API/worker/job/report or package/set object is opened by this closure.
+
+## `commit-07-b` exact peripheral object closure
+
+Formal `03-详细设计.md` §6.3H.1-§6.3H.2 is the sole current-boundary Rust-facing object source.
+It replaces, rather than extends, earlier package/set field skeletons.
+
+| exact object family | exact current-boundary shape |
+|---|---|
+| named wrappers | `MethodPackageRef`, `MethodPackageIdentityRef`, `MethodSetAssemblyRef`, `MethodSetAssemblyIdentityRef`, `PackageCompositionRuleRef`, `PackageCompositionSummaryRef`, each over `MethodLibraryTypedBoundaryRef` with the exact kind in formal §6.3H.1 |
+| sets/summaries | `MethodAssetDefinitionRefSet`, `MethodPackageRefSet`, `MethodPackageSummary`, `MethodSetAssemblySummary`;sets deduplicate typed equality and preserve first-seen order;summary markers must have existing kind `MethodLibrarySafeMarkerKind::NoBodyMarker` |
+| residual | `PeripheralResidualRiskMarker { risk_marker_ref, owner, acceptor, deadline_or_trigger }`;deadline-or-trigger is exactly `Deadline(Timestamp) | Trigger(MethodLibraryTypedBoundaryRef)` |
+| package | exact nine fields in formal §6.3H.2 and state `Active | Unavailable | Retired` |
+| assembly | exact ten fields in formal §6.3H.2 and state `Active | Stale | Unavailable | Retired` |
+| composition rule | `PackageCompositionRule { rule_ref }` with only the constructor and two pure evaluate helpers in formal §6.3H.2 |
+
+Owner and acceptor validity compares the exact principal pair `(actor_kind, actor_id)`;both actor
+ids must be non-empty and the pairs must differ. Optional display names are neither validation
+identity nor evidence output. A `Timestamp` deadline and typed trigger are validated through their
+existing `as_str`/typed-ref surfaces and may not be inferred from current time,config or text.
+
+Historical `MarketplaceContextRef`, `PackageCompositionReasonRef`, package marketplace context,
+publication/distribution field,consumer compatibility field,replacement hint,run-history field,
+availability-resolver output and old package/assembly factory signatures do not coexist with this
+closure. `PackageCompositionSummaryRef` is factory-owned and body-free;there is no summary body.
+Retirement/evaluation markers are validation and digest inputs only because no aggregate field owns
+them. Residual risk is persisted only in the exact optional aggregate field. No alias,compatibility
+field,default state,string status or local `*ReasonRef` family is allowed.
+
+This closure adds no second stored-result or repository-error object family. The complete canonical
+`MethodAssetStoredOperationResult` and `MethodAssetStoredOperationResultKind` remain the
+application-owned `crate::definition_catalog` types re-exported from the application crate root;
+the zero-sized same-named shell and duplicate enum in `crate::idempotency` are legacy/non-canonical
+and are not extended or consumed by `commit-07-b`. Repository/UoW safe markers are
+`NoBodyMarker` values derived only from the exact support factory
+`peripheral_package_set_dispatch_ref()` typed ref,not from strings,time,config or fake state.

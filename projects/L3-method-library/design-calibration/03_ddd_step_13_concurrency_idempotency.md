@@ -2086,3 +2086,37 @@ Fake determinism means only:
 Tests may call the pure domain helpers repeatedly to prove illegal/terminal transitions preserve
 state,but they must not claim durable idempotency,concurrent update,rollback,replay or fake/durable
 parity. Any future service/store concurrency contract requires a later formal owning boundary.
+
+## `commit-07-b` package/set replay and concurrency override
+
+Replay-envelope construction follows selector/source validation and precedes UoW creation.
+Canonical digest includes capability,exact selector and source-variant labels,API-entry/dispatch
+refs,actor context,ordered shell typed refs/markers,idempotency option tag/value,and every matching
+source field in declaration order. Enum labels and option tags are explicit;sets retain first-seen
+order. Current truth,repository version/request/trace ids,timestamps,raw/free text,route/body/config,
+map iteration and fake state are excluded.
+
+| selector family | exact dedup natural owner |
+|---|---|
+| establish package | package identity ref |
+| adjust/retire/mark package | package ref |
+| assemble method set | assembly identity ref |
+| adjust/retire/mark assembly | assembly ref |
+| evaluate composition | exact `PackageCompositionTargetRef` variant and ref |
+
+| scenario | required behavior |
+|---|---|
+| same key/scope/digest | exact stored replay;no UoW,preload,service,repository/domain call or new ref |
+| same key/scope/different digest | ephemeral conflict;no UoW and no replacement |
+| concurrent same natural identity create | one owner commits;synchronous loser may store rejection,while a conflict first exposed under the commit lock aborts all staged writes and returns ephemeral conflict |
+| concurrent same aggregate mutation | service reload/version equality and save expected version admit one update;synchronous loser may store rejection,while commit-time loser aborts all writes and returns ephemeral conflict |
+| concurrent package retire vs assembly create/adjust | commit lock evaluates post-write full aggregates;first valid commit wins;loser applies zero staged writes and returns ephemeral conflict |
+| rollback | no aggregate,index,version or stored result visible |
+| CommitUnknown mutation | read back exact stored result plus final aggregate/version;no retry |
+| CommitUnknown evaluation | read back exact stored result only;no aggregate was saved |
+
+Truth/package/summary/result refs come only from the exact support factory. Identity,digest,
+membership and state cannot come from array position,map iteration,time/counter,row id,opaque-ref
+parsing,route,config or failure injection. The fake scans full stored assembly/package values and
+must exhibit the same observable result as a future durable adapter. No physical lock schema,
+lease,TTL,retry/backoff,history/checkpoint or marketplace concurrency behavior is introduced.

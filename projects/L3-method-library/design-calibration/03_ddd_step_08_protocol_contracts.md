@@ -2667,3 +2667,25 @@ it does not create an `ExternalSourceSummaryRef` or public accepted receipt.
 All earlier external command/inbound/outbound protocol rows remain future-flow direction only for
 this boundary. If implementation needs a public shell,selector,handler,receipt,dedup envelope or
 transport mapping,Design Gate must stop rather than adding one locally.
+
+## `commit-07-b` body-free command-shell override
+
+This boundary adds no route,RPC,HTTP body,public command DTO,Query,Inbound Consumer,Outbound Event,
+Operations Job,receipt or transport result. It reuses `MethodLibraryCommandShell`;only
+`command_shell.boundary_ref.kind` selects one of the nine exact intent labels in formal
+`03-详细设计.md` §6.3H.1/§6.3H.3. The matching
+`MethodAssetPeripheralPackageSetCommandSource`,selected inputs,replay envelope and facade input are
+application-owned non-wire carriers.
+
+The facade input is exactly `{ command_shell, command_source, api_entry_context_ref,
+application_dispatch_ref }`;the output is the existing body-free definition/catalog dispatch
+output projection. Selector/source mismatch,unsupported kind,wrong named-ref kind,missing
+idempotency key,non-command actor origin or unsafe marker is rejected before mutation. Source
+fields may not be reconstructed from route,DTO type,typed-ref order/count,marker text,config,raw
+body,fake map or marketplace payload.
+
+The canonical digest includes capability,selector/source labels,all exact source fields and option
+tags,actor context,ordered shell refs/markers,API-entry/dispatch refs and idempotency metadata as
+formal §6.3H.4 specifies. The canonical material is neither a public payload nor persisted/logged
+text. Earlier query/discovery/event/history protocol rows remain future design and cannot be used
+to add a current-boundary carrier.

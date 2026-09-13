@@ -1839,3 +1839,26 @@ repository error,service rejection,transport status,quarantine state or retry cl
 No branch performs provider retry,refresh,recovery,repository read-back,stored replay,body fetch,
 archive load,query fallback,worker handoff or job scheduling. Missing a formal marker/schema/port
 is a Design Gate blocker,not an instruction to add an error payload or private fallback.
+
+## `commit-07-b` package/set safe error and recovery override
+
+No package/set-specific domain,service,repository,transport or recovery error enum is added.
+
+| condition | exact result/error behavior |
+|---|---|
+| wrong named-ref kind | existing `MethodLibraryTypedBoundaryRefKindMismatch`;never inspect opaque text |
+| missing required typed input,empty required member shape | existing `MissingRequiredTypedInput` or `InvariantViolation` according to formal domain guard;no mutation |
+| unsafe marker,invalid residual owner/acceptor/deadline-or-trigger,rule/member rejection | existing `PolicyRejected`/`InvariantViolation`;fresh command stores body-free `Rejected` |
+| illegal or terminal package/assembly transition | existing `InvalidTransition`;fresh command stores body-free `Rejected` and aggregate is unchanged |
+| missing truth,natural identity collision,member inactive/mismatch,version conflict or duplicate-key race | fresh command stores body-free `Rejected` when the UoW remains valid |
+| same idempotency/scope and same digest | replay exact stored result before UoW;no rerun |
+| same idempotency/scope and different digest | ephemeral `Conflict`;first record unchanged |
+| storage unavailable,inactive UoW | exact existing repository error mapped to ephemeral safe rejection;rollback |
+| stored-result integrity failure or CommitUnknown read-back absence/mismatch | ephemeral `Conflict`;never rerun mutation |
+| commit-time cross-aggregate,uniqueness or expected-version race failure | apply no staged write and return ephemeral `Conflict`;no accepted/rejected stored result remains |
+
+The repository error variants/fields remain exactly those in formal §6.3H.4. Safe output refs are
+factory-produced and contain no raw reason,status,SQL/HTTP error,stack,path,config,body or canonical
+digest material. There is no retry loop,recovery job,query repair,availability fallback,
+replacement hint,event/handoff or marketplace compensation. Missing any required formal source is
+a Design Gate stop,not permission to add a string error,private map or default state.

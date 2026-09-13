@@ -3955,3 +3955,28 @@ A body kind absent from the forbidden set or summary kind outside the allow-list
 `InvariantViolation`. The old boolean raw-body helper is removed;raw-body fixture/carrier attempts
 map to `BodyFreeBoundaryViolation`,not a new state. No repository/version/event/stored-result
 transition is implied by this state closure.
+
+## `commit-07-b` package/set state override
+
+This override is normative over all earlier peripheral lifecycle labels and flow side effects.
+Formal `03-详细设计.md` §6.3H.1-§6.3H.2 owns the exact state fields.
+
+| owner | exact state | legal current-boundary transition |
+|---|---|---|
+| `MethodPackage.package_status` | `Active | Unavailable | Retired` | establish initializes `Active`;adjust is `Active -> Active`;mark unavailable is only `Active -> Unavailable` with exact residual marker;retire is `Active | Unavailable -> Retired` with no-body retirement marker |
+| `MethodSetAssembly.assembly_status` | `Active | Stale | Unavailable | Retired` | assemble initializes `Active`;adjust is `Active -> Active`;mark accepts target `Stale | Unavailable` from `Active | Stale | Unavailable` and replaces residual marker;retire is any non-retired state to `Retired` |
+
+Constructors set `residual_risk_marker = None`. Adjustment replaces the entire summary/member/
+rule/composition group,preserves identity and truth ref,and remains `Active` with no residual.
+Stale/unavailable transitions require and copy the complete residual carrier. Retirement preserves
+all identity/member/rule/composition fields and any existing residual;the retirement marker is a
+guard/digest input only. Every repeated/terminal/illegal operation returns the existing domain
+error without changing any field.
+
+Historical `assembling`,`draft`,`ready`,`scope_limited`,`deprecated`,`valid`,`invalid`,
+`partially_available` and string aliases are not states in this boundary. Availability/degraded
+mapper output,consumption status,stored-result kind,query freshness,event outcome,run history,
+marketplace/install state and fake map membership cannot set package/assembly state. Package/set
+state never mutates or gates definition,formalization,formal-version,consumption or trace truth.
+The commit-time package/assembly invariant in formal §6.3H.4 is transaction validation,not a third
+aggregate state or hidden lifecycle transition.

@@ -1893,3 +1893,22 @@ Dependency direction remains `contracts <- domain`, with `application` consuming
 `infra` implementing the application-owned port. The fake may validate typed body-free carriers;
 it may not depend on domain persistence or create an application service. Package/method-set and
 all peripheral behavior remain `commit-07-b` or later.
+
+## `commit-07-b` peripheral package/set module ownership override
+
+This override is normative for `commit-07-b` over every earlier family-level peripheral,
+marketplace,discovery and package/set candidate. Formal `03-详细设计.md` §6.3H owns the exact
+schema,callables,state,transaction and evidence contract.
+
+| module | current-boundary ownership | forbidden expansion |
+|---|---|---|
+| `contracts` | six exact package/set/rule/summary named wrappers, nine selector labels, two first-seen ref sets, body-free summaries, residual-risk/deadline-or-trigger carrier, target and state enums | no marketplace/listing/order/install/fulfillment carrier, public command body, route/RPC, query/view/event/job schema or extra marker/ref family |
+| `domain` | exact `MethodPackage`, `MethodSetAssembly`, `PackageCompositionRule`, constructors, transitions, membership checks and existing `MethodLibraryDomainError` mapping | no discovery/query material,consumption authorization,event/history,replacement hint,repository access or local marker/ref creation |
+| `application` | one facade, one nine-method service trait/default service, body-free command source/input/replay carriers, two truth repository ports, support factory, reused upstream read/stored-result/UoW/error surfaces | no API handler,resolver/mapper,builder,marketplace adapter,query/event/publisher/worker/job/report generator or parallel result/error/UoW family |
+| `infra` | one typed in-memory runtime with full-value package/assembly/upstream fixtures, staged UoW, stored replay, commit-time cross-aggregate invariant and support-factory parity | no durable adapter,private semantic map,valid/status/membership side map,external runtime/config or fake-only schema/rule |
+| `api` / `worker` / `jobs` | no current-boundary implementation | no transport binding,event candidate,publisher,consumer,job,history or evidence generator |
+
+Dependency direction remains `contracts <- domain <- application <- infra`;only
+`core-contracts` supplies `ActorRef` and `Timestamp`. Package/set failure or residual state never
+changes or blocks already accepted definition,formal-version,consumption or trace truth. The fixed
+artifacts in formal §6.3H are outputs of actual checks,not a new module or generator.

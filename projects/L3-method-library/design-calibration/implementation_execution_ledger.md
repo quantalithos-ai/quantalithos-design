@@ -16,12 +16,12 @@
 | implementation_repo | `/home/aris/Projects/quantalithos-method-library` |
 | current_design_baseline | `132db640cb19ea3ca0939c2e315af871ab6b7e5e` |
 | current_boundary | `commit-07-b` |
-| gate_status | ready_for_design_gate |
-| gate_reason | Design commit `132db640cb19ea3ca0939c2e315af871ab6b7e5e` closes `BLK-ML-07B-DESIGN-001`;the prior blocked result is historical and no Required Read or gate result may be reused. |
-| next_allowed_action | read_docs |
-| current_recovery_point | Restart `commit-07-b` from the ordered Required Reads at exact baseline `132db640cb19ea3ca0939c2e315af871ab6b7e5e`,then independently run Design/Scope/Worktree Gates before any implementation edit;preserve user-owned `?? .gitignore`. |
+| gate_status | in_progress |
+| gate_reason | Fresh Required Reads and independent Design/Scope/Worktree Gates passed against exact design baseline `132db640cb19ea3ca0939c2e315af871ab6b7e5e`;formal §6.3H and matching Step/formal sources close the exact package/set contracts/domain/service/store/replay/fake/evidence slice without local invention. |
+| next_allowed_action | implement |
+| current_recovery_point | Implement only the `commit-07-b` contracts/domain/application/infra slice and direct tests,then run the fixed actual checks and run-scoped evidence;keep user-owned `?? .gitignore` untouched and unstaged. |
 | last_updated_by | implementation agent |
-| last_updated_at | 2026-09-13 18:11:20 +0800 |
+| last_updated_at | 2026-09-13 18:25:00 +0800 |
 
 ---
 
@@ -43,7 +43,7 @@
 | `commit-06-a` | `current-design-with-commit-06-a-lineage-link-state-closure` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-a` completed at `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;PH-06 trace/impact/audit/evidence-lineage contracts,domain guards and run-scoped `contract-domain-fast` evidence are closed. |
 | `commit-06-b` | `1bb592535f5fc2f4b6535ba8ed782ff664ae05b0` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-06-b` completed at `f4af30991e993ffe92fe0f83046057fddc581995`;seven PH-06 service flows,four repository fakes,versioned UoW/stored replay/CommitUnknown behavior and run-scoped service/redaction evidence are closed. |
 | `commit-07-a` | `a6132575c3d91744f28d8521975110639f5f2df6` | implemented | handoff_gate | start_next_boundary | Implementation repo reports `commit-07-a` completed at `be7550b2231aeb915c398ea92973008f1fbce5f1`;external body-free contracts/domain,one-method adapter port,three-field fake and run-scoped contract/redaction evidence are closed. |
-| `commit-07-b` | `132db640cb19ea3ca0939c2e315af871ab6b7e5e` | ready_for_design_gate | design_closure_recorded | read_docs | Exact peripheral package/set carrier/domain/service/store/replay/state/residual/dependency/VETO/redaction closure is committed;fresh gates remain mandatory. |
+| `commit-07-b` | `132db640cb19ea3ca0939c2e315af871ab6b7e5e` | in_progress | worktree_gate | implement | Fresh Required Reads and Design/Scope/Worktree Gates passed;implementation is authorized only inside the formal §6.3H allowed scope. |
 
 ---
 
@@ -115,7 +115,7 @@ Any implementation agent resuming `L3-method-library` must read files in this or
 4. The `required_reads` listed by the current boundary ledger.
 5. Optional implementation scratch ledger: `/home/aris/Projects/quantalithos-method-library/.codex/implementation_ledger.md`
 
-Design commit `132db640cb19ea3ca0939c2e315af871ab6b7e5e` resolves `BLK-ML-07B-DESIGN-001`;current state is `ready_for_design_gate / read_docs`. Implementation must reread every required source and independently pass Design/Scope/Worktree Gates before editing code.
+Design commit `132db640cb19ea3ca0939c2e315af871ab6b7e5e` resolves `BLK-ML-07B-DESIGN-001`;fresh Required Reads and independent Design/Scope/Worktree Gates passed. Current state is `in_progress / implement`,limited to the exact `commit-07-b` Allowed Scope.
 
 ---
 
@@ -149,4 +149,4 @@ Design commit `132db640cb19ea3ca0939c2e315af871ab6b7e5e` resolves `BLK-ML-07B-DE
 | `commit-06-a` | implemented handoff closed | Implementation handoff records PH-06 traceability,impact,audit and evidence-lineage contracts/domain commit `997b7b02331e11fdc3222f4d0839ab8ce9ea0316`;exact typed refs,body-free carriers,first-seen sets,pure state guards,terminal/no-mutation redlines and run-scoped `contract-domain-fast` evidence are closed. |
 | `commit-06-b` | implemented handoff closed | Implementation handoff records PH-06 trace/impact/audit/evidence-lineage service/store commit `f4af30991e993ffe92fe0f83046057fddc581995`;seven service flows,four repository fakes,stored replay/CommitUnknown checks and run-scoped `service-flow-fast` / redaction evidence are closed. |
 | `commit-07-a` | implemented handoff closed | Implementation handoff records external body-free contracts/domain/application-port/infra-fake commit `be7550b2231aeb915c398ea92973008f1fbce5f1`;typed refs,body-free carriers,state guards,deterministic fake and run-scoped `contract-domain-fast` / redaction evidence are closed. |
-| `commit-07-b` | design closure committed;fresh gate pending | Design commit `132db640cb19ea3ca0939c2e315af871ab6b7e5e` resolves `BLK-ML-07B-DESIGN-001`;implementation remains unchanged until ordered Required Reads and fresh Design/Scope/Worktree Gates pass. |
+| `commit-07-b` | implementation gate passed | Fresh Required Reads and independent Design/Scope/Worktree Gates passed at `132db640cb19ea3ca0939c2e315af871ab6b7e5e`;implementation is authorized only for the exact package/set service-store slice and fixed evidence. |

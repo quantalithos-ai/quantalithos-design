@@ -2,7 +2,7 @@
 
 > 创建日期: 2026-06-15
 > 最近更新: 2026-09-13
-> 当前任务: `commit-07-b` 设计闭口已提交为 `132db640cb19ea3ca0939c2e315af871ab6b7e5e`,`BLK-ML-07B-DESIGN-001` 已关闭。当前状态为 `ready_for_design_gate / read_docs`;实现仓代码与用户 `?? .gitignore` 尚未改动。
+> 当前任务: `commit-07-b` fresh Required Reads 和独立 Design/Scope/Worktree Gates 已通过。当前状态为 `in_progress / implement`;只允许实现 formal §6.3H 精确范围,用户 `?? .gitignore` 保持 untouched/unstaged。
 > 项目目录: `projects/L3-method-library`
 
 ---
@@ -11,7 +11,7 @@
 
 | 当前文档 | 当前 Step | 当前模块 | gate_status | gate_reason | next_allowed_action | 细节入口 |
 |---|---|---|---|---|---|---|
-| `07-实施计划.md` | implementation boundary handoff | `commit-07-b fresh gate restart` | ready_for_design_gate | Exact package/set closure is committed at `132db640cb19ea3ca0939c2e315af871ab6b7e5e`;historical blocked findings are not reusable gate results. | read_docs:按 boundary 顺序全量重读并独立重跑 Design/Scope/Worktree Gate;通过前不得修改实现仓代码。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-07-b.md`;`projects/L3-method-library/07-实施计划.md` |
+| `07-实施计划.md` | implementation boundary handoff | `commit-07-b implementation` | in_progress | Fresh Required Reads and independent Design/Scope/Worktree Gates passed at exact baseline `132db640cb19ea3ca0939c2e315af871ab6b7e5e`;no local schema/port/state/mapper/config/evidence invention is required. | implement:仅修改 formal §6.3H Allowed Scope,随后运行固定 checks 和 actual run-scoped evidence。 | `design-calibration/implementation_execution_ledger.md`;`design-calibration/implementation-boundaries/commit-07-b.md`;`projects/L3-method-library/07-实施计划.md` |
 
 ---
 
@@ -26,7 +26,7 @@
 | `04-配置设计.md` | `design-calibration/04_config_calibration_flow.md` | completed | completed | R15.18_completed_wait_user_confirm_to_05 | 正式 `04-配置设计.md` 可作为测试方案输入。 |
 | `05-测试方案.md` | `design-calibration/05_test_plan_calibration_flow.md` | completed | Step 15 completed | R15.2_completed_wait_user_confirm_to_06 | 正式 `05-测试方案.md` 已按 Step 1~14 完成 full-restart 装配,可作为 `06` 输入。 |
 | `06-验收标准.md` | `design-calibration/06_acceptance_calibration_flow.md` | completed | Step 15 R15.2 completed_wait_user_confirm_to_07 | pass | 正式 `06-验收标准.md` 已按 Step 1~14 中间产物完成 full-restart 装配,可作为 `07` 输入。 |
-| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_ready | Step 13 completed + `commit-07-b` design closure committed | read_docs | Fresh Required Reads and Design/Scope/Worktree Gates are pending at `132db640cb19ea3ca0939c2e315af871ab6b7e5e`. |
+| `07-实施计划.md` | `design-calibration/07_implementation_plan_calibration_flow.md` | implementation_handoff_ready | Step 13 completed + `commit-07-b` implementation gate passed | implement | Fresh Required Reads and Design/Scope/Worktree Gates passed at `132db640cb19ea3ca0939c2e315af871ab6b7e5e`;implementation is restricted to the exact Allowed Scope. |
 
 ---
 
@@ -124,7 +124,7 @@
 
 ```text
 `commit-07-a` implementation/handoff 已由 `be7550b2231aeb915c398ea92973008f1fbce5f1` 和 run `20260909T051615Z-commit-07-a` 关闭;
-当前 boundary 是 `commit-07-b`,设计提交 `132db640cb19ea3ca0939c2e315af871ab6b7e5e` 已关闭 `BLK-ML-07B-DESIGN-001`,状态为 `ready_for_design_gate / read_docs`;
+当前 boundary 是 `commit-07-b`,设计提交 `132db640cb19ea3ca0939c2e315af871ab6b7e5e` 已关闭 `BLK-ML-07B-DESIGN-001`,fresh Required Reads 与 Design/Scope/Worktree Gates 已通过,状态为 `in_progress / implement`;
 下一步按 implementation ledger、boundary ledger、正式 `07` 和全部 Required Reads 顺序重读并独立重跑 Design/Scope/Worktree Gates;
 三项 gate 通过并回填 `in_progress / implement` 前不得修改实现仓,用户 `?? .gitignore` 必须继续保持 untouched/unstaged.
 ```

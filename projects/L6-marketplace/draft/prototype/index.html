@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Marketplace Prototype</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="i18n.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">M</span><span>Marketplace</span><small>prototype</small></div>
+        <div class="topbar-actions"><span class="network-pill" data-i18n="fixtureOnly">Fixture only</span><button id="language-toggle" class="language-toggle" type="button">中文</button><button class="icon-button" title="Notifications">&#128276;<span class="dot"></span></button><button class="avatar">AR</button></div>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="eyebrow">OPERATIONS SURFACE</div>
+          <nav id="nav" class="nav-list">
+            <button class="nav-item active" data-view="catalog"><span>▦</span><span data-i18n="navCatalog">Catalog &amp; Search</span></button>
+            <button class="nav-item" data-view="applications"><span>↗</span><span data-i18n="navApplications">Release Applications</span> <b>3</b></button>
+            <button class="nav-item" data-view="releases"><span>◫</span><span data-i18n="navReleases">Versions &amp; Distribution</span></button>
+            <button class="nav-item" data-view="withdrawals"><span>!</span><span data-i18n="navWithdrawals">Withdrawals &amp; Notices</span> <b class="danger-count">2</b></button>
+            <button class="nav-item" data-view="operations"><span>⌘</span><span data-i18n="navOperations">Operations &amp; Recovery</span></button>
+          </nav>
+          <div class="sidebar-footer"><div class="eyebrow" data-i18n="publisher">PUBLISHER</div><button class="profile-button"><span class="profile-mark">AC</span><span><strong>Aris Collective</strong><small data-i18n="verifiedView">verified view</small></span><span>⋯</span></button></div>
+        </aside>
+
+        <main id="main" class="main-content"></main>
+      </div>
+    </div>
+    <script src="app.js"></script>
+    <script src="consumer.js"></script>
+  </body>
+</html>

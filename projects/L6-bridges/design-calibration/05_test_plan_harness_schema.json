@@ -1,0 +1,1628 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:quantalithos:bridges:test-harness:1",
+  "title": "L6-bridges planned local test-harness DTOs",
+  "description": "Design-only closed schema; not a run, case result, evidence instance or production protocol.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/RunContext"
+    },
+    {
+      "$ref": "#/$defs/CaseResult"
+    },
+    {
+      "$ref": "#/$defs/SuiteResult"
+    },
+    {
+      "$ref": "#/$defs/ArtifactIndex"
+    },
+    {
+      "$ref": "#/$defs/CheckResult"
+    },
+    {
+      "$ref": "#/$defs/EvidencePage"
+    },
+    {
+      "$ref": "#/$defs/ReportIndex"
+    },
+    {
+      "$ref": "#/$defs/Handoff"
+    },
+    {
+      "$ref": "#/$defs/HumanReview"
+    }
+  ],
+  "$defs": {
+    "RunId": {
+      "type": "string",
+      "pattern": "^br-[0-9]{8}T[0-9]{6}Z-[a-z0-9]{6,12}$",
+      "maxLength": 40
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "maxLength": 64
+    },
+    "ContextId": {
+      "type": "string",
+      "pattern": "^ctx-[0-9]{3}$",
+      "maxLength": 7
+    },
+    "TcId": {
+      "type": "string",
+      "pattern": "^TC-[A-Z]+-[0-9]{3}$",
+      "maxLength": 40
+    },
+    "DsId": {
+      "type": "string",
+      "pattern": "^DS-[A-Z]+-001$",
+      "maxLength": 40
+    },
+    "EvId": {
+      "type": "string",
+      "pattern": "^EV-(CONTRACT|REAL)-[0-9]{3}$",
+      "maxLength": 40
+    },
+    "InstanceId": {
+      "type": "string",
+      "pattern": "^TC-[A-Z]+-[0-9]{3}--p[0-9]{4,6}--ctx-[0-9]{3}$",
+      "maxLength": 70
+    },
+    "ParameterId": {
+      "type": "string",
+      "pattern": "^p[0-9]{4,6}$",
+      "maxLength": 7
+    },
+    "AssertionId": {
+      "type": "string",
+      "pattern": "^a[0-9]{3}$",
+      "maxLength": 4
+    },
+    "SuiteId": {
+      "type": "string",
+      "enum": [
+        "SUITE-S",
+        "SUITE-D",
+        "SUITE-A",
+        "SUITE-C",
+        "SUITE-R",
+        "SUITE-B",
+        "SUITE-L",
+        "SUITE-P",
+        "SUITE-I",
+        "SUITE-W",
+        "SUITE-J",
+        "SUITE-TOOLS",
+        "SUITE-REAL"
+      ]
+    },
+    "Status": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "blocked",
+        "unavailable"
+      ]
+    },
+    "FailureCode": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "assertion_failed",
+            "invalid_input",
+            "schema_invalid",
+            "baseline_mismatch",
+            "path_invalid",
+            "digest_mismatch",
+            "coverage_incomplete",
+            "result_inconsistent",
+            "qualification_missing",
+            "forbidden_material",
+            "timeout",
+            "cancelled",
+            "tool_unavailable",
+            "environment_unavailable",
+            "io_unavailable",
+            "output_limit",
+            "write_conflict"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "BlockerId": {
+      "type": "string",
+      "enum": [
+        "BR-UP-001",
+        "BR-UP-002",
+        "BR-UP-003",
+        "BR-UP-004",
+        "BR-UP-005",
+        "BR-UP-006",
+        "BR-UP-007",
+        "BR-UP-008",
+        "BR-UP-009",
+        "WS-UP-001",
+        "WS-UP-002",
+        "WS-UP-003",
+        "WS-UP-004",
+        "WS-UP-005",
+        "WS-UP-006",
+        "WS-UP-007",
+        "WS-UP-008",
+        "WS-UP-006-S",
+        "WS-LOCAL-001",
+        "WS-LOCAL-002",
+        "WS-LOCAL-003",
+        "implementation_not_authorized",
+        "qualification_not_established",
+        "artifact_policy_unapproved",
+        "S08-E-I05-PAYLOAD-SCHEMA-01",
+        "S08-E-I05-PRODUCER-EVENT-BINDING-01",
+        "R06.6-F2-H13-UPSTREAM",
+        "R06-F-AFFECT-UOW-01",
+        "S08-RECOVERY-CLASS-OWNER-01",
+        "R07-EXTERNAL-PHASE-LINK-01",
+        "R07-EXTERNAL-PHASE-RETRY-ACCOUNTING-01",
+        "S08-CONSUMER-OUTBOX-SURFACE-01",
+        "S08-CONSUMER-INDETERMINATE-COMPLETION-01",
+        "S08-JOB-REPORT-REF-OWNER-01",
+        "S08-M1-SECONDARY-TYPE-OWNER-01",
+        "03-RPR-S09-PER-FLOW"
+      ]
+    },
+    "ArtifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(context\\.json|index\\.json|cases/TC-[A-Z]+-[0-9]{3}--p[0-9]{4,6}--ctx-[0-9]{3}\\.json|suites/SUITE-(S|D|A|C|R|B|L|P|I|W|J|TOOLS|REAL)/ctx-[0-9]{3}/(report\\.json|stdout\\.log|stderr\\.log)|checks/(run-context|test-evidence)\\.json)$",
+          "maxLength": 160
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4194304
+        },
+        "media_type": {
+          "type": "string",
+          "enum": [
+            "application/json",
+            "text/plain"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "byte_length",
+        "media_type"
+      ]
+    },
+    "ReportRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(index\\.json|summary\\.md|evidence-index\\.md|gate-results\\.md|redaction-check\\.md|suites/SUITE-(S|D|A|C|R|B|L|P|I|W|J|TOOLS|REAL)/ctx-[0-9]{3}\\.md|evidence/EV-(CONTRACT|REAL)-[0-9]{3}\\.(json|md))$",
+          "maxLength": 160
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4194304
+        },
+        "media_type": {
+          "type": "string",
+          "enum": [
+            "application/json",
+            "text/markdown"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "byte_length",
+        "media_type"
+      ]
+    },
+    "DesignDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "doc": {
+          "type": "string",
+          "enum": [
+            "00",
+            "01",
+            "02",
+            "03",
+            "04",
+            "05"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "doc",
+        "sha256"
+      ]
+    },
+    "SafeConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "type": "string",
+          "enum": [
+            "local",
+            "ci",
+            "test",
+            "staging",
+            "prod"
+          ]
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Management",
+              "Inbound",
+              "Preparation",
+              "Dispatch",
+              "Callback",
+              "Recovery",
+              "SafeRead",
+              "SafeHandoff",
+              "Qualification",
+              "WorkspaceRead"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "platforms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Slack",
+              "Mattermost",
+              "Telegram",
+              "Discord"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 4,
+          "uniqueItems": true
+        },
+        "max_inflight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "max_batch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "max_private_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8388608
+        },
+        "max_wait_millis": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        },
+        "shutdown_window_millis": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120000
+        }
+      },
+      "required": [
+        "environment",
+        "branches",
+        "platforms",
+        "max_inflight",
+        "max_batch",
+        "max_private_bytes",
+        "max_wait_millis",
+        "shutdown_window_millis"
+      ]
+    },
+    "Qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slot_id": {
+          "type": "string",
+          "pattern": "^q[0-9]{3}$",
+          "maxLength": 4
+        },
+        "seam": {
+          "type": "string",
+          "enum": [
+            "core",
+            "sdk",
+            "conversation",
+            "identity",
+            "governance",
+            "artifact",
+            "workspace",
+            "observability",
+            "bus",
+            "slack",
+            "mattermost",
+            "telegram",
+            "discord",
+            "local_store",
+            "executor",
+            "clock",
+            "secret",
+            "route"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "synthetic_only",
+            "established",
+            "blocked",
+            "unavailable",
+            "not_selected"
+          ]
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockerId"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "slot_id",
+        "seam",
+        "state",
+        "blockers"
+      ]
+    },
+    "ExecutionContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context_id": {
+          "$ref": "#/$defs/ContextId"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "synthetic",
+            "real-seam"
+          ]
+        },
+        "config_safe": {
+          "$ref": "#/$defs/SafeConfig"
+        },
+        "config_safe_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "qualification_slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Qualification"
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "context_id",
+        "mode",
+        "config_safe",
+        "config_safe_sha256",
+        "qualification_slots"
+      ]
+    },
+    "ExpectedInstance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "$ref": "#/$defs/InstanceId"
+        },
+        "tc_id": {
+          "$ref": "#/$defs/TcId"
+        },
+        "parameter_id": {
+          "$ref": "#/$defs/ParameterId"
+        },
+        "context_id": {
+          "$ref": "#/$defs/ContextId"
+        },
+        "suite_id": {
+          "$ref": "#/$defs/SuiteId"
+        },
+        "ds_id": {
+          "$ref": "#/$defs/DsId"
+        },
+        "ev_id": {
+          "$ref": "#/$defs/EvId"
+        },
+        "assertion_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AssertionId"
+          },
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "target_id": {
+          "type": "string",
+          "enum": [
+            "S",
+            "D",
+            "A",
+            "C",
+            "R",
+            "B",
+            "L",
+            "P",
+            "I",
+            "W",
+            "J"
+          ]
+        }
+      },
+      "required": [
+        "instance_id",
+        "tc_id",
+        "parameter_id",
+        "context_id",
+        "suite_id",
+        "ds_id",
+        "ev_id",
+        "assertion_ids",
+        "target_id"
+      ]
+    },
+    "RunContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "const": "L6-bridges/test-harness"
+        },
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "run_context"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$",
+          "maxLength": 64
+        },
+        "source_tree_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "design_baseline": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DesignDigest"
+          },
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true
+        },
+        "harness_profile": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]{0,95}@[1-9][0-9]{0,9}$",
+          "maxLength": 128
+        },
+        "harness_build_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "tool_baseline_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "safe_output_allowlist_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "started_at_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "harness_timeout_millis": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600000
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExecutionContext"
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "expected_instances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExpectedInstance"
+          },
+          "minItems": 1,
+          "maxItems": 16384,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "kind",
+        "run_id",
+        "source_revision",
+        "source_tree_sha256",
+        "design_baseline",
+        "harness_profile",
+        "harness_build_sha256",
+        "tool_baseline_sha256",
+        "safe_output_allowlist_version",
+        "started_at_ms",
+        "harness_timeout_millis",
+        "contexts",
+        "expected_instances"
+      ]
+    },
+    "Assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "assertion_id": {
+          "$ref": "#/$defs/AssertionId"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "failed",
+            "not_reached"
+          ]
+        },
+        "failure_code": {
+          "$ref": "#/$defs/FailureCode"
+        }
+      },
+      "required": [
+        "assertion_id",
+        "status",
+        "failure_code"
+      ]
+    },
+    "Counters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "local_write_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "owner_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "platform_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "consumer_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "id_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "probe_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "local_write_calls",
+        "owner_calls",
+        "platform_calls",
+        "consumer_calls",
+        "id_calls",
+        "probe_calls"
+      ]
+    },
+    "CaseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "const": "L6-bridges/test-harness"
+        },
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "case_result"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "context_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "context_id": {
+          "$ref": "#/$defs/ContextId"
+        },
+        "suite_id": {
+          "$ref": "#/$defs/SuiteId"
+        },
+        "instance_id": {
+          "$ref": "#/$defs/InstanceId"
+        },
+        "tc_id": {
+          "$ref": "#/$defs/TcId"
+        },
+        "parameter_id": {
+          "$ref": "#/$defs/ParameterId"
+        },
+        "ds_id": {
+          "$ref": "#/$defs/DsId"
+        },
+        "ev_id": {
+          "$ref": "#/$defs/EvId"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "executed": {
+          "type": "boolean"
+        },
+        "started_at_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "finished_at_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "elapsed_millis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "assertions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "minItems": 0,
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "call_counters": {
+          "$ref": "#/$defs/Counters"
+        },
+        "failure_code": {
+          "$ref": "#/$defs/FailureCode"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockerId"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "target_id": {
+          "type": "string",
+          "enum": [
+            "S",
+            "D",
+            "A",
+            "C",
+            "R",
+            "B",
+            "L",
+            "P",
+            "I",
+            "W",
+            "J"
+          ]
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "kind",
+        "run_id",
+        "context_sha256",
+        "context_id",
+        "suite_id",
+        "instance_id",
+        "tc_id",
+        "parameter_id",
+        "ds_id",
+        "ev_id",
+        "status",
+        "executed",
+        "started_at_ms",
+        "finished_at_ms",
+        "elapsed_millis",
+        "assertions",
+        "call_counters",
+        "failure_code",
+        "blockers",
+        "target_id"
+      ]
+    },
+    "SuiteResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "const": "L6-bridges/test-harness"
+        },
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "suite_result"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "context_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "context_id": {
+          "$ref": "#/$defs/ContextId"
+        },
+        "suite_id": {
+          "$ref": "#/$defs/SuiteId"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "runner_exit": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "started_at_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "finished_at_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "elapsed_millis": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "case_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0,
+          "maxItems": 16384,
+          "uniqueItems": true
+        },
+        "missing_instance_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/InstanceId"
+          },
+          "minItems": 0,
+          "maxItems": 16384,
+          "uniqueItems": true
+        },
+        "stdout": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "stderr": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "failure_code": {
+          "$ref": "#/$defs/FailureCode"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockerId"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "runner_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "target_id": {
+                "type": "string",
+                "enum": [
+                  "S",
+                  "D",
+                  "A",
+                  "C",
+                  "R",
+                  "B",
+                  "L",
+                  "P",
+                  "I",
+                  "W",
+                  "J"
+                ]
+              },
+              "runner_exit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "instance_ids": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/InstanceId"
+                },
+                "minItems": 0,
+                "maxItems": 16384,
+                "uniqueItems": true
+              },
+              "elapsed_millis": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "target_id",
+              "runner_exit",
+              "instance_ids",
+              "elapsed_millis"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 11,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "kind",
+        "run_id",
+        "context_sha256",
+        "context_id",
+        "suite_id",
+        "status",
+        "runner_exit",
+        "started_at_ms",
+        "finished_at_ms",
+        "elapsed_millis",
+        "case_refs",
+        "missing_instance_ids",
+        "stdout",
+        "stderr",
+        "failure_code",
+        "blockers",
+        "runner_results"
+      ]
+    },
+    "CoverageSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "$ref": "#/$defs/InstanceId"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "recorded",
+            "missing"
+          ]
+        },
+        "case_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "instance_id",
+        "state",
+        "case_ref"
+      ]
+    },
+    "ArtifactIndex": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "const": "L6-bridges/test-harness"
+        },
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "artifact_index"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "shell",
+            "final"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "in_progress",
+            "passed",
+            "failed",
+            "blocked",
+            "unavailable"
+          ]
+        },
+        "context_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "suite_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0,
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "case_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0,
+          "maxItems": 16384,
+          "uniqueItems": true
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CoverageSlot"
+          },
+          "minItems": 1,
+          "maxItems": 16384,
+          "uniqueItems": true
+        },
+        "failure_code": {
+          "$ref": "#/$defs/FailureCode"
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "kind",
+        "run_id",
+        "generation",
+        "stage",
+        "status",
+        "context_ref",
+        "suite_refs",
+        "case_refs",
+        "coverage",
+        "failure_code"
+      ]
+    },
+    "CheckResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "const": "L6-bridges/test-harness"
+        },
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "check_result"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "check_id": {
+          "type": "string",
+          "enum": [
+            "run-context",
+            "test-evidence"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "context_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "input_index_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "checked_at_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "failure_code": {
+          "$ref": "#/$defs/FailureCode"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockerId"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "kind",
+        "run_id",
+        "check_id",
+        "status",
+        "context_ref",
+        "input_index_ref",
+        "checked_at_ms",
+        "failure_code",
+        "blockers"
+      ]
+    },
+    "EvidencePage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "const": "L6-bridges/test-harness"
+        },
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "evidence_page"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "ev_id": {
+          "$ref": "#/$defs/EvId"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "tc_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TcId"
+          },
+          "minItems": 1,
+          "maxItems": 116,
+          "uniqueItems": true
+        },
+        "instance_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/InstanceId"
+          },
+          "minItems": 1,
+          "maxItems": 16384,
+          "uniqueItems": true
+        },
+        "context_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContextId"
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "qualification_scope": {
+          "type": "string",
+          "enum": [
+            "local_mechanism",
+            "real_seam",
+            "mixed"
+          ]
+        },
+        "context_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "source_index_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "case_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 1,
+          "maxItems": 16384,
+          "uniqueItems": true
+        },
+        "suite_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "check_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "ac_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^AC-BR-[0-9]{3}$",
+            "maxLength": 10
+          },
+          "minItems": 1,
+          "maxItems": 38,
+          "uniqueItems": true
+        },
+        "veto_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^VETO-BR-[0-9]{3}$",
+            "maxLength": 12
+          },
+          "minItems": 0,
+          "maxItems": 6,
+          "uniqueItems": true
+        },
+        "failure_code": {
+          "$ref": "#/$defs/FailureCode"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockerId"
+          },
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "kind",
+        "run_id",
+        "ev_id",
+        "status",
+        "tc_refs",
+        "instance_ids",
+        "context_ids",
+        "qualification_scope",
+        "context_ref",
+        "source_index_ref",
+        "case_refs",
+        "suite_refs",
+        "check_refs",
+        "ac_refs",
+        "veto_refs",
+        "failure_code",
+        "blockers"
+      ]
+    },
+    "ReportEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ev_id": {
+          "$ref": "#/$defs/EvId"
+        },
+        "page_ref": {
+          "$ref": "#/$defs/ReportRef"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        }
+      },
+      "required": [
+        "ev_id",
+        "page_ref",
+        "status"
+      ]
+    },
+    "ReportIndex": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "const": "L6-bridges/test-harness"
+        },
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "report_index"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "partial",
+            "final"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "context_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "source_index_ref": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "check_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ReportEvidence"
+          },
+          "minItems": 0,
+          "maxItems": 22,
+          "uniqueItems": true
+        },
+        "missing_ev_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvId"
+          },
+          "minItems": 0,
+          "maxItems": 22,
+          "uniqueItems": true
+        },
+        "generated_at_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "failure_code": {
+          "$ref": "#/$defs/FailureCode"
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "kind",
+        "run_id",
+        "stage",
+        "status",
+        "context_ref",
+        "source_index_ref",
+        "check_refs",
+        "evidence_refs",
+        "missing_ev_ids",
+        "generated_at_ms",
+        "failure_code"
+      ]
+    },
+    "AcCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ac_id": {
+          "type": "string",
+          "pattern": "^AC-BR-[0-9]{3}$",
+          "maxLength": 10
+        },
+        "ev_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvId"
+          },
+          "minItems": 0,
+          "maxItems": 22,
+          "uniqueItems": true
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "not_evaluated",
+            "blocked",
+            "available_for_review"
+          ]
+        }
+      },
+      "required": [
+        "ac_id",
+        "ev_refs",
+        "state"
+      ]
+    },
+    "Handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "const": "L6-bridges/test-harness"
+        },
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "acceptance_handoff"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "status": {
+          "type": "string",
+          "const": "draft_for_review"
+        },
+        "source_report_index": {
+          "$ref": "#/$defs/ReportRef"
+        },
+        "ac_coverage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AcCoverage"
+          },
+          "minItems": 38,
+          "maxItems": 38,
+          "uniqueItems": true
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockerId"
+          },
+          "minItems": 0,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "review_state": {
+          "type": "string",
+          "const": "waiting"
+        },
+        "generated_at_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "kind",
+        "run_id",
+        "status",
+        "source_report_index",
+        "ac_coverage",
+        "blockers",
+        "review_state",
+        "generated_at_ms"
+      ]
+    },
+    "HumanReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "type": "string",
+          "const": "L6-bridges/test-harness"
+        },
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "human_review"
+        },
+        "run_id": {
+          "$ref": "#/$defs/RunId"
+        },
+        "reviewer_role": {
+          "type": "string",
+          "enum": [
+            "human_responsible_owner",
+            "authorized_reviewer"
+          ]
+        },
+        "reviewer_assignment_slot": {
+          "type": "string",
+          "pattern": "^r[0-9]{3}$",
+          "maxLength": 4
+        },
+        "source_report_index": {
+          "$ref": "#/$defs/ReportRef"
+        },
+        "reviewed_at_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "changes_requested",
+            "handoff_reviewed_no_acceptance_verdict"
+          ]
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BlockerId"
+          },
+          "minItems": 0,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "comment_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "coverage_gap",
+              "qualification_gap",
+              "baseline_changed",
+              "safety_failure",
+              "unknown_responsibility_open",
+              "evidence_invalid",
+              "handoff_scope_checked"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 16,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "owner",
+        "schema_version",
+        "kind",
+        "run_id",
+        "reviewer_role",
+        "reviewer_assignment_slot",
+        "source_report_index",
+        "reviewed_at_ms",
+        "disposition",
+        "blockers",
+        "comment_codes"
+      ]
+    }
+  }
+}

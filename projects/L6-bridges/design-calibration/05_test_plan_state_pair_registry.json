@@ -1,0 +1,1479 @@
+{
+  "schema_version": 1,
+  "kind": "design_state_pair_registry",
+  "status": "planned",
+  "source": "../03-详细设计.md",
+  "source_selector": "§9",
+  "source_excerpt_sha256": "1eab0e044374c7f5f75d9029f828c0a27dba67a430614a6f2cf318581b7774a6",
+  "machines": [
+    {
+      "machine": "M01",
+      "enum": "BridgeInstallationState",
+      "states": [
+        "Configured",
+        "Qualified",
+        "Blocked",
+        "Suspended",
+        "Retired"
+      ],
+      "pairs": [
+        {
+          "from": "Configured",
+          "to": "Qualified",
+          "member_flow": "`BridgeInstallation.record_qualification` @ J05",
+          "guard": "IQ + 原config/local expected",
+          "candidate_commit": "建立qualification；local checked next；U installation",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Blocked",
+          "to": "Qualified",
+          "member_flow": "`BridgeInstallation.record_qualification` @ J05",
+          "guard": "IQ，不借旧失效Slot",
+          "candidate_commit": "同上，config含义不变",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Configured",
+          "to": "Blocked",
+          "member_flow": "`BridgeInstallation.block` @ J05",
+          "guard": "IB + local expected",
+          "candidate_commit": "缺口状态及资格按原卡；U installation",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Qualified",
+          "to": "Blocked",
+          "member_flow": "`BridgeInstallation.block` @ J05",
+          "guard": "IB + local expected",
+          "candidate_commit": "阻新IO，保已发生effect",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Configured",
+          "to": "Suspended",
+          "member_flow": "`BridgeInstallation.suspend` @ C01",
+          "guard": "IC当前basis/config/local",
+          "candidate_commit": "checked config/local next；U installation",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Qualified",
+          "to": "Suspended",
+          "member_flow": "`BridgeInstallation.suspend` @ C01",
+          "guard": "IC当前basis/config/local",
+          "candidate_commit": "同上，不取消旧IO",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Blocked",
+          "to": "Suspended",
+          "member_flow": "`BridgeInstallation.suspend` @ C01",
+          "guard": "IC当前basis/config/local",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Suspended",
+          "to": "Configured",
+          "member_flow": "`BridgeInstallation.restart_configured` @ C01",
+          "guard": "IC显式重启；旧config/local",
+          "candidate_commit": "config/local next、资格失效；需另J05",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Configured",
+          "to": "Retired",
+          "member_flow": "`BridgeInstallation.retire` @ C01",
+          "guard": "IC退役授权、config/local",
+          "candidate_commit": "U installation终态；保所有历史",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Qualified",
+          "to": "Retired",
+          "member_flow": "`BridgeInstallation.retire` @ C01",
+          "guard": "同上",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Blocked",
+          "to": "Retired",
+          "member_flow": "`BridgeInstallation.retire` @ C01",
+          "guard": "同上",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Suspended",
+          "to": "Retired",
+          "member_flow": "`BridgeInstallation.retire` @ C01",
+          "guard": "同上",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        }
+      ]
+    },
+    {
+      "machine": "M02",
+      "enum": "ExternalBindingState",
+      "states": [
+        "Pending",
+        "Active",
+        "Suspended",
+        "Revoked",
+        "Expired"
+      ],
+      "pairs": [
+        {
+          "from": "Pending",
+          "to": "Active",
+          "member_flow": "`ExternalBinding.activate` @ C02",
+          "guard": "BA双expected、next generation",
+          "candidate_commit": "两Slot建立、generation/local next；U binding",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Suspended",
+          "to": "Active",
+          "member_flow": "`ExternalBinding.activate` @ C02",
+          "guard": "BA重新显式授权，同target/action含义",
+          "candidate_commit": "新generation，不复用旧current；U binding",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Active",
+          "to": "Suspended",
+          "member_flow": "`ExternalBinding.suspend` @ C02/J05",
+          "guard": "BM暂停、原两expected",
+          "candidate_commit": "generation/local next；阻新IO",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Pending",
+          "to": "Revoked",
+          "member_flow": "`ExternalBinding.revoke` @ C02/J05",
+          "guard": "BR双expected，J05仅actual正式候选",
+          "candidate_commit": "两Slot失效、generation/local next；保历史",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Active",
+          "to": "Revoked",
+          "member_flow": "`ExternalBinding.revoke` @ C02/J05",
+          "guard": "同上",
+          "candidate_commit": "同上；不取消已发生效果",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Suspended",
+          "to": "Revoked",
+          "member_flow": "`ExternalBinding.revoke` @ C02/J05",
+          "guard": "同上",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Pending",
+          "to": "Expired",
+          "member_flow": "`ExternalBinding.expire` @ C02/J05",
+          "guard": "BM正式expiry、双expected、now",
+          "candidate_commit": "local变化按原generation规则，保历史",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Active",
+          "to": "Expired",
+          "member_flow": "`ExternalBinding.expire` @ C02/J05",
+          "guard": "同上",
+          "candidate_commit": "阻新动作，旧known-only finalize另核",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Suspended",
+          "to": "Expired",
+          "member_flow": "`ExternalBinding.expire` @ C02/J05",
+          "guard": "同上",
+          "candidate_commit": "原relation终态；U binding",
+          "illegal_error": "E0/E1/E2"
+        }
+      ]
+    },
+    {
+      "machine": "M03",
+      "enum": "IdentityMappingState",
+      "states": [
+        "Valid",
+        "Stale",
+        "Revoked"
+      ],
+      "pairs": [
+        {
+          "from": "Valid",
+          "to": "Stale",
+          "member_flow": "`ExternalIdentityMapping.invalidate` @ C03/J05",
+          "guard": "II + local expected",
+          "candidate_commit": "local next；两端不换；U identity",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Valid",
+          "to": "Revoked",
+          "member_flow": "`ExternalIdentityMapping.revoke` @ J05",
+          "guard": "IR实际候选 + local expected",
+          "candidate_commit": "local next；历史保留；U identity",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Stale",
+          "to": "Revoked",
+          "member_flow": "`ExternalIdentityMapping.revoke` @ J05",
+          "guard": "IR不借旧Active current",
+          "candidate_commit": "同上，无复活",
+          "illegal_error": "E0/E1/E2"
+        }
+      ]
+    },
+    {
+      "machine": "M04",
+      "enum": "LocationMappingState",
+      "states": [
+        "Valid",
+        "Stale",
+        "Revoked"
+      ],
+      "pairs": [
+        {
+          "from": "Valid",
+          "to": "Stale",
+          "member_flow": "`ExternalLocationMapping.invalidate` @ C03/J05",
+          "guard": "LI + local expected",
+          "candidate_commit": "local next；原parent/target保留；U location",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Valid",
+          "to": "Revoked",
+          "member_flow": "`ExternalLocationMapping.revoke` @ J05",
+          "guard": "LR完整actual候选/local",
+          "candidate_commit": "local next；原关系解除；U location",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Stale",
+          "to": "Revoked",
+          "member_flow": "`ExternalLocationMapping.revoke` @ J05",
+          "guard": "LR，不强求失效旧current",
+          "candidate_commit": "同上，无复活",
+          "illegal_error": "E0/E1/E2"
+        }
+      ]
+    },
+    {
+      "machine": "M05",
+      "enum": "MessageMappingState",
+      "states": [
+        "Linked",
+        "Stale",
+        "Tombstoned"
+      ],
+      "pairs": [
+        {
+          "from": "Linked",
+          "to": "Stale",
+          "member_flow": "`ExternalMessageMapping.invalidate` @ C03/J05",
+          "guard": "MI + local expected",
+          "candidate_commit": "local next；原locator/result/source不删；U message",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Linked",
+          "to": "Tombstoned",
+          "member_flow": "`ExternalMessageMapping.record_tombstone` @ C03",
+          "guard": "MT actual正式处分",
+          "candidate_commit": "local next；只记原处分历史；U message",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Stale",
+          "to": "Tombstoned",
+          "member_flow": "`ExternalMessageMapping.record_tombstone` @ C03",
+          "guard": "MT核当前删除处置，不借旧失效资格",
+          "candidate_commit": "同上；不复活消费资格",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M06",
+      "enum": "InboundHandoffState",
+      "states": [
+        "Verified",
+        "Blocked",
+        "Quarantined",
+        "HandoffPending",
+        "OwnerAccepted",
+        "OwnerRejected",
+        "Indeterminate"
+      ],
+      "pairs": [
+        {
+          "from": "Verified",
+          "to": "Blocked",
+          "member_flow": "`InboundHandoffRecord.block` @ E01",
+          "guard": "HV已有原行+finite材料/权限缺口/local",
+          "candidate_commit": "local next；安全拒绝；U inbound",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Verified",
+          "to": "Quarantined",
+          "member_flow": "`InboundHandoffRecord.quarantine` @ E01",
+          "guard": "HV已有原meaning/row、finite loop/conflict/local",
+          "candidate_commit": "local next；零raw/假actor；U inbound",
+          "illegal_error": "E0/E1/E2/E4"
+        },
+        {
+          "from": "Verified",
+          "to": "HandoffPending",
+          "member_flow": "`InboundHandoffRecord.begin_handoff` @ E01 B",
+          "guard": "HC/HQ，首次resume/recovery None",
+          "candidate_commit": "claim对应接管、local next；actual B才可能owner IO",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Blocked",
+          "to": "HandoffPending",
+          "member_flow": "`InboundHandoffRecord.begin_handoff` @ E01原op重入",
+          "guard": "HR + HC/HQ完整",
+          "candidate_commit": "同op续接、零新original；U inbound",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "HandoffPending",
+          "to": "OwnerAccepted",
+          "member_flow": "`InboundHandoffRecord.apply_owner_result` @ E01 C/J02",
+          "guard": "HO Accepted/local expected",
+          "candidate_commit": "actual owner_result/accepted关联；U inbound+合格known mapping",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "HandoffPending",
+          "to": "OwnerRejected",
+          "member_flow": "`InboundHandoffRecord.apply_owner_result` @ E01 C/J02",
+          "guard": "HO Rejected/local expected",
+          "candidate_commit": "原拒绝结果保真；U inbound",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "HandoffPending",
+          "to": "Indeterminate",
+          "member_flow": "`InboundHandoffRecord.mark_unknown` @ E01 C",
+          "guard": "同op可能effect但无known/local",
+          "candidate_commit": "保original/claim、local next；U inbound",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "OwnerAccepted",
+          "member_flow": "`InboundHandoffRecord.apply_owner_result` @ J02",
+          "guard": "HO权威同op已知/local",
+          "candidate_commit": "known-only finalize，零再次handoff",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "OwnerRejected",
+          "member_flow": "`InboundHandoffRecord.apply_owner_result` @ J02",
+          "guard": "HO权威确定拒绝/local",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "HandoffPending",
+          "member_flow": "`InboundHandoffRecord.begin_handoff` @ E01原op重入",
+          "guard": "HR + HC/HQ，unknown不能冒NoEffect",
+          "candidate_commit": "same op有据续接；actual claim后才外部调用",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M07",
+      "enum": "PresentationState",
+      "states": [
+        "Qualified",
+        "Degraded",
+        "Blocked",
+        "Stale"
+      ],
+      "pairs": [
+        {
+          "from": "Qualified",
+          "to": "Stale",
+          "member_flow": "`SafePresentationPlan.invalidate` @ J01/J05",
+          "guard": "PI原版本/target/期限、local expected",
+          "candidate_commit": "local next；原refs不换；U plan",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Degraded",
+          "to": "Stale",
+          "member_flow": "`SafePresentationPlan.invalidate` @ J01/J05",
+          "guard": "同上，降级资格也失效",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Qualified",
+          "to": "Blocked",
+          "member_flow": "`SafePresentationPlan.block` @ J01/J05",
+          "guard": "PI当前资格不成立+finite reason/local",
+          "candidate_commit": "local next；阻派发；U plan",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Degraded",
+          "to": "Blocked",
+          "member_flow": "`SafePresentationPlan.block` @ J01/J05",
+          "guard": "同上，不创建action",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        }
+      ]
+    },
+    {
+      "machine": "M08",
+      "enum": "DeliveryIntentState",
+      "states": [
+        "Planned",
+        "Dispatching",
+        "RetryWait",
+        "PlatformAccepted",
+        "KnownRejected",
+        "Indeterminate",
+        "Blocked",
+        "Unsupported"
+      ],
+      "pairs": [
+        {
+          "from": "Planned",
+          "to": "Dispatching",
+          "member_flow": "`DeliveryIntent.claim` @ J01 A",
+          "guard": "DC同effect/claim/current/all bounds",
+          "candidate_commit": "local next；同U新attempt+lane claim；actual提交不是已IO",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "RetryWait",
+          "to": "Dispatching",
+          "member_flow": "`DeliveryIntent.claim` @ J01 A",
+          "guard": "DC + Established DR、全部等待下界及预算有效",
+          "candidate_commit": "同上，原effect不换",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Planned",
+          "to": "Blocked",
+          "member_flow": "`DeliveryIntent.block` @ J01",
+          "guard": "DB真实缺口/local",
+          "candidate_commit": "local next，零receipt/平台IO；U intent",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "RetryWait",
+          "to": "Blocked",
+          "member_flow": "`DeliveryIntent.block` @ J01",
+          "guard": "DB/local，保原retry历史",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Planned",
+          "to": "Unsupported",
+          "member_flow": "`DeliveryIntent.mark_unsupported` @ J01",
+          "guard": "DB正式capability/finite reason/local",
+          "candidate_commit": "原intent终态；无send替代edit/delete/reply",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "RetryWait",
+          "to": "Unsupported",
+          "member_flow": "`DeliveryIntent.mark_unsupported` @ J01",
+          "guard": "同上",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Dispatching",
+          "to": "PlatformAccepted",
+          "member_flow": "`DeliveryIntent.apply_receipt` @ J01 C/J02",
+          "guard": "DK Accepted/local",
+          "candidate_commit": "known结果引用，U attempt/receipt/intent/lane",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Dispatching",
+          "to": "KnownRejected",
+          "member_flow": "`DeliveryIntent.apply_receipt` @ J01 C/J02",
+          "guard": "DK确定终态Rejected/local",
+          "candidate_commit": "原拒绝保真，非transport错误",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Dispatching",
+          "to": "RetryWait",
+          "member_flow": "`DeliveryIntent.schedule_retry` @ J01 C/J02",
+          "guard": "DR完整五源/local/now",
+          "candidate_commit": "建立retry_basis/local next；零新attempt/send",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Dispatching",
+          "to": "Indeterminate",
+          "member_flow": "`DeliveryIntent.mark_unknown` @ J01 C",
+          "guard": "actual同AttemptEffectRef/finite reason/local",
+          "candidate_commit": "保原effect/claim/head；U intent+attempt/lane",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "PlatformAccepted",
+          "member_flow": "`DeliveryIntent.apply_receipt` @ J02",
+          "guard": "DK权威同effect known",
+          "candidate_commit": "只finalize；不再次dispatch",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "KnownRejected",
+          "member_flow": "`DeliveryIntent.apply_receipt` @ J02",
+          "guard": "DK确定原effect拒绝",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "RetryWait",
+          "member_flow": "`DeliveryIntent.schedule_retry` @ J02",
+          "guard": "DR同effect权威NoEffect，非NoIo",
+          "candidate_commit": "只记eligibility；后续J01重新全部核验",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Blocked",
+          "to": "Planned",
+          "member_flow": "`DeliveryIntent.restore_planned` @ J02",
+          "guard": "DP，完整原plan仍有效",
+          "candidate_commit": "原含义恢复/local next；同U原subject+recovery；零IO",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M09",
+      "enum": "DeliveryAttemptState",
+      "states": [
+        "Claimed",
+        "InFlight",
+        "KnownAccepted",
+        "KnownRejected",
+        "Indeterminate",
+        "NotDispatched"
+      ],
+      "pairs": [
+        {
+          "from": "Claimed",
+          "to": "InFlight",
+          "member_flow": "`DeliveryAttempt.begin_io` @ J01 B",
+          "guard": "AC当前fence/资格/local/now，actual A",
+          "candidate_commit": "local next；U attempt；actual B后一次IO",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Claimed",
+          "to": "NotDispatched",
+          "member_flow": "`DeliveryAttempt.record_not_dispatched` @ J01/J02原NoIo finalize",
+          "guard": "AN权威未IO + 原actual Claimed",
+          "candidate_commit": "local next；终态attempt；lane/intent各合法边另核",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "InFlight",
+          "to": "KnownAccepted",
+          "member_flow": "`DeliveryAttempt.record_result` @ J01 C/J02",
+          "guard": "AK Accepted/local",
+          "candidate_commit": "result SlotEstablished；U attempt/intent/receipt/lane",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "InFlight",
+          "to": "KnownRejected",
+          "member_flow": "`DeliveryAttempt.record_result` @ J01 C/J02",
+          "guard": "AK Rejected/local",
+          "candidate_commit": "同上；retry资格不由本标签授予",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "InFlight",
+          "to": "Indeterminate",
+          "member_flow": "`DeliveryAttempt.mark_unknown` @ J01 C",
+          "guard": "actual原可能IO、finite reason/local",
+          "candidate_commit": "保claim/effect；U关联unknown head",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Claimed",
+          "to": "Indeterminate",
+          "member_flow": "`DeliveryAttempt.mark_unknown` @ J02 crash恢复",
+          "guard": "actual原stage无法证IO/local",
+          "candidate_commit": "local next；保original，不造receipt",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "KnownAccepted",
+          "member_flow": "`DeliveryAttempt.record_result` @ J02",
+          "guard": "AK权威同attempt accepted",
+          "candidate_commit": "只finalize，零再次dispatch",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "KnownRejected",
+          "member_flow": "`DeliveryAttempt.record_result` @ J02",
+          "guard": "AK权威确定拒绝",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "NotDispatched",
+          "member_flow": "`DeliveryAttempt.record_not_dispatched` @ J01 D/J02原NoIo finalize",
+          "guard": "AN，C实际提交后的original行",
+          "candidate_commit": "只finalize；旧attempt不可重用",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M10",
+      "enum": "ExternalActionState",
+      "states": [
+        "Active",
+        "Claimed",
+        "Expired",
+        "Revoked"
+      ],
+      "pairs": [
+        {
+          "from": "Active",
+          "to": "Claimed",
+          "member_flow": "`ExternalActionBinding.claim_once` @ E03 B",
+          "guard": "XA/XC full current/local/now",
+          "candidate_commit": "one_use Established与原op固定；同U callback OwnerPending+dedup",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Active",
+          "to": "Expired",
+          "member_flow": "`ExternalActionBinding.expire` @ J05",
+          "guard": "XE actual正式expiry/local/now",
+          "candidate_commit": "local next；原source/授权历史保留；U action",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Active",
+          "to": "Revoked",
+          "member_flow": "`ExternalActionBinding.revoke` @ J05",
+          "guard": "XR actual原basis/local",
+          "candidate_commit": "local next；阻后续动作；U action",
+          "illegal_error": "E0/E1/E2"
+        }
+      ]
+    },
+    {
+      "machine": "M11",
+      "enum": "CallbackHandoffState",
+      "states": [
+        "Verified",
+        "Blocked",
+        "Rejected",
+        "OwnerPending",
+        "OwnerAccepted",
+        "OwnerRejected",
+        "Indeterminate"
+      ],
+      "pairs": [
+        {
+          "from": "Verified",
+          "to": "OwnerPending",
+          "member_flow": "`CallbackHandoffRecord.begin_handoff` @ E03 B",
+          "guard": "CVF/CVC all current/local/now",
+          "candidate_commit": "one_use原op绑定、local next；同U action Claimed",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Verified",
+          "to": "Blocked",
+          "member_flow": "`CallbackHandoffRecord.block` @ E03",
+          "guard": "已有CVF record、finite合同缺口/local",
+          "candidate_commit": "local next；安全拒绝；零claim/owner",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Verified",
+          "to": "Rejected",
+          "member_flow": "`CallbackHandoffRecord.reject` @ E03",
+          "guard": "已有CVF record、finite冲突/期限/local",
+          "candidate_commit": "local next；不保存被拒raw",
+          "illegal_error": "E0/E1/E2/E4"
+        },
+        {
+          "from": "OwnerPending",
+          "to": "OwnerAccepted",
+          "member_flow": "`CallbackHandoffRecord.apply_owner_result` @ E03 C/J02",
+          "guard": "CVO known Accepted/local",
+          "candidate_commit": "owner_result Established；U callback/原关联",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "OwnerPending",
+          "to": "OwnerRejected",
+          "member_flow": "`CallbackHandoffRecord.apply_owner_result` @ E03 C/J02",
+          "guard": "CVO known Rejected/local",
+          "candidate_commit": "原拒绝保真；action仍Claimed",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "OwnerPending",
+          "to": "Indeterminate",
+          "member_flow": "`CallbackHandoffRecord.mark_unknown` @ E03 C",
+          "guard": "actual同op可能effect、finite reason/local",
+          "candidate_commit": "保one-use/original；零再approve",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "OwnerAccepted",
+          "member_flow": "`CallbackHandoffRecord.apply_owner_result` @ J02",
+          "guard": "CVO权威same-op Accepted",
+          "candidate_commit": "只finalize；action不回Active",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "OwnerRejected",
+          "member_flow": "`CallbackHandoffRecord.apply_owner_result` @ J02",
+          "guard": "CVO权威same-op Rejected",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M12",
+      "enum": "DedupState",
+      "states": [
+        "Reserved",
+        "ResultRecorded",
+        "Indeterminate",
+        "Expired"
+      ],
+      "pairs": [
+        {
+          "from": "Reserved",
+          "to": "ResultRecorded",
+          "member_flow": "`DedupRecord.attach_result` @ C/E/J已取得原actual结果的后续阶段",
+          "guard": "KM/KR/local expected",
+          "candidate_commit": "result SlotEstablished/local next；U原subject+dedup",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Reserved",
+          "to": "Indeterminate",
+          "member_flow": "`DedupRecord.mark_unknown` @ E01/E03/J01/J04",
+          "guard": "KM/KU/local",
+          "candidate_commit": "保原op/effect；U关联unknown",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "ResultRecorded",
+          "member_flow": "`DedupRecord.attach_result` @ J02/E04原known finalize",
+          "guard": "KM/KR权威原结果/local",
+          "candidate_commit": "known关联，零第二效果",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Reserved",
+          "to": "Expired",
+          "member_flow": "`DedupRecord.expire` @ J05 Dedup分支",
+          "guard": "KE/current/input expected",
+          "candidate_commit": "仅state/local next，目标Present+独立Job dedup/seed/audit/正式条件规则同U；保tombstone",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "ResultRecorded",
+          "to": "Expired",
+          "member_flow": "`DedupRecord.expire` @ J05 Dedup分支",
+          "guard": "KE/current/input expected",
+          "candidate_commit": "同上，不改immutable result",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "Expired",
+          "member_flow": "`DedupRecord.expire` @ J05 Dedup分支",
+          "guard": "KE/current/input expected且unknown不能丢",
+          "candidate_commit": "同上，原effect责任不因expiry清除",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M13",
+      "enum": "StreamCursorState",
+      "states": [
+        "Ready",
+        "Incomparable",
+        "Blocked"
+      ],
+      "pairs": [
+        {
+          "from": "Ready",
+          "to": "Ready",
+          "member_flow": "`StreamCursor.advance` @ J03 C",
+          "guard": "SA After/actual完整stage coverage、双expected",
+          "candidate_commit": "position/coverage及cursor/local checked next；独立U cursor",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Ready",
+          "to": "Incomparable",
+          "member_flow": "`StreamCursor.mark_incomparable` / `StreamCursor.lose_comparator` @ E01/J03/J05合法维护",
+          "guard": "SI/source范围、local expected",
+          "candidate_commit": "comparator Stale/Missing、保旧position/epoch；必要gap同U",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Ready",
+          "to": "Blocked",
+          "member_flow": "`StreamCursor.block` @ J03/J05",
+          "guard": "SB正式basis/local",
+          "candidate_commit": "local next，保旧position/coverage事实",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Incomparable",
+          "to": "Blocked",
+          "member_flow": "`StreamCursor.block` @ J03/J05",
+          "guard": "SB/local",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Incomparable",
+          "to": "Ready",
+          "member_flow": "`StreamCursor.requalify_same_epoch` @ J03/J05",
+          "guard": "SQ全部same epoch/双expected/now",
+          "candidate_commit": "建立资格、双revision按原卡；不advance position",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Blocked",
+          "to": "Ready",
+          "member_flow": "`StreamCursor.requalify_same_epoch` @ J03/J05",
+          "guard": "SQ，不拼新epoch/丢unknown gap",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M14",
+      "enum": "GapState",
+      "states": [
+        "Open",
+        "Probing",
+        "Closed",
+        "Manual"
+      ],
+      "pairs": [
+        {
+          "from": "Open",
+          "to": "Probing",
+          "member_flow": "`GapRecord.begin_probe` @ J03 A",
+          "guard": "GP/recovery current/local",
+          "candidate_commit": "window/recovery原关联、local next；同U recovery Probing",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Probing",
+          "to": "Closed",
+          "member_flow": "`GapRecord.close` @ J03 B",
+          "guard": "GC complete authoritative/local",
+          "candidate_commit": "coverage Established/local next；同U recovery Resolved",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Open",
+          "to": "Manual",
+          "member_flow": "`GapRecord.require_manual` @ J03",
+          "guard": "GU真实缺口/local",
+          "candidate_commit": "finite原因、原range保留；U gap/recovery各合法边",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Probing",
+          "to": "Manual",
+          "member_flow": "`GapRecord.require_manual` @ J03 B",
+          "guard": "GU未知/不可判/local",
+          "candidate_commit": "同上，不清除未覆盖责任",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Probing",
+          "to": "Open",
+          "member_flow": "`GapRecord.retain_uncovered` @ J03 B",
+          "guard": "GU actual同range partial probe/local",
+          "candidate_commit": "原range保留，局部覆盖不伪Closed",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Manual",
+          "to": "Probing",
+          "member_flow": "`GapRecord.begin_probe` @ C06受权后J03 A",
+          "guard": "GP actual显式授权+原range/source/window齐",
+          "candidate_commit": "同U原recovery Probing，不换gap/op",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M15",
+      "enum": "DispatchLaneState",
+      "states": [
+        "Ready",
+        "Held",
+        "Cooldown",
+        "Blocked"
+      ],
+      "pairs": [
+        {
+          "from": "Ready",
+          "to": "Held",
+          "member_flow": "`DispatchLane.claim` @ J01 A",
+          "guard": "LC/LF + 双expected/now",
+          "candidate_commit": "claim/fence建立、lane/local next；同U intent/attempt",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Held",
+          "to": "Ready",
+          "member_flow": "`DispatchLane.release` @ J01 C/J02",
+          "guard": "LR known/noIO、原claim/无head、双expected",
+          "candidate_commit": "仅clear本地claim/双revision；零no-effect推断",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Held",
+          "to": "Cooldown",
+          "member_flow": "`DispatchLane.apply_bounds` @ J01 C/J02",
+          "guard": "LB + actual原release处置/双expected",
+          "candidate_commit": "合并全bounds、clear claim按原卡；Unknown仍保head",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Ready",
+          "to": "Cooldown",
+          "member_flow": "`DispatchLane.apply_bounds` @ J01",
+          "guard": "LB全scope向量/双expected",
+          "candidate_commit": "rate_bounds合并不缩短、双revision；不重置budget",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Ready",
+          "to": "Blocked",
+          "member_flow": "`DispatchLane.block` @ J01/J05",
+          "guard": "LX actual维护basis/双expected",
+          "candidate_commit": "保原scope/window/head，双revision",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Held",
+          "to": "Blocked",
+          "member_flow": "`DispatchLane.block` / `DispatchLane.release` @ J01/J02/J05合法分支",
+          "guard": "block=LX保claim；release=LR Unknown/依赖未立且实际处置",
+          "candidate_commit": "block保旧claim/unknown；release只清local claim且保unresolved_head",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Cooldown",
+          "to": "Blocked",
+          "member_flow": "`DispatchLane.block` @ J01/J05",
+          "guard": "LX当前欠缺/双expected",
+          "candidate_commit": "原bounds/budget/head保留",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Cooldown",
+          "to": "Ready",
+          "member_flow": "`DispatchLane.finish_cooldown` @ J01/J05",
+          "guard": "LC/LX全bounds到期、无head/未处置claim/双expected/now",
+          "candidate_commit": "双revision；不清未知、不授权send",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Blocked",
+          "to": "Ready",
+          "member_flow": "`DispatchLane.restore_ready` @ J02/J05",
+          "guard": "LX + LC实际current，head若有先actual权威finalize",
+          "candidate_commit": "原scope恢复、合格head处理/双revision；不产生retry权",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M16",
+      "enum": "RecoveryState",
+      "states": [
+        "Requested",
+        "Probing",
+        "Resolved",
+        "Blocked",
+        "Manual"
+      ],
+      "pairs": [
+        {
+          "from": "Requested",
+          "to": "Probing",
+          "member_flow": "`RecoveryRecord.begin_probe` @ J02/J03 A",
+          "guard": "RQ全current/local",
+          "candidate_commit": "qualification Established/local next；U recovery/Gap各合法边",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Requested",
+          "to": "Blocked",
+          "member_flow": "`RecoveryRecord.block` @ J02/J03",
+          "guard": "RB实际失效basis/local",
+          "candidate_commit": "保original、finite reason/local next",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Probing",
+          "to": "Blocked",
+          "member_flow": "`RecoveryRecord.block` @ J02/J03 B",
+          "guard": "RB/local",
+          "candidate_commit": "不Resolved/不新effect",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Probing",
+          "to": "Resolved",
+          "member_flow": "`RecoveryRecord.resolve` @ J02/J03 B",
+          "guard": "RK FinalizeOnly 或 RR SameEffectRetryEligible 或 RG GapCovered；各typed参数exclusive、local",
+          "candidate_commit": "actual probe/result+resolution/local next；关联known-only U",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Requested",
+          "to": "Manual",
+          "member_flow": "`RecoveryRecord.require_manual` @ J02/J03",
+          "guard": "来源/window欠缺/finite reason/local",
+          "candidate_commit": "resolution_kind Manual；保unknown",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Probing",
+          "to": "Manual",
+          "member_flow": "`RecoveryRecord.require_manual` @ J02/J03 B",
+          "guard": "actualUnknown/Unavailable/partial不可判/local",
+          "candidate_commit": "同上，不能清head/gap",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Manual",
+          "to": "Probing",
+          "member_flow": "`RecoveryRecord.begin_probe` @ C06显式授权后J02/J03 A",
+          "guard": "RQ actual完整重新授权，同subject/op",
+          "candidate_commit": "qualification重建，原effect/range不换",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Blocked",
+          "to": "Probing",
+          "member_flow": "`RecoveryRecord.begin_probe` @ C06显式授权后J02/J03 A",
+          "guard": "RQ同上，不借旧失效current",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M17",
+      "enum": "SafeHandoffState",
+      "states": [
+        "Pending",
+        "Dispatching",
+        "ConsumerAccepted",
+        "ConsumerRejected",
+        "Indeterminate",
+        "Blocked"
+      ],
+      "pairs": [
+        {
+          "from": "Pending",
+          "to": "Dispatching",
+          "member_flow": "`begin_handoff` @ J04 A（O01后也复用此唯一claim通路）",
+          "guard": "HF/HC 全 current、claim 实际 reservation、local CAS",
+          "candidate_commit": "audit/dedup/immutable seed/record/claim 同 U；commit unknown 不外呼",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Pending",
+          "to": "Blocked",
+          "member_flow": "`block` @ J05",
+          "guard": "HB actual basis/current 失效",
+          "candidate_commit": "保 canonical/op；安全 local mutation，零 consumer IO",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Dispatching",
+          "to": "ConsumerAccepted",
+          "member_flow": "`apply_consumer_result` @ E04/J04 B/J02 B",
+          "guard": "HK actual same-op known Accepted + local CAS",
+          "candidate_commit": "结果关联原 row/seed/audit；不产生新 canonical/O01",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Dispatching",
+          "to": "ConsumerRejected",
+          "member_flow": "`apply_consumer_result` @ E04/J04 B/J02 B",
+          "guard": "HK actual same-op known Rejected + local CAS",
+          "candidate_commit": "同上；Rejected 不释放 claim 语义之外的事实",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Dispatching",
+          "to": "Indeterminate",
+          "member_flow": "`mark_unknown` @ E04/J04 B",
+          "guard": "HU actual possible effect/finite reason/local",
+          "candidate_commit": "保原 claim/material/op；不新增 producer/consumer call",
+          "illegal_error": "E0/E1/E2"
+        },
+        {
+          "from": "Dispatching",
+          "to": "Blocked",
+          "member_flow": "`block` @ J05",
+          "guard": "HB 合法维护 basis；保 unknown claim",
+          "candidate_commit": "local-only block；零重交",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "ConsumerAccepted",
+          "member_flow": "`apply_consumer_result` @ E04/J02/J04",
+          "guard": "HK 权威 same-op Accepted",
+          "candidate_commit": "known-only finalize；不回 Pending/不重交",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "ConsumerRejected",
+          "member_flow": "`apply_consumer_result` @ E04/J02/J04",
+          "guard": "HK 权威 same-op Rejected",
+          "candidate_commit": "同上",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Indeterminate",
+          "to": "Pending",
+          "member_flow": "`resume_pending` @ J04 R",
+          "guard": "HR formal NoEffect + current/admission/预算全齐",
+          "candidate_commit": "原 record actual commit；下一 U 才 claim/外呼",
+          "illegal_error": "E0/E1/E2/E3"
+        },
+        {
+          "from": "Blocked",
+          "to": "Pending",
+          "member_flow": "`resume_pending` @ J04 R",
+          "guard": "HR 同原材料/op、实际 NoEffect/current requalification",
+          "candidate_commit": "同上；不凭 timeout/NotFound/ACK lost",
+          "illegal_error": "E0/E1/E2/E3"
+        }
+      ]
+    },
+    {
+      "machine": "M18",
+      "enum": "RuntimeExecutionPhase",
+      "states": [
+        "Constructed",
+        "Active",
+        "Draining",
+        "StoppedLocal",
+        "StoppedWithUnknown"
+      ],
+      "pairs": [
+        {
+          "from": "Constructed",
+          "to": "Active",
+          "member_flow": "`RuntimeExecutionState::begin` @ runtime composition",
+          "guard": "`RuntimeRequiredSeams` 全部 Required seam actual current、`RuntimeAvailability::Qualified`、budget 有界、actual now",
+          "candidate_commit": "只建立本地 host；不创建业务 effect",
+          "illegal_error": "`CV::InconsistentFields` / `CV::MissingRequired` / `PE::NotEstablished`"
+        },
+        {
+          "from": "Active",
+          "to": "Draining",
+          "member_flow": "`begin_shutdown` @ runtime host",
+          "guard": "仅Active；shutdown_budget bounded、四资源元组与原budget全等；deadline由受信host在本次停止事件经同域clock+批准窗口checked派生；全部guard通过后替换budget，输入unresolved与既有集合并集",
+          "candidate_commit": "本地停止旗标；不撤销外部IO；guard失败零修改",
+          "illegal_error": "`CV::InconsistentFields` / `CV::UnknownEffect`"
+        },
+        {
+          "from": "Draining",
+          "to": "StoppedLocal",
+          "member_flow": "`record_local_stop`",
+          "guard": "实际 unresolved 集合为空，所有 scoped wait/session 已结束",
+          "candidate_commit": "只写本地 phase",
+          "illegal_error": "`CV::UnknownEffect` / `CV::InconsistentFields`"
+        },
+        {
+          "from": "Draining",
+          "to": "StoppedWithUnknown",
+          "member_flow": "`record_local_stop`",
+          "guard": "实际 unresolved 集合非空，逐项保留 typed 原 op/effect",
+          "candidate_commit": "只写本地 phase；交 Application 原恢复责任",
+          "illegal_error": "`CV::InconsistentFields`"
+        }
+      ]
+    },
+    {
+      "machine": "M19",
+      "enum": "JobInvocationPhase",
+      "states": [
+        "Pending",
+        "Dispatched",
+        "CompletedLocal",
+        "CancelledLocal",
+        "Indeterminate"
+      ],
+      "pairs": [
+        {
+          "from": "Pending",
+          "to": "Dispatched",
+          "member_flow": "`mark_dispatched` @ 五 J entry",
+          "guard": "plan/context/continuity/budget/runtime qualification actual valid；实际已交 Application",
+          "candidate_commit": "不创建新 op；只 phase 变更",
+          "illegal_error": "`CV::InconsistentFields` / `PE::Denied` / `PE::NotEstablished`"
+        },
+        {
+          "from": "Pending",
+          "to": "CancelledLocal",
+          "member_flow": "`cancel_local_wait` @ local cancel",
+          "guard": "只停止本地等待；unresolved 取并集，不清旧项",
+          "candidate_commit": "不撤回 claim/IO，不生成 no-effect",
+          "illegal_error": "`CV::UnknownEffect` / `CV::InconsistentFields`"
+        },
+        {
+          "from": "Dispatched",
+          "to": "CompletedLocal",
+          "member_flow": "`record_returned` @ 五 J result",
+          "guard": "actual bounded `SafeJobResultSummary` 可见且 unresolved 为空；原 plan/subject/op 一致",
+          "candidate_commit": "只保存 local result；不宣称 foreign success",
+          "illegal_error": "`CV::MissingRequired` / `CV::OutOfScope` / `PE::Unavailable`"
+        },
+        {
+          "from": "Dispatched",
+          "to": "Indeterminate",
+          "member_flow": "`record_returned` @ J/driver unknown",
+          "guard": "返回或错误携同 invocation 原 unresolved；不能以空结果覆盖已有 unknown",
+          "candidate_commit": "保原 op/effect；交恢复责任",
+          "illegal_error": "`PE::Indeterminate{original,phase}`"
+        },
+        {
+          "from": "Dispatched",
+          "to": "CancelledLocal",
+          "member_flow": "`cancel_local_wait` @ shutdown",
+          "guard": "actual local cancellation；可能已产生 effect 时 unresolved 必须保留",
+          "candidate_commit": "不重入队、不换 operation",
+          "illegal_error": "`CV::UnknownEffect`"
+        }
+      ]
+    },
+    {
+      "machine": "M20",
+      "enum": "SourceSessionPhase",
+      "states": [
+        "Configured",
+        "Active",
+        "Disconnected",
+        "NotEstablished",
+        "Stopped"
+      ],
+      "pairs": [
+        {
+          "from": "Configured",
+          "to": "Active",
+          "member_flow": "`record_connected` @ E01/E03 runner",
+          "guard": "same registration/family/mode/source；epoch actual；stateful mode session Established；basis kind exact",
+          "candidate_commit": "只保存 adapter-local session；不写 cursor/gap",
+          "illegal_error": "`CV::WrongKind` / `CV::MissingRequired` / `PE::NotEstablished`"
+        },
+        {
+          "from": "Configured",
+          "to": "NotEstablished",
+          "member_flow": "`record_unavailable` @ connect failure",
+          "guard": "actual qualification/connection 缺口与 finite reason",
+          "candidate_commit": "保历史，不造 Active",
+          "illegal_error": "`CV::InconsistentFields`"
+        },
+        {
+          "from": "Configured",
+          "to": "Stopped",
+          "member_flow": "`stop_local` @ shutdown",
+          "guard": "host stop sequence actual",
+          "candidate_commit": "只本地停止",
+          "illegal_error": "`CV::InconsistentFields`"
+        },
+        {
+          "from": "Active",
+          "to": "Disconnected",
+          "member_flow": "`record_disconnect` @ driver/source loss",
+          "guard": "actual disconnect；保旧 epoch/session",
+          "candidate_commit": "仅通知 Application 记录 gap 的输入；不直写 gap",
+          "illegal_error": "`CV::InconsistentFields`"
+        },
+        {
+          "from": "Active",
+          "to": "Stopped",
+          "member_flow": "`stop_local`",
+          "guard": "停止接收并 close local host",
+          "candidate_commit": "不证明外部无效果",
+          "illegal_error": "`CV::InconsistentFields`"
+        },
+        {
+          "from": "Disconnected",
+          "to": "Active",
+          "member_flow": "`record_connected` @ qualified reconnect",
+          "guard": "新/同 epoch actual proof；不得跨 epoch 比较 position",
+          "candidate_commit": "只建立本地连接",
+          "illegal_error": "`CV::WrongKind` / `PE::Stale`"
+        },
+        {
+          "from": "Disconnected",
+          "to": "NotEstablished",
+          "member_flow": "`record_unavailable`",
+          "guard": "actual source/mode/binding 缺口",
+          "candidate_commit": "保 old epoch/session",
+          "illegal_error": "`PE::NotEstablished`"
+        },
+        {
+          "from": "Disconnected",
+          "to": "Stopped",
+          "member_flow": "`stop_local`",
+          "guard": "actual stop",
+          "candidate_commit": "只本地停止",
+          "illegal_error": "`CV::InconsistentFields`"
+        },
+        {
+          "from": "NotEstablished",
+          "to": "Active",
+          "member_flow": "`record_connected`",
+          "guard": "完整新 qualification；不能从配置 bool 推断",
+          "candidate_commit": "只保存 session",
+          "illegal_error": "`PE::NotEstablished` / `CV::MissingRequired`"
+        },
+        {
+          "from": "NotEstablished",
+          "to": "Stopped",
+          "member_flow": "`stop_local`",
+          "guard": "actual stop",
+          "candidate_commit": "只本地停止",
+          "illegal_error": "`CV::InconsistentFields`"
+        }
+      ]
+    },
+    {
+      "machine": "M21",
+      "enum": "WorkerBatchPhase",
+      "states": [
+        "Collected",
+        "Dispatching",
+        "CompletedLocal",
+        "StoppedLocal",
+        "StoppedWithUnknown"
+      ],
+      "pairs": [
+        {
+          "from": "Collected",
+          "to": "Dispatching",
+          "member_flow": "`take_next_plan` @ worker scheduling",
+          "guard": "candidate head current/budget/scope valid；`in_flight=None`；成功后才消费 index 并建立 owned plan",
+          "candidate_commit": "无 IO；不 mint operation/key",
+          "illegal_error": "`CV::InconsistentFields` / `CV::Expired` / `PE::Conflict`"
+        },
+        {
+          "from": "Collected",
+          "to": "CompletedLocal",
+          "member_flow": "`take_next_plan(None)` @ empty bounded batch",
+          "guard": "无候选、无 in-flight；继承unresolved不清，空页不是coverage",
+          "candidate_commit": "只本地 phase；不是无未知证明",
+          "illegal_error": "`CV::InconsistentFields`"
+        },
+        {
+          "from": "Collected",
+          "to": "StoppedLocal",
+          "member_flow": "`stop_local` @ shutdown",
+          "guard": "actual unresolved 集合为空且无 in-flight",
+          "candidate_commit": "只本地停止",
+          "illegal_error": "`CV::UnknownEffect`"
+        },
+        {
+          "from": "Collected",
+          "to": "StoppedWithUnknown",
+          "member_flow": "`stop_local` @ shutdown",
+          "guard": "actual unresolved 或 in-flight 原 op 存在",
+          "candidate_commit": "保原 candidate/operation identity",
+          "illegal_error": "`CV::UnknownEffect`"
+        },
+        {
+          "from": "Dispatching",
+          "to": "Dispatching",
+          "member_flow": "`record_returned`（尚有候选） / `take_next_plan`（后续项） @ worker",
+          "guard": "returned核原in_flight subject/op/context、清在途并合并unresolved；下一take须已清在途、next candidate current/budget valid",
+          "candidate_commit": "append actual summary或换下一owned plan；两个触发各自guard，无跳项/重排",
+          "illegal_error": "`CV::InconsistentFields` / `CV::OutOfScope` / `PE::Conflict`"
+        },
+        {
+          "from": "Dispatching",
+          "to": "CompletedLocal",
+          "member_flow": "`record_returned`（最后actual返回） / `take_next_plan(None)`（已收齐） @ worker",
+          "guard": "actual原returned plan一致、所有候选已消费且无in_flight；unresolved并集仍保留",
+          "candidate_commit": "append bounded safe summary或仅phase；非外部成功/无未知证明",
+          "illegal_error": "`CV::OutOfScope` / `CV::MissingRequired`"
+        },
+        {
+          "from": "Dispatching",
+          "to": "StoppedLocal",
+          "member_flow": "`stop_local` @ shutdown",
+          "guard": "no unresolved and no in-flight effect",
+          "candidate_commit": "只本地停止",
+          "illegal_error": "`CV::UnknownEffect`"
+        },
+        {
+          "from": "Dispatching",
+          "to": "StoppedWithUnknown",
+          "member_flow": "`stop_local` @ shutdown/cancel",
+          "guard": "in-flight 或 actual unresolved 非空",
+          "candidate_commit": "合并 unresolved；不重入队",
+          "illegal_error": "`CV::UnknownEffect`"
+        }
+      ]
+    }
+  ]
+}

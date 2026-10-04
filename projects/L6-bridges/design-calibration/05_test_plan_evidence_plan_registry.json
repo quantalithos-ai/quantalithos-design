@@ -1,0 +1,689 @@
+{
+  "schema_version": 1,
+  "owner": "L6-bridges/design-calibration",
+  "kind": "planned_evidence_mapping",
+  "status": "planned",
+  "evidence": [
+    {
+      "ev_id": "EV-CONTRACT-001",
+      "cut_id": "CUT-BR-SURFACE",
+      "status": "planned",
+      "tc_refs": [
+        "TC-SURFACE-001",
+        "TC-SURFACE-002",
+        "TC-SURFACE-003",
+        "TC-SURFACE-004"
+      ],
+      "ds_refs": [
+        "DS-SURFACE-001"
+      ],
+      "suite_refs": [
+        "SUITE-S",
+        "SUITE-C",
+        "SUITE-D"
+      ],
+      "ac_refs": [
+        "AC-BR-006",
+        "AC-BR-013",
+        "AC-BR-020",
+        "AC-BR-026",
+        "AC-BR-035",
+        "AC-BR-037",
+        "AC-BR-038"
+      ],
+      "veto_refs": [],
+      "required_scope": "local_mechanism",
+      "source": "03§8/15.1/16.3~16.5"
+    },
+    {
+      "ev_id": "EV-CONTRACT-002",
+      "cut_id": "CUT-BR-BIND",
+      "status": "planned",
+      "tc_refs": [
+        "TC-BIND-001",
+        "TC-BIND-002",
+        "TC-BIND-003",
+        "TC-BIND-004"
+      ],
+      "ds_refs": [
+        "DS-BIND-001"
+      ],
+      "suite_refs": [
+        "SUITE-A"
+      ],
+      "ac_refs": [
+        "AC-BR-001",
+        "AC-BR-003",
+        "AC-BR-005",
+        "AC-BR-006",
+        "AC-BR-007",
+        "AC-BR-022"
+      ],
+      "veto_refs": [
+        "VETO-BR-002"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 C01/C02/§9 M01/M02/§15.1"
+    },
+    {
+      "ev_id": "EV-CONTRACT-003",
+      "cut_id": "CUT-BR-MAP",
+      "status": "planned",
+      "tc_refs": [
+        "TC-MAP-001",
+        "TC-MAP-002",
+        "TC-MAP-003",
+        "TC-MAP-004",
+        "TC-MAP-005"
+      ],
+      "ds_refs": [
+        "DS-MAP-001"
+      ],
+      "suite_refs": [
+        "SUITE-A"
+      ],
+      "ac_refs": [
+        "AC-BR-001",
+        "AC-BR-004",
+        "AC-BR-005",
+        "AC-BR-006",
+        "AC-BR-011",
+        "AC-BR-023"
+      ],
+      "veto_refs": [
+        "VETO-BR-001"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 C03/§9 M03~M05/§15.1"
+    },
+    {
+      "ev_id": "EV-CONTRACT-004",
+      "cut_id": "CUT-BR-INBOUND",
+      "status": "planned",
+      "tc_refs": [
+        "TC-INBOUND-001",
+        "TC-INBOUND-002",
+        "TC-INBOUND-003",
+        "TC-INBOUND-004",
+        "TC-INBOUND-005"
+      ],
+      "ds_refs": [
+        "DS-INBOUND-001"
+      ],
+      "suite_refs": [
+        "SUITE-I"
+      ],
+      "ac_refs": [
+        "AC-BR-008",
+        "AC-BR-009",
+        "AC-BR-010",
+        "AC-BR-012",
+        "AC-BR-013",
+        "AC-BR-014"
+      ],
+      "veto_refs": [
+        "VETO-BR-004"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 E01/§9 M06/§15.1"
+    },
+    {
+      "ev_id": "EV-CONTRACT-005",
+      "cut_id": "CUT-BR-CHANGE",
+      "status": "planned",
+      "tc_refs": [
+        "TC-CHANGE-001",
+        "TC-CHANGE-002",
+        "TC-CHANGE-003",
+        "TC-CHANGE-004"
+      ],
+      "ds_refs": [
+        "DS-CHANGE-001"
+      ],
+      "suite_refs": [
+        "SUITE-B"
+      ],
+      "ac_refs": [
+        "AC-BR-004",
+        "AC-BR-011",
+        "AC-BR-012",
+        "AC-BR-019"
+      ],
+      "veto_refs": [
+        "VETO-BR-001"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 E01/C03/§9 M04/M05/M13/M14/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-006",
+      "cut_id": "CUT-BR-PRESENT",
+      "status": "planned",
+      "tc_refs": [
+        "TC-PRESENT-001",
+        "TC-PRESENT-002",
+        "TC-PRESENT-003",
+        "TC-PRESENT-004"
+      ],
+      "ds_refs": [
+        "DS-PRESENT-001"
+      ],
+      "suite_refs": [
+        "SUITE-A"
+      ],
+      "ac_refs": [
+        "AC-BR-015",
+        "AC-BR-016",
+        "AC-BR-019",
+        "AC-BR-021"
+      ],
+      "veto_refs": [
+        "VETO-BR-002",
+        "VETO-BR-003"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 C04/E02/§9 M07/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-007",
+      "cut_id": "CUT-BR-ATTACH",
+      "status": "planned",
+      "tc_refs": [
+        "TC-ATTACH-001",
+        "TC-ATTACH-002",
+        "TC-ATTACH-003",
+        "TC-ATTACH-004"
+      ],
+      "ds_refs": [
+        "DS-ATTACH-001"
+      ],
+      "suite_refs": [
+        "SUITE-A",
+        "SUITE-B"
+      ],
+      "ac_refs": [
+        "AC-BR-015",
+        "AC-BR-017",
+        "AC-BR-020"
+      ],
+      "veto_refs": [
+        "VETO-BR-003"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 C04/E01/§13/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-008",
+      "cut_id": "CUT-BR-DELIVERY",
+      "status": "planned",
+      "tc_refs": [
+        "TC-DELIVERY-001",
+        "TC-DELIVERY-002",
+        "TC-DELIVERY-003",
+        "TC-DELIVERY-004",
+        "TC-DELIVERY-005"
+      ],
+      "ds_refs": [
+        "DS-DELIVERY-001"
+      ],
+      "suite_refs": [
+        "SUITE-C"
+      ],
+      "ac_refs": [
+        "AC-BR-015",
+        "AC-BR-018",
+        "AC-BR-019",
+        "AC-BR-020",
+        "AC-BR-021",
+        "AC-BR-030"
+      ],
+      "veto_refs": [
+        "VETO-BR-004"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 C04/J01/§9 M08/M09/§10.3/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-009",
+      "cut_id": "CUT-BR-CALLBACK",
+      "status": "planned",
+      "tc_refs": [
+        "TC-CALLBACK-001",
+        "TC-CALLBACK-002",
+        "TC-CALLBACK-003",
+        "TC-CALLBACK-004",
+        "TC-CALLBACK-005"
+      ],
+      "ds_refs": [
+        "DS-CALLBACK-001"
+      ],
+      "suite_refs": [
+        "SUITE-A",
+        "SUITE-P"
+      ],
+      "ac_refs": [
+        "AC-BR-014",
+        "AC-BR-022",
+        "AC-BR-023",
+        "AC-BR-024",
+        "AC-BR-025",
+        "AC-BR-026",
+        "AC-BR-027"
+      ],
+      "veto_refs": [
+        "VETO-BR-002",
+        "VETO-BR-004",
+        "VETO-BR-006"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 C05/E03/§9 M10/M11/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-010",
+      "cut_id": "CUT-BR-KEY",
+      "status": "planned",
+      "tc_refs": [
+        "TC-KEY-001",
+        "TC-KEY-002",
+        "TC-KEY-003",
+        "TC-KEY-004",
+        "TC-KEY-005"
+      ],
+      "ds_refs": [
+        "DS-KEY-001"
+      ],
+      "suite_refs": [
+        "SUITE-C"
+      ],
+      "ac_refs": [
+        "AC-BR-003",
+        "AC-BR-007",
+        "AC-BR-009",
+        "AC-BR-012",
+        "AC-BR-018",
+        "AC-BR-023",
+        "AC-BR-026",
+        "AC-BR-027",
+        "AC-BR-029",
+        "AC-BR-031",
+        "AC-BR-034",
+        "AC-BR-035"
+      ],
+      "veto_refs": [
+        "VETO-BR-005"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§11/§9 M12/§8 J05/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-011",
+      "cut_id": "CUT-BR-CURSOR",
+      "status": "planned",
+      "tc_refs": [
+        "TC-CURSOR-001",
+        "TC-CURSOR-002",
+        "TC-CURSOR-003",
+        "TC-CURSOR-004"
+      ],
+      "ds_refs": [
+        "DS-CURSOR-001"
+      ],
+      "suite_refs": [
+        "SUITE-C"
+      ],
+      "ac_refs": [
+        "AC-BR-012",
+        "AC-BR-028",
+        "AC-BR-029",
+        "AC-BR-031",
+        "AC-BR-034",
+        "AC-BR-035"
+      ],
+      "veto_refs": [
+        "VETO-BR-005"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 J03/§9 M13/M14/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-012",
+      "cut_id": "CUT-BR-RATE",
+      "status": "planned",
+      "tc_refs": [
+        "TC-RATE-001",
+        "TC-RATE-002",
+        "TC-RATE-003",
+        "TC-RATE-004",
+        "TC-RATE-005"
+      ],
+      "ds_refs": [
+        "DS-RATE-001"
+      ],
+      "suite_refs": [
+        "SUITE-C",
+        "SUITE-B"
+      ],
+      "ac_refs": [
+        "AC-BR-030",
+        "AC-BR-034",
+        "AC-BR-036"
+      ],
+      "veto_refs": [
+        "VETO-BR-005"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 J01/J02/§9 M15/§11~12/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-013",
+      "cut_id": "CUT-BR-RECOVERY",
+      "status": "planned",
+      "tc_refs": [
+        "TC-RECOVERY-001",
+        "TC-RECOVERY-002",
+        "TC-RECOVERY-003",
+        "TC-RECOVERY-004",
+        "TC-RECOVERY-005"
+      ],
+      "ds_refs": [
+        "DS-RECOVERY-001"
+      ],
+      "suite_refs": [
+        "SUITE-C"
+      ],
+      "ac_refs": [
+        "AC-BR-021",
+        "AC-BR-028",
+        "AC-BR-031",
+        "AC-BR-034",
+        "AC-BR-036"
+      ],
+      "veto_refs": [
+        "VETO-BR-005"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 C06/J02/J03/J04/§9 M16/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-014",
+      "cut_id": "CUT-BR-LOCAL",
+      "status": "planned",
+      "tc_refs": [
+        "TC-LOCAL-001",
+        "TC-LOCAL-002",
+        "TC-LOCAL-003",
+        "TC-LOCAL-004",
+        "TC-LOCAL-005",
+        "TC-LOCAL-006"
+      ],
+      "ds_refs": [
+        "DS-LOCAL-001"
+      ],
+      "suite_refs": [
+        "SUITE-L",
+        "SUITE-REAL"
+      ],
+      "ac_refs": [
+        "AC-BR-007",
+        "AC-BR-018"
+      ],
+      "veto_refs": [],
+      "required_scope": "mixed",
+      "source": "03§10.1~10.4/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-015",
+      "cut_id": "CUT-BR-READ",
+      "status": "planned",
+      "tc_refs": [
+        "TC-READ-001",
+        "TC-READ-002",
+        "TC-READ-003",
+        "TC-READ-004"
+      ],
+      "ds_refs": [
+        "DS-READ-001"
+      ],
+      "suite_refs": [
+        "SUITE-R"
+      ],
+      "ac_refs": [
+        "AC-BR-026",
+        "AC-BR-033",
+        "AC-BR-034",
+        "AC-BR-036"
+      ],
+      "veto_refs": [
+        "VETO-BR-005"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 Q01~Q04/§16.4/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-016",
+      "cut_id": "CUT-BR-AUDIT",
+      "status": "planned",
+      "tc_refs": [
+        "TC-AUDIT-001",
+        "TC-AUDIT-002",
+        "TC-AUDIT-003",
+        "TC-AUDIT-004",
+        "TC-AUDIT-005"
+      ],
+      "ds_refs": [
+        "DS-AUDIT-001"
+      ],
+      "suite_refs": [
+        "SUITE-C",
+        "SUITE-A"
+      ],
+      "ac_refs": [
+        "AC-BR-028",
+        "AC-BR-032",
+        "AC-BR-034",
+        "AC-BR-035",
+        "AC-BR-036"
+      ],
+      "veto_refs": [
+        "VETO-BR-004"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§8 E04/O01/J04/§9 M17/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-017",
+      "cut_id": "CUT-BR-CONFIG",
+      "status": "planned",
+      "tc_refs": [
+        "TC-CONFIG-001",
+        "TC-CONFIG-002",
+        "TC-CONFIG-003",
+        "TC-CONFIG-004",
+        "TC-CONFIG-005",
+        "TC-CONFIG-006",
+        "TC-CONFIG-007",
+        "TC-CONFIG-008",
+        "TC-CONFIG-009",
+        "TC-CONFIG-010",
+        "TC-CONFIG-011",
+        "TC-CONFIG-012"
+      ],
+      "ds_refs": [
+        "DS-CONFIG-001"
+      ],
+      "suite_refs": [
+        "SUITE-B",
+        "SUITE-I",
+        "SUITE-A",
+        "SUITE-P",
+        "SUITE-C",
+        "SUITE-W",
+        "SUITE-J"
+      ],
+      "ac_refs": [
+        "AC-BR-001",
+        "AC-BR-002",
+        "AC-BR-006"
+      ],
+      "veto_refs": [],
+      "required_scope": "local_mechanism",
+      "source": "04§7/9/11/12.2；03§13"
+    },
+    {
+      "ev_id": "EV-CONTRACT-018",
+      "cut_id": "CUT-BR-PRIVATE",
+      "status": "planned",
+      "tc_refs": [
+        "TC-PRIVATE-001",
+        "TC-PRIVATE-002",
+        "TC-PRIVATE-003",
+        "TC-PRIVATE-004",
+        "TC-PRIVATE-005"
+      ],
+      "ds_refs": [
+        "DS-PRIVATE-001"
+      ],
+      "suite_refs": [
+        "SUITE-P"
+      ],
+      "ac_refs": [
+        "AC-BR-002",
+        "AC-BR-005",
+        "AC-BR-013",
+        "AC-BR-016",
+        "AC-BR-017",
+        "AC-BR-020",
+        "AC-BR-025",
+        "AC-BR-037",
+        "AC-BR-038"
+      ],
+      "veto_refs": [
+        "VETO-BR-003"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§13~15；04§8"
+    },
+    {
+      "ev_id": "EV-CONTRACT-019",
+      "cut_id": "CUT-BR-ENTRY",
+      "status": "planned",
+      "tc_refs": [
+        "TC-ENTRY-001",
+        "TC-ENTRY-002",
+        "TC-ENTRY-003",
+        "TC-ENTRY-004",
+        "TC-ENTRY-005",
+        "TC-ENTRY-006",
+        "TC-ENTRY-007"
+      ],
+      "ds_refs": [
+        "DS-ENTRY-001"
+      ],
+      "suite_refs": [
+        "SUITE-I",
+        "SUITE-W",
+        "SUITE-J"
+      ],
+      "ac_refs": [
+        "AC-BR-008",
+        "AC-BR-014",
+        "AC-BR-027"
+      ],
+      "veto_refs": [],
+      "required_scope": "local_mechanism",
+      "source": "03§7外层/§8 J/§9 M18~M21/§15；04§12 CFG-CUT-011"
+    },
+    {
+      "ev_id": "EV-CONTRACT-020",
+      "cut_id": "CUT-BR-STATE",
+      "status": "planned",
+      "tc_refs": [
+        "TC-STATE-001",
+        "TC-STATE-002",
+        "TC-STATE-003",
+        "TC-STATE-004",
+        "TC-STATE-005",
+        "TC-STATE-006"
+      ],
+      "ds_refs": [
+        "DS-STATE-001"
+      ],
+      "suite_refs": [
+        "SUITE-D",
+        "SUITE-I",
+        "SUITE-J",
+        "SUITE-W"
+      ],
+      "ac_refs": [
+        "AC-BR-034",
+        "AC-BR-038"
+      ],
+      "veto_refs": [],
+      "required_scope": "local_mechanism",
+      "source": "03§9/§16.6/§15.2"
+    },
+    {
+      "ev_id": "EV-CONTRACT-021",
+      "cut_id": "CUT-BR-EVIDENCE",
+      "status": "planned",
+      "tc_refs": [
+        "TC-EVIDENCE-001",
+        "TC-EVIDENCE-002",
+        "TC-EVIDENCE-003",
+        "TC-EVIDENCE-004",
+        "TC-EVIDENCE-005"
+      ],
+      "ds_refs": [
+        "DS-EVIDENCE-001"
+      ],
+      "suite_refs": [
+        "SUITE-TOOLS"
+      ],
+      "ac_refs": [
+        "AC-BR-032",
+        "AC-BR-037",
+        "AC-BR-038"
+      ],
+      "veto_refs": [
+        "VETO-BR-003",
+        "VETO-BR-004"
+      ],
+      "required_scope": "local_mechanism",
+      "source": "03§15脚本边界；00 AC037/038；测试规范§4.6/5.13"
+    },
+    {
+      "ev_id": "EV-REAL-001",
+      "cut_id": "CUT-BR-REAL",
+      "status": "planned",
+      "tc_refs": [
+        "TC-REAL-001",
+        "TC-REAL-002",
+        "TC-REAL-003",
+        "TC-REAL-004",
+        "TC-REAL-005",
+        "TC-REAL-006",
+        "TC-REAL-007"
+      ],
+      "ds_refs": [
+        "DS-REAL-001"
+      ],
+      "suite_refs": [
+        "SUITE-REAL"
+      ],
+      "ac_refs": [
+        "AC-BR-002",
+        "AC-BR-008",
+        "AC-BR-010",
+        "AC-BR-014",
+        "AC-BR-024",
+        "AC-BR-038"
+      ],
+      "veto_refs": [
+        "VETO-BR-001",
+        "VETO-BR-006"
+      ],
+      "required_scope": "real_seam",
+      "source": "03§14~17；04§14/平台核验附录"
+    }
+  ]
+}
